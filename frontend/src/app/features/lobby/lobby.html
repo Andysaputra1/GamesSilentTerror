@@ -296,7 +296,7 @@
     <button class="back-btn" routerLink="/main">◀ BACK</button>
     <h2 class="lobby-title">SAFEHOUSE LOBBY</h2>
     <div class="user-profile">
-      <span class="username">Civilian_01</span>
+      <span class="username">{{ username }}</span>
       <div class="avatar-circle">🕵️</div>
     </div>
   </header>
@@ -342,7 +342,7 @@
         <div class="player-grid">
           <!-- Slot Terisi -->
           <div class="player-slot joined">
-            <span class="slot-icon">👤</span> Civilian_01 (You)
+            <span class="slot-icon">👤</span> {{ username }} (You)
           </div>
           <div class="player-slot joined">
             <span class="slot-icon">👤</span> Detective_X
@@ -371,7 +371,7 @@
   <!-- Bottom Area: Tombol Start Game -->
   <footer class="bottom-row">
     <!-- Router link diarahkan ke halaman game -->
-    <button class="wood-panel-btn start-game-btn" routerLink="/game">
+    <button class="wood-panel-btn start-game-btn" type="button" (click)="enterGame()">
       <span class="btn-title">BEGIN THE HEIST</span>
       <span class="btn-desc">Lock the doors. The silence begins.</span>
     </button>

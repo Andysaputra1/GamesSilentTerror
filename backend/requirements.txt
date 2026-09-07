@@ -1,0 +1,16 @@
+fastapi
+uvicorn
+pydantic
+pydantic-settings
+SQLAlchemy
+PyMySQL
+scikit-fuzzy
+numpy
+networkx
+scikit-learn==1.9.0
+python-dotenv
+thefuzz
+openai
+httpx
+joblib 
+python-socketio
