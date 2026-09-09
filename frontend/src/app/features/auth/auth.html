@@ -3,14 +3,14 @@
   <div class="auth-glow auth-glow--red"></div>
   <div class="auth-grid"></div>
 
-  <section class="auth-layout" aria-label="Shadow Heist login">
+  <section class="auth-layout" aria-label="Silent Terror login">
     <aside class="briefing-panel" aria-label="Mission briefing">
       <div class="brand-lockup">
         <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
-        <span class="brand-code">SH//H</span>
+        <span class="brand-code">ST//01</span>
       </div>
       <p class="eyebrow">SECURE INFILTRATION NETWORK</p>
-      <h1>SHADOW<br><em>HEIST</em></h1>
+      <h1>SILENT<br><em>TERROR</em></h1>
       <p class="briefing-copy">Masuk ke ruang operasi. Baca gerak-gerik, jaga alibi, dan jangan biarkan bayanganmu memberi terlalu banyak jawaban.</p>
       <div class="briefing-meta"><span><i></i> LIVE OPERATION</span><span>NODE 08 / JAKARTA</span></div>
     </aside>
@@ -48,12 +48,12 @@
         }
 
         <button class="submit-button" type="submit" [disabled]="isSubmitting">
-          @if (isSubmitting) { <span class="button-spinner" aria-hidden="true"></span> VERIFYING... } @else { ENTER THE HEIST <span aria-hidden="true">→</span> }
+          @if (isSubmitting) { <span class="button-spinner" aria-hidden="true"></span> VERIFYING... } @else { MASUK KE PERMAINAN <span aria-hidden="true">→</span> }
         </button>
       </form>
 
       <div class="demo-access"><div><span>DEVELOPMENT ACCESS</span><strong>user1 / user132</strong></div><button type="button" (click)="useDevelopmentCredentials()" [disabled]="isSubmitting">USE</button></div>
-      <footer class="card-footer"><span>SESSION IS PROTECTED</span><span>v0.1.0 // SHADOW PROTOCOL</span></footer>
+      <footer class="card-footer"><span>SESSION IS PROTECTED</span><span>v0.1.0 // SILENT TERROR</span></footer>
     </section>
   </section>
 </main>

@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from api.dependencies import require_authenticated_user
+from controller.middleware.auth import require_authenticated_user
 from schemas.auth import AuthenticatedUserResponse, LoginRequest, LoginResponse
 from services.auth_service import (
     AuthenticatedUser,
@@ -18,6 +18,7 @@ _bearer_scheme = HTTPBearer(auto_error=False)
 
 
 @router.post("/login", response_model=LoginResponse)
+# CONTROLLER LOGIN: minta service memeriksa akun dan membuat sesi; kembalikan token atau error HTTP.
 def login(request: LoginRequest) -> LoginResponse:
     """Create a short-lived opaque session after validating credentials."""
     try:
@@ -37,6 +38,7 @@ def login(request: LoginRequest) -> LoginResponse:
 
 
 @router.get("/me", response_model=AuthenticatedUserResponse)
+# CONTROLLER PROFIL: kembalikan username dan nama tampilan pengguna yang sudah lolos autentikasi.
 def current_user(
     user: AuthenticatedUser = Depends(require_authenticated_user),
 ) -> AuthenticatedUserResponse:
@@ -44,6 +46,7 @@ def current_user(
 
 
 @router.post("/logout", status_code=204)
+# CONTROLLER LOGOUT: cabut sesi bearer yang diberikan; error database diterjemahkan menjadi HTTP 503.
 def logout(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
 ) -> None:

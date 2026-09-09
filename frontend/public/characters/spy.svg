@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 340" role="img" aria-label="Spy, pelindung warga">
+  <ellipse cx="130" cy="320" rx="70" ry="12" fill="#201d19" opacity=".12"/>
+  <path d="M88 230h36v69H84zm49 0h37l4 69h-39" fill="#c9b28b" stroke="#302820" stroke-width="3"/>
+  <path d="M83 294h42v17H76q-5-9 7-17m57 0h38l9 17h-48" fill="#f4eee0" stroke="#302820" stroke-width="3"/>
+  <path d="M81 157q-18 11-24 77l21 5 17-49m83-33q20 11 25 77l-21 5-15-49" fill="#92acbd" stroke="#302820" stroke-width="3"/>
+  <path d="M61 232q-5 27 9 27 10-3 9-22m103 0q-2 22 9 22 15-2 10-27" fill="#e7ae88" stroke="#302820" stroke-width="3"/>
+  <path d="M88 152h82l12 89H78z" fill="#92acbd" stroke="#302820" stroke-width="3"/>
+  <path d="m108 151 22 21 22-21-8-18h-28z" fill="#e7ae88" stroke="#302820" stroke-width="3"/>
+  <path d="m106 150-12 16 24 15 12-9 11 9 23-15-12-16" fill="#b7c9d2" stroke="#302820" stroke-width="3"/>
+  <circle cx="130" cy="187" r="2" fill="#302820"/>
+  <ellipse cx="75" cy="103" rx="15" ry="21" fill="#e7ae88" stroke="#302820" stroke-width="3"/>
+  <ellipse cx="185" cy="103" rx="15" ry="21" fill="#e7ae88" stroke="#302820" stroke-width="3"/>
+  <path d="M77 60q52-39 106 0v49q-5 47-53 47t-53-47z" fill="#efbc99" stroke="#302820" stroke-width="3"/>
+  <path d="M75 84Q48 20 121 18q62-16 72 44l-6 33-17-38q-33 29-68 13l-23 21z" fill="#302d2a"/>
+  <path d="M78 87q20-10 45 0l5 9h6l5-9q25-10 44 0l-5 28q-29 15-41-9h-12q-13 24-41 9z" fill="#282c30" stroke="#151719" stroke-width="4"/>
+  <path d="m92 91 13 2m43-2 13 2" stroke="#8e9ea4" stroke-width="4" stroke-linecap="round"/>
+  <path d="M119 131q12 8 25-1" fill="none" stroke="#aa634c" stroke-width="3" stroke-linecap="round"/>
+</svg>

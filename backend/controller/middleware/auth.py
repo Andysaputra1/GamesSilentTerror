@@ -14,6 +14,7 @@ from services.auth_service import (
 _bearer_scheme = HTTPBearer(auto_error=False)
 
 
+# DEPENDENCY AUTH: validasi bearer token lewat service sebelum endpoint dijalankan; gagal menjadi HTTP 401/503.
 def require_authenticated_user(
     credentials: HTTPAuthorizationCredentials | None = Security(_bearer_scheme),
 ) -> AuthenticatedUser:

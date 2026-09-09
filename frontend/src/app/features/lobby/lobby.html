@@ -1,380 +1,119 @@
-<style>
-    :host {
-  display: block;
-  width: 100vw;
-  height: 100vh;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  overflow: hidden;
-}
-
-/* Latar Belakang Kayu (Konsisten dengan Main Menu) */
-.game-container {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  background-color: #211510;
-  background-image: repeating-linear-gradient(to right, #211510 0px, #1a100c 20px, #211510 40px);
-  color: #f4efe4;
-  box-shadow: inset 0 0 150px rgba(0, 0, 0, 0.9);
-}
-
-/* --- TOP ROW --- */
-.top-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px 40px;
-  height: 10vh;
-}
-
-.lobby-title {
-  font-size: 2rem;
-  letter-spacing: 4px;
-  margin: 0;
-  color: #f4efe4;
-  text-shadow: 2px 2px 0px #8b0000;
-  font-weight: 900;
-}
-
-.back-btn {
-  background: #1c110d;
-  border: 2px solid #0a0a0a;
-  color: #f4efe4;
-  padding: 8px 16px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: bold;
-  box-shadow: 2px 2px 5px rgba(0,0,0,0.5);
-  transition: background 0.2s;
-}
-
-.back-btn:hover {
-  background: #8b0000;
-}
-
-.user-profile {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 6px 16px;
-  background: #2a1b14;
-  border-radius: 8px;
-  border: 2px solid #000;
-  box-shadow: 2px 2px 5px rgba(0,0,0,0.5);
-}
-
-.avatar-circle {
-  font-size: 1.2rem;
-  background: #f4efe4;
-  border-radius: 50%;
-  width: 35px;
-  height: 35px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid #000;
-}
-
-/* --- MIDDLE ROW (PANEL LOBBY) --- */
-.middle-row {
-  display: flex;
-  flex: 1;
-  justify-content: center;
-  align-items: center;
-  gap: 40px;
-  padding: 0 5%;
-}
-
-/* Desain Panel mirip Kartu Karakter */
-.lobby-panel {
-  background-color: #f4efe4; 
-  border: 12px solid #0a0a0a; 
-  border-radius: 12px;
-  height: 65vh;
-  box-shadow: 15px 20px 30px rgba(0,0,0,0.8);
-  padding: 6px; 
-  color: #0a0a0a;
-}
-
-.config-panel {
-  flex: 1;
-  max-width: 400px;
-}
-
-.roster-panel {
-  flex: 1.5;
-  max-width: 500px;
-}
-
-.panel-inner-border {
-  border: 2px solid #0a0a0a;
-  border-radius: 6px;
-  height: 100%;
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-}
-
-.panel-heading {
-  font-family: 'Arial Narrow', Arial, sans-serif;
-  font-size: 1.5rem;
-  font-weight: bold;
-  letter-spacing: 1px;
-  border-bottom: 2px dotted #0a0a0a;
-  padding-bottom: 8px;
-  margin-top: 0;
-  margin-bottom: 15px;
-}
-
-.mt-4 {
-  margin-top: 30px;
-}
-
-/* --- KODE INVITE --- */
-.code-box {
-  display: flex;
-  align-items: center;
-  background: #e5dfd1;
-  border: 2px solid #0a0a0a;
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.invite-code {
-  flex: 1;
-  font-size: 1.8rem;
-  font-family: monospace;
-  font-weight: bold;
-  text-align: center;
-  letter-spacing: 3px;
-  padding: 10px;
-}
-
-.copy-btn {
-  background: #0a0a0a;
-  color: #f4efe4;
-  border: none;
-  padding: 0 20px;
-  height: 100%;
-  font-size: 1.2rem;
-  cursor: pointer;
-}
-
-.copy-btn:hover {
-  background: #8b0000;
-}
-
-.helper-text {
-  font-size: 0.85rem;
-  font-style: italic;
-  margin-top: 5px;
-  opacity: 0.8;
-}
-
-/* --- PLAYER COUNT SETTING --- */
-.player-count-selector {
-  display: flex;
-  gap: 10px;
-  justify-content: space-between;
-}
-
-.count-btn {
-  flex: 1;
-  background: transparent;
-  border: 2px solid #0a0a0a;
-  padding: 10px 0;
-  font-size: 1.2rem;
-  font-weight: bold;
-  cursor: pointer;
-  border-radius: 4px;
-  transition: all 0.2s;
-}
-
-.count-btn:hover {
-  background: #e5dfd1;
-}
-
-.count-btn.active {
-  background: #8b0000;
-  color: #f4efe4;
-  border-color: #8b0000;
-}
-
-.role-distribution {
-  margin-top: 20px;
-  padding: 15px;
-  background: rgba(0,0,0,0.05);
-  border-radius: 6px;
-  font-size: 0.9rem;
-}
-
-.role-distribution p {
-  margin: 5px 0;
-}
-
-/* --- ROSTER / DAFTAR PEMAIN --- */
-.player-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  overflow-y: auto;
-  padding-right: 5px;
-}
-
-.player-slot {
-  border: 2px solid #0a0a0a;
-  padding: 12px 15px;
-  border-radius: 6px;
-  font-size: 1.1rem;
-  font-weight: bold;
-  display: flex;
-  align-items: center;
-  gap: 15px;
-}
-
-.player-slot.joined {
-  background: #e5dfd1;
-  color: #0a0a0a;
-}
-
-.player-slot.empty {
-  background: transparent;
-  border-style: dashed;
-  color: #666;
-  font-weight: normal;
-  font-style: italic;
-}
-
-.slot-icon {
-  font-size: 1.3rem;
-}
-
-/* --- BOTTOM ROW (TOMBOL START) --- */
-.bottom-row {
-  height: 15vh;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.start-game-btn {
-  background: #8b0000;
-  border: 4px solid #0a0a0a;
-  color: #f4efe4;
-  padding: 15px 50px;
-  border-radius: 8px;
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  box-shadow: 5px 5px 15px rgba(0,0,0,0.8);
-  transition: transform 0.2s;
-}
-
-.start-game-btn:hover {
-  transform: scale(1.05);
-  background: #a00000;
-}
-
-.start-game-btn .btn-title {
-  font-size: 1.8rem;
-  font-weight: 900;
-  letter-spacing: 2px;
-}
-
-.start-game-btn .btn-desc {
-  font-size: 0.9rem;
-  opacity: 0.8;
-  margin-top: 5px;
-}
-</style>
-
-<div class="game-container">
-  
-  <!-- Top Bar: Tombol Back & Profil -->
-  <header class="top-row">
-    <button class="back-btn" routerLink="/main">◀ BACK</button>
-    <h2 class="lobby-title">SAFEHOUSE LOBBY</h2>
-    <div class="user-profile">
-      <span class="username">{{ username }}</span>
-      <div class="avatar-circle">🕵️</div>
-    </div>
-  </header>
-
-  <!-- Middle Area: Panel Kiri (Setting) & Kanan (Pemain) -->
-  <main class="middle-row lobby-layout">
-    
-    <!-- PANEL KIRI: Kode Invite & Setting -->
-    <div class="lobby-panel config-panel">
-      <div class="panel-inner-border">
-        
-        <h3 class="panel-heading">INVITE CODE</h3>
-        <div class="code-box">
-          <!-- Hardcode kode invite -->
-          <span class="invite-code">SHDW-9X2F</span>
-          <button class="copy-btn" title="Copy Code">📋</button>
-        </div>
-        <p class="helper-text">Share this code with other players.</p>
-
-        <h3 class="panel-heading mt-4">MAX PLAYERS</h3>
-        <div class="player-count-selector">
-          <!-- Harcode status aktif di angka 6 -->
-          <button class="count-btn">4</button>
-          <button class="count-btn">5</button>
-          <button class="count-btn active">6</button>
-          <button class="count-btn">7</button>
-          <button class="count-btn">8</button>
-        </div>
-        
-        <div class="role-distribution">
-          <p><strong>Estimated Roles (6 Players):</strong></p>
-          <p>1 Hitman, 1 Spy, 1 Stalker, 3 Civilians</p>
-        </div>
-
+<main class="operation-shell">
+  <div class="operation-content">
+    <header class="operation-header">
+      <a class="operation-brand" routerLink="/main"><span>♧</span> SILENT TERROR</a>
+      <div class="operation-profile">
+        <i>◈</i><b>{{ username }}</b>
       </div>
-    </div>
-
-    <!-- PANEL KANAN: Daftar Pemain (Roster) -->
-    <div class="lobby-panel roster-panel">
-      <div class="panel-inner-border">
-        <h3 class="panel-heading">ROSTER (4/6)</h3>
-        
-        <div class="player-grid">
-          <!-- Slot Terisi -->
-          <div class="player-slot joined">
-            <span class="slot-icon">👤</span> {{ username }} (You)
+    </header>
+    <section class="lobby-heading">
+      <a class="operation-secondary" routerLink="/main">← Main page</a>
+      <p class="operation-label">THE SAFEHOUSE / LOBBY</p>
+      <h1 class="operation-title">Ambil tempatmu.</h1>
+      <p class="operation-copy">Buat ruangan, bagikan kodenya, atau gabung ke meja temanmu.</p>
+    </section>
+    <section class="lobby-layout">
+      <article class="briefing-card">
+        <p class="operation-label">YOUR PRIVATE TABLE</p>
+        <h2>Satu kode.<br />Satu ruangan.</h2>
+        @if (room) {
+          <div class="room-code">
+            <span>KODE RUANGAN</span><strong>{{ room.code }}</strong
+            ><button class="operation-secondary" (click)="copyCode()">
+              {{ copied ? 'Tersalin' : 'Salin kode' }}
+            </button>
           </div>
-          <div class="player-slot joined">
-            <span class="slot-icon">👤</span> Detective_X
-          </div>
-          <div class="player-slot joined">
-            <span class="slot-icon">👤</span> Shadow_99
-          </div>
-          <div class="player-slot joined">
-            <span class="slot-icon">👤</span> Player_Two
-          </div>
-          
-          <!-- Slot Kosong -->
-          <div class="player-slot empty">
-            <span class="slot-icon">⏳</span> Waiting for player...
-          </div>
-          <div class="player-slot empty">
-            <span class="slot-icon">⏳</span> Waiting for player...
-          </div>
+          <p>Bagikan kode ini kepada teman. Mereka harus login terlebih dahulu untuk bergabung.</p>
+        } @else {
+          <p>Mulai meja baru, lalu tentukan apakah NOX ikut bermain.</p>
+          <button class="operation-primary" (click)="createRoom()" [disabled]="busy">
+            BUAT RUANGAN <span>+</span>
+          </button>
+        }
+        <div class="join-room">
+          <label for="room-code">PUNYA KODE RUANGAN?</label>
+          <form (ngSubmit)="joinRoom()">
+            <input
+              id="room-code"
+              name="roomCode"
+              [(ngModel)]="joinCode"
+              maxlength="6"
+              placeholder="Contoh: A3F921"
+              autocomplete="off"
+              [disabled]="busy"
+            /><button class="operation-secondary" type="submit" [disabled]="busy">Gabung</button>
+          </form>
         </div>
-
-      </div>
-    </div>
-
-  </main>
-
-  <!-- Bottom Area: Tombol Start Game -->
-  <footer class="bottom-row">
-    <!-- Router link diarahkan ke halaman game -->
-    <button class="wood-panel-btn start-game-btn" type="button" (click)="enterGame()">
-      <span class="btn-title">BEGIN THE HEIST</span>
-      <span class="btn-desc">Lock the doors. The silence begins.</span>
-    </button>
-  </footer>
-
-</div>
+        @if (error) {
+          <p class="room-error" role="alert">{{ error }}</p>
+        }
+        <p class="entry-note">Ruangan aktif tersedia selama server berjalan.</p>
+      </article>
+      <article class="roster-card">
+        <div class="roster-heading">
+          <h2>At the table</h2>
+          <span>{{ room ? room.members.length : 0 }} / 6 PEMAIN</span>
+        </div>
+        @if (room) {
+          @for (member of room.members; track member) {
+            <div class="player-row">
+              <span class="player-avatar">◈</span>
+              <div>
+                <b>{{ member }}</b
+                ><small>{{ member === room.owner ? 'PEMBUAT RUANGAN' : 'PEMAIN' }}</small>
+              </div>
+              @if (member === username) {
+                <span class="player-tag">YOU</span>
+              }
+            </div>
+          }
+          @if (room.bot_enabled) {
+            <div class="player-row">
+              <span class="player-avatar bot-avatar">◆</span>
+              <div><b>NOX</b><small>BOT / IDENTITAS TERSEMBUNYI</small></div>
+              <span class="player-tag">BOT</span>
+            </div>
+          }
+          <div class="bot-control">
+            <div>
+              <b>Tambahkan bot NOX</b>
+              <p>Teman bicara saat latihan. Tanpa bot, chat hanya antar pemain.</p>
+            </div>
+            <button
+              class="operation-secondary"
+              [disabled]="busy || room.owner !== username"
+              [attr.aria-pressed]="room.bot_enabled"
+              (click)="toggleBot()"
+            >
+              {{ room.bot_enabled ? 'Hapus bot' : '+ Bot' }}
+            </button>
+          </div>
+          @if (room.owner !== username) {
+            <p class="entry-note">Bot diatur oleh pembuat ruangan.</p>
+          }
+          <button
+            class="operation-primary start-game-btn"
+            type="button"
+            (click)="enterGame()"
+            [disabled]="busy"
+          >
+            MULAI DISKUSI <span>↗</span>
+          </button>
+          <p class="entry-note">
+            Masuk ke diskusi. Aksi malam dan voting belum tersedia pada versi ini.
+          </p>
+        } @else {
+          <div class="empty-table">
+            <span>♧</span>
+            <h3>Mejamu masih kosong.</h3>
+            <p>Buat atau gabung ke ruangan untuk melihat pemain dan menambahkan bot.</p>
+          </div>
+        }
+      </article>
+    </section>
+    <footer class="operation-footer">
+      <span>SILENT TERROR / ZERO ECONOMY</span
+      ><span>Hostage kehilangan chat dan voting—tanpa pengumuman target.</span>
+    </footer>
+  </div>
+</main>

@@ -1,307 +1,75 @@
-<style>
-html, body {
-  margin: 0;
-  padding: 0;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  background-color: #211510; 
-}
-
-:host {
-  display: block;
-  width: 100vw;
-  height: 100vh;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  overflow: hidden;
-}
-
-/* Container Utama - Latar Belakang Meja Kayu Gelap */
-.game-container {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  width: 100vw;
-  /* Membuat tekstur kayu gelap buatan menggunakan gradient */
-  background-color: #211510;
-  background-image: repeating-linear-gradient(
-    to right,
-    #211510 0px,
-    #1a100c 20px,
-    #211510 40px
-  );
-  color: #f4efe4;
-  overflow: hidden;
-  /* Efek gelap (vignette) di pinggir layar agar fokus ke tengah */
-  box-shadow: inset 0 0 150px rgba(0, 0, 0, 0.9);
-}
-
-/* --- BARIS 1: Top Row --- */
-.top-row {
-  display: flex;
-  justify-content: flex-end;
-  padding: 20px 40px;
-  height: 10vh;
-}
-
-.user-profile {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  cursor: pointer;
-  padding: 6px 16px;
-  /* Desain plat kayu kecil untuk profil */
-  background: #2a1b14;
-  border-radius: 8px;
-  border: 2px solid #000;
-  box-shadow: 2px 2px 5px rgba(0,0,0,0.5);
-  transition: transform 0.2s ease;
-}
-
-.user-profile:hover {
-  transform: translateY(-2px);
-  background: #36241a;
-}
-
-.avatar-circle {
-  font-size: 1.2rem;
-  background: #f4efe4;
-  border-radius: 50%;
-  width: 35px;
-  height: 35px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid #000;
-}
-
-.username {
-  font-weight: 600;
-  letter-spacing: 1px;
-  color: #f4efe4;
-}
-
-/* --- BARIS 2: Middle Row --- */
-.middle-row {
-  display: flex;
-  flex: 1;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0 8%;
-}
-
-.side-col {
-  flex: 1;
-  display: flex;
-  justify-content: center;
-}
-
-.center-col {
-  flex: 1.5;
-  display: flex;
-  justify-content: center;
-}
-
-/* Tombol Kiri & Kanan (Desain Papan Kayu / Panel Gelap) */
-.wood-panel-btn {
-  background: #1c110d;
-  border: 4px solid #000;
-  color: #f4efe4;
-  padding: 20px 30px;
-  border-radius: 10px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 5px 5px 15px rgba(0,0,0,0.8);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  width: 80%;
-  max-width: 280px;
-}
-
-.wood-panel-btn:hover {
-  transform: scale(1.05);
-  background: #2a1913;
-  border-color: #8b0000; /* Sentuhan merah darah (Hitman) saat dihover */
-}
-
-.btn-title {
-  display: block;
-  font-size: 1.5rem;
-  font-weight: 900;
-  letter-spacing: 2px;
-  margin-top: 10px;
-}
-
-.btn-desc {
-  display: block;
-  font-size: 0.85rem;
-  opacity: 0.7;
-  letter-spacing: 1px;
-  margin-top: 8px;
-}
-
-.icon-box {
-  font-size: 3.5rem;
-}
-
-/* --- DESAIN KARTU TENGAH (Sesuai Konsep Gambar) --- */
-.playing-card {
-  background-color: #f4efe4; /* Warna cream kertas */
-  border: 14px solid #0a0a0a; /* Border hitam tebal luar */
-  border-radius: 12px;
-  width: 320px;
-  height: 460px;
-  padding: 8px; /* Jarak antara border tebal luar dan garis tipis dalam */
-  box-shadow: 15px 20px 30px rgba(0,0,0,0.8);
-  position: relative;
-  transition: transform 0.3s ease;
-}
-
-.playing-card:hover {
-  transform: translateY(-10px);
-}
-
-.card-inner-border {
-  border: 2px solid #0a0a0a; /* Garis tipis di bagian dalam */
-  border-radius: 8px;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: space-between;
-  padding: 20px 10px;
-}
-
-.card-role-title {
-  font-family: 'Arial Narrow', Arial, sans-serif; /* Mirip font di gambar */
-  font-size: 3rem;
-  color: #0a0a0a;
-  font-weight: bold;
-  letter-spacing: 2px;
-  margin: 0;
-  text-transform: uppercase;
-}
-
-.character-wrapper {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  padding: 10px 0;
-}
-
-.center-character {
-  max-width: 90%;
-  max-height: 250px;
-  object-fit: contain;
-  /* Memberikan sedikit efek bayangan pada karakter agar tidak flat */
-  filter: drop-shadow(0px 5px 5px rgba(0,0,0,0.2)); 
-}
-
-.card-action-box {
-  border-top: 2px dotted #0a0a0a; /* Meniru hiasan titik-titik di bawah */
-  width: 80%;
-  padding-top: 15px;
-}
-
-.card-action-text {
-  color: #0a0a0a;
-  font-weight: 800;
-  text-align: center;
-  font-size: 1.1rem;
-  letter-spacing: 1px;
-  margin: 0;
-  line-height: 1.4;
-}
-
-/* --- BARIS 3: Footer --- */
-.bottom-row {
-  height: 10vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-
-.flavor-text {
-  font-style: italic;
-  letter-spacing: 2px;
-  margin: 0;
-  color: #8b0000; /* Merah gelap */
-  font-weight: bold;
-}
-
-.version {
-  font-size: 0.75rem;
-  margin-top: 5px;
-  font-family: monospace;
-  opacity: 0.6;
-}
-</style>
-
-<div class="game-container">
-  
-  <!-- BARIS 1: Top Row (Profil di Ujung Kanan) -->
-  <header class="top-row">
-    <div class="user-profile">
-      <!-- Menggunakan istilah "Civilian" sebagai default user -->
-      <span class="username">{{ username || 'Civilian_01' }}</span>
-      <div class="avatar-circle">🕵️</div>
-    </div>
-  </header>
-
-  <!-- BARIS 2: Middle Row -->
-  <main class="middle-row">
-    
-    <!-- Kiri: Tombol Start (Masuk ke Lobby / Tribunal) -->
-    <div class="side-col left-col">
-      <button class="wood-panel-btn start-btn" routerLink="/lobby">
-        <span class="btn-title">ENTER TRIBUNAL</span>
-        <span class="btn-desc">Join the Lobby. Trust No One.</span>
-      </button>
-    </div>
-
-    <!-- Tengah: Desain persis seperti kartu di gambar -->
-    <div class="center-col">
-      <div class="playing-card">
-        <div class="card-inner-border">
-          
-          <!-- Judul Kartu (Bisa diubah dinamis) -->
-          <h1 class="card-role-title">CIVILIAN</h1>
-          
-          <!-- Gambar Karakter (Ganti src dengan path gambarmu) -->
-          <div class="character-wrapper">
-            <img src="assets/image_2ae9f3.jpg" alt="Character" class="center-character">
-          </div>
-          
-          <!-- Teks Bawah Kartu -->
-          <div class="card-action-box">
-            <p class="card-action-text">SURVIVE & VOTE OUT<br>THE HITMAN.</p>
-          </div>
-
-        </div>
+<main class="operation-shell">
+  <div class="operation-content">
+    <header class="operation-header">
+      <a class="operation-brand" routerLink="/main"><span>♧</span> SILENT TERROR</a>
+      <div class="operation-profile">
+        <i aria-hidden="true">◈</i><b>{{ username }}</b>
       </div>
-    </div>
-
-    <!-- Kanan: Tombol ke Penjelasan Role (Hitman, Spy, Stalker, dll) -->
-    <div class="side-col right-col">
-      <button class="wood-panel-btn role-btn" routerLink="/profile" title="View Roles & Skills">
-        <div class="icon-box">📜</div>
-        <span class="btn-title">GAME ROLES</span>
-        <span class="btn-desc">Hitman, Spy, Stalker</span>
-      </button>
-    </div>
-
-  </main>
-
-  <!-- BARIS 3: Footer -->
-  <footer class="bottom-row">
-    <p class="flavor-text">"If they go silent, they are either the Hostage... or plotting your demise."</p>
-    <p class="version">Zero Economy Edition • The Silent Terror</p>
-  </footer>
-
-</div>
+    </header>
+    <section class="table-menu" aria-label="Menu permainan">
+      <article class="start-card">
+        <p class="operation-label">TAKE YOUR SEAT</p>
+        <h1>Siapa yang<br />tiba-tiba diam?</h1>
+        <p>
+          Hitman bersembunyi di antara warga. Amati percakapan, pertanyakan alibi, dan jaga
+          identitasmu.
+        </p>
+        <button class="operation-primary" routerLink="/lobby">ENTER TRIBUNAL <span>↗</span></button>
+        <small>Buat ruangan atau gabung bersama teman.</small>
+      </article>
+      <article class="character-card">
+        <p class="operation-label">MEET THE ROLES</p>
+        <h2>SPY</h2>
+        <img src="characters/spy.svg" alt="Karakter Spy berkacamata hitam dan berbaju biru" />
+        <b>PROTECT THE CIVILIANS.</b>
+        <p>☾ GUARD</p>
+      </article>
+      <article class="dossier rules-card">
+        <div class="dossier-top"><span>ZERO ECONOMY</span><span>RULES / 01</span></div>
+        <h2>Silent<br />Terror</h2>
+        <p class="operation-copy">
+          Tidak ada uang, item, atau tebusan. Hanya percakapan, kecurigaan, dan warga yang perlahan
+          kehilangan suara.
+        </p>
+        <ol>
+          <li><b>DAY</b><span>Diskusi. Waspadai Gag Order.</span></li>
+          <li><b>NIGHT</b><span>Hostage, Guard, dan Peek.</span></li>
+          <li><b>TRIBUNAL</b><span>Voting menentukan eksekusi.</span></li>
+        </ol>
+        <p class="rules-note">
+          Hostage kehilangan chat dan hak voting, bukan mati. Sistem tidak pernah mengumumkan
+          targetnya: diam bisa berarti disandera, dibungkam, atau sengaja tidak membalas.
+        </p>
+      </article>
+    </section>
+    <section class="field-notes" aria-label="Role permainan">
+      <article>
+        <span>HITMAN / PENYUSUP</span>
+        <h2>Hostage & Gag Order</h2>
+        <p>Sandera satu korban saat malam. Bungkam satu pemain saat siang; cooldown satu ronde.</p>
+      </article>
+      <article>
+        <span>SPY / PELINDUNG</span>
+        <h2>Guard</h2>
+        <p>
+          Lindungi satu warga dari Hostage. Tidak boleh mengawal target sama dua malam
+          berturut-turut.
+        </p>
+      </article>
+      <article>
+        <span>STALKER / INTEL</span>
+        <h2>Peek</h2>
+        <p>Intip identitas asli satu pemain saat malam. Bisa digunakan sekali setiap dua ronde.</p>
+      </article>
+      <article>
+        <span>CIVILIAN / WARGA</span>
+        <h2>Observe</h2>
+        <p>Tanpa skill malam. Baca chat, uji alibi, dan gunakan hak voting dengan hati-hati.</p>
+      </article>
+    </section>
+    <footer class="operation-footer">
+      <span>DIAM BISA BERARTI APA SAJA.</span
+      ><span>Aturan ronde di atas adalah konsep game. Versi saat ini: lobby dan chat.</span>
+    </footer>
+  </div>
+</main>

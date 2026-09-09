@@ -1,0 +1,127 @@
+<main class="checker-shell">
+  <header>
+    <div>
+      <p class="eyebrow">SILENT TERROR / DEVELOPER TOOLS</p>
+      <h1>Chat pipeline checker.</h1>
+    </div>
+    <a routerLink="/main">← Main page</a>
+  </header>
+  <p class="warning">
+    DEVELOPMENT ONLY · Tanpa login/guard. Prompt dapat membocorkan role rahasia. Jangan expose
+    halaman/API ini ke internet.
+  </p>
+  <form (ngSubmit)="watchRoom()" class="toolbar">
+    <label
+      >Kode ruangan<input name="code" [(ngModel)]="code" maxlength="6" placeholder="A3F921"
+    /></label>
+    <button type="submit" [disabled]="busy">Pantau ruangan</button>
+    <button type="button" (click)="refresh()" [disabled]="busy || !activeCode">Refresh</button>
+    <label class="toggle"
+      ><input type="checkbox" name="auto" [(ngModel)]="autoRefresh" /> Auto refresh / 2 detik</label
+    >
+  </form>
+  <p class="meta">
+    {{ activeCode || 'Pilih ruangan' }} · {{ traces.length }} / 100 pesan terbaru ·
+    {{ busy ? 'Memuat…' : 'Read-only' }}
+    @if (updatedAt) {
+      · Diperbarui {{ updatedAt | date: 'HH:mm:ss' }}
+    }
+  </p>
+  @if (error) {
+    <p class="warning" role="alert">{{ error }}</p>
+  }
+  <p class="note">
+    Pesan → SVM → agresivitas → fuzzy → prompt NLG/LLM → output → MySQL → chat. Jejak hanya sejak
+    fitur aktif, disimpan sementara di memori dan hilang saat backend restart. Pesan yang ditolak
+    sebelum analisis tidak masuk daftar.
+  </p>
+  <section class="workspace">
+    <aside aria-label="Daftar pesan">
+      @for (trace of traces; track trace.id) {
+        <button
+          class="trace-card"
+          [class.active]="selectedId === trace.id"
+          (click)="selectedId = trace.id"
+        >
+          <span>{{ trace.sender }} · {{ trace.created_at | date: 'HH:mm:ss' }}</span>
+          <p>{{ trace.message }}</p>
+          <small>{{ trace.stage }} · {{ trace.intent || 'intent belum tersedia' }}</small>
+        </button>
+      } @empty {
+        <p class="empty">
+          Belum ada jejak. Masukkan kode yang benar lalu kirim pesan di game. Ruangan baru atau
+          backend yang baru restart akan kosong.
+        </p>
+      }
+    </aside>
+    <div class="detail">
+      @if (selected; as trace) {
+        <article>
+          <p class="eyebrow">01 / INPUT CHAT</p>
+          <h2>{{ trace.sender }}</h2>
+          <pre>{{ trace.message }}</pre>
+          <p class="meta">
+            Status: {{ trace.stage }} · ID database: {{ trace.message_id ?? 'belum tersimpan' }}
+          </p>
+        </article>
+        <article>
+          <p class="eyebrow">02 / SVM & FUZZY</p>
+          <dl>
+            <div>
+              <dt>Intent SVM</dt>
+              <dd>{{ trace.intent ?? '—' }}</dd>
+            </div>
+            <div>
+              <dt>Bobot intent</dt>
+              <dd>{{ trace.intent_weight ?? '—' }}</dd>
+            </div>
+            <div>
+              <dt>Agresivitas sebelum</dt>
+              <dd>{{ trace.aggressiveness_before ?? '—' }}</dd>
+            </div>
+            <div>
+              <dt>Agresivitas setelah (maks. 100)</dt>
+              <dd>{{ trace.aggressiveness ?? '—' }}</dd>
+            </div>
+            <div>
+              <dt>Silence input</dt>
+              <dd>{{ trace.silence_percentage }}%</dd>
+            </div>
+            <div>
+              <dt>Skor fuzzy</dt>
+              <dd>{{ trace.suspicion_score ?? '—' }} · {{ trace.suspicion_status ?? '—' }}</dd>
+            </div>
+          </dl>
+          <p class="note">
+            Silence masih nilai tetap 20%, bukan pengukuran pemain diam. Bobot intent adalah aturan
+            aplikasi, bukan confidence SVM.
+          </p>
+        </article>
+        <article>
+          <p class="eyebrow">03 / PROMPT NLG → LLM</p>
+          <h2>{{ trace.provider ?? 'Belum dipanggil' }} / {{ trace.model ?? '—' }}</h2>
+          <pre>{{
+            trace.prompt ??
+              'Tidak ada prompt: AI belum dipanggil (misalnya bot nonaktif atau SVM belum siap).'
+          }}</pre>
+        </article>
+        <article>
+          <p class="eyebrow">04 / OUTPUT AI</p>
+          <pre>{{ trace.output ?? 'Belum ada output.' }}</pre>
+          @if (trace.llm_error || trace.error) {
+            <p class="warning">
+              {{ trace.llm_error || trace.error }}. Output fallback/error bukan jawaban AI yang
+              berhasil.
+            </p>
+          }
+        </article>
+        <details>
+          <summary>Snapshot JSON lengkap</summary>
+          <pre>{{ trace | json }}</pre>
+        </details>
+      } @else {
+        <div class="empty">Pilih pesan untuk melihat hasil setiap tahap backend.</div>
+      }
+    </div>
+  </section>
+</main>

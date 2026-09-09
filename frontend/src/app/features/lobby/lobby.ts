@@ -1,33 +1,142 @@
 import { isPlatformBrowser } from '@angular/common';
-import { Component, Inject, OnInit, PLATFORM_ID } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
+import {
+  ChangeDetectorRef,
+  Component,
+  DestroyRef,
+  Inject,
+  OnDestroy,
+  OnInit,
+  PLATFORM_ID,
+} from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
+import { finalize } from 'rxjs';
 import { gameEntryStorageKey } from '../../core/flow.guard';
+import { Room, RoomService } from '../../core/room.service';
 
+// DECORATOR: hubungkan Lobby dengan template, CSS, navigasi, dan binding form.
 @Component({
   selector: 'app-lobby',
-  imports: [RouterLink],
+  imports: [RouterLink, FormsModule],
   templateUrl: './lobby.html',
   styleUrl: './lobby.css',
 })
-export class Lobby implements OnInit {
+// CLASS KOMPONEN: mengatur buat/gabung ruangan, roster, pilihan bot, dan masuk chat.
+export class Lobby implements OnInit, OnDestroy {
+  // STATE/PROPERTY: data ruangan, input kode, dan status yang ditampilkan di lobby.html.
   username = 'Operative';
+  room: Room | null = null;
+  joinCode = '';
+  error = '';
+  busy = false;
+  copied = false;
+  // PRIVATE PROPERTY: simpan timer polling agar dapat dihentikan ketika meninggalkan lobby.
+  private timer?: ReturnType<typeof setInterval>;
 
-  constructor(@Inject(PLATFORM_ID) private readonly platformId: object, private readonly router: Router) {}
+  // CONSTRUCTOR: Angular menyediakan service ruangan, router, platform, dan fasilitas lifecycle.
+  constructor(
+    @Inject(PLATFORM_ID) private readonly platformId: object,
+    private readonly router: Router,
+    private readonly rooms: RoomService,
+    private readonly cdr: ChangeDetectorRef,
+    private readonly destroy: DestroyRef,
+  ) {}
 
+  // LIFECYCLE METHOD: baca sesi browser, ambil kembali ruangan, lalu perbarui roster tiap 3 detik.
   ngOnInit(): void {
     if (!isPlatformBrowser(this.platformId)) return;
     try {
-      const rawUser = localStorage.getItem('shadow_heist_user');
-      const user = rawUser ? JSON.parse(rawUser) as { username?: string } : null;
-      this.username = user?.username || this.username;
-    } catch {
-      // Continue with a neutral name if local storage is corrupted.
-    }
+      this.username =
+        JSON.parse(localStorage.getItem('shadow_heist_user') ?? '{}').username || this.username;
+    } catch {}
+    const code = sessionStorage.getItem('shadow_heist_room');
+    if (code) this.load('GET', '/' + encodeURIComponent(code));
+    this.timer = setInterval(() => {
+      if (this.room && !this.busy) this.load('GET', '/' + this.room.code);
+    }, 3000);
   }
 
+  // LIFECYCLE METHOD: hentikan polling saat komponen dilepas agar tidak berjalan di belakang.
+  ngOnDestroy(): void {
+    if (this.timer) clearInterval(this.timer);
+  }
+
+  // METHOD EVENT TOMBOL: minta backend membuat ruangan dan kode baru.
+  createRoom(): void {
+    if (!this.busy) this.load('POST', '');
+  }
+
+  // METHOD EVENT FORM: periksa format kode, lalu minta backend menambahkan keanggotaan.
+  joinRoom(): void {
+    if (this.busy) return;
+    const code = this.joinCode.trim().toUpperCase();
+    if (!/^[A-F0-9]{6}$/.test(code)) {
+      this.error = 'Masukkan kode ruangan 6 karakter.';
+      return;
+    }
+    this.load('POST', '/join', { code });
+  }
+
+  // METHOD EVENT TOMBOL: minta perubahan pilihan NOX; izin pembuat ruangan diperiksa backend.
+  toggleBot(): void {
+    if (this.room && !this.busy)
+      this.load('POST', '/' + this.room.code + '/bot', { enabled: !this.room.bot_enabled });
+  }
+
+  // ASYNC METHOD: tunggu penyalinan kode ke clipboard; berikan pesan jika browser menolaknya.
+  async copyCode(): Promise<void> {
+    if (!this.room) return;
+    try {
+      await navigator.clipboard.writeText(this.room.code);
+      this.copied = true;
+    } catch {
+      this.error = 'Salin kode ruangan secara manual.';
+    }
+    this.cdr.markForCheck();
+  }
+
+  // METHOD EVENT TOMBOL: simpan ruangan dan tanda navigasi pada tab ini, lalu buka /game.
+  // Tanda lokal bukan otorisasi backend; koneksi chat tetap memeriksa token dan keanggotaan.
   enterGame(): void {
-    if (!isPlatformBrowser(this.platformId)) return;
+    if (!this.room || this.busy) return;
+    sessionStorage.setItem('shadow_heist_room', this.room.code);
+    sessionStorage.setItem('shadow_heist_room_snapshot', JSON.stringify(this.room));
     sessionStorage.setItem(gameEntryStorageKey, 'allowed');
     void this.router.navigateByUrl('/game');
+  }
+
+  // PRIVATE METHOD: jalankan Observable dari RoomService, kelola loading dan hasil/error.
+  // takeUntilDestroyed membatalkan subscription saat komponen dilepas; finalize membuka UI.
+  private load(method: 'GET' | 'POST', path: string, body?: unknown): void {
+    this.busy = true;
+    this.rooms
+      .request(method, path, body)
+      .pipe(
+        takeUntilDestroyed(this.destroy),
+        finalize(() => {
+          this.busy = false;
+          this.cdr.markForCheck();
+        }),
+      )
+      .subscribe({
+        next: (room) => {
+          this.room = room;
+          this.error = '';
+          sessionStorage.setItem('shadow_heist_room', room.code);
+        },
+        error: (error: HttpErrorResponse) => {
+          this.error = error.error?.detail || 'Server belum bisa dihubungi. Coba lagi.';
+          if (error.status === 401) {
+            localStorage.removeItem('shadow_heist_access_token');
+            void this.router.navigateByUrl('/login');
+          }
+          if (method === 'GET' && error.status === 400) {
+            this.room = null;
+            sessionStorage.removeItem('shadow_heist_room');
+          }
+        },
+      });
   }
 }

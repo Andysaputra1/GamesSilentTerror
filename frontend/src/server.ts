@@ -7,25 +7,21 @@ import {
 import express from 'express';
 import { join } from 'node:path';
 
+// CONSTANT: lokasi HTML, JavaScript, CSS, dan aset hasil build browser.
 const browserDistFolder = join(import.meta.dirname, '../browser');
 
+// INSTANCE: server Express untuk menyajikan frontend; API game tetap di Python.
 const app = express();
+// INSTANCE: mesin Angular yang menangani permintaan halaman sesuai aturan rendering.
 const angularApp = new AngularNodeAppEngine();
 
 /**
- * Example Express Rest API endpoints can be defined here.
- * Uncomment and define endpoints as necessary.
- *
- * Example:
- * ```ts
- * app.get('/api/{*splat}', (req, res) => {
- *   // Handle API request
- * });
- * ```
+ * BATAS TANGGUNG JAWAB: Express di file ini menyajikan frontend Angular.
+ * Endpoint login, ruangan, database, dan AI tetap berada di backend Python.
  */
 
 /**
- * Serve static files from /browser
+ * MIDDLEWARE: sajikan aset hasil build browser sebelum memproses route halaman.
  */
 app.use(
   express.static(browserDistFolder, {
@@ -36,20 +32,19 @@ app.use(
 );
 
 /**
- * Handle all other requests by rendering the Angular application.
+ * CALLBACK MIDDLEWARE: serahkan request halaman kepada mesin Angular.
+ * Kirim respons ke browser, atau teruskan ke middleware berikutnya jika tidak ditangani.
  */
 app.use((req, res, next) => {
   angularApp
     .handle(req)
-    .then((response) =>
-      response ? writeResponseToNodeResponse(response, res) : next(),
-    )
+    .then((response) => (response ? writeResponseToNodeResponse(response, res) : next()))
     .catch(next);
 });
 
 /**
- * Start the server if this module is the main entry point, or it is ran via PM2.
- * The server listens on the port defined by the `PORT` environment variable, or defaults to 4000.
+ * STARTUP KONDISIONAL: buka port jika file ini dijalankan langsung atau melalui PM2.
+ * Gunakan environment PORT, default 4000. Ini berbeda dari ng serve development pada 4200.
  */
 if (isMainModule(import.meta.url) || process.env['pm_id']) {
   const port = process.env['PORT'] || 4000;
@@ -63,6 +58,7 @@ if (isMainModule(import.meta.url) || process.env['pm_id']) {
 }
 
 /**
- * Request handler used by the Angular CLI (for dev-server and during build) or Firebase Cloud Functions.
+ * FUNCTION HANDLER EKSPOR: adapter request Express yang dapat dipakai Angular CLI
+ * saat development/build atau oleh lingkungan hosting yang mengimpor modul ini.
  */
 export const reqHandler = createNodeRequestHandler(app);

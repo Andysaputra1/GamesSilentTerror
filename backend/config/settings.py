@@ -5,17 +5,18 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
-from urllib.parse import quote_plus
 
-from pydantic import AliasChoices, Field, SecretStr
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import AliasChoices, Field, SecretStr, field_validator
+from pydantic_settings import SettingsConfigDict
+
+from config.mysql import MySQLSettings
 
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 PROJECT_DIR = BACKEND_DIR.parent
 
 
-class Settings(BaseSettings):
+class Settings(MySQLSettings):
     """Settings loaded from Docker environment variables or the root ``.env``."""
 
     model_config = SettingsConfigDict(
@@ -27,6 +28,25 @@ class Settings(BaseSettings):
     app_name: str = "Shadow Heist Python Backend"
     app_environment: str = "development"
     cors_origins: str = "http://localhost:4200,http://127.0.0.1:4200"
+    ai_provider: Literal["api", "docker"] = "api"
+    ollama_base_url: str = "http://localhost:11435"
+    ollama_model: str = "qwen3:8b"
+    ollama_timeout_seconds: float = Field(default=180.0, gt=0)
+    ollama_max_output_tokens: int = Field(default=160, ge=1, le=2000)
+    ollama_context_length: int = Field(default=2048, ge=512)
+
+    @field_validator("ollama_model", mode="before")
+    @classmethod
+    # VALIDATOR CLASS METHOD: ubah pilihan 8/14 menjadi nama model Ollama dan tolak pilihan lain.
+    def resolve_ollama_model(cls, value: object) -> str:
+        models = {
+            "8": "qwen3:8b", "14": "qwen3:14b",
+            "qwen3:8b": "qwen3:8b", "qwen3:14b": "qwen3:14b",
+        }
+        selected = str(value).strip().lower()
+        if selected not in models:
+            raise ValueError("OLLAMA_MODEL harus 8 atau 14.")
+        return models[selected]
 
     # ``openai_api_env`` remains accepted only as a compatibility alias. New
     # installations should always use the official OPENAI_API_KEY name.
@@ -38,48 +58,29 @@ class Settings(BaseSettings):
     openai_timeout_seconds: float = Field(default=30.0, gt=0)
     openai_max_output_tokens: int = Field(default=320, ge=64, le=2_000)
     openai_reasoning_effort: Literal["minimal", "low", "medium", "high"] = "minimal"
-    intent_model_path: Path = BACKEND_DIR / "models" / "intent_classifier.pkl"
+    intent_model_path: Path = BACKEND_DIR / "artifacts" / "svm" / "intent_classifier.pkl"
 
     auth_session_hours: int = Field(default=24, ge=1, le=24 * 30)
-
-    mysql_host: str = "localhost"
-    mysql_port: int = Field(default=3306, ge=1, le=65535)
-    mysql_database: str = "shadow_heist"
-    mysql_user: str = "shadow_app"
-    mysql_password: str = "shadow_app_dev_2026"
-    database_url: str | None = None
-    sql_echo: bool = False
-    database_pool_size: int = Field(default=5, ge=1)
-    database_max_overflow: int = Field(default=10, ge=0)
 
     default_room_code: str = "local-lobby"
 
     @property
+    # PROPERTY: pecah konfigurasi CORS menjadi daftar origin browser yang diizinkan.
     def allowed_origins(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
 
     @property
+    # PROPERTY: ambil nilai secret untuk klien API di backend; jangan tampilkan nilainya di log/frontend.
     def openai_api_key_value(self) -> str | None:
         """Return the key only for the server-side OpenAI client."""
         if self.openai_api_key is None:
             return None
         return self.openai_api_key.get_secret_value().strip() or None
 
-    @property
-    def sqlalchemy_database_url(self) -> str:
-        if self.database_url:
-            return self.database_url
-
-        user = quote_plus(self.mysql_user)
-        password = quote_plus(self.mysql_password)
-        database = quote_plus(self.mysql_database)
-        return (
-            f"mysql+pymysql://{user}:{password}@{self.mysql_host}:"
-            f"{self.mysql_port}/{database}?charset=utf8mb4"
-        )
 
 
 @lru_cache
+# FUNCTION CACHE: buat konfigurasi tervalidasi sekali, lalu gunakan ulang hasilnya.
 def get_settings() -> Settings:
     return Settings()
 

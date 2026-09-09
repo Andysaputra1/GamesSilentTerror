@@ -1,181 +1,111 @@
-"""Database use cases backed by the SQLAlchemy models.
-
-The migration files own schema changes. This service only reads and writes rows
-from that versioned schema.
-"""
+"""Game persistence use cases. SQL stays in models; each action is atomic."""
 
 from __future__ import annotations
-
 import logging
-
-from sqlalchemy import select
+from typing import TYPE_CHECKING
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import Session
 
-from config.database import SessionLocal
 from config.settings import settings
-from models import AIAnalysis, ChatMessage, GameSession, Player
-from services.analysis_service import AnalysisResult
+from module.mysql_connector import SessionLocal
+from models import game_queries as queries
 from services.fuzzy_service import status_for_score
 
+if TYPE_CHECKING:
+    from services.analysis_service import AnalysisResult
 
 logger = logging.getLogger("shadow_heist.persistence")
 
 
 class PersistenceError(RuntimeError):
-    """Raised when a game action cannot be committed to MySQL."""
-
-
-def _session_for_room(database: Session) -> GameSession:
-    game_session = database.scalar(
-        select(GameSession).where(GameSession.room_code == settings.default_room_code)
-    )
-    if game_session is None:
-        game_session = GameSession(room_code=settings.default_room_code, phase="day")
-        database.add(game_session)
-        database.flush()
-    return game_session
-
-
-def _player_for_username(
-    database: Session, game_session: GameSession, username: str
-) -> Player:
-    player = database.scalar(
-        select(Player).where(
-            Player.game_session_id == game_session.id,
-            Player.username == username,
-        )
-    )
-    if player is None:
-        player = Player(
-            game_session_id=game_session.id,
-            username=username,
-            display_name=username,
-            role="civilian",
-            status="active",
-            aggressiveness=0,
-            suspicion_score=0,
-        )
-        database.add(player)
-        database.flush()
-    return player
+    """A game transaction could not be committed."""
 
 
 class PersistenceService:
-    """Persists application state in the configured default game room."""
+    # CONSTRUCTOR: pilih kode ruangan penyimpanan; gunakan ruangan default untuk pemanggil tanpa kode.
+    def __init__(self, room_code: str | None = None):
+        self.room_code = room_code or settings.default_room_code
 
     @staticmethod
+    # STATIC METHOD TRANSAKSI: jalankan callback dengan commit/rollback otomatis dan terjemahkan error SQL.
     def _run(operation):
-        database = SessionLocal()
         try:
-            result = operation(database)
-            database.commit()
-            return result
+            with SessionLocal.begin() as database:
+                return operation(database)
         except SQLAlchemyError as error:
-            database.rollback()
-            logger.exception("Transaksi MySQL gagal: %s", error)
+            # Do not log SQL parameters: they may contain private chat content.
+            logger.error("Game database transaction failed (%s).", type(error).__name__)
             raise PersistenceError("Data game gagal disimpan ke database.") from error
-        finally:
-            database.close()
 
+    # HELPER TRANSAKSI: pastikan ruangan dan pemain tersedia, lalu kembalikan kedua ID-nya.
+    def _player(self, database, username):
+        room_id = queries.ensure_room(database, self.room_code)
+        return room_id, queries.ensure_player(database, room_id, username)
+
+    # SERVICE PENYIMPANAN: pastikan pemain terdaftar dalam ruangan melalui satu transaksi.
     def ensure_player(self, username: str) -> None:
-        def operation(database: Session) -> None:
-            _player_for_username(database, _session_for_room(database), username)
+        self._run(lambda db: self._player(db, username))
 
-        self._run(operation)
+    # SERVICE REST: petakan hasil analisis ke proses penyimpanan pesan dan respons AI.
+    def record_analysis(self, *, player_name: str, message: str, result: AnalysisResult) -> None:
+        self._record(
+            username=player_name, message=message, intent=result.intent,
+            aggressiveness=result.aggressiveness, suspicion_score=result.suspicion_score,
+            status=None, llm_response=result.llm_response, suspicion_status=result.suspicion_status,
+        )
 
-    def record_analysis(
-        self, *, player_name: str, message: str, result: AnalysisResult
-    ) -> None:
-        def operation(database: Session) -> None:
-            player = _player_for_username(database, _session_for_room(database), player_name)
-            player.aggressiveness = result.aggressiveness
-            player.suspicion_score = round(result.suspicion_score, 2)
-            chat_message = ChatMessage(
-                game_session_id=player.game_session_id,
-                player_id=player.id,
-                sender_name=player_name,
-                message=message,
-                intent=result.intent,
-                suspicion_score=round(result.suspicion_score, 2),
+    # SERVICE CHAT SOCKET: simpan pesan, skor, status pemain, dan respons LLM jika tersedia.
+    def record_player_message(self, *, username: str, message: str, intent: str | None,
+                              aggressiveness: int, suspicion_score: float, status: str,
+                              llm_response: str | None = None) -> int:
+        return self._record(
+            username=username, message=message, intent=intent, aggressiveness=aggressiveness,
+            suspicion_score=suspicion_score, status=status, llm_response=llm_response,
+            suspicion_status=status_for_score(suspicion_score),
+        )
+
+    # HELPER PENYIMPANAN: gabungkan pembaruan pemain, pesan, dan analisis dalam satu transaksi atomik.
+    def _record(self, *, username, message, intent, aggressiveness, suspicion_score,
+                status, llm_response, suspicion_status):
+        # CALLBACK TRANSAKSI: perbarui pemain, buat pesan, simpan analisis jika ada intent serta respons, lalu kembalikan ID pesan.
+        def operation(database):
+            room_id, player_id = self._player(database, username)
+            queries.update_player_scores(database, player_id, aggressiveness, suspicion_score)
+            if status is not None:
+                queries.update_player_status(database, player_id, status)
+            message_id = queries.insert_message(
+                database, room_id=room_id, player_id=player_id, username=username,
+                message=message, intent=intent, suspicion_score=suspicion_score,
             )
-            database.add(chat_message)
-            database.flush()
-            database.add(
-                AIAnalysis(
-                    chat_message_id=chat_message.id,
-                    intent=result.intent,
-                    aggressiveness=result.aggressiveness,
-                    suspicion_score=round(result.suspicion_score, 2),
-                    suspicion_status=result.suspicion_status,
-                    llm_response=result.llm_response,
-                )
-            )
-
-        self._run(operation)
-
-    def record_player_message(
-        self,
-        *,
-        username: str,
-        message: str,
-        intent: str | None,
-        aggressiveness: int,
-        suspicion_score: float,
-        status: str,
-        llm_response: str | None = None,
-    ) -> int:
-        def operation(database: Session) -> int:
-            player = _player_for_username(database, _session_for_room(database), username)
-            player.aggressiveness = aggressiveness
-            player.suspicion_score = round(suspicion_score, 2)
-            player.status = status
-            chat_message = ChatMessage(
-                game_session_id=player.game_session_id,
-                player_id=player.id,
-                sender_name=username,
-                message=message,
-                intent=intent,
-                suspicion_score=round(suspicion_score, 2),
-            )
-            database.add(chat_message)
-            database.flush()
             if intent is not None and llm_response is not None:
-                database.add(
-                    AIAnalysis(
-                        chat_message_id=chat_message.id,
-                        intent=intent,
-                        aggressiveness=aggressiveness,
-                        suspicion_score=round(suspicion_score, 2),
-                        suspicion_status=status_for_score(suspicion_score),
-                        llm_response=llm_response,
-                    )
+                queries.insert_analysis(
+                    database, message_id=message_id, intent=intent, aggressiveness=aggressiveness,
+                    suspicion_score=suspicion_score, suspicion_status=suspicion_status,
+                    llm_response=llm_response,
                 )
-            return int(chat_message.id)
-
+            return message_id
         return self._run(operation)
 
+    # SERVICE PENYIMPANAN: ubah status pemain secara transaksional, bukan keputusan aturan permainan.
     def update_player_status(self, *, username: str, status: str) -> None:
-        def operation(database: Session) -> None:
-            player = _player_for_username(database, _session_for_room(database), username)
-            player.status = status
-
+        # CALLBACK TRANSAKSI: pastikan pemain ada lalu perbarui statusnya.
+        def operation(database):
+            _, player_id = self._player(database, username)
+            queries.update_player_status(database, player_id, status)
         self._run(operation)
 
-    def update_player_scores(
-        self, *, username: str, aggressiveness: int, suspicion_score: float
-    ) -> None:
-        def operation(database: Session) -> None:
-            player = _player_for_username(database, _session_for_room(database), username)
-            player.aggressiveness = aggressiveness
-            player.suspicion_score = round(suspicion_score, 2)
-
+    # SERVICE PENYIMPANAN: perbarui skor pemain melalui transaksi database.
+    def update_player_scores(self, *, username: str, aggressiveness: int, suspicion_score: float) -> None:
+        # CALLBACK TRANSAKSI: pastikan pemain ada lalu perbarui agresivitas dan kecurigaannya.
+        def operation(database):
+            _, player_id = self._player(database, username)
+            queries.update_player_scores(database, player_id, aggressiveness, suspicion_score)
         self._run(operation)
 
+    # SERVICE PENYIMPANAN: simpan nama fase ruangan; fungsi ini tidak menjalankan timer/voting.
     def set_phase(self, phase: str) -> None:
-        def operation(database: Session) -> None:
-            _session_for_room(database).phase = phase
-
+        # CALLBACK TRANSAKSI: pastikan ruangan ada lalu simpan fase yang diminta.
+        def operation(database):
+            queries.set_phase(database, queries.ensure_room(database, self.room_code), phase)
         self._run(operation)
 
 

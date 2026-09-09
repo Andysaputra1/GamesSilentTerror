@@ -1,0 +1,281 @@
+/* Page-specific spacing. Shared tokens are in src/styles.css. */
+:host {
+  display: block;
+}
+.room-code {
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+  padding: 20px 0;
+}
+.room-code > span,
+.join-room label {
+  font:
+    11px Consolas,
+    monospace;
+  letter-spacing: 0.12em;
+}
+.room-code strong {
+  font:
+    800 38px Consolas,
+    monospace;
+  letter-spacing: 0.12em;
+}
+.join-room {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--color-line);
+}
+.join-room form {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.join-room input {
+  min-width: 0;
+  width: 100%;
+  border: 1px solid var(--card-ink);
+  border-radius: 8px;
+  padding: 12px;
+  background: #fffaf0;
+  text-transform: uppercase;
+}
+.room-error {
+  color: #922e2e !important;
+}
+.bot-control {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 24px 0;
+}
+.bot-control b {
+  font-size: 14px;
+}
+.bot-control p,
+.empty-table p {
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--color-muted);
+}
+.bot-control button {
+  flex-shrink: 0;
+}
+.empty-table {
+  text-align: center;
+  padding: 48px 0;
+}
+.empty-table > span {
+  font-size: 56px;
+}
+button:disabled {
+  opacity: 0.5;
+}
+.lobby-heading {
+  padding: 32px 0;
+}
+.lobby-heading > a {
+  display: inline-block;
+  margin-bottom: 32px;
+}
+.lobby-heading .operation-title {
+  font-size: clamp(38px, 5vw, 58px);
+}
+.lobby-heading .operation-copy {
+  max-width: 590px;
+  margin-bottom: 0;
+}
+.lobby-layout {
+  display: grid;
+  grid-template-columns: 1fr 1.1fr;
+  gap: var(--layout-gap);
+  align-items: stretch;
+}
+.briefing-card,
+.roster-card {
+  padding: var(--panel-padding);
+  border-radius: var(--radius-panel);
+}
+.briefing-card {
+  background: var(--color-paper);
+  color: #201d19;
+}
+.briefing-card .operation-label {
+  color: #876528;
+}
+.briefing-card h2 {
+  font:
+    clamp(32px, 4vw, 46px) Georgia,
+    serif;
+  line-height: 1.1;
+  margin: 24px 0;
+}
+.briefing-card > p:not(.operation-label) {
+  font-size: 14px;
+  line-height: 1.8;
+  color: #566051;
+}
+.briefing-card dl {
+  margin: 28px 0;
+}
+.briefing-card dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 13px 0;
+  border-top: 1px solid #ccc4b2;
+}
+.briefing-card dt {
+  font:
+    10px Consolas,
+    monospace;
+  letter-spacing: 0.1em;
+}
+.briefing-card dd {
+  margin: 0;
+  font-size: 12px;
+  text-align: right;
+}
+.briefing-note {
+  display: flex;
+  gap: 10px;
+  border-top: 1px solid #ccc4b2;
+  padding-top: 18px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.briefing-note span {
+  color: #967331;
+}
+.roster-card {
+  background: #eee5d6;
+  border: 1px solid var(--color-line);
+}
+.roster-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 24px;
+}
+.roster-heading h2 {
+  font-size: 22px;
+  font-weight: 500;
+  margin: 0;
+}
+.roster-heading > span {
+  font:
+    10px Consolas,
+    monospace;
+  color: var(--color-muted);
+}
+.player-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 0;
+  border-top: 1px solid var(--color-line);
+}
+.player-avatar {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border: 1px solid #687760;
+  border-radius: 50%;
+  color: var(--card-ink);
+}
+.bot-avatar {
+  color: var(--color-gold);
+  border-color: #8f774a;
+  background: #a4b9c6;
+}
+.player-row b {
+  display: block;
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
+.player-row small {
+  display: block;
+  font:
+    9px Consolas,
+    monospace;
+  color: var(--color-muted);
+  margin-top: 7px;
+  letter-spacing: 0.08em;
+}
+.player-tag {
+  margin-left: auto;
+  color: var(--color-gold);
+  font:
+    10px Consolas,
+    monospace;
+}
+.role-preview {
+  padding: 24px 0;
+  border-top: 1px solid var(--color-line);
+}
+.role-preview > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.role-preview > div span {
+  padding: 7px 10px;
+  border: 1px solid #a39783;
+  border-radius: 3px;
+  font-size: 11px;
+}
+.role-preview > p:last-child {
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 1.7;
+  margin: 16px 0 0;
+}
+.start-game-btn {
+  width: 100%;
+}
+.entry-note {
+  color: var(--color-muted);
+  font-size: 11px;
+  text-align: center;
+  line-height: 1.6;
+  margin: 16px 0 0;
+}
+@media (max-width: 760px) {
+  .lobby-layout {
+    grid-template-columns: 1fr;
+  }
+  .roster-heading {
+    flex-wrap: wrap;
+  }
+}
+
+/* Both panels read as cards from the same deck. */
+.briefing-card,
+.roster-card {
+  position: relative;
+  border: 3px solid var(--card-ink);
+  outline: 1px solid var(--card-ink);
+  outline-offset: -11px;
+  box-shadow: 5px 6px 0 #a39076;
+}
+.briefing-card h2 {
+  font-family: var(--font-title);
+  font-weight: 900;
+  text-transform: uppercase;
+}
+.player-avatar {
+  border: 2px solid var(--card-ink);
+  background: var(--card-peach);
+}
+.bot-avatar {
+  background: var(--card-blue);
+  color: var(--card-ink);
+}
+.role-preview > div span {
+  border: 1px solid var(--card-ink);
+  background: var(--color-paper);
+  border-radius: 8px;
+}

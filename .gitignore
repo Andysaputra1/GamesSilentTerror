@@ -34,6 +34,12 @@ env/
 .env.*
 !.env.example
 
+# Runtime uploads are user data, not source code.
+backend/public/uploads/
+
+# Private design references and conversation material (local only).
+/communicationfolder/
+
 # ==========================================
 # 3. IDEs, EDITORS & SYSTEM
 # ==========================================
@@ -48,3 +54,5 @@ env/
 
 .DS_Store
 Thumbs.db
+
+/communicationfolder

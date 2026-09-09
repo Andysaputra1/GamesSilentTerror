@@ -12,6 +12,7 @@ _ITERATIONS = 600_000
 _SCHEME = "pbkdf2_sha256"
 
 
+# FUNCTION HASH: buat hash PBKDF2-SHA256 dengan salt acak; password asli tidak disimpan.
 def hash_password(password: str) -> str:
     """Create a salted PBKDF2-SHA256 password hash for a new account."""
     salt = secrets.token_bytes(16)
@@ -21,6 +22,7 @@ def hash_password(password: str) -> str:
     return f"{_SCHEME}${_ITERATIONS}${salt.hex()}${digest.hex()}"
 
 
+# FUNCTION VERIFIKASI: hitung ulang hash password dan bandingkan digest dengan compare_digest; format rusak menghasilkan False.
 def verify_password(password: str, encoded_hash: str) -> bool:
     """Compare a password against a PBKDF2 hash without timing leaks."""
     try:

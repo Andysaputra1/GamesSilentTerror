@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from api.dependencies import require_authenticated_user
+from controller.middleware.auth import require_authenticated_user
 from schemas.chat import AnalyzeChatRequest, LegacyAIChatRequest, LegacyGameChatRequest
 from services.analysis_service import IntentModelNotReadyError, analysis_service
 from services.auth_service import AuthenticatedUser
@@ -12,6 +12,7 @@ from services.persistence_service import PersistenceError, persistence_service
 router = APIRouter(prefix="/api", tags=["game"])
 
 
+# HELPER ASYNC: jalankan analisis pesan REST, simpan hasil ke MySQL, dan terjemahkan kegagalan menjadi HTTP 503.
 async def _analyze_and_store(request: AnalyzeChatRequest):
     try:
         result = await analysis_service.analyze(request)
@@ -30,6 +31,7 @@ async def _analyze_and_store(request: AnalyzeChatRequest):
 
 
 @router.post("/analyze")
+# CONTROLLER ASYNC: gunakan identitas dari sesi, bukan nama kiriman klien, lalu kembalikan hasil analisis.
 async def analyze_chat(
     request: AnalyzeChatRequest,
     user: AuthenticatedUser = Depends(require_authenticated_user),
@@ -40,6 +42,7 @@ async def analyze_chat(
 
 
 @router.post("/game/chat")
+# CONTROLLER KOMPATIBILITAS: proses format chat API lama dengan input silence tetap 50 dan respons AI_BOT.
 async def game_chat(
     request: LegacyGameChatRequest,
     user: AuthenticatedUser = Depends(require_authenticated_user),
@@ -62,6 +65,7 @@ async def game_chat(
 
 
 @router.post("/ai-chat")
+# CONTROLLER KOMPATIBILITAS: proses player_message dari API lama, lalu kembalikan teks balasan AI.
 async def ai_chat(
     request: LegacyAIChatRequest,
     user: AuthenticatedUser = Depends(require_authenticated_user),
@@ -78,6 +82,7 @@ async def ai_chat(
 
 
 @router.delete("/reset")
+# CONTROLLER ASYNC: kosongkan konteks LLM service REST; tidak menghapus data MySQL atau konteks socket per ruangan.
 async def reset_history(
     _: AuthenticatedUser = Depends(require_authenticated_user),
 ) -> dict[str, str]:
@@ -86,5 +91,6 @@ async def reset_history(
     return {"message": "Histori chat game berhasil di-reset."}
 
 
+# HELPER SERIALISASI: ubah hasil analisis menjadi dictionary sesuai schema respons API.
 def _analyze_response(result) -> dict[str, object]:
     return result.to_response().model_dump()
