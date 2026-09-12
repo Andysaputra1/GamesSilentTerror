@@ -15,3 +15,9 @@ itu menghapus volume database **dan model Ollama**, bukan hanya mengulang
 migration. Gunakan `docker compose down` biasa untuk mempertahankan data.
 
 Panduan setup database baru tersedia di [README utama](../../README.md).
+
+`V3__add_demo_players.sql` menambahkan janice dan kimberly dengan password demo
+`user132`, menggunakan hash PBKDF2. `INSERT IGNORE` tidak mengganti akun yang sudah
+ada. Hanya untuk development lokal. Database pengembang telah diberi V3 melalui
+SQL; database teman yang sudah berisi data perlu menerapkannya sendiri tanpa
+menghapus volume.

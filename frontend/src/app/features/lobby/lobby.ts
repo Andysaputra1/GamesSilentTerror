@@ -32,6 +32,7 @@ export class Lobby implements OnInit, OnDestroy {
   error = '';
   busy = false;
   copied = false;
+  quick = false;
   // PRIVATE PROPERTY: simpan timer polling agar dapat dihentikan ketika meninggalkan lobby.
   private timer?: ReturnType<typeof setInterval>;
 
@@ -85,6 +86,36 @@ export class Lobby implements OnInit, OnDestroy {
       this.load('POST', '/' + this.room.code + '/bot', { enabled: !this.room.bot_enabled });
   }
 
+  // START: backend memeriksa host/jumlah peserta lalu mengacak role.
+  startGame(): void {
+    if (this.room && !this.busy)
+      this.load('POST', '/' + this.room.code + '/start', { quick: this.quick });
+  }
+
+  // Keluar hanya dari lobby atau game selesai; tidak mengeluarkan pemain lain.
+  leaveRoom(): void {
+    if (!this.room || this.busy) return;
+    this.busy = true;
+    this.rooms
+      .request('POST', '/' + this.room.code + '/leave')
+      .pipe(
+        takeUntilDestroyed(this.destroy),
+        finalize(() => {
+          this.busy = false;
+          this.cdr.markForCheck();
+        }),
+      )
+      .subscribe({
+        next: () => {
+          this.room = null;
+          sessionStorage.removeItem('shadow_heist_room');
+        },
+        error: (error: HttpErrorResponse) => {
+          this.error = error.error?.detail || 'Gagal keluar ruangan.';
+        },
+      });
+  }
+
   // ASYNC METHOD: tunggu penyalinan kode ke clipboard; berikan pesan jika browser menolaknya.
   async copyCode(): Promise<void> {
     if (!this.room) return;
@@ -125,6 +156,10 @@ export class Lobby implements OnInit, OnDestroy {
           this.room = room;
           this.error = '';
           sessionStorage.setItem('shadow_heist_room', room.code);
+          if (path.endsWith('/start')) {
+            this.busy = false;
+            this.enterGame();
+          }
         },
         error: (error: HttpErrorResponse) => {
           this.error = error.error?.detail || 'Server belum bisa dihubungi. Coba lagi.';

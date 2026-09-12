@@ -16,6 +16,7 @@ backend/
       auth.py
       game.py
       health.py
+      rooms.py                  # Lobby, start, snapshot privat, aksi/vote, checker
     middleware/
       auth.py                   # Validasi bearer token sebelum controller
       cors.py                   # Kebijakan cross-origin
@@ -26,6 +27,7 @@ backend/
   module/
     mysql_connector.py          # Engine, connection pool, session, health probe
     upload.py                   # Helper simpan satu file atau batch
+    create_user.py              # CLI akun tambahan untuk multiplayer lokal
   services/                     # Logika password, sesi login, AI, dan game
   schemas/                      # Validasi request/response API
   realtime/                     # Controller event Socket.IO
@@ -36,6 +38,17 @@ backend/
 Alur: HTTP/Socket.IO -> controller -> service -> models (SQL) -> module (MySQL).
 Model tidak menyimpan aturan HTTP atau menulis respons API. Services mengatur
 transaksi agar beberapa query bisa commit/rollback bersama.
+
+Engine murni ada di `services/match_engine.py`: role, fase, skill, cooldown,
+voting, kemenangan, serta snapshot privat. `services/room_service.py` membatasi
+akses anggota/host dan memegang lock. `main.py` menjalankan clock pertandingan;
+frontend hanya menampilkan keputusan server. Lihat [alur dan aturan game](../GAME_CONCEPT.md).
+
+State pertandingan masih di memori satu proses, bukan snapshot MySQL. Reconnect
+browser aman selama proses hidup, tetapi restart backend menghilangkan match.
+Chat/analisis disimpan lewat model SQL yang sudah ada. Tes `tests/live_match_smoke.py`
+menjalankan pertandingan nyata empat akun sementara sampai selesai, dengan cleanup
+akun milik tes. Jangan menjalankannya pada deployment publik.
 
 ## SQL langsung di model
 

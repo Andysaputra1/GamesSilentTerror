@@ -27,6 +27,7 @@ class Settings(MySQLSettings):
 
     app_name: str = "Shadow Heist Python Backend"
     app_environment: str = "development"
+    admin_usernames: str = "user1"
     cors_origins: str = "http://localhost:4200,http://127.0.0.1:4200"
     ai_provider: Literal["api", "docker"] = "api"
     ollama_base_url: str = "http://localhost:11435"

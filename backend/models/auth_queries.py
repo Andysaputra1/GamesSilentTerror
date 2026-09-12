@@ -5,6 +5,14 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 
+# QUERY INSERT: akun baru saja; constraint unik mencegah menimpa akun yang sudah ada.
+def create_account(database: Session, *, username: str, display_name: str, password_hash: str):
+    return database.execute(text("""
+        INSERT INTO user_accounts (username, display_name, password_hash)
+        VALUES (:username, :display_name, :password_hash)
+    """), {"username": username, "display_name": display_name, "password_hash": password_hash}).lastrowid
+
+
 # QUERY SELECT: cari satu akun berdasarkan username dengan parameter SQL terikat; hasil bisa kosong.
 def account_by_username(database: Session, username: str):
     sql = text("""

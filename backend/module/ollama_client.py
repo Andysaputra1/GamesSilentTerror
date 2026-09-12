@@ -5,19 +5,20 @@ from config.settings import settings
 
 
 # ADAPTER ASYNC: kirim prompt ke Ollama, tunggu respons penuh, lalu validasi dan ambil teks jawabannya.
-async def generate_reply(prompt: str) -> str:
+async def generate_reply(prompt: str, *, config=None) -> str:
+    selected = settings if config is None else config
     # TAHAP 7 (docker): kirim prompt ke Ollama /api/chat memakai model dari env.
-    async with httpx.AsyncClient(timeout=settings.ollama_timeout_seconds) as client:
+    async with httpx.AsyncClient(timeout=selected.ollama_timeout_seconds) as client:
         response = await client.post(
-            settings.ollama_base_url.rstrip("/") + "/api/chat",
+            selected.ollama_base_url.rstrip("/") + "/api/chat",
             json={
-                "model": settings.ollama_model,
+                "model": selected.ollama_model,
                 "messages": [{"role": "user", "content": prompt}],
                 "stream": False,
                 "think": False,
                 "options": {
-                    "num_ctx": settings.ollama_context_length,
-                    "num_predict": settings.ollama_max_output_tokens,
+                    "num_ctx": selected.ollama_context_length,
+                    "num_predict": selected.ollama_max_output_tokens,
                 },
             },
         )
@@ -30,12 +31,13 @@ async def generate_reply(prompt: str) -> str:
 
 
 # HEALTH CHECK ASYNC: cek ketersediaan model terpilih lewat Ollama /api/show; gagal koneksi menghasilkan False.
-async def model_available() -> bool:
+async def model_available(*, config=None) -> bool:
+    selected = settings if config is None else config
     try:
         async with httpx.AsyncClient(timeout=3.0) as client:
             response = await client.post(
-                settings.ollama_base_url.rstrip("/") + "/api/show",
-                json={"model": settings.ollama_model},
+                selected.ollama_base_url.rstrip("/") + "/api/show",
+                json={"model": selected.ollama_model},
             )
             return response.status_code == 200
     except httpx.HTTPError:

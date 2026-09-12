@@ -9,6 +9,9 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 import logging
+import asyncio
+from contextlib import suppress
+from services.room_service import room_service
 
 import socketio
 from fastapi import FastAPI
@@ -37,8 +40,20 @@ async def lifespan(_: FastAPI):
         logger.info("Koneksi MySQL siap.")
     else:
         logger.error("Koneksi awal MySQL gagal.")
-    yield
-    engine.dispose()
+    # Timer server tidak bergantung pada tab pemain atau kecepatan respons LLM.
+    async def game_clock():
+        while True:
+            room_service.tick_all()
+            await asyncio.sleep(0.5)
+
+    clock = asyncio.create_task(game_clock())
+    try:
+        yield
+    finally:
+        clock.cancel()
+        with suppress(asyncio.CancelledError):
+            await clock
+        engine.dispose()
 
 
 app = FastAPI(title=settings.app_name, lifespan=lifespan)

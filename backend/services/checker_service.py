@@ -15,6 +15,7 @@ class CheckerService:
     def begin(self, code, sender, message):
         trace = {
             "id": uuid4().hex, "created_at": datetime.now(timezone.utc).isoformat(),
+            "room_code": code,
             "sender": sender, "message": message, "stage": "received",
             "intent": None, "aggressiveness_before": None, "intent_weight": None,
             "aggressiveness": None, "silence_percentage": 20,

@@ -56,6 +56,8 @@ services:
     environment:
       OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
       AI_PROVIDER: "${AI_PROVIDER:-api}"
+      APP_ENVIRONMENT: "${APP_ENVIRONMENT:-development}"
+      ADMIN_USERNAMES: "${ADMIN_USERNAMES:-user1}"
       OLLAMA_BASE_URL: "http://ollama:11434"
       OLLAMA_MODEL: "${OLLAMA_MODEL:-8}"
       OLLAMA_TIMEOUT_SECONDS: "${OLLAMA_TIMEOUT_SECONDS:-180}"

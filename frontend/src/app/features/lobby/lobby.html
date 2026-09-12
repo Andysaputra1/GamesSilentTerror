@@ -36,7 +36,8 @@
             <input
               id="room-code"
               name="roomCode"
-              [(ngModel)]="joinCode"
+              [value]="joinCode"
+              (input)="joinCode = $any($event.target).value"
               maxlength="6"
               placeholder="Contoh: A3F921"
               autocomplete="off"
@@ -52,7 +53,7 @@
       <article class="roster-card">
         <div class="roster-heading">
           <h2>At the table</h2>
-          <span>{{ room ? room.members.length : 0 }} / 6 PEMAIN</span>
+          <span>{{ room ? room.members.length + room.bots.length : 0 }} / 6 PEMAIN</span>
         </div>
         @if (room) {
           @for (member of room.members; track member) {
@@ -67,21 +68,27 @@
               }
             </div>
           }
-          @if (room.bot_enabled) {
+          @for (bot of room.bots; track bot) {
             <div class="player-row">
               <span class="player-avatar bot-avatar">◆</span>
-              <div><b>NOX</b><small>BOT / IDENTITAS TERSEMBUNYI</small></div>
+              <div>
+                <b>{{ bot }}</b
+                ><small>BOT / IDENTITAS TERSEMBUNYI</small>
+              </div>
               <span class="player-tag">BOT</span>
             </div>
           }
           <div class="bot-control">
             <div>
-              <b>Tambahkan bot NOX</b>
-              <p>Teman bicara saat latihan. Tanpa bot, chat hanya antar pemain.</p>
+              <b>Isi kursi dengan bot</b>
+              <p>
+                Minimal 4 peserta. Bot mengisi kursi, melakukan aksi malam, dan ikut voting. Role
+                semua peserta diacak.
+              </p>
             </div>
             <button
               class="operation-secondary"
-              [disabled]="busy || room.owner !== username"
+              [disabled]="busy || room.owner !== username || room.phase !== 'lobby'"
               [attr.aria-pressed]="room.bot_enabled"
               (click)="toggleBot()"
             >
@@ -91,17 +98,40 @@
           @if (room.owner !== username) {
             <p class="entry-note">Bot diatur oleh pembuat ruangan.</p>
           }
-          <button
-            class="operation-primary start-game-btn"
-            type="button"
-            (click)="enterGame()"
-            [disabled]="busy"
-          >
-            MULAI DISKUSI <span>↗</span>
-          </button>
+          @if (room.phase === 'lobby') {
+            @if (room.owner === username) {
+              <label class="entry-note"
+                ><input type="checkbox" [(ngModel)]="quick" /> Mode cepat: 20s siang / 15s malam /
+                15s voting</label
+              >
+              <button
+                class="operation-primary start-game-btn"
+                (click)="startGame()"
+                [disabled]="busy || room.members.length + room.bots.length < 4"
+              >
+                MULAI PERMAINAN ↗
+              </button>
+            } @else {
+              <p class="entry-note">Menunggu pembuat ruangan memulai permainan.</p>
+            }
+          } @else {
+            <button
+              class="operation-primary start-game-btn"
+              (click)="enterGame()"
+              [disabled]="busy"
+            >
+              {{ room.phase === 'finished' ? 'LIHAT HASIL' : 'MASUK PERMAINAN' }} ↗
+            </button>
+          }
           <p class="entry-note">
-            Masuk ke diskusi. Aksi malam dan voting belum tersedia pada versi ini.
+            Standar: siang 120 detik, malam 30 detik, Tribunal 45 detik. Timer tetap berjalan saat
+            tab ditutup.
           </p>
+          @if (room.phase === 'lobby' || room.phase === 'finished') {
+            <button class="operation-secondary" (click)="leaveRoom()" [disabled]="busy">
+              Keluar ruangan
+            </button>
+          }
         } @else {
           <div class="empty-table">
             <span>♧</span>

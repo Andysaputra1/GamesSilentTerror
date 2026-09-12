@@ -8,6 +8,8 @@ export interface Room {
   owner: string;
   members: string[];
   bot_enabled: boolean;
+  bots: string[];
+  phase: string;
 }
 
 // DECORATOR: daftarkan service agar Angular dapat menyuntikkannya ke komponen.

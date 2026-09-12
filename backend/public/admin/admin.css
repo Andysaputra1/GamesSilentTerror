@@ -1,0 +1,26 @@
+:root { color-scheme: light; font-family: system-ui, sans-serif; color: #252a31; background: #e8edf1; }
+* { box-sizing: border-box; }
+body { margin: 0 auto; max-width: 1500px; padding: clamp(16px, 3vw, 40px); }
+header, .toolbar, form { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+header { justify-content: space-between; margin-bottom: 24px; }
+h1 { margin: 6px 0; font-size: clamp(28px, 4vw, 44px); } h2 { margin-top: 0; }
+.eyebrow { font: 12px monospace; letter-spacing: .15em; }
+.panel { padding: 24px; margin-bottom: 24px; background: #fff; border: 1px solid #bccbd6; border-radius: 16px; }
+.warning { border-left: 4px solid #ac6414; background: #fff2d6; padding: 16px; line-height: 1.6; }
+#notice:not(:empty) { padding: 14px; background: #dae8f4; border-radius: 8px; overflow-wrap: anywhere; }
+label { display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+label:has(input[type=checkbox]) { flex-direction: row; align-items: center; }
+button, input, select { font: inherit; border: 1px solid #7a8b98; border-radius: 8px; padding: 10px 14px; max-width: 100%; }
+button { cursor: pointer; background: #183b54; color: #fff; } button:disabled { opacity: .5; cursor: wait; }
+input, select { background: #fff; color: #252a31; }
+.muted { color: #51606a; line-height: 1.6; font-size: 13px; }
+.workspace { display: grid; grid-template-columns: minmax(230px, .8fr) minmax(0, 1.8fr); gap: 20px; }
+.events { max-height: 560px; overflow: auto; display: flex; flex-direction: column; gap: 8px; }
+.event { background: #edf3f8; color: #203441; text-align: left; display: block; overflow-wrap: anywhere; }
+.event.selected { border: 2px solid #145d88; background: #d6e9f4; }
+.event small { display: block; margin-top: 7px; color: #51606a; }
+article { min-width: 0; }
+pre { padding: 18px; margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; background: #111f2b; color: #e0edf5; border-radius: 10px; max-height: 650px; overflow: auto; font-size: 12px; line-height: 1.6; }
+[hidden] { display: none !important; }
+:focus-visible { outline: 3px solid #df9a35; outline-offset: 3px; }
+@media(max-width: 800px) { .workspace { grid-template-columns: 1fr; } .events { max-height: 250px; } .panel { padding: 16px; } }

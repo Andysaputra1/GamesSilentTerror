@@ -47,7 +47,7 @@ class ProviderTests(unittest.IsolatedAsyncioTestCase):
         request = httpx.Request("POST", "http://ollama:11434/api/chat")
         mock_client = AsyncMock()
         mock_client.post.return_value = httpx.Response(200, request=request, json={"message": {"content": " Reply "}})
-        with patch("module.ollama_client.httpx.AsyncClient") as factory:
+        with patch("module.ollama_client.settings", Settings(_env_file=None, OLLAMA_MODEL="8")), patch("module.ollama_client.httpx.AsyncClient") as factory:
             factory.return_value.__aenter__.return_value = mock_client
             self.assertEqual(await ollama_client.generate_reply("hello"), "Reply")
             body = mock_client.post.call_args.kwargs["json"]

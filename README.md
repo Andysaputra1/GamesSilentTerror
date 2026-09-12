@@ -6,11 +6,11 @@ Nama Silent Terror masih sementara. Nama repository, database, dan container mas
 
 ## Status proyek
 
-Sudah tersedia: login, main page, buat/gabung ruangan melalui kode, roster pemain, bot NOX opsional, dan chat melalui backend Python dengan respons AI. Hanya pembuat ruangan yang dapat mengatur bot; chat dipisahkan per ruangan.
+Sudah dapat dimainkan: login, main page, buat/gabung ruangan, 4–6 peserta, bot opsional, role acak dari server, timer Day → Night → Tribunal, skill/cooldown, voting, eksekusi, dan kondisi kemenangan. Login dan desain main page dipertahankan. Hanya pembuat ruangan yang mengatur bot dan memulai game.
 
-Konsep role: **Hitman** (Hostage/Gag Order), **Spy** (Guard), **Stalker** (Peek), dan **Civilian** (observasi). Alur ronde yang direncanakan adalah Day → Night → Tribunal. Korban Hostage kehilangan chat dan voting tanpa pengumuman identitas target.
+Role: **Hitman** (Hostage/Gag Order), **Spy** (Guard), **Stalker** (Peek), dan **Civilian** (observasi). Korban Hostage tetap terlihat hidup, tetapi kehilangan chat, voting, dan aksi; identitas target tidak diumumkan. Balasan bot memakai pipeline SVM → fuzzy → LLM melalui backend.
 
-**Engine ronde, skill, cooldown, voting, dan kondisi kemenangan belum aktif.** Kartu peran pada halaman game masih pratinjau untuk latihan chat. Baca [konsep dan batas implementasi](GAME_CONCEPT.md).
+Engine menjadi sumber kebenaran, bukan browser/LLM. Bot memilih aksi/vote menggunakan aturan, sementara LLM menghasilkan percakapan sesuai role bot tersebut. Baca [aturan, alur kode, dan batas implementasi](GAME_CONCEPT.md).
 
 ## Persiapan
 
@@ -142,12 +142,44 @@ API key hanya dibaca backend. Penggunaan API dapat menimbulkan biaya pada akun p
 | Status backend | http://localhost:8000/app-status |
 | Dokumentasi API | http://localhost:8000/docs |
 | phpMyAdmin | http://localhost:8000/phpmyadmin/ |
+| Panel backend development | http://localhost:8000/admin |
+
+### Panel backend development
+
+Buka `/admin` pada port 8000, login dengan admin development `user1` / `user132`. Janice/Kimberly tidak memiliki akses admin. Atur daftar admin lewat `ADMIN_USERNAMES` (dipisahkan koma); panel hanya tersedia ketika `APP_ENVIRONMENT=development`. Kredensial demo ini **bukan pengamanan untuk deployment publik**: ganti akun/password dan nonaktifkan mode development sebelum deployment.
+
+- Pilih provider `api` atau `docker`, serta model Ollama `8`/`14`. Backend memeriksa konfigurasi API/model tersedia sebelum menerima perubahan. Ketersediaan model tidak menjamin respons cepat; Docker CPU bisa lambat.
+- Perubahan berlaku global untuk request AI berikutnya; request berjalan tetap menggunakan provider awal. Override hanya di memori, tidak menulis `.env`. Tombol reset atau restart backend mengembalikan konfigurasi environment.
+- Pilih room untuk melihat aktivitas fungsi yang diinstrumentasi, parameter, hasil/status, dan trace SVM → fuzzy → prompt LLM → output → pengiriman chat. Ini bukan debugger semua fungsi Python. Event `running` adalah catatan saat fungsi mulai; lihat event akhir dengan `call_id` yang sama untuk hasilnya.
+- Log aktivitas dibatasi 2.000 event dalam memori, endpoint menampilkan 200 terbaru. Restart menghapus log ini. Password/token/API key disensor, tetapi chat, prompt, dan informasi role dalam trace tetap sensitif dan hanya untuk admin.
+
+Implementasi: `backend/controller/api/admin.py`, `backend/public/admin/`, `backend/services/ai_runtime_service.py`, dan `backend/services/activity_service.py`. Desain login/main page Angular tidak diubah.
 | MySQL dari host / DB client | `localhost:3307`, database `shadow_heist` |
 | Ollama dari host (mode lokal) | http://localhost:11435 |
 
 Login aplikasi development: **`user1` / `user132`**. Akun ini disiapkan oleh migration saat inisialisasi database baru.
 
-Alur mencoba: **Login → Main page → Enter Tribunal → Buat Ruangan / Gabung → + Bot → Mulai Diskusi**. Ketik pesan dan tunggu NOX membalas. Tanpa bot, chat hanya antar pemain.
+Akun demo tambahan: **`janice` / `user132`** dan **`kimberly` / `user132`** melalui migration `V3__add_demo_players.sql`. Database lama perlu menerapkan V3; startup backend tidak otomatis menjalankan migration. Migration tidak menimpa password akun yang sudah ada. Ketiga akun/password bersama ini hanya untuk development, bukan deployment publik.
+
+Alur mencoba: **Login → Main page → Enter Tribunal → Buat Ruangan / Gabung → + Bot → Mulai Permainan**. Bot mengisi kursi sampai minimal 4 peserta sehingga bisa dicoba sendiri. Tanpa bot, siapkan minimal 4 akun berbeda. Pemilik ruangan menekan Mulai; anggota lain menekan Masuk Permainan ketika game sudah dimulai.
+
+Di game, buka role privatmu. Saat Day, diskusikan alibi; Hitman dapat memilih target Gag. Saat Night, pilih kartu target lalu kunci Hostage/Guard/Peek jika tersedia. Saat Tribunal, pilih kartu tersangka lalu kunci vote. Pemain yang tidak bisa bertindak tetap dapat menonton. Setelah selesai, kembali ke lobby → Keluar ruangan → Buat ruangan baru.
+
+Timer standar 120/30/45 detik. Mode cepat di lobby memakai 20/15/15 detik, cocok untuk tes aturan. Respons Ollama yang selesai setelah fase berubah **tidak ditampilkan** agar tidak menerobos malam atau efek bungkam; gunakan durasi standar untuk mencoba chat AI.
+
+Saat Day, tombol **Setuju skip diskusi** mempercepat ke Night setelah seluruh manusia yang masih hidup setuju. Bot tidak dihitung. Pemain dibungkam/disandera tetap boleh menyetujui karena ini bukan chat atau vote Tribunal; status mereka tetap tidak dipublikasikan. Persetujuan tidak bisa ditarik pada ronde itu. Pemain offline belum dianggap setuju; timer normal tetap berjalan.
+
+Selama pertandingan aktif, membuka halaman aplikasi lain/tab baru atau login ulang akan mengembalikan akun ke `/game` berdasarkan data backend, bukan hanya storage tab. Akun tidak bisa membuat/gabung pertandingan lain sebelum match selesai. Ini berlaku dalam aplikasi ini, bukan memaksa browser meninggalkan situs eksternal. Desain login dan main page tidak diubah.
+
+### Akun teman untuk multiplayer
+
+Akun yang sama di beberapa tab tetap satu pemain. Buat akun tambahan lewat CLI lokal (password diminta tersembunyi dan disimpan sebagai hash; akun lama tidak ditimpa):
+
+```sh
+docker compose exec ai-engine python -m module.create_user teman1 --name "Teman Satu"
+```
+
+Gunakan `-f docker-compose.gpu.yml` jika memakai stack NVIDIA. Setiap teman login dengan akun sendiri, lalu gabung memakai kode room yang sama. Pengujian lintas perangkat/LAN memerlukan konfigurasi CORS/host yang sesuai; QC lokal memakai beberapa sesi terpisah pada satu mesin.
 
 Untuk login phpMyAdmin, gunakan `MYSQL_USER` dan `MYSQL_PASSWORD` dari `.env`, bukan akun game. Backend dan phpMyAdmin berbagi port `8000` melalui gateway Nginx; port `3307` hanya untuk koneksi MySQL, bukan halaman web.
 
@@ -188,7 +220,7 @@ Jika mengubah daftar model lokal yang harus diunduh, jalankan pula `docker compo
 - Database disimpan di named volume `shadow_heist_mysql_data`.
 - Model Ollama disimpan di named volume `games_ollama_data`.
 - `down` biasa mempertahankan kedua volume. **Jangan gunakan `docker compose down -v` jika data/model masih diperlukan: opsi itu menghapus named volume beserta isinya.** Volume persisten bukan pengganti backup.
-- Lobby dan konteks AI masih berada di memori satu proses backend. Restart/recreate backend menghilangkan ruangan aktif dan konteks percakapan. Catatan chat di MySQL tetap tersimpan; pemulihan lobby/chat ke UI belum tersedia.
+- Lobby, engine pertandingan, role/aksi/vote, dan konteks AI berada di memori satu proses backend. Reload/reconnect browser memulihkan snapshot dan 100 pesan terbaru selama proses yang sama hidup. Restart/recreate backend menghilangkan pertandingan aktif. Catatan chat/analisis di MySQL tetap tersimpan, tetapi belum memulihkan pertandingan. Jangan menjalankan beberapa worker backend sebelum menambahkan shared state/persistence engine.
 - SQL di `backend/migrations/` dijalankan saat database pertama kali diinisialisasi. Menambah file migration atau mengganti password di `.env` tidak otomatis memperbarui database yang sudah berisi data. Lihat [catatan migration](backend/migrations/README.md).
 
 ## Jika belum berjalan
@@ -226,6 +258,10 @@ Dengan container aplikasi sudah berjalan:
 docker compose exec -T ai-engine python -m unittest discover -s tests -v
 docker compose exec -T frontend npm test -- --watch=false
 docker compose exec -T frontend npm run build
+
+# Opsional: tes 4 akun sementara pada server/MySQL lokal sampai warga menang.
+# Hanya akun QC yang dibuat tes akan dibersihkan; bukan akun pengguna.
+docker compose exec -T ai-engine python -m tests.live_match_smoke
 ```
 
 Tes otomatis bukan bukti koneksi AI eksternal sedang aktif; coba chat melalui UI untuk menguji provider sebenarnya. Tes database khusus hanya boleh diarahkan ke database percobaan.
@@ -264,9 +300,10 @@ dikonfigurasi dalam `angular.json`; jangan menganggapnya sebagai tes siap pakai.
 
 ### Pipeline checker (development saja)
 
-Buka `http://localhost:4200/games/checker`, masukkan kode ruangan, lalu kirim chat
-melalui game di tab lain. Link **Buka pipeline checker** di game mengisi kode
-secara otomatis. Monitor menampilkan pesan, intent SVM, bobot/agresivitas,
+Buka `http://localhost:4200/games/checker`, masukkan kode ruangan setelah pertandingan
+selesai. Link **Lihat analisis pertandingan** di hasil game mengisi kode
+secara otomatis. Checker dikunci selama pertandingan aktif (HTTP 403) supaya prompt
+tidak membocorkan role bot. Monitor menampilkan pesan, intent SVM, bobot/agresivitas,
 input/output fuzzy, prompt persis yang diberikan ke LLM, provider/model,
 output/fallback, status proses, dan ID pesan MySQL. Ini bukan chain-of-thought
 internal model; hanya input/output dan tahap aplikasi yang dapat diamati.
@@ -276,8 +313,8 @@ Jejak lama sebelum fitur aktif tidak direkonstruksi dari DB dan jejak hilang saa
 backend restart. Silence fuzzy masih konstan 20%, bukan pengukuran pemain.
 
 **Sesuai kebutuhan development, route ini dan GET `/api/rooms/{code}/checker`
-tidak memakai guard/autentikasi.** Siapa pun dengan kode ruangan dapat membaca
-chat dan prompt yang membocorkan role NOX. Jangan expose aplikasi/API ini ke
+tidak memakai guard/autentikasi, tetapi menolak pertandingan aktif.** Setelah game selesai,
+siapa pun dengan kode ruangan dapat membaca chat dan prompt berisi role bot. Jangan expose aplikasi/API ini ke
 internet; wajib tambahkan pembatasan akses atau nonaktifkan checker sebelum
 deployment publik. Monitor tidak mengirim token/API key konfigurasi ke browser.
 

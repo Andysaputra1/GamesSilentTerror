@@ -23,10 +23,50 @@ Korban Hostage tidak mati, tetapi kehilangan kemampuan chat dan hak voting. Sist
 
 ## Status implementasi
 
-Sudah tersedia: login, main page, buat/gabung kode ruangan, roster, bot opsional yang hanya dapat diatur pembuat ruangan, chat terisolasi per ruangan, dan respons NOX melalui backend.
+Sudah aktif: pembagian role server, timer, resolusi malam, cooldown, Hostage/Gag, voting, eksekusi, kemenangan, dan bot dengan aksi/vote. Login dan main page tidak diubah. Lobby/game membaca state dari backend; keputusan tidak dilakukan di frontend.
 
-Belum tersedia: pembagian role otoritatif dari server, timer fase, resolusi aksi malam, cooldown, efek Hostage/Gag, voting, eksekusi, serta kondisi akhir permainan. Kartu acak pada halaman game hanya pratinjau role warga untuk latihan chat dengan NOX.
+## Aturan operasional
 
-Ruangan saat ini disimpan di memori satu proses backend dan hilang ketika backend restart. Riwayat chat disimpan di MySQL per kode ruangan; belum ada pemulihan lobby atau pemutaran ulang chat.
+- Peserta 4–6; tepat 1 Hitman, 1 Spy, 1 Stalker, sisanya Civilian. Semua termasuk bot mendapat role acak.
+- Bot mengisi hingga minimal 4 peserta; dengan 4–5 manusia, opsi bot menambah satu bot. Roster terkunci setelah mulai. Anggota lama boleh reconnect, orang baru tidak boleh masuk.
+- Durasi standar: Day 120s, Night 30s, Tribunal 45s. Mode cepat: 20/15/15s. Timer server terus berjalan walaupun browser ditutup.
+- Skip diskusi hanya pada Day: semua manusia yang masih hidup harus setuju. Bot dan pemain mati tidak dihitung. Gag/Hostage tidak menghapus hak persetujuan ini (bukan chat/vote), supaya status rahasia tidak bocor lewat jumlah yang diperlukan. Persetujuan final per ronde, duplikat tidak menambah hitungan, reset saat ronde baru. Pemain offline tetap diperlukan; jika belum lengkap, timer normal berlaku. Persetujuan lengkap memajukan fase melalui engine yang sama dengan timer, termasuk kesempatan aksi siang bot.
+- Satu akun hanya boleh mengikuti satu pertandingan aktif. Endpoint privat `GET /api/rooms/active` memulihkan room pada tab baru/login ulang. Route aplikasi dan pengecekan berkala/focus mengarahkan pemain ke `/game` selama match aktif. Tidak memaksa navigasi tab situs eksternal. Pemain mati tetap kembali sebagai penonton sampai pertandingan selesai.
+- Gag aktif segera saat Day sampai Tribunal ronde itu selesai, lalu hilang pada Day berikutnya. Pemain terkena Gag tidak dapat chat/vote, tetapi masih bisa aksi malam. Dipakai ronde 1 → tersedia lagi ronde 3.
+- Peek dipakai ronde 1 → tersedia lagi ronde 3. Hasil baru muncul setelah resolusi malam dan hanya untuk Stalker tersebut.
+- Guard boleh memilih diri sendiri, tetapi tidak target yang sama pada dua malam berturut-turut. Guard diproses sebelum Hostage, terlepas urutan request.
+- Hostage permanen sampai akhir game. Korban tetap hidup namun tidak dapat chat/vote/aksi malam. Ini asumsi implementasi untuk pemain yang sedang disandera.
+- Setiap aksi malam dan vote hanya satu pilihan final. Boleh tidak memilih sebelum timer habis. Target harus hidup; hanya Guard boleh memilih diri sendiri.
+- Suara terbanyak tunggal dieksekusi. Seri atau tanpa suara: tidak ada eksekusi.
+- Warga menang jika Hitman dieksekusi. Hitman menang jika semua warga yang masih hidup sudah Hostage.
+- Tidak ada pengumuman target Hostage, status bungkam publik, atau aksi malam orang lain dalam snapshot. Selama Tribunal, vote yang sudah dikirim bersifat publik: jumlah dan nama pemilih per target, tanpa daftar siapa yang berhak voting. Tampilan maksimal 4 badge nama lalu +N dan daftar lengkap yang bisa dibuka. Role dibuka untuk semua setelah game selesai. Status bungkam sendiri tersedia privat; hasil Peek tetap privat.
+- Bot memilih target dari pemain hidup, tanpa membaca role/status rahasia lawan. Stalker bot boleh memakai hasil Peek miliknya sendiri saat voting. Aksi bot dijalankan di pertengahan fase.
+- Bot chat menjawab pesan manusia yang diterima, bukan percakapan otomatis antarsesama bot. LLM tidak menentukan hasil aksi/vote. Bot bungkam/mati tidak boleh membalas; balasan yang terlambat melewati fase dibuang. Kegagalan LLM tidak menghentikan timer.
 
-Sebelum implementasi engine, perlu ditetapkan: durasi fase/Gag Order, hasil voting seri, kondisi kemenangan warga, dan apakah korban Gag masih boleh voting saat Tribunal.
+## Alur kode
+
+```text
+Lobby → POST /api/rooms /join /{code}/bot /{code}/start
+                       ↓
+controller/api/rooms.py → services/room_service.py (membership + lock)
+                       ↓
+services/match_engine.py (role, timer, aksi, vote, winner, snapshot privat)
+                       ↓
+GET /api/rooms/{code}/game → frontend/core/game.service.ts → game.ts/html/css
+
+Tombol aksi/vote → POST /api/rooms/{code}/play
+  → validasi match_id + round_number + phase → validasi aturan → snapshot baru
+
+send_chat → realtime/socket_handlers.py → engine.can_chat
+  → echo server → SVM → fuzzy → LLM sesuai role bot → MySQL → receive_chat
+```
+
+`main.py` menjalankan clock 0,5 detik. Frontend polling snapshot tiap 1 detik dan memakai Socket.IO untuk chat. Header bearer mengikat HTTP ke akun; Socket.IO memeriksa token dan membership. Username pada payload tidak dapat menyamar sebagai pemain lain. `/games/checker` tetap route development tanpa login, tetapi data room aktif ditolak HTTP 403 untuk melindungi Silent Terror.
+
+Persetujuan skip: `POST /api/rooms/{code}/skip-discussion` → `RoomService.skip()` → `Match.skip_discussion()`. Payload membawa `match_id`, `round_number`, dan `phase: day`; permintaan fase lama ditolak. Pemulihan UI ada di `core/active-match.service.ts` (guard + lookup), dan `app.ts` mengecek setiap 3 detik ketika berada di halaman lain serta saat tab kembali aktif. Identitas persetujuan orang lain tidak dipublikasikan; snapshot hanya membawa total dan persetujuan akun sendiri.
+
+## Batas versi development
+
+Ruangan/role/aksi/vote disimpan di memori satu proses backend dan hilang ketika backend restart. Reload browser memulihkan pertandingan yang masih ada serta 100 pesan terakhir. MySQL mencatat chat/analisis, bukan snapshot pertandingan; pemulihan match setelah restart dan multi-worker belum tersedia. Pemain yang menutup tab tetap di roster dan melewatkan aksi/vote sampai kembali; belum ada bot pengganti otomatis.
+
+Fuzzy masih memakai persentase diam tetap 20%, bukan pengukuran aktivitas nyata. Akurasi/balance SVM-fuzzy-LLM bukan jaminan hasil game. Aplikasi, checker, akun demo dan Compose ditujukan untuk pengembangan lokal, bukan deployment publik.

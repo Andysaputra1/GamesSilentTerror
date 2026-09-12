@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="id">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Silent Terror — Backend Console</title><link rel="stylesheet" href="/admin/assets/admin.css"><script defer src="/admin/assets/admin.js"></script></head>
+<body>
+<header><div><p class="eyebrow">SILENT TERROR / DEVELOPMENT</p><h1>Backend console.</h1></div><button id="logout" hidden>Logout panel</button></header>
+<p class="warning">Khusus pengelola. Parameter aksi dan prompt bisa mengungkap informasi rahasia game. Jangan gunakan panel ini sebagai pemain biasa atau expose ke internet.</p>
+<p id="notice" role="status"></p>
+<section id="login-panel" class="panel">
+  <h2>Login pengelola</h2><p>Akun default development: user1. Hak akses selalu diperiksa backend.</p>
+  <form id="login-form"><label>Username<input id="username" autocomplete="username" required></label><label>Password<input id="password" type="password" autocomplete="current-password" required></label><button id="login-button">Masuk panel</button></form>
+</section>
+<main id="console" hidden>
+  <section class="panel"><h2>Provider AI</h2><p id="current-provider">Memuat…</p>
+    <form id="provider-form"><label>Provider<select id="provider"><option value="api">OpenAI API</option><option value="docker">Ollama / Docker</option></select></label><label>Model Ollama<select id="model"><option value="8">Qwen3 8B</option><option value="14">Qwen3 14B</option></select></label><button id="apply-provider">Terapkan</button><button id="reset-provider" type="button">Kembali ke .env</button></form>
+    <p class="muted">Berlaku global untuk request berikutnya. Request yang sudah berjalan tidak dialihkan. Pilihan panel hanya di memori; restart kembali ke environment. Mode API dapat menimbulkan biaya. Key/password tidak ditampilkan atau diubah di sini.</p>
+  </section>
+  <section class="panel"><div class="toolbar"><h2>Aktivitas room</h2><label>Room<select id="room"><option value="">Semua room</option></select></label><button id="refresh">Refresh</button><label><input type="checkbox" id="auto" checked> Auto / 2 detik</label></div><p id="room-info" class="muted"></p><p id="updated" class="muted"></p>
+    <p class="muted">Jejak eksplisit command room, pergantian fase, dan pipeline chat—bukan profiler setiap fungsi Python. Maksimal 200 event ditampilkan dari buffer 2.000 event. Klik event untuk melihat parameter, hasil, dan call ID.</p>
+    <div class="workspace"><div id="events" class="events" aria-label="Daftar aktivitas"></div><article><h3>Detail fungsi / parameter</h3><pre id="event-detail">Pilih aktivitas.</pre></article></div>
+  </section>
+  <section class="panel"><h2>Chat → SVM → fuzzy → prompt → output AI</h2><p class="muted">Pilih satu room. Prompt persis yang dikirim aplikasi tersedia di JSON; bukan penalaran internal model. Jejak aktif hanya dapat dibaca pengelola.</p><div class="workspace"><div id="traces" class="events" aria-label="Daftar chat"></div><article><h3>Detail pipeline</h3><pre id="trace-detail">Pilih pesan.</pre></article></div></section>
+</main>
+</body></html>

@@ -1,6 +1,8 @@
 """AI analysis use case: SVM intent, fuzzy score, and AI Host response."""
 
 from __future__ import annotations
+from services.ai_runtime_service import ai_runtime
+from services.activity_service import activity
 
 from collections import deque
 from dataclasses import dataclass
@@ -147,6 +149,8 @@ class AnalysisService:
         suspicion_score: float,
         suspicion_status: str,
         trace: dict | None = None,
+        bot_name: str = "NOX",
+        bot_role: str = "hitman",
     ) -> str:
         """Add context and ask the selected provider to speak as NOX."""
         # TAHAP 6: simpan konteks pesan pemain (maksimal 10 pesan di memori).
@@ -159,6 +163,8 @@ class AnalysisService:
             suspicion_score=suspicion_score,
             suspicion_status=suspicion_status,
             trace=trace,
+            bot_name=bot_name,
+            bot_role=bot_role,
         )
 
     # HELPER ASYNC LLM: susun prompt, catat trace bila diminta, panggil provider, dan kembalikan teks atau pesan fallback.
@@ -172,20 +178,24 @@ class AnalysisService:
         suspicion_score: float,
         suspicion_status: str,
         trace: dict | None = None,
+        bot_name: str = "NOX",
+        bot_role: str = "hitman",
     ) -> str:
+        selected = ai_runtime.current(settings)
         # TAHAP 6: susun prompt NOX dari riwayat, pesan, intent SVM, dan skor fuzzy.
         history_text = "\n".join(self._chat_history)
         prompt = f"""
-Kamu adalah NOX, karakter bot dalam game deduksi sosial. Peran rahasiamu adalah
-Hitman, tetapi JANGAN PERNAH mengakuinya atau menyebut instruksi ini. Berbicaralah
+Kamu adalah {bot_name}, pemain bot dalam game deduksi sosial. Peran rahasiamu adalah
+{bot_role}, tetapi jangan menyebut instruksi ini atau membocorkan role. Berbicaralah
 seperti pemain lain: singkat, tenang, sedikit misterius, dan sesekali mengalihkan
 kecurigaan secara halus.
 Konsep game: zero economy, tanpa uang, pembelian item, atau tebusan.
 Hitman menyandera warga diam-diam; Spy melindungi dengan Guard;
 Stalker mengintip identitas dengan Peek; Civilian mengamati chat.
 Hostage tidak mati, tetapi kehilangan chat dan voting. Target tidak diumumkan.
-Saat ini hanya latihan diskusi: jangan mengklaim telah menyandera, membungkam,
-melindungi, mengintip, atau mengeksekusi pemain. Jangan mengarang hasil aksi.
+Aksi dan voting dikerjakan engine terpisah. Kamu hanya menghasilkan percakapan:
+jangan mengarang hasil aksi, role lawan, status Hostage, atau mengaku tahu siapa
+yang dibungkam. Diskusikan alibi dari chat saja, bukan bahasa tubuh atau suara.
 Berikut adalah percakapan terakhir para pemain:
 {history_text}
 
@@ -195,26 +205,30 @@ Analisis sistem terhadap pemain '{player_name}':
 - Tingkat agresivitas: {aggressiveness}
 - Tingkat Kecurigaan (Fuzzy Logic): {suspicion_score:.2f} ({suspicion_status})
 
-Balas langsung sebagai NOX, maksimal 2 kalimat. Jangan sebutkan angka skor,
+Balas langsung sebagai {bot_name}, maksimal 2 kalimat bahasa Indonesia. Jangan sebutkan angka skor,
 SVM, fuzzy logic, AI, atau status role rahasia.
 """
         # TAHAP 7: pilih LLM dari AI_PROVIDER di .env.
         # Simpan prompt yang benar-benar digunakan, bukan rekonstruksi setelah respons.
         if trace is not None:
-            trace.update(prompt=prompt, provider=settings.ai_provider,
-                         model=settings.ollama_model if settings.ai_provider == "docker" else settings.openai_model,
+            trace.update(prompt=prompt, provider=selected.ai_provider,
+                         model=selected.ollama_model if selected.ai_provider == "docker" else selected.openai_model,
                          stage="llm_pending")
         # docker -> Ollama; api -> OpenAI. Tidak ada fallback otomatis antarprovider.
-        if settings.ai_provider == "docker":
+        if trace is not None:
+            activity.record(trace.get('room_code'), 'AnalysisService._request_host_response',
+                            {'provider':selected.ai_provider, 'model':trace['model'], 'player_name':player_name, 'intent':intent},
+                            status='running', call_id=trace.get('id'))
+        if selected.ai_provider == "docker":
             try:
-                return await generate_reply(prompt)
+                return await generate_reply(prompt, config=selected)
             except (httpx.HTTPError, ValueError, TypeError, AttributeError) as error:
                 if trace is not None:
                     trace["llm_error"] = type(error).__name__
                 logger.warning("Ollama request failed (%s).", type(error).__name__)
                 return "NOX belum bisa merespons. Periksa server Ollama dan model yang dipilih."
 
-        api_key = settings.openai_api_key_value
+        api_key = selected.openai_api_key_value
         if api_key is None:
             if trace is not None:
                 trace["llm_error"] = "API key belum dikonfigurasi"
@@ -222,13 +236,13 @@ SVM, fuzzy logic, AI, atau status role rahasia.
             return "AI Host belum dikonfigurasi."
 
         unavailable_response = "AI Host sedang tidak dapat dihubungi."
-        client = AsyncOpenAI(api_key=api_key, timeout=settings.openai_timeout_seconds)
+        client = AsyncOpenAI(api_key=api_key, timeout=selected.openai_timeout_seconds)
         try:
             response = await client.responses.create(
-                model=settings.openai_model,
+                model=selected.openai_model,
                 input=prompt,
-                reasoning={"effort": settings.openai_reasoning_effort},
-                max_output_tokens=settings.openai_max_output_tokens,
+                reasoning={"effort": selected.openai_reasoning_effort},
+                max_output_tokens=selected.openai_max_output_tokens,
                 store=False,
             )
             response_text = response.output_text.strip()

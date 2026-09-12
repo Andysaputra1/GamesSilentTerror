@@ -42,7 +42,7 @@ class PromptTraceTests(unittest.IsolatedAsyncioTestCase):
         trace = {}
         sent = []
         # CALLBACK MOCK ASYNC: rekam prompt pengujian lalu kembalikan jawaban tiruan tanpa menghubungi LLM.
-        async def generate(prompt):
+        async def generate(prompt, **kwargs):
             sent.append(prompt)
             return 'Respons nyata adapter mock'
         with patch('services.analysis_service.settings') as settings, patch('services.analysis_service.generate_reply', generate):
