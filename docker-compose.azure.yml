@@ -1,0 +1,32 @@
+# Standalone Azure database setup. Backend services will be added separately.
+name: silent-terror-azure
+services:
+  mysql:
+    image: mysql:8.4.11
+    restart: unless-stopped
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    environment:
+      MYSQL_DATABASE: shadow_heist
+      MYSQL_USER: shadow_app
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env.azure}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env.azure}
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./backend/deployment/mysql:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# No host port: only containers in this Compose network can access MySQL.
+volumes:
+  mysql_data:
+    external: true
+    name: shadow_heist_mysql_data
