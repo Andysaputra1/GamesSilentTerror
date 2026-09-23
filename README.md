@@ -144,7 +144,29 @@ API key hanya dibaca backend. Penggunaan API dapat menimbulkan biaya pada akun p
 | phpMyAdmin | http://localhost:8000/phpmyadmin/ |
 | Panel backend development | http://localhost:8000/admin |
 
+### Testing lewat LAN
+
+Frontend development mengizinkan `localhost`, `127.0.0.1`, dan IP LAN pengembang `192.168.40.176`. Untuk IP lain, sesuaikan kedua daftar `allowedHosts` (build security dan serve) di `frontend/angular.json`, lalu tambahkan origin lengkap ke `.env`, misalnya `CORS_ORIGINS=http://localhost:4200,http://127.0.0.1:4200,http://192.168.40.176:4200`. Konfigurasi ini berlaku untuk HTTP API dan Socket.IO. Jangan menggunakan wildcard untuk membuka semua host/origin.
+
+Jalankan `docker compose -f docker-compose.gpu.yml up -d --no-deps ai-engine frontend`, lalu `docker compose -f docker-compose.gpu.yml restart frontend gateway` setelah mengubah konfigurasi (pakai `docker-compose.yml` untuk CPU). Restart backend menghapus pertandingan dalam memori, bukan database/model. Teman satu jaringan membuka `http://192.168.40.176:4200`; jangan memakai IP adapter WSL. Jika masih timeout dari perangkat lain, periksa firewall dan isolasi klien Wi-Fi. Jangan membuka MySQL/admin ke internet atau mematikan firewall keseluruhan.
+
 ### Panel backend development
+
+### Akun, desain Kimberly, dan login Google
+
+Halaman login menggunakan `auth.html` + `auth.scss` dari desain Kimberly. File CSS lama dan duplikat `auth_kim.*` sudah digantikan; aset sumber lainnya tetap dipertahankan.
+
+- Register memakai username 3–40 huruf/angka/underscore, email, password 10–128 karakter dan kedua konfirmasi. Password disimpan sebagai PBKDF2; username/email duplikat ditolak. Setelah register berhasil pengguna mendapat sesi dan masuk main page.
+- Login biasa menerima username atau email. Konfirmasi email di form **bukan verifikasi lewat email**. Reset password dan penautan akun belum tersedia; hubungi pengelola.
+- Database lama harus menerapkan `backend/migrations/V4__account_identities.sql` satu kali. Database baru membaca migrasi dari volume init MySQL. Jangan hapus volume untuk migrasi.
+- Google memakai Identity Services popup + callback JavaScript. Isi `GOOGLE_CLIENT_ID=...apps.googleusercontent.com` di `.env`, lalu rebuild/recreate backend. Client Secret tidak digunakan, dan jangan menaruh JSON kredensial mentah di `.env`.
+- Google Console: OAuth client jenis **Web application**, Authorized JavaScript origins `http://localhost:4200`; redirect URI tidak diperlukan untuk alur ini. Domain deployment harus HTTPS dan didaftarkan sebagai origin; IP LAN HTTP tidak didukung login Google. Login password tetap bisa digunakan lewat LAN.
+- Backend memverifikasi signature/audience/issuer/expiry token Google, email verified, dan nonce sekali pakai (5 menit). Identitas memakai Google `sub`; email yang sama tidak otomatis menautkan/mengambil alih akun lama. Token Google tidak disimpan; sesi aplikasi tetap dapat dicabut lewat logout.
+- Pembatasan percobaan 15/menit per alamat peer/endpoint dan nonce disimpan di memori untuk satu worker development. Di belakang gateway beberapa pengguna bisa berbagi batas peer; sebelum production gunakan rate limiter bersama/proxy tepercaya, HTTPS, verifikasi email, reset password, dan audit lanjutan.
+
+Panduan resmi: [Google Identity Services setup](https://developers.google.com/identity/gsi/web/guides/get-google-api-clientid) dan [verifikasi token backend](https://developers.google.com/identity/gsi/web/guides/verify-google-id-token).
+
+### Pengelolaan backend
 
 Buka `/admin` pada port 8000, login dengan admin development `user1` / `user132`. Janice/Kimberly tidak memiliki akses admin. Atur daftar admin lewat `ADMIN_USERNAMES` (dipisahkan koma); panel hanya tersedia ketika `APP_ENVIRONMENT=development`. Kredensial demo ini **bukan pengamanan untuk deployment publik**: ganti akun/password dan nonaktifkan mode development sebelum deployment.
 
