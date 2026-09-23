@@ -10,6 +10,7 @@ import { backendUrl } from '../../core/backend-url';
 export class PanelRedirect implements OnInit {
   private readonly platform = inject(PLATFORM_ID);
   message = 'Membuka panel administrator...';
+  // Arahkan browser ke panel yang disajikan backend; lewati proses render server.
   ngOnInit(): void {
     if (!isPlatformBrowser(this.platform)) return;
     const target = new URL(backendUrl() + '/panel', window.location.origin);

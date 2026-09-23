@@ -8,11 +8,23 @@ from pydantic_settings import BaseSettings
 
 class MySQLSettings(BaseSettings):
     # Both the existing MYSQL_* names and the requested DB_* names are accepted.
-    mysql_host: str = Field(default="localhost", validation_alias=AliasChoices("MYSQL_HOST", "DB_HOST"))
-    mysql_port: int = Field(default=3306, ge=1, le=65535, validation_alias=AliasChoices("MYSQL_PORT", "DB_PORT"))
-    mysql_database: str = Field(default="shadow_heist", validation_alias=AliasChoices("MYSQL_DATABASE", "DB_NAME"))
-    mysql_user: str = Field(default="shadow_app", validation_alias=AliasChoices("MYSQL_USER", "DB_USER"))
-    mysql_password: str = Field(default="shadow_app_dev_2026", repr=False, validation_alias=AliasChoices("MYSQL_PASSWORD", "DB_PASSWORD"))
+    mysql_host: str = Field(
+        default="localhost", validation_alias=AliasChoices("MYSQL_HOST", "DB_HOST")
+    )
+    mysql_port: int = Field(
+        default=3306, ge=1, le=65535, validation_alias=AliasChoices("MYSQL_PORT", "DB_PORT")
+    )
+    mysql_database: str = Field(
+        default="shadow_heist", validation_alias=AliasChoices("MYSQL_DATABASE", "DB_NAME")
+    )
+    mysql_user: str = Field(
+        default="shadow_app", validation_alias=AliasChoices("MYSQL_USER", "DB_USER")
+    )
+    mysql_password: str = Field(
+        default="shadow_app_dev_2026",
+        repr=False,
+        validation_alias=AliasChoices("MYSQL_PASSWORD", "DB_PASSWORD"),
+    )
     database_url: str | None = Field(default=None, repr=False)
     sql_echo: bool = False
     database_pool_size: int = Field(default=5, ge=1)

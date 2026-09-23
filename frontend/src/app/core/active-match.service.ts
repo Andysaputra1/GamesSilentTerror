@@ -14,12 +14,14 @@ interface ActiveMatch {
 // Pemulihan lintas tab/login: backend menentukan room aktif, bukan data tab lama.
 @Injectable({ providedIn: 'root' })
 export class ActiveMatchService {
+  // Sediakan HTTP, status logout, dan platform untuk pemulihan pertandingan.
   constructor(
     private readonly http: HttpClient,
     private readonly session: SessionService,
     @Inject(PLATFORM_ID) private readonly platform: object,
   ) {}
 
+  // Cari pertandingan aktif; abaikan respons jika token berubah atau logout dimulai.
   lookup() {
     if (!isPlatformBrowser(this.platform)) return of(null);
     const token = localStorage.getItem('shadow_heist_access_token');
@@ -31,8 +33,11 @@ export class ActiveMatchService {
       })
       .pipe(
         timeout(10000),
-        map((result) => !this.session.loggingOut() && localStorage.getItem('shadow_heist_access_token') === token
-          ? result.active : null),
+        map((result) =>
+          !this.session.loggingOut() && localStorage.getItem('shadow_heist_access_token') === token
+            ? result.active
+            : null,
+        ),
       );
   }
 

@@ -10,7 +10,6 @@ from services.auth_service import (
     auth_service,
 )
 
-
 _bearer_scheme = HTTPBearer(auto_error=False)
 
 

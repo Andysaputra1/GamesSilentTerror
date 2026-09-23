@@ -8,7 +8,6 @@ from services.analysis_service import IntentModelNotReadyError, analysis_service
 from services.auth_service import AuthenticatedUser
 from services.persistence_service import PersistenceError, persistence_service
 
-
 router = APIRouter(prefix="/api", tags=["game"])
 
 

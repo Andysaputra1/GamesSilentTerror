@@ -57,7 +57,9 @@ export interface GameSnapshot {
 // ADAPTER HTTP: backend memutuskan izin, role, dan hasil aksi.
 @Injectable({ providedIn: 'root' })
 export class GameService {
+  // function Object() { [native code] }
   constructor(private readonly http: HttpClient) {}
+  // Kirim aksi atau ambil snapshot privat pertandingan dengan token sesi dan timeout.
   request(code: string, body?: unknown, action = 'play') {
     const base = `${backendUrl()}/api/rooms/${encodeURIComponent(code)}`;
     const headers = new HttpHeaders({

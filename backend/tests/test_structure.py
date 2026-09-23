@@ -1,6 +1,5 @@
 """Run with: python -m unittest discover -s tests -v (from backend)."""
 
-import asyncio
 from datetime import datetime, timedelta
 from io import BytesIO
 from pathlib import Path
@@ -43,7 +42,9 @@ class AccountQueryTests(unittest.TestCase):
             self.assertIsNone(auth_queries.account_by_username(db, "' OR 1=1 --"))
             self.assertEqual(auth_queries.account_by_username(db, "user1")["id"], 1)
             now = datetime.now()
-            auth_queries.create_session(db, user_id=1, token_hash="test", expires_at=now + timedelta(hours=1))
+            auth_queries.create_session(
+                db, user_id=1, token_hash="test", expires_at=now + timedelta(hours=1)
+            )
             self.assertEqual(auth_queries.account_for_token(db, "test", now)["username"], "user1")
             self.assertIsNone(auth_queries.account_for_token(db, "test", now + timedelta(hours=2)))
             self.assertEqual(auth_queries.delete_session(db, "test"), 1)
@@ -54,8 +55,9 @@ class AccountQueryTests(unittest.TestCase):
 class UploadTests(unittest.IsolatedAsyncioTestCase):
     # HELPER TES: buat UploadFile di memori dengan nama berbahaya untuk menguji keamanan penamaan.
     def file(self, data, mime="image/png"):
-        return UploadFile(BytesIO(data), filename="../../escape.png",
-                          headers=Headers({"content-type": mime}))
+        return UploadFile(
+            BytesIO(data), filename="../../escape.png", headers=Headers({"content-type": mime})
+        )
 
     # TES ASYNC UPLOAD: pastikan nama hasil unik, isi/ukuran benar, dan file berada di folder sementara.
     async def test_safe_unique_names(self):

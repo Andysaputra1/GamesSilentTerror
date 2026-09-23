@@ -60,7 +60,9 @@ class RoomService:
                 raise ValueError("Kembali ke pertandingan aktifmu terlebih dahulu.")
             current = self.current(username)
             if current and current.code != code.strip().upper():
-                raise ValueError("Keluar dari ruangan sebelumnya sebelum bergabung ke ruangan lain.")
+                raise ValueError(
+                    "Keluar dari ruangan sebelumnya sebelum bergabung ke ruangan lain."
+                )
             room = self.rooms.get(code.strip().upper())
             if room is None:
                 raise ValueError("Kode ruangan tidak ditemukan.")
@@ -89,9 +91,14 @@ class RoomService:
     # METHOD SERIALISASI: salin data publik ruangan dan roster untuk respons API/socket.
     def snapshot(self, room: Room):
         with self.lock:
-            return {"code": room.code, "owner": room.owner, "members": list(room.members),
-                    "bot_enabled": room.bot_enabled, "bots": self.bot_names(room),
-                    "phase": room.match.phase if room.match else "lobby"}
+            return {
+                "code": room.code,
+                "owner": room.owner,
+                "members": list(room.members),
+                "bot_enabled": room.bot_enabled,
+                "bots": self.bot_names(room),
+                "phase": room.match.phase if room.match else "lobby",
+            }
 
     # Bot mengisi hingga minimal empat peserta; nama dicadangkan supaya tidak meniru manusia.
     def bot_names(self, room):
@@ -100,7 +107,11 @@ class RoomService:
         if not room.bot_enabled:
             return []
         count = min(6 - len(room.members), max(1, 4 - len(room.members)))
-        return [name for name in ["NOX", "ECHO", "VEIL", "RAVEN", "ASH", "DUSK"] if name not in room.members][:count]
+        return [
+            name
+            for name in ["NOX", "ECHO", "VEIL", "RAVEN", "ASH", "DUSK"]
+            if name not in room.members
+        ][:count]
 
     # START: hanya host; role tidak pernah dikembalikan lewat snapshot lobby.
     @traced
@@ -110,7 +121,9 @@ class RoomService:
             if room.owner != username:
                 raise ValueError("Hanya pembuat ruangan yang dapat memulai.")
             if room.match:
-                raise ValueError("Pertandingan sudah dimulai. Buat ruangan baru untuk bermain lagi.")
+                raise ValueError(
+                    "Pertandingan sudah dimulai. Buat ruangan baru untuk bermain lagi."
+                )
             if any(self.active(name) for name in room.members):
                 raise ValueError("Ada anggota yang masih mengikuti pertandingan lain.")
             room.match = Match(room.members, self.bot_names(room), quick=quick)
@@ -122,6 +135,7 @@ class RoomService:
         with self.lock:
             return next((room for room in self.rooms.values() if username in room.members), None)
 
+    # Cari pertandingan yang belum selesai untuk mencegah pengguna bermain di dua ruangan.
     def active(self, username):
         with self.lock:
             for room in self.rooms.values():
@@ -179,8 +193,16 @@ class RoomService:
                     before = (room.match.phase, room.match.round)
                     room.match.tick()
                     if before != (room.match.phase, room.match.round):
-                        activity.record(room.code, 'Match.tick', {'phase_before':before[0], 'round_before':before[1]},
-                                        result={'phase':room.match.phase, 'round':room.match.round, 'winner':room.match.winner})
+                        activity.record(
+                            room.code,
+                            "Match.tick",
+                            {"phase_before": before[0], "round_before": before[1]},
+                            result={
+                                "phase": room.match.phase,
+                                "round": room.match.round,
+                                "winner": room.match.winner,
+                            },
+                        )
 
     # LEAVE: pertandingan aktif tidak boleh berubah roster; lobby kosong dibersihkan.
     @traced
@@ -188,7 +210,9 @@ class RoomService:
         with self.lock:
             room = self.get(code, username)
             if room.match and not room.match.winner:
-                raise ValueError("Tidak dapat keluar dari pertandingan aktif. Kamu bisa menyambung kembali setelah menutup tab.")
+                raise ValueError(
+                    "Tidak dapat keluar dari pertandingan aktif. Kamu bisa menyambung kembali setelah menutup tab."
+                )
             room.members.remove(username)
             if not room.members:
                 del self.rooms[room.code]

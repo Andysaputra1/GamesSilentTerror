@@ -11,14 +11,20 @@ from typing import Any
 
 import joblib
 import httpx
-from openai import APIConnectionError, APIError, APITimeoutError, AsyncOpenAI, AuthenticationError, RateLimitError
+from openai import (
+    APIConnectionError,
+    APIError,
+    APITimeoutError,
+    AsyncOpenAI,
+    AuthenticationError,
+    RateLimitError,
+)
 
 from config.settings import settings
 from module.ollama_client import generate_reply
 from module.openrouter_client import generate_reply as openrouter_reply, failure_message
 from schemas.chat import AnalysisResponse, AnalyzeChatRequest, FuzzyResult
 from services.fuzzy_service import calculate_suspicion, status_for_score
-
 
 logger = logging.getLogger("shadow_heist.analysis")
 
@@ -216,14 +222,34 @@ SVM, fuzzy logic, AI, atau status role rahasia.
         # TAHAP 7: pilih LLM dari AI_PROVIDER di .env.
         # Simpan prompt yang benar-benar digunakan, bukan rekonstruksi setelah respons.
         if trace is not None:
-            trace.update(prompt=prompt, provider=selected.ai_provider,
-                         model=selected.ollama_model if selected.ai_provider == "docker" else (selected.openrouter_model if selected.api_backend == "openrouter" else selected.openai_model),
-                         stage="llm_pending")
+            trace.update(
+                prompt=prompt,
+                provider=selected.ai_provider,
+                model=(
+                    selected.ollama_model
+                    if selected.ai_provider == "docker"
+                    else (
+                        selected.openrouter_model
+                        if selected.api_backend == "openrouter"
+                        else selected.openai_model
+                    )
+                ),
+                stage="llm_pending",
+            )
         # docker -> Ollama; api -> OpenAI. Tidak ada fallback otomatis antarprovider.
         if trace is not None:
-            activity.record(trace.get('room_code'), 'AnalysisService._request_host_response',
-                            {'provider':selected.ai_provider, 'model':trace['model'], 'player_name':player_name, 'intent':intent},
-                            status='running', call_id=trace.get('id'))
+            activity.record(
+                trace.get("room_code"),
+                "AnalysisService._request_host_response",
+                {
+                    "provider": selected.ai_provider,
+                    "model": trace["model"],
+                    "player_name": player_name,
+                    "intent": intent,
+                },
+                status="running",
+                call_id=trace.get("id"),
+            )
         if selected.ai_provider == "docker":
             try:
                 return await generate_reply(prompt, config=selected)

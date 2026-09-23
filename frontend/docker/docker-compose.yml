@@ -6,15 +6,21 @@ services:
       dockerfile: docker/Dockerfile
     init: true
     ports:
-      - "127.0.0.1:${FRONTEND_PORT:-4200}:4200"
+      - '127.0.0.1:${FRONTEND_PORT:-4200}:4200'
     environment:
       BACKEND_URL: ${BACKEND_URL:-https://backendthesis.andylabs.site}
-      NG_CLI_ANALYTICS: "false"
+      NG_CLI_ANALYTICS: 'false'
     volumes:
       - ../src:/app/src
       - ../public:/app/public
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4200').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:4200').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
       interval: 15s
       timeout: 5s
       retries: 5

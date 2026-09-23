@@ -14,14 +14,26 @@ class CheckerService:
     # METHOD TRACE: buat jejak pesan baru dan batasi riwayat menjadi 100 pesan terbaru per ruangan.
     def begin(self, code, sender, message):
         trace = {
-            "id": uuid4().hex, "created_at": datetime.now(timezone.utc).isoformat(),
+            "id": uuid4().hex,
+            "created_at": datetime.now(timezone.utc).isoformat(),
             "room_code": code,
-            "sender": sender, "message": message, "stage": "received",
-            "intent": None, "aggressiveness_before": None, "intent_weight": None,
-            "aggressiveness": None, "silence_percentage": 20,
-            "suspicion_score": None, "suspicion_status": None,
-            "provider": None, "model": None, "prompt": None, "output": None,
-            "llm_error": None, "error": None, "message_id": None,
+            "sender": sender,
+            "message": message,
+            "stage": "received",
+            "intent": None,
+            "aggressiveness_before": None,
+            "intent_weight": None,
+            "aggressiveness": None,
+            "silence_percentage": 20,
+            "suspicion_score": None,
+            "suspicion_status": None,
+            "provider": None,
+            "model": None,
+            "prompt": None,
+            "output": None,
+            "llm_error": None,
+            "error": None,
+            "message_id": None,
         }
         self.rooms.setdefault(code, deque(maxlen=100)).appendleft(trace)
         return trace

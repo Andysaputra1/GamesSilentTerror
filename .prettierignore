@@ -1,0 +1,9 @@
+**/node_modules/**
+**/dist/**
+**/.angular/**
+**/package-lock.json
+**/*.css
+**/*.scss
+tmp/**
+communicationfolder/**
+frontend/src/environments/environment.vercel.ts

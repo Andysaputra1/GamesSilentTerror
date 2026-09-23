@@ -18,11 +18,20 @@ export interface Room {
 // CLASS SERVICE: pusat request HTTP ruangan agar komponen tidak mengulang URL dan header.
 export class RoomService {
   // CONSTRUCTOR: Angular menyediakan HttpClient melalui dependency injection.
+  // function Object() { [native code] }
   constructor(private readonly http: HttpClient) {}
+  // Pulihkan keanggotaan ruangan dari server tanpa mengandalkan cache tab.
   current() {
-    return this.http.get<{room: Room | null}>(backendUrl() + '/api/rooms/current', {
-      headers: new HttpHeaders({ Authorization: 'Bearer ' + (localStorage.getItem('shadow_heist_access_token') ?? '') }),
-    }).pipe(timeout(10000), map(response => response.room));
+    return this.http
+      .get<{ room: Room | null }>(backendUrl() + '/api/rooms/current', {
+        headers: new HttpHeaders({
+          Authorization: 'Bearer ' + (localStorage.getItem('shadow_heist_access_token') ?? ''),
+        }),
+      })
+      .pipe(
+        timeout(10000),
+        map((response) => response.room),
+      );
   }
   // METHOD: siapkan request ber-token dengan timeout 10 detik.
   // Mengembalikan Observable; request dikirim ketika pemanggil melakukan subscribe.

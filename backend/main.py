@@ -24,7 +24,6 @@ from realtime.socket_handlers import register_socket_handlers
 from services.analysis_service import analysis_service
 from services.persistence_service import persistence_service
 
-
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("shadow_heist")
 
@@ -40,12 +39,14 @@ async def lifespan(_: FastAPI):
         logger.info("Koneksi MySQL siap.")
         from services.ai_runtime_service import load_panel_configuration
         from services.persistence_service import PersistenceError
+
         try:
             load_panel_configuration()
         except PersistenceError:
             logger.error("Konfigurasi panel belum tersedia; jalankan migrasi V6.")
     else:
         logger.error("Koneksi awal MySQL gagal.")
+
     # Timer server tidak bergantung pada tab pemain atau kecepatan respons LLM.
     async def game_clock():
         while True:

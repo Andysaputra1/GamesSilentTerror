@@ -26,7 +26,10 @@ describe('Lobby', () => {
     component = fixture.componentInstance;
     await fixture.whenStable();
   });
-  afterEach(() => { localStorage.clear(); sessionStorage.clear(); });
+  afterEach(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+  });
 
   // TES: pastikan komponen halaman dapat dibuat; belum menguji seluruh interaksinya.
   it('should create', () => {
@@ -70,7 +73,14 @@ describe('Lobby', () => {
   });
 
   it('restores the server room in a new tab and prevents joining another lobby', () => {
-    const room = {code: 'ABC123', owner: 'alice', members: ['alice'], bots: [], bot_enabled: false, phase: 'lobby'};
+    const room = {
+      code: 'ABC123',
+      owner: 'alice',
+      members: ['alice'],
+      bots: [],
+      bot_enabled: false,
+      phase: 'lobby',
+    };
     vi.spyOn(TestBed.inject(RoomService), 'current').mockReturnValue(of(room));
     const request = vi.spyOn(TestBed.inject(RoomService), 'request');
     component.restoreRoom();
@@ -85,7 +95,12 @@ describe('Lobby', () => {
   });
 
   it('clears stale room and game pointers when the server no longer has a room', () => {
-    for (const key of ['shadow_heist_room', 'shadow_heist_room_snapshot', 'shadow_heist_game_entry']) sessionStorage.setItem(key, 'stale');
+    for (const key of [
+      'shadow_heist_room',
+      'shadow_heist_room_snapshot',
+      'shadow_heist_game_entry',
+    ])
+      sessionStorage.setItem(key, 'stale');
     vi.spyOn(TestBed.inject(RoomService), 'current').mockReturnValue(of(null));
     component.restoreRoom();
     expect(component.room).toBeNull();

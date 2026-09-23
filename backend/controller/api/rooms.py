@@ -50,6 +50,7 @@ def active(user=Depends(require_authenticated_user)):
     return {"active": room_service.active(user.username)}
 
 
+# Pulihkan ruangan milik pengguna, termasuk lobby dan pertandingan selesai.
 @router.get("/current")
 def current(user=Depends(require_authenticated_user)):
     with room_service.lock:
@@ -111,6 +112,7 @@ def create(user=Depends(require_authenticated_user)):
                     raise HTTPException(503, "Ruangan gagal disimpan. Coba lagi.") from error
                 room_service.rooms.pop(room.code, None)
             raise HTTPException(503, "Kode ruangan belum tersedia. Coba lagi.")
+
     return result(create_archived)
 
 
@@ -132,6 +134,9 @@ def bot(code: str, body: BotOption, user=Depends(require_authenticated_user)):
     return result(lambda: room_service.set_bot(code, user.username, body.enabled))
 
 
+# Tutup endpoint checker publik lama; data analisis hanya tersedia lewat panel.
 @router.get("/{code}/checker", include_in_schema=False)
 def checker(code: str):
-    raise HTTPException(status_code=410, detail="Checker dipindahkan ke /panel dan memerlukan login administrator.")
+    raise HTTPException(
+        status_code=410, detail="Checker dipindahkan ke /panel dan memerlukan login administrator."
+    )

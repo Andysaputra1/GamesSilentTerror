@@ -6,7 +6,6 @@ import hashlib
 import hmac
 import secrets
 
-
 _ALGORITHM = "sha256"
 _ITERATIONS = 600_000
 _SCHEME = "pbkdf2_sha256"
@@ -16,9 +15,7 @@ _SCHEME = "pbkdf2_sha256"
 def hash_password(password: str) -> str:
     """Create a salted PBKDF2-SHA256 password hash for a new account."""
     salt = secrets.token_bytes(16)
-    digest = hashlib.pbkdf2_hmac(
-        _ALGORITHM, password.encode("utf-8"), salt, _ITERATIONS
-    )
+    digest = hashlib.pbkdf2_hmac(_ALGORITHM, password.encode("utf-8"), salt, _ITERATIONS)
     return f"{_SCHEME}${_ITERATIONS}${salt.hex()}${digest.hex()}"
 
 

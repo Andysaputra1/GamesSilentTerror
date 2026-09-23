@@ -1,4 +1,4 @@
-import { Component, signal, OnInit, OnDestroy, Inject, PLATFORM_ID } from '@angular/core';
+import { Component, OnInit, OnDestroy, Inject, PLATFORM_ID } from '@angular/core';
 import { RouterOutlet, Router } from '@angular/router';
 import { isPlatformBrowser } from '@angular/common';
 import { catchError, exhaustMap, filter, fromEvent, merge, of, Subscription, timer } from 'rxjs';
@@ -16,6 +16,7 @@ import { SessionService } from './core/session.service';
 export class App implements OnInit, OnDestroy {
   private monitor?: Subscription;
   private storageMonitor?: Subscription;
+  // Sediakan layanan pemulihan pertandingan, sesi, router, dan identitas platform.
   constructor(
     private readonly matches: ActiveMatchService,
     private readonly router: Router,
@@ -26,14 +27,19 @@ export class App implements OnInit, OnDestroy {
   // Host bisa memulai ketika anggota masih di main/lobby. Cek juga saat kembali ke tab.
   ngOnInit(): void {
     if (!isPlatformBrowser(this.platform)) return;
-    this.storageMonitor = fromEvent<StorageEvent>(window, 'storage').pipe(
-      filter(event => event.storageArea === localStorage &&
-        (event.key === 'shadow_heist_access_token' || event.key === null) &&
-        !localStorage.getItem('shadow_heist_access_token')),
-    ).subscribe(() => {
-      this.session.clearLocalSession();
-      void this.router.navigateByUrl('/login', { replaceUrl: true });
-    });
+    this.storageMonitor = fromEvent<StorageEvent>(window, 'storage')
+      .pipe(
+        filter(
+          (event) =>
+            event.storageArea === localStorage &&
+            (event.key === 'shadow_heist_access_token' || event.key === null) &&
+            !localStorage.getItem('shadow_heist_access_token'),
+        ),
+      )
+      .subscribe(() => {
+        this.session.clearLocalSession();
+        void this.router.navigateByUrl('/login', { replaceUrl: true });
+      });
     this.monitor = merge(
       timer(0, 3000),
       fromEvent(window, 'focus'),
@@ -51,10 +57,9 @@ export class App implements OnInit, OnDestroy {
       });
   }
 
+  // Hentikan pemantauan pertandingan dan sesi antar-tab saat aplikasi dilepas.
   ngOnDestroy(): void {
     this.monitor?.unsubscribe();
     this.storageMonitor?.unsubscribe();
   }
-  // PROPERTY SIGNAL: nilai reaktif; perubahan melalui API signal dapat memperbarui tampilan.
-  protected readonly title = signal('frontend');
 }

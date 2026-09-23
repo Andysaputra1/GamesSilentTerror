@@ -8,7 +8,6 @@ from controller.api.health import router as health_router
 from controller.api.rooms import router as rooms_router
 from controller.api.panel import router as panel_router
 
-
 api_router = APIRouter()
 api_router.include_router(health_router)
 api_router.include_router(auth_router)

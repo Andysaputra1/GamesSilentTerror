@@ -17,7 +17,6 @@ from services.auth_service import (
     auth_service,
 )
 
-
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 _bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -72,39 +71,51 @@ def account_response(operation):
         raise HTTPException(401, str(error)) from error
     except AuthenticationPersistenceError as error:
         raise HTTPException(503, str(error)) from error
-    return LoginResponse(access_token=result.access_token, expires_at=result.expires_at,
-        user=AuthenticatedUserResponse(username=result.user.username, display_name=result.user.display_name))
+    return LoginResponse(
+        access_token=result.access_token,
+        expires_at=result.expires_at,
+        user=AuthenticatedUserResponse(
+            username=result.user.username, display_name=result.user.display_name
+        ),
+    )
 
 
-@router.post('/register', response_model=LoginResponse, status_code=201, dependencies=[Depends(limit_auth)])
+# Daftarkan akun dan terbitkan sesi; respons autentikasi tidak boleh di-cache.
+@router.post(
+    "/register", response_model=LoginResponse, status_code=201, dependencies=[Depends(limit_auth)]
+)
 def register(body: RegisterRequest, response: Response):
-    response.headers['Cache-Control'] = 'no-store'
+    response.headers["Cache-Control"] = "no-store"
     return account_response(lambda: register_account(body))
 
 
-@router.get('/google/config')
+# Kirim client ID publik agar browser dapat menyiapkan tombol Google.
+@router.get("/google/config")
 def google_config(response: Response):
-    response.headers['Cache-Control'] = 'no-store'
-    return {'client_id': settings.google_client_id.strip()}
+    response.headers["Cache-Control"] = "no-store"
+    return {"client_id": settings.google_client_id.strip()}
 
 
-@router.post('/google/challenge', dependencies=[Depends(limit_auth)])
+# Validasi origin lalu buat nonce sekali pakai untuk percobaan login Google.
+@router.post("/google/challenge", dependencies=[Depends(limit_auth)])
 def google_challenge(request: Request, response: Response):
     validate_google_origin(request)
     if not settings.google_client_id.strip():
-        raise HTTPException(503, 'Login Google belum dikonfigurasi.')
-    response.headers['Cache-Control'] = 'no-store'
-    return {'nonce': nonces.issue()}
+        raise HTTPException(503, "Login Google belum dikonfigurasi.")
+    response.headers["Cache-Control"] = "no-store"
+    return {"nonce": nonces.issue()}
 
 
+# Tolak login Google dari origin yang tidak diizinkan backend.
 def validate_google_origin(request):
     # Callback JS mengirim JSON, bukan auto POST form GIS. Tolak origin lain.
-    if request.headers.get('origin') not in settings.allowed_origins:
-        raise HTTPException(403, 'Origin login tidak diizinkan.')
+    if request.headers.get("origin") not in settings.allowed_origins:
+        raise HTTPException(403, "Origin login tidak diizinkan.")
 
 
-@router.post('/google', response_model=LoginResponse, dependencies=[Depends(limit_auth)])
+# Verifikasi origin, token, dan nonce Google sebelum membuat sesi aplikasi.
+@router.post("/google", response_model=LoginResponse, dependencies=[Depends(limit_auth)])
 def google_login(body: GoogleLoginRequest, request: Request, response: Response):
     validate_google_origin(request)
-    response.headers['Cache-Control'] = 'no-store'
+    response.headers["Cache-Control"] = "no-store"
     return account_response(lambda: google_account(verify_google(body.credential, body.nonce)))

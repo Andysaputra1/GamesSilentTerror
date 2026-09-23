@@ -4,7 +4,5 @@
   "installCommand": "npm ci",
   "buildCommand": "npm run build:vercel",
   "outputDirectory": "dist/frontend/browser",
-  "rewrites": [
-    { "source": "/((?!api/|socket\\.io/).*)", "destination": "/index.csr.html" }
-  ]
+  "rewrites": [{ "source": "/((?!api/|socket\\.io/).*)", "destination": "/index.csr.html" }]
 }

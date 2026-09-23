@@ -1,7 +1,15 @@
 import { backendUrl } from '../../core/backend-url';
 import { isPlatformBrowser } from '@angular/common';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectorRef, Component, DestroyRef, Inject, PLATFORM_ID, ElementRef, ViewChild } from '@angular/core';
+import {
+  ChangeDetectorRef,
+  Component,
+  DestroyRef,
+  Inject,
+  PLATFORM_ID,
+  ElementRef,
+  ViewChild,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -49,34 +57,56 @@ export class Auth {
     const username = this.registerName.trim();
     const email = this.registerEmail.trim().toLowerCase();
     if (!/^[A-Za-z0-9_]{3,40}$/.test(username)) {
-      this.registerError = 'Username harus 3–40 huruf, angka, atau underscore.'; return;
+      this.registerError = 'Username harus 3–40 huruf, angka, atau underscore.';
+      return;
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email !== this.registerEmailVerify.trim().toLowerCase()) {
-      this.registerError = 'Email tidak valid atau konfirmasinya berbeda.'; return;
+    if (
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
+      email !== this.registerEmailVerify.trim().toLowerCase()
+    ) {
+      this.registerError = 'Email tidak valid atau konfirmasinya berbeda.';
+      return;
     }
-    if (this.registerPassword.length < 10 || this.registerPassword.length > 128
-        || this.registerPassword !== this.registerPasswordVerify) {
-      this.registerError = 'Password 10–128 karakter dan konfirmasinya harus sama.'; return;
+    if (
+      this.registerPassword.length < 10 ||
+      this.registerPassword.length > 128 ||
+      this.registerPassword !== this.registerPasswordVerify
+    ) {
+      this.registerError = 'Password 10–128 karakter dan konfirmasinya harus sama.';
+      return;
     }
     this.isSubmitting = true;
-    this.http.post<LoginResponse>(this.backendUrl + '/api/auth/register', {
-      username, email, email_confirmation: this.registerEmailVerify.trim(),
-      password: this.registerPassword, password_confirmation: this.registerPasswordVerify,
-    }).pipe(timeout(15000), takeUntilDestroyed(this.destroyRef), finalize(() => {
-      this.isSubmitting = false; this.changeDetector.markForCheck();
-    })).subscribe({
-      next: response => {
-        this.registerPassword = this.registerPasswordVerify = '';
-        this.completeLogin(response);
-      },
-      error: (error: unknown) => {
-        this.registerError = error instanceof HttpErrorResponse && error.status === 409
-          ? 'Username atau email sudah digunakan. Silakan login.'
-          : this.describeLoginError(error);
-      },
-    });
+    this.http
+      .post<LoginResponse>(this.backendUrl + '/api/auth/register', {
+        username,
+        email,
+        email_confirmation: this.registerEmailVerify.trim(),
+        password: this.registerPassword,
+        password_confirmation: this.registerPasswordVerify,
+      })
+      .pipe(
+        timeout(15000),
+        takeUntilDestroyed(this.destroyRef),
+        finalize(() => {
+          this.isSubmitting = false;
+          this.changeDetector.markForCheck();
+        }),
+      )
+      .subscribe({
+        next: (response) => {
+          this.registerPassword = this.registerPasswordVerify = '';
+          this.completeLogin(response);
+        },
+        error: (error: unknown) => {
+          this.registerError =
+            error instanceof HttpErrorResponse && error.status === 409
+              ? 'Username atau email sudah digunakan. Silakan login.'
+              : this.describeLoginError(error);
+        },
+      });
   }
 
+  // Gunakan resolver URL bersama untuk request login biasa dan Google.
   private get backendUrl(): string {
     return backendUrl();
   }
@@ -87,41 +117,76 @@ export class Auth {
     this.googleError = '';
     this.googleLoading = true;
     try {
-      if (location.protocol !== 'https:' && !['localhost', '127.0.0.1'].includes(location.hostname)) {
-        throw new Error('Login Google perlu localhost atau domain HTTPS. Untuk LAN HTTP gunakan login biasa.');
+      if (
+        location.protocol !== 'https:' &&
+        !['localhost', '127.0.0.1'].includes(location.hostname)
+      ) {
+        throw new Error(
+          'Login Google perlu localhost atau domain HTTPS. Untuk LAN HTTP gunakan login biasa.',
+        );
       }
-      const config = await firstValueFrom(this.http.get<{client_id: string}>(this.backendUrl + '/api/auth/google/config').pipe(timeout(15000)));
+      const config = await firstValueFrom(
+        this.http
+          .get<{ client_id: string }>(this.backendUrl + '/api/auth/google/config')
+          .pipe(timeout(15000)),
+      );
       if (!config.client_id) throw new Error('Login Google belum diaktifkan pengelola.');
-      const challenge = await firstValueFrom(this.http.post<{nonce: string}>(this.backendUrl + '/api/auth/google/challenge', {}).pipe(timeout(15000)));
+      const challenge = await firstValueFrom(
+        this.http
+          .post<{ nonce: string }>(this.backendUrl + '/api/auth/google/challenge', {})
+          .pipe(timeout(15000)),
+      );
       const identity = await loadGoogleIdentity();
       if (this.destroyRef.destroyed) return;
-      identity.initialize({client_id: config.client_id, nonce: challenge.nonce, auto_select: false,
-        callback: result => this.submitGoogle(result.credential, challenge.nonce)});
+      identity.initialize({
+        client_id: config.client_id,
+        nonce: challenge.nonce,
+        auto_select: false,
+        callback: (result) => this.submitGoogle(result.credential, challenge.nonce),
+      });
       // Icon resmi Google tidak memaksa binder kecil menjadi lebih lebar.
-      identity.renderButton(this.googleButton.nativeElement, {theme: 'outline', size: 'large', type: 'icon'});
+      identity.renderButton(this.googleButton.nativeElement, {
+        theme: 'outline',
+        size: 'large',
+        type: 'icon',
+      });
       this.googleReady = true;
     } catch (error) {
-      this.googleError = error instanceof HttpErrorResponse ? this.describeLoginError(error)
-        : error instanceof Error ? error.message : 'Login Google gagal disiapkan.';
+      this.googleError =
+        error instanceof HttpErrorResponse
+          ? this.describeLoginError(error)
+          : error instanceof Error
+            ? error.message
+            : 'Login Google gagal disiapkan.';
     } finally {
-      this.googleLoading = false; this.changeDetector.markForCheck();
+      this.googleLoading = false;
+      this.changeDetector.markForCheck();
     }
   }
 
+  // Tukar credential dan nonce Google menjadi sesi aplikasi, lalu bersihkan tombol login.
   private submitGoogle(credential: string, nonce: string): void {
     if (this.destroyRef.destroyed || this.isSubmitting) return;
     this.isSubmitting = true;
-    this.http.post<LoginResponse>(this.backendUrl + '/api/auth/google', {credential, nonce})
-      .pipe(timeout(20000), takeUntilDestroyed(this.destroyRef), finalize(() => {
-        this.isSubmitting = false; this.googleReady = false;
-        this.googleButton?.nativeElement.replaceChildren();
-        this.changeDetector.markForCheck();
-      })).subscribe({
-        next: response => this.completeLogin(response),
+    this.http
+      .post<LoginResponse>(this.backendUrl + '/api/auth/google', { credential, nonce })
+      .pipe(
+        timeout(20000),
+        takeUntilDestroyed(this.destroyRef),
+        finalize(() => {
+          this.isSubmitting = false;
+          this.googleReady = false;
+          this.googleButton?.nativeElement.replaceChildren();
+          this.changeDetector.markForCheck();
+        }),
+      )
+      .subscribe({
+        next: (response) => this.completeLogin(response),
         error: (error: unknown) => {
-          this.googleError = error instanceof HttpErrorResponse && error.status === 409
-            ? 'Email sudah terdaftar. Gunakan metode login awal.'
-            : 'Login Google gagal atau kedaluwarsa. Silakan coba lagi.';
+          this.googleError =
+            error instanceof HttpErrorResponse && error.status === 409
+              ? 'Email sudah terdaftar. Gunakan metode login awal.'
+              : 'Login Google gagal atau kedaluwarsa. Silakan coba lagi.';
         },
       });
   }
@@ -130,6 +195,7 @@ export class Auth {
   private readonly loginTimeoutMs = 15_000;
 
   // CONSTRUCTOR: Angular menyediakan HTTP, router, lifecycle, pembaruan view, dan platform.
+  // function Object() { [native code] }
   constructor(
     private readonly http: HttpClient,
     private readonly router: Router,

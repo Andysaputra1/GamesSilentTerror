@@ -1,4 +1,13 @@
-import { Component, DestroyRef, ElementRef, HostListener, Input, ViewChild, inject, signal } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  ElementRef,
+  HostListener,
+  Input,
+  ViewChild,
+  inject,
+  signal,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { SessionService } from './session.service';
 
@@ -54,24 +63,33 @@ export class ProfileMenu {
   private readonly element = inject(ElementRef<HTMLElement>);
   private readonly destroy = inject(DestroyRef);
 
-  toggle(): void { this.open.update(value => !value); }
+  // Buka atau tutup pilihan akun dari tombol profil.
+  toggle(): void {
+    this.open.update((value) => !value);
+  }
 
+  // Tutup menu saat klik berasal dari luar komponen profil.
   @HostListener('document:click', ['$event'])
   outside(event: MouseEvent): void {
     if (!this.element.nativeElement.contains(event.target as Node)) this.open.set(false);
   }
 
+  // Tutup menu lewat Escape dan kembalikan fokus ke tombol profil.
   @HostListener('keydown.escape')
   close(): void {
     this.open.set(false);
     this.trigger?.nativeElement.focus();
   }
 
+  // Cegah klik ganda, jalankan logout, dan tampilkan error agar pengguna bisa mencoba lagi.
   logout(): void {
     if (this.session.loggingOut()) return;
     this.error.set('');
-    this.session.logout().pipe(takeUntilDestroyed(this.destroy)).subscribe({
-      error: () => this.error.set('Logout belum berhasil. Periksa koneksi lalu coba lagi.'),
-    });
+    this.session
+      .logout()
+      .pipe(takeUntilDestroyed(this.destroy))
+      .subscribe({
+        error: () => this.error.set('Logout belum berhasil. Periksa koneksi lalu coba lagi.'),
+      });
   }
 }

@@ -11,7 +11,6 @@ from pydantic_settings import SettingsConfigDict
 
 from config.mysql import MySQLSettings
 
-
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 PROJECT_DIR = BACKEND_DIR.parent
 
@@ -31,7 +30,9 @@ class Settings(MySQLSettings):
     panel_username: str = "administrator"
     panel_password_hash: SecretStr | None = None
     openrouter_api_key: SecretStr | None = None
-    openrouter_default: SecretStr | None = Field(default=None, validation_alias=AliasChoices("openrouter_default", "OPENROUTER_DEFAULT"))
+    openrouter_default: SecretStr | None = Field(
+        default=None, validation_alias=AliasChoices("openrouter_default", "OPENROUTER_DEFAULT")
+    )
     openrouter_key_source: Literal["default", "custom"] = "default"
     openrouter_custom_configured: bool = False
     openrouter_model: str = "qwen/qwen3-14b"
@@ -53,8 +54,10 @@ class Settings(MySQLSettings):
     # VALIDATOR CLASS METHOD: ubah pilihan 8/14 menjadi nama model Ollama dan tolak pilihan lain.
     def resolve_ollama_model(cls, value: object) -> str:
         models = {
-            "8": "qwen3:8b", "14": "qwen3:14b",
-            "qwen3:8b": "qwen3:8b", "qwen3:14b": "qwen3:14b",
+            "8": "qwen3:8b",
+            "14": "qwen3:14b",
+            "qwen3:8b": "qwen3:8b",
+            "qwen3:14b": "qwen3:14b",
         }
         selected = str(value).strip().lower()
         if selected not in models:
@@ -77,9 +80,14 @@ class Settings(MySQLSettings):
 
     default_room_code: str = "local-lobby"
 
+    # Pilih kunci bawaan atau kustom sesuai konfigurasi panel tanpa fallback diam-diam.
     @property
     def openrouter_api_key_value(self) -> str | None:
-        key = (self.openrouter_default or self.openrouter_api_key) if self.openrouter_key_source == "default" else self.openrouter_api_key
+        key = (
+            (self.openrouter_default or self.openrouter_api_key)
+            if self.openrouter_key_source == "default"
+            else self.openrouter_api_key
+        )
         return key.get_secret_value().strip() or None if key else None
 
     @property
@@ -94,7 +102,6 @@ class Settings(MySQLSettings):
         if self.openai_api_key is None:
             return None
         return self.openai_api_key.get_secret_value().strip() or None
-
 
 
 @lru_cache

@@ -25,7 +25,12 @@ def main():
         parser.error("Password harus 8-256 karakter dan konfirmasi harus sama.")
     try:
         with SessionLocal.begin() as database:
-            create_account(database, username=args.username, display_name=display_name, password_hash=hash_password(password))
+            create_account(
+                database,
+                username=args.username,
+                display_name=display_name,
+                password_hash=hash_password(password),
+            )
     except IntegrityError:
         parser.error("Username sudah digunakan; akun lama tidak diubah.")
     print(f"Akun {args.username} siap dipakai login.")

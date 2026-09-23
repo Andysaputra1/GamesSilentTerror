@@ -56,6 +56,7 @@ export class Checker implements OnInit, OnDestroy {
   updatedAt: Date | null = null;
   private timer?: ReturnType<typeof setInterval>;
 
+  // Sediakan HTTP, parameter route, dan lifecycle untuk pembacaan jejak ruangan.
   constructor(
     private readonly http: HttpClient,
     private readonly route: ActivatedRoute,
@@ -77,6 +78,7 @@ export class Checker implements OnInit, OnDestroy {
     }, 2000);
   }
 
+  // Hentikan polling ketika halaman checker dilepas.
   ngOnDestroy(): void {
     if (this.timer) clearInterval(this.timer);
   }
@@ -86,6 +88,7 @@ export class Checker implements OnInit, OnDestroy {
     return this.traces.find((trace) => trace.id === this.selectedId);
   }
 
+  // Validasi kode ruangan, reset pilihan lama, lalu ambil snapshot checker.
   watchRoom(): void {
     if (this.busy) return;
     const normalized = this.code.trim().toUpperCase();

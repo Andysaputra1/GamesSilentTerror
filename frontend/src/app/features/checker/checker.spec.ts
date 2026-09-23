@@ -9,9 +9,10 @@ describe('Checker', () => {
   let component: Checker;
   let http: HttpTestingController;
   beforeEach(() => {
-    TestBed.configureTestingModule({ imports: [Checker], providers: [
-      provideHttpClient(), provideHttpClientTesting(), provideRouter([]),
-    ] });
+    TestBed.configureTestingModule({
+      imports: [Checker],
+      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
+    });
     component = TestBed.createComponent(Checker).componentInstance;
     http = TestBed.inject(HttpTestingController);
   });
@@ -38,7 +39,9 @@ describe('Checker', () => {
   it('unlocks refresh and reports server failures', () => {
     component.code = 'ABC123';
     component.watchRoom();
-    http.expectOne('http://localhost:8000/api/rooms/ABC123/checker').flush({}, { status: 500, statusText: 'Error' });
+    http
+      .expectOne('http://localhost:8000/api/rooms/ABC123/checker')
+      .flush({}, { status: 500, statusText: 'Error' });
     expect(component.busy).toBe(false);
     expect(component.error).toContain('gagal diperbarui');
   });

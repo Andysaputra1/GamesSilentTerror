@@ -34,7 +34,9 @@ def _image_type(header: bytes) -> tuple[str, str]:
 
 
 # HELPER ASYNC: periksa path, tipe, dan ukuran upload; simpan bernama UUID, bersihkan file parsial jika gagal.
-async def save_upload(file: UploadFile, policy: UploadPolicy, *, root: Path = UPLOAD_ROOT) -> StoredUpload:
+async def save_upload(
+    file: UploadFile, policy: UploadPolicy, *, root: Path = UPLOAD_ROOT
+) -> StoredUpload:
     """Validate headers and size; callers decide authorization and HTTP responses."""
     root = root.resolve()
     destination = (root / policy.directory).resolve()
@@ -72,7 +74,9 @@ async def save_upload(file: UploadFile, policy: UploadPolicy, *, root: Path = UP
 
 
 # HELPER ASYNC BATCH: simpan beberapa file sesuai batas kebijakan; jika gagal, hapus hanya hasil batch ini.
-async def save_uploads(files: list[UploadFile], policy: UploadPolicy, *, root: Path = UPLOAD_ROOT) -> list[StoredUpload]:
+async def save_uploads(
+    files: list[UploadFile], policy: UploadPolicy, *, root: Path = UPLOAD_ROOT
+) -> list[StoredUpload]:
     """Batch upload; a failed file removes only files created in this batch."""
     uploaded: list[StoredUpload] = []
     try:

@@ -3,6 +3,8 @@
 import httpx
 from config.settings import settings
 
+
+# Siapkan header akses tunnel Ollama sesuai token yang dikonfigurasi.
 def tunnel_headers(config):
     token = config.ollama_tunnel_token
     return {"Authorization": "Bearer " + token.get_secret_value()} if token else {}

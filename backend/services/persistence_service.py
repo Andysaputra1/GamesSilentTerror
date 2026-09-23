@@ -48,24 +48,55 @@ class PersistenceService:
     # SERVICE REST: petakan hasil analisis ke proses penyimpanan pesan dan respons AI.
     def record_analysis(self, *, player_name: str, message: str, result: AnalysisResult) -> None:
         self._record(
-            username=player_name, message=message, intent=result.intent,
-            aggressiveness=result.aggressiveness, suspicion_score=result.suspicion_score,
-            status=None, llm_response=result.llm_response, suspicion_status=result.suspicion_status,
+            username=player_name,
+            message=message,
+            intent=result.intent,
+            aggressiveness=result.aggressiveness,
+            suspicion_score=result.suspicion_score,
+            status=None,
+            llm_response=result.llm_response,
+            suspicion_status=result.suspicion_status,
         )
 
     # SERVICE CHAT SOCKET: simpan pesan, skor, status pemain, dan respons LLM jika tersedia.
-    def record_player_message(self, *, username: str, message: str, intent: str | None,
-                              aggressiveness: int, suspicion_score: float, status: str,
-                              llm_response: str | None = None, context: dict | None = None) -> int:
+    def record_player_message(
+        self,
+        *,
+        username: str,
+        message: str,
+        intent: str | None,
+        aggressiveness: int,
+        suspicion_score: float,
+        status: str,
+        llm_response: str | None = None,
+        context: dict | None = None,
+    ) -> int:
         return self._record(
-            username=username, message=message, intent=intent, aggressiveness=aggressiveness,
-            suspicion_score=suspicion_score, status=status, llm_response=llm_response,
-            suspicion_status=status_for_score(suspicion_score), context=context,
+            username=username,
+            message=message,
+            intent=intent,
+            aggressiveness=aggressiveness,
+            suspicion_score=suspicion_score,
+            status=status,
+            llm_response=llm_response,
+            suspicion_status=status_for_score(suspicion_score),
+            context=context,
         )
 
     # HELPER PENYIMPANAN: gabungkan pembaruan pemain, pesan, dan analisis dalam satu transaksi atomik.
-    def _record(self, *, username, message, intent, aggressiveness, suspicion_score,
-                status, llm_response, suspicion_status, context=None):
+    def _record(
+        self,
+        *,
+        username,
+        message,
+        intent,
+        aggressiveness,
+        suspicion_score,
+        status,
+        llm_response,
+        suspicion_status,
+        context=None,
+    ):
         # CALLBACK TRANSAKSI: perbarui pemain, buat pesan, simpan analisis jika ada intent serta respons, lalu kembalikan ID pesan.
         def operation(database):
             room_id, player_id = self._player(database, username)
@@ -73,51 +104,95 @@ class PersistenceService:
             if status is not None:
                 queries.update_player_status(database, player_id, status)
             message_id = queries.insert_message(
-                database, room_id=room_id, player_id=player_id, username=username,
-                message=message, intent=intent, suspicion_score=suspicion_score,
+                database,
+                room_id=room_id,
+                player_id=player_id,
+                username=username,
+                message=message,
+                intent=intent,
+                suspicion_score=suspicion_score,
             )
             if context is not None:
-                queries.set_message_context(database, message_id, sender_kind="human", context=context)
+                queries.set_message_context(
+                    database, message_id, sender_kind="human", context=context
+                )
             if intent is not None and llm_response is not None:
                 queries.insert_analysis(
-                    database, message_id=message_id, intent=intent, aggressiveness=aggressiveness,
-                    suspicion_score=suspicion_score, suspicion_status=suspicion_status,
+                    database,
+                    message_id=message_id,
+                    intent=intent,
+                    aggressiveness=aggressiveness,
+                    suspicion_score=suspicion_score,
+                    suspicion_status=suspicion_status,
                     llm_response=llm_response,
                 )
             return message_id
+
         return self._run(operation)
 
+    # Arsipkan ruangan baru beserta pemiliknya sebelum dipakai bermain.
     def archive_new_room(self, username):
         from sqlalchemy import text
+
+        # Simpan ruangan dan pemiliknya dalam satu transaksi agar arsip tidak setengah jadi.
         def operation(db):
-            inserted = db.execute(text("INSERT IGNORE INTO game_sessions(room_code,phase) VALUES(:code,'lobby')"), {"code": self.room_code}).rowcount
+            inserted = db.execute(
+                text("INSERT IGNORE INTO game_sessions(room_code,phase) VALUES(:code,'lobby')"),
+                {"code": self.room_code},
+            ).rowcount
             if not inserted:
                 return False
             self._player(db, username)
             return True
+
         return self._run(operation)
 
+    # Simpan jejak checker sebagai arsip analisis ruangan.
     def record_trace(self, trace):
         import json
         from sqlalchemy import text
-        self._run(lambda db: db.execute(text("""
+
+        self._run(
+            lambda db: db.execute(
+                text("""
             INSERT INTO checker_traces(id,room_code,trace) VALUES(:id,:room,:trace)
             ON DUPLICATE KEY UPDATE trace=:trace
-        """), {"id": trace["id"], "room": self.room_code, "trace": json.dumps(trace)}))
+        """),
+                {"id": trace["id"], "room": self.room_code, "trace": json.dumps(trace)},
+            )
+        )
 
-    def record_bot_message(self, *, username, message, context, reply_to_id,
-                           intent, aggressiveness, suspicion_score):
+    # Simpan balasan bot beserta konteks dan ID pesan yang dijawab.
+    def record_bot_message(
+        self, *, username, message, context, reply_to_id, intent, aggressiveness, suspicion_score
+    ):
+        # Simpan pesan bot lalu tautkan konteks fase dan pesan manusia yang dibalas.
         def operation(db):
             room_id = queries.ensure_room(db, self.room_code)
-            message_id = queries.insert_message(db, room_id=room_id, player_id=None,
-                username=username, message=message, intent=None, suspicion_score=0)
-            queries.set_message_context(db, message_id, sender_kind="bot",
-                context=context, reply_to_id=reply_to_id)
+            message_id = queries.insert_message(
+                db,
+                room_id=room_id,
+                player_id=None,
+                username=username,
+                message=message,
+                intent=None,
+                suspicion_score=0,
+            )
+            queries.set_message_context(
+                db, message_id, sender_kind="bot", context=context, reply_to_id=reply_to_id
+            )
             if intent is not None:
-                queries.insert_analysis(db, message_id=reply_to_id, intent=intent,
-                    aggressiveness=aggressiveness, suspicion_score=suspicion_score,
-                    suspicion_status=status_for_score(suspicion_score), llm_response=message)
+                queries.insert_analysis(
+                    db,
+                    message_id=reply_to_id,
+                    intent=intent,
+                    aggressiveness=aggressiveness,
+                    suspicion_score=suspicion_score,
+                    suspicion_status=status_for_score(suspicion_score),
+                    llm_response=message,
+                )
             return message_id
+
         return self._run(operation)
 
     # SERVICE PENYIMPANAN: ubah status pemain secara transaksional, bukan keputusan aturan permainan.
@@ -126,14 +201,18 @@ class PersistenceService:
         def operation(database):
             _, player_id = self._player(database, username)
             queries.update_player_status(database, player_id, status)
+
         self._run(operation)
 
     # SERVICE PENYIMPANAN: perbarui skor pemain melalui transaksi database.
-    def update_player_scores(self, *, username: str, aggressiveness: int, suspicion_score: float) -> None:
+    def update_player_scores(
+        self, *, username: str, aggressiveness: int, suspicion_score: float
+    ) -> None:
         # CALLBACK TRANSAKSI: pastikan pemain ada lalu perbarui agresivitas dan kecurigaannya.
         def operation(database):
             _, player_id = self._player(database, username)
             queries.update_player_scores(database, player_id, aggressiveness, suspicion_score)
+
         self._run(operation)
 
     # SERVICE PENYIMPANAN: simpan nama fase ruangan; fungsi ini tidak menjalankan timer/voting.
@@ -141,6 +220,7 @@ class PersistenceService:
         # CALLBACK TRANSAKSI: pastikan ruangan ada lalu simpan fase yang diminta.
         def operation(database):
             queries.set_phase(database, queries.ensure_room(database, self.room_code), phase)
+
         self._run(operation)
 
 

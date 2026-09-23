@@ -25,8 +25,6 @@ export class MainPage implements OnInit {
       const storedUser = localStorage.getItem('shadow_heist_user');
       const user = storedUser ? (JSON.parse(storedUser) as { username?: string }) : null;
       this.username = user?.username || this.username;
-    } catch {
-
-    }
+    } catch {}
   }
 }

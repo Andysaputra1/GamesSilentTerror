@@ -10,18 +10,14 @@
   <body>
     <header>
       <a href="/panel" class="brand"
-        ><span class="mark">ST</span
-        ><span>SILENT TERROR<small>ADMINISTRATION</small></span></a
+        ><span class="mark">ST</span><span>SILENT TERROR<small>ADMINISTRATION</small></span></a
       ><button id="logout" class="secondary" hidden>Keluar</button>
     </header>
     <main>
       <section id="login-view" class="login-card">
         <span class="eyebrow">CONTROL ROOM</span>
         <h1>Selamat datang<br />kembali.</h1>
-        <p>
-          Masuk untuk mengelola AI, memantau checker, dan membaca arsip
-          percakapan.
-        </p>
+        <p>Masuk untuk mengelola AI, memantau checker, dan membaca arsip percakapan.</p>
         <form id="login-form">
           <label
             >Username<input
@@ -48,8 +44,7 @@
           <span class="badge">Silent Terror</span>
         </div>
         <nav aria-label="Menu panel">
-          <button data-menu="ai" aria-current="page">
-            <span>01</span> Konfigurasi AI</button
+          <button data-menu="ai" aria-current="page"><span>01</span> Konfigurasi AI</button
           ><button data-menu="checker"><span>02</span> Checker</button
           ><button data-menu="history"><span>03</span> Riwayat chat</button>
         </nav>
@@ -66,9 +61,7 @@
             <label
               >Provider<select id="provider">
                 <option value="api">API &middot; OpenRouter</option>
-                <option value="docker">
-                  LLM lokal &middot; Ollama melalui tunnel
-                </option>
+                <option value="docker">LLM lokal &middot; Ollama melalui tunnel</option>
               </select></label
             >
             <div id="local-settings" hidden>
@@ -79,8 +72,7 @@
                   placeholder="https://ollama.domain-kamu.com"
               /></label>
               <p class="hint">
-                Masukkan alamat dasar tunnel, tanpa /api/chat. Model lokal:
-                qwen3:14b.
+                Masukkan alamat dasar tunnel, tanpa /api/chat. Model lokal: qwen3:14b.
               </p>
             </div>
             <div id="api-settings">
@@ -105,14 +97,12 @@
                   />
                 </label>
                 <p class="hint">
-                  Kosongkan untuk tetap memakai key yang tersimpan. Isi key baru
-                  untuk menggantinya. Key tidak ditampilkan kembali setelah
-                  disimpan.
+                  Kosongkan untuk tetap memakai key yang tersimpan. Isi key baru untuk menggantinya.
+                  Key tidak ditampilkan kembali setelah disimpan.
                 </p>
               </div>
               <p class="info">
-                Model otomatis: <strong>qwen/qwen3-14b</strong><br /><span
-                  id="key-status"
+                Model otomatis: <strong>qwen/qwen3-14b</strong><br /><span id="key-status"
                   >Memeriksa konfigurasi key...</span
                 >
               </p>
@@ -129,8 +119,8 @@
               <h3>Status koneksi AI</h3>
               <p id="ai-status" role="status" aria-live="polite">Belum diperiksa.</p>
               <small
-                >Pengecekan mengirim satu prompt pendek. Mode API menggunakan
-                saldo OpenRouter.</small
+                >Pengecekan mengirim satu prompt pendek. Mode API menggunakan saldo
+                OpenRouter.</small
               >
             </div>
             <button id="check-ai" class="secondary">Cek AI aktif</button>
@@ -141,10 +131,7 @@
             <div>
               <span class="eyebrow">LIVE & ARCHIVED</span>
               <h2>Checker per room</h2>
-              <p>
-                Lihat pesan &rarr; SVM &rarr; fuzzy &rarr; prompt &rarr; respons
-                AI.
-              </p>
+              <p>Lihat pesan &rarr; SVM &rarr; fuzzy &rarr; prompt &rarr; respons AI.</p>
             </div>
             <button id="refresh-checker" class="secondary">Refresh</button>
           </div>
@@ -154,25 +141,21 @@
                 <option value="">Pilih ruangan</option>
               </select></label
             ><label class="check"
-              ><input id="auto-checker" type="checkbox" checked /> Update
-              otomatis / 5 detik</label
+              ><input id="auto-checker" type="checkbox" checked /> Update otomatis / 5 detik</label
             >
           </div>
           <p class="hint">
-            Prompt yang dikirim aplikasi, bukan penalaran internal model. Trace
-            selesai tersimpan; aktivitas fungsi adalah buffer live.
+            Prompt yang dikirim aplikasi, bukan penalaran internal model. Trace selesai tersimpan;
+            aktivitas fungsi adalah buffer live.
           </p>
           <div class="split">
             <div>
               <div id="traces" class="trace-list"></div>
-              <button id="older-traces" class="secondary" hidden>
-                Jejak lebih lama
-              </button>
+              <button id="older-traces" class="secondary" hidden>Jejak lebih lama</button>
             </div>
             <div>
               <h3>Detail pipeline</h3>
-              <pre id="trace-detail">
-Pilih room dan pesan untuk melihat detail.</pre>
+              <pre id="trace-detail">Pilih room dan pesan untuk melihat detail.</pre>
             </div>
           </div>
           <details>
@@ -199,8 +182,8 @@ Pilih room dan pesan untuk melihat detail.</pre>
             ><button class="secondary">Terapkan filter</button>
           </form>
           <p class="hint">
-            Tanggal opsional, zona waktu WIB. Download mencakup semua room
-            dengan filter tanggal di atas; kolom CSV: chat_id, isi_chat.
+            Tanggal opsional, zona waktu WIB. Download mencakup semua room dengan filter tanggal di
+            atas; kolom CSV: chat_id, isi_chat.
           </p>
           <div class="table-scroll">
             <table>
@@ -215,12 +198,8 @@ Pilih room dan pesan untuk melihat detail.</pre>
               <tbody id="history-rows"></tbody>
             </table>
           </div>
-          <p id="history-empty" hidden>
-            Belum ada percakapan untuk filter ini.
-          </p>
-          <button id="more-history" class="secondary" hidden>
-            Muat berikutnya
-          </button>
+          <p id="history-empty" hidden>Belum ada percakapan untuk filter ini.</p>
+          <button id="more-history" class="secondary" hidden>Muat berikutnya</button>
         </section>
       </div>
       <p id="notice" role="status" aria-live="polite"></p>

@@ -6,9 +6,21 @@
 
   <section class="auth-table" aria-label="Silent Terror account access">
     <section class="register-sheet left-column" aria-labelledby="register-heading">
-      <img class="decoration decoration--gears" src="/assets/decorations/gears/gear-trio.png" alt="" />
-      <img class="decoration decoration--map" src="/assets/decorations/maps/world-map-double-scroll.png" alt="" />
-      <img class="decoration decoration--glasses" src="/assets/decorations/objects/round-glasses.png" alt="" />
+      <img
+        class="decoration decoration--gears"
+        src="/assets/decorations/gears/gear-trio.png"
+        alt=""
+      />
+      <img
+        class="decoration decoration--map"
+        src="/assets/decorations/maps/world-map-double-scroll.png"
+        alt=""
+      />
+      <img
+        class="decoration decoration--glasses"
+        src="/assets/decorations/objects/round-glasses.png"
+        alt=""
+      />
 
       <div class="paper-content">
         <header class="form-heading">
@@ -19,30 +31,79 @@
         <form class="storybook-form register-form" (ngSubmit)="register()" novalidate>
           <label class="paper-field" for="reg-name">
             <span>Username</span>
-            <input id="reg-name" type="text" name="name" [(ngModel)]="registerName" autocomplete="username" placeholder="3–40 huruf, angka, underscore" maxlength="40" [disabled]="isSubmitting" />
+            <input
+              id="reg-name"
+              type="text"
+              name="name"
+              [(ngModel)]="registerName"
+              autocomplete="username"
+              placeholder="3–40 huruf, angka, underscore"
+              maxlength="40"
+              [disabled]="isSubmitting"
+            />
           </label>
           <label class="paper-field" for="reg-email">
             <span>Email</span>
-            <input id="reg-email" type="email" name="email" [(ngModel)]="registerEmail" autocomplete="email" placeholder="your@email.com" maxlength="254" [disabled]="isSubmitting" />
+            <input
+              id="reg-email"
+              type="email"
+              name="email"
+              [(ngModel)]="registerEmail"
+              autocomplete="email"
+              placeholder="your@email.com"
+              maxlength="254"
+              [disabled]="isSubmitting"
+            />
           </label>
           <label class="paper-field" for="reg-email-verify">
             <span>Confirm email</span>
-            <input id="reg-email-verify" type="email" name="emailVerify" [(ngModel)]="registerEmailVerify" autocomplete="email" placeholder="Confirm email" maxlength="254" [disabled]="isSubmitting" />
+            <input
+              id="reg-email-verify"
+              type="email"
+              name="emailVerify"
+              [(ngModel)]="registerEmailVerify"
+              autocomplete="email"
+              placeholder="Confirm email"
+              maxlength="254"
+              [disabled]="isSubmitting"
+            />
           </label>
           <label class="paper-field" for="reg-password">
             <span>Password</span>
-            <input id="reg-password" type="password" name="password" [(ngModel)]="registerPassword" autocomplete="new-password" placeholder="Minimal 10 karakter" maxlength="128" [disabled]="isSubmitting" />
+            <input
+              id="reg-password"
+              type="password"
+              name="password"
+              [(ngModel)]="registerPassword"
+              autocomplete="new-password"
+              placeholder="Minimal 10 karakter"
+              maxlength="128"
+              [disabled]="isSubmitting"
+            />
           </label>
           <label class="paper-field" for="reg-password-verify">
             <span>Confirm password</span>
-            <input id="reg-password-verify" type="password" name="passwordVerify" [(ngModel)]="registerPasswordVerify" autocomplete="new-password" placeholder="Confirm password" maxlength="128" [disabled]="isSubmitting" />
+            <input
+              id="reg-password-verify"
+              type="password"
+              name="passwordVerify"
+              [(ngModel)]="registerPasswordVerify"
+              autocomplete="new-password"
+              placeholder="Confirm password"
+              maxlength="128"
+              [disabled]="isSubmitting"
+            />
           </label>
 
           @if (registerError) {
             <p class="form-alert" role="alert">{{ registerError }}</p>
           }
 
-          <button class="storybook-button storybook-button--signup" type="submit" [disabled]="isSubmitting">
+          <button
+            class="storybook-button storybook-button--signup"
+            type="submit"
+            [disabled]="isSubmitting"
+          >
             {{ isSubmitting ? 'PROCESSING...' : 'SIGN UP' }}
           </button>
         </form>
@@ -59,18 +120,47 @@
         <form class="storybook-form login-form" (ngSubmit)="submit()" novalidate>
           <label class="paper-field" for="username">
             <span>Email / username</span>
-            <input id="username" type="text" name="username" [(ngModel)]="username" (input)="clearError()" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Your detective name" [disabled]="isSubmitting" />
+            <input
+              id="username"
+              type="text"
+              name="username"
+              [(ngModel)]="username"
+              (input)="clearError()"
+              autocomplete="username"
+              autocapitalize="none"
+              spellcheck="false"
+              placeholder="Your detective name"
+              [disabled]="isSubmitting"
+            />
           </label>
           <label class="paper-field" for="password">
             <span>Password</span>
             <span class="password-line">
-              <input id="password" [type]="passwordVisible ? 'text' : 'password'" name="password" [(ngModel)]="password" (input)="clearError()" autocomplete="current-password" placeholder="Your secret password" [disabled]="isSubmitting" />
-              <button class="password-toggle" type="button" (click)="togglePasswordVisibility()" [disabled]="isSubmitting">{{ passwordVisible ? 'Hide' : 'Show' }}</button>
+              <input
+                id="password"
+                [type]="passwordVisible ? 'text' : 'password'"
+                name="password"
+                [(ngModel)]="password"
+                (input)="clearError()"
+                autocomplete="current-password"
+                placeholder="Your secret password"
+                [disabled]="isSubmitting"
+              />
+              <button
+                class="password-toggle"
+                type="button"
+                (click)="togglePasswordVisibility()"
+                [disabled]="isSubmitting"
+              >
+                {{ passwordVisible ? 'Hide' : 'Show' }}
+              </button>
             </span>
           </label>
 
           <div class="journal-links">
-            <button type="button" (click)="useDevelopmentCredentials()" [disabled]="isSubmitting">Use demo account</button>
+            <button type="button" (click)="useDevelopmentCredentials()" [disabled]="isSubmitting">
+              Use demo account
+            </button>
             <span class="unavailable-note">Lupa password? Hubungi pengelola.</span>
           </div>
 
@@ -78,22 +168,38 @@
             <p class="form-alert" role="alert" aria-live="assertive">{{ errorMessage }}</p>
           }
 
-          <button class="storybook-button storybook-button--signin submit-button" type="submit" [disabled]="isSubmitting">
+          <button
+            class="storybook-button storybook-button--signin submit-button"
+            type="submit"
+            [disabled]="isSubmitting"
+          >
             {{ isSubmitting ? 'VERIFYING...' : 'SIGN IN' }}
           </button>
         </form>
         <section class="google-access" aria-label="Google sign in">
           @if (!googleReady) {
-            <button type="button" class="storybook-button storybook-button--google" (click)="prepareGoogle()" [disabled]="isSubmitting || googleLoading" [attr.aria-busy]="googleLoading">
+            <button
+              type="button"
+              class="storybook-button storybook-button--google"
+              (click)="prepareGoogle()"
+              [disabled]="isSubmitting || googleLoading"
+              [attr.aria-busy]="googleLoading"
+            >
               {{ googleLoading ? 'Menyiapkan Google...' : 'Login dengan Google' }}
             </button>
           }
           <div #googleButton class="google-provider"></div>
-          @if (googleError) { <p class="form-alert" role="alert">{{ googleError }}</p> }
+          @if (googleError) {
+            <p class="form-alert" role="alert">{{ googleError }}</p>
+          }
         </section>
       </div>
 
-      <img class="decoration decoration--books" src="/assets/decorations/objects/detective-book-stack.png" alt="" />
+      <img
+        class="decoration decoration--books"
+        src="/assets/decorations/objects/detective-book-stack.png"
+        alt=""
+      />
     </section>
   </section>
 

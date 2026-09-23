@@ -1,13 +1,10 @@
 """Shared MySQL pool and transaction sessions for parameterized raw SQL."""
 
-from collections.abc import Generator
-
 from sqlalchemy import create_engine, text, event
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import sessionmaker
 
 from config.settings import settings
-
 
 engine = create_engine(
     settings.sqlalchemy_database_url,
@@ -18,22 +15,15 @@ engine = create_engine(
     max_overflow=settings.database_max_overflow,
 )
 if engine.dialect.name == "mysql":
+    # Set zona waktu setiap koneksi MySQL baru ke UTC agar timestamp konsisten.
     @event.listens_for(engine, "connect")
     def use_utc(dbapi_connection, _):
         with dbapi_connection.cursor() as cursor:
             cursor.execute("SET time_zone = '+00:00'")
 
+
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
 
-
-# GENERATOR DEPENDENCY: sediakan sesi database untuk pemanggil dan selalu tutup sesi setelah selesai.
-def get_db() -> Generator[Session, None, None]:
-    """Yield one transaction session per HTTP request."""
-    database = SessionLocal()
-    try:
-        yield database
-    finally:
-        database.close()
 
 # HEALTH CHECK: jalankan SELECT 1 untuk mengecek koneksi tanpa mengubah data.
 def database_is_ready() -> bool:

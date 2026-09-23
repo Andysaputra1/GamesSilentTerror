@@ -1,0 +1,11 @@
+[tool.black]
+line-length = 100
+target-version = ['py311']
+include = '\.py$'
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["F401", "F841"]

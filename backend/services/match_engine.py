@@ -35,13 +35,19 @@ class Match:
         self.rng = rng or random.SystemRandom()
         roles = ["hitman", "spy", "stalker"] + ["civilian"] * (len(names) - 3)
         self.rng.shuffle(roles)
-        self.players = {name: Participant(name, role, name in bots) for name, role in zip(names, roles)}
+        self.players = {
+            name: Participant(name, role, name in bots) for name, role in zip(names, roles)
+        }
         self.id = uuid4().hex
         self.round = 1
         self.max_rounds = 8
         self.ai_grace_phase = None
         self.phase = "day"
-        self.durations = {"day": 20, "night": 15, "tribunal": 15} if quick else {"day": 120, "night": 30, "tribunal": 45}
+        self.durations = (
+            {"day": 20, "night": 15, "tribunal": 15}
+            if quick
+            else {"day": 120, "night": 30, "tribunal": 45}
+        )
         self.deadline = (time.time() if now is None else now) + self.durations["day"]
         self.actions = {}
         self.votes = {}
@@ -72,7 +78,13 @@ class Match:
     # VALIDASI CHAT: Gag/Hostage/kematian dan fase malam ditegakkan di backend.
     def can_chat(self, name):
         player = self.players.get(name)
-        return bool(player and player.alive and not player.hostage and not player.gagged and self.phase in {"day", "tribunal"})
+        return bool(
+            player
+            and player.alive
+            and not player.hostage
+            and not player.gagged
+            and self.phase in {"day", "tribunal"}
+        )
 
     # VALIDASI TARGET: tidak boleh memilih pemain mati atau identitas di luar pertandingan.
     def target(self, actor, name, *, allow_self=False):
@@ -95,7 +107,11 @@ class Match:
         if expected is None or self.phase != "night" or ability != expected or name in self.actions:
             raise ValueError("Aksi malam tidak tersedia atau sudah dikunci.")
         self.target(player, target_name, allow_self=ability == "guard")
-        if ability == "guard" and player.last_guard == target_name and player.last_guard_round == self.round - 1:
+        if (
+            ability == "guard"
+            and player.last_guard == target_name
+            and player.last_guard_round == self.round - 1
+        ):
             raise ValueError("Tidak boleh Guard target yang sama dua malam berturut-turut.")
         if ability == "peek" and self.round < player.next_peek:
             raise ValueError("Peek hanya tersedia sekali setiap dua ronde.")
@@ -120,27 +136,39 @@ class Match:
                 player.last_guard = target
                 player.last_guard_round = self.round
             elif action["ability"] == "peek":
-                player.intel.append({"round": self.round, "name": target, "role": self.players[target].role})
+                player.intel.append(
+                    {"round": self.round, "name": target, "role": self.players[target].role}
+                )
                 player.next_peek = self.round + 2
         for action in self.actions.values():
             if action["ability"] == "hostage" and action["target"] not in guards:
                 self.players[action["target"]].hostage = True
         # Rekap identik untuk semua hasil, termasuk kegagalan atau target yang sudah Hostage.
-        self.events.append("Malam selesai. Semua aksi telah diselesaikan; identitas dan target tidak diumumkan.")
+        self.events.append(
+            "Malam selesai. Semua aksi telah diselesaikan; identitas dan target tidak diumumkan."
+        )
         self.check_winner()
 
     # RESOLUSI TRIBUNAL: plurality; seri/tanpa suara tidak mengeksekusi siapa pun.
     def resolve_votes(self):
         counts = Counter(self.votes.values())
-        leaders = [name for name, count in counts.items() if count == max(counts.values())] if counts else []
+        leaders = (
+            [name for name, count in counts.items() if count == max(counts.values())]
+            if counts
+            else []
+        )
         if len(leaders) == 1:
             self.players[leaders[0]].alive = False
-            self.events.append(f"Tribunal mengeksekusi {leaders[0]}. Role tetap dirahasiakan sampai permainan selesai.")
+            self.events.append(
+                f"Tribunal mengeksekusi {leaders[0]}. Role tetap dirahasiakan sampai permainan selesai."
+            )
         else:
             self.events.append("Tribunal berakhir tanpa eksekusi: suara seri atau tidak ada suara.")
         self.check_winner()
         if not self.winner and self.round >= self.max_rounds:
-            self.finish("draw", "round_limit", f"Batas {self.max_rounds} ronde tercapai tanpa pemenang.")
+            self.finish(
+                "draw", "round_limit", f"Batas {self.max_rounds} ronde tercapai tanpa pemenang."
+            )
 
     def finish(self, winner, reason, explanation):
         """Satu hasil final untuk semua pemain; tidak berubah oleh tick berikutnya."""
@@ -149,7 +177,11 @@ class Match:
         self.winner = winner
         self.winner_reason = reason
         self.phase = "finished"
-        label = {"civilians": "Kubu warga menang.", "hitman": "Hitman menang.", "draw": "Permainan seri."}[winner]
+        label = {
+            "civilians": "Kubu warga menang.",
+            "hitman": "Hitman menang.",
+            "draw": "Permainan seri.",
+        }[winner]
         self.events.append(f"{label} {explanation}")
 
     # KONDISI AKHIR: kematian Hitman berarti warga menang; semua warga hidup disandera berarti Hitman menang.
@@ -163,7 +195,9 @@ class Match:
         elif not survivors:
             self.finish("hitman", "no_civilians_alive", "Tidak ada warga yang masih hidup.")
         elif all(p.hostage for p in survivors):
-            self.finish("hitman", "all_survivors_hostage", "Semua warga yang masih hidup telah disandera.")
+            self.finish(
+                "hitman", "all_survivors_hostage", "Semua warga yang masih hidup telah disandera."
+            )
 
     def result(self, viewer):
         """Ringkasan hanya setelah selesai; korban tetap bagian dari kubu warga."""
@@ -174,7 +208,9 @@ class Match:
         return {
             "reason": self.winner_reason,
             "team": team,
-            "outcome": "draw" if self.winner == "draw" else "won" if team == self.winner else "lost",
+            "outcome": (
+                "draw" if self.winner == "draw" else "won" if team == self.winner else "lost"
+            ),
             "civilians_alive": sum(p.alive for p in civilians),
             "civilians_hostage": sum(p.alive and p.hostage for p in civilians),
             "civilians_eliminated": sum(not p.alive for p in civilians),
@@ -182,25 +218,41 @@ class Match:
 
     # BOT ATURAN: aksi/vote mengikuti validasi yang sama; tidak melihat role atau Hostage lawan.
     def run_bots(self):
-        flag = {"day": "bot_day_done", "night": "bot_night_done", "tribunal": "bot_vote_done"}.get(self.phase)
+        flag = {"day": "bot_day_done", "night": "bot_night_done", "tribunal": "bot_vote_done"}.get(
+            self.phase
+        )
         if not flag or getattr(self, flag):
             return
         setattr(self, flag, True)
         for player in self.players.values():
             if not player.bot or not player.alive or player.hostage:
                 continue
-            targets = [other.name for other in self.players.values() if other.alive and other.name != player.name]
+            targets = [
+                other.name
+                for other in self.players.values()
+                if other.alive and other.name != player.name
+            ]
             self.rng.shuffle(targets)
             if self.phase == "tribunal":
                 # Stalker hanya memakai intel hasil Peek miliknya sendiri.
-                known = [item["name"] for item in player.intel if item["role"] == "hitman" and item["name"] in targets]
+                known = [
+                    item["name"]
+                    for item in player.intel
+                    if item["role"] == "hitman" and item["name"] in targets
+                ]
                 targets = known + [name for name in targets if name not in known]
             for target in targets:
                 try:
                     if self.phase == "tribunal":
                         self.vote(player.name, target)
                     else:
-                        ability = "gag" if self.phase == "day" else {"hitman": "hostage", "spy": "guard", "stalker": "peek"}.get(player.role)
+                        ability = (
+                            "gag"
+                            if self.phase == "day"
+                            else {"hitman": "hostage", "spy": "guard", "stalker": "peek"}.get(
+                                player.role
+                            )
+                        )
                         self.act(player.name, ability, target)
                     break
                 except ValueError:
@@ -261,36 +313,85 @@ class Match:
     # SNAPSHOT PRIVAT: roster hanya mengandung alive; status diam orang lain tidak pernah dikirim.
     def snapshot(self, viewer):
         player = self.players[viewer]
-        ability = "gag" if self.phase == "day" and player.role == "hitman" else (
-            {"hitman": "hostage", "spy": "guard", "stalker": "peek"}.get(player.role) if self.phase == "night" else None)
+        ability = (
+            "gag"
+            if self.phase == "day" and player.role == "hitman"
+            else (
+                {"hitman": "hostage", "spy": "guard", "stalker": "peek"}.get(player.role)
+                if self.phase == "night"
+                else None
+            )
+        )
         can_act = bool(ability and player.alive and not player.hostage and not self.winner)
         if ability == "gag":
             can_act &= self.round >= player.next_gag
         elif ability:
-            can_act &= viewer not in self.actions and (ability != "peek" or self.round >= player.next_peek)
+            can_act &= viewer not in self.actions and (
+                ability != "peek" or self.round >= player.next_peek
+            )
         return {
             # Vote yang sudah dikirim terbuka saat Tribunal, tanpa daftar hak vote/status bungkam.
-            "tribunal_votes": [{"target": name, "voters": [voter for voter, target in self.votes.items() if target == name]}
-                               for name in self.players] if self.phase == "tribunal" else [],
+            "tribunal_votes": (
+                [
+                    {
+                        "target": name,
+                        "voters": [voter for voter, target in self.votes.items() if target == name],
+                    }
+                    for name in self.players
+                ]
+                if self.phase == "tribunal"
+                else []
+            ),
             "discussion_skip": {
                 "agreed": len(self.skip_consents) if self.phase == "day" else 0,
                 "required": sum(not p.bot and p.alive for p in self.players.values()),
                 "consented": viewer in self.skip_consents if self.phase == "day" else False,
-                "can_consent": self.phase == "day" and not player.bot and player.alive and viewer not in self.skip_consents,
+                "can_consent": self.phase == "day"
+                and not player.bot
+                and player.alive
+                and viewer not in self.skip_consents,
             },
-            "id": self.id, "phase": self.phase, "round": self.round, "max_rounds": self.max_rounds, "deadline": self.deadline,
-            "server_time": time.time(), "winner": self.winner, "events": list(self.events),
+            "id": self.id,
+            "phase": self.phase,
+            "round": self.round,
+            "max_rounds": self.max_rounds,
+            "deadline": self.deadline,
+            "server_time": time.time(),
+            "winner": self.winner,
+            "events": list(self.events),
             "result": self.result(viewer),
-            "players": [{"name": p.name, "bot": p.bot, "alive": p.alive,
-                         **({"role": p.role, "hostage": p.hostage} if self.winner else {})} for p in self.players.values()],
+            "players": [
+                {
+                    "name": p.name,
+                    "bot": p.bot,
+                    "alive": p.alive,
+                    **({"role": p.role, "hostage": p.hostage} if self.winner else {}),
+                }
+                for p in self.players.values()
+            ],
             "messages": list(self.messages),
-            "me": {"name": viewer, "role": player.role, "alive": player.alive,
-                   "hostage": player.hostage, "gagged": player.gagged,
-                   "muted": player.hostage or player.gagged, "can_chat": self.can_chat(viewer),
-                   "can_vote": self.phase == "tribunal" and player.alive and not player.hostage and not player.gagged and viewer not in self.votes,
-                   "vote": self.votes.get(viewer), "ability": ability, "can_act": bool(can_act),
-                   "action": self.actions.get(viewer) if self.phase == "night" else None,
-                   "next_gag": player.next_gag, "next_peek": player.next_peek,
-                   "last_guard": player.last_guard if player.last_guard_round == self.round - 1 else None,
-                   "intel": list(player.intel)},
+            "me": {
+                "name": viewer,
+                "role": player.role,
+                "alive": player.alive,
+                "hostage": player.hostage,
+                "gagged": player.gagged,
+                "muted": player.hostage or player.gagged,
+                "can_chat": self.can_chat(viewer),
+                "can_vote": self.phase == "tribunal"
+                and player.alive
+                and not player.hostage
+                and not player.gagged
+                and viewer not in self.votes,
+                "vote": self.votes.get(viewer),
+                "ability": ability,
+                "can_act": bool(can_act),
+                "action": self.actions.get(viewer) if self.phase == "night" else None,
+                "next_gag": player.next_gag,
+                "next_peek": player.next_peek,
+                "last_guard": (
+                    player.last_guard if player.last_guard_round == self.round - 1 else None
+                ),
+                "intel": list(player.intel),
+            },
         }

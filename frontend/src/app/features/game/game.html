@@ -7,8 +7,13 @@
       </h1>
     </div>
     <div class="match-account">
-      @if (game?.winner) { <a routerLink="/lobby">← Kembali ke lobby</a> }
-      <app-profile-menu [username]="game?.me?.name || 'Pemain'" [activeMatch]="!!game && !game.winner" />
+      @if (game?.winner) {
+        <a routerLink="/lobby">← Kembali ke lobby</a>
+      }
+      <app-profile-menu
+        [username]="game?.me?.name || 'Pemain'"
+        [activeMatch]="!!game && !game.winner"
+      />
     </div>
   </header>
   @if (error) {
@@ -18,7 +23,9 @@
     <div class="phase-strip">
       <b>RONDE {{ state.round }} / {{ state.max_rounds || 8 }} · {{ phaseNames[state.phase] }}</b
       ><strong>{{ state.winner ? 'SELESAI' : seconds + 's' }}</strong
-      ><span>{{ state.winner ? 'RIWAYAT DISKUSI' : connected ? 'CHAT TERHUBUNG' : 'MENYAMBUNG CHAT…' }}</span>
+      ><span
+        >{{ state.winner ? 'RIWAYAT DISKUSI' : connected ? 'CHAT TERHUBUNG' : 'MENYAMBUNG CHAT…' }}</span
+      >
     </div>
     @if (!state.winner) {
       <nav class="round-flow" aria-label="Urutan fase">
@@ -29,9 +36,19 @@
       <details class="rules-panel">
         <summary>Cara menang dan arti status pemain</summary>
         <p><b>Kubu warga (Spy, Stalker, Civilian):</b> menang jika Hitman dieksekusi.</p>
-        <p><b>Hitman:</b> menang jika semua warga yang masih hidup menjadi Hostage, atau tidak ada warga yang masih hidup.</p>
-        <p>Hostage tetap hidup, tetapi tidak dapat chat, voting, atau memakai skill. Gag hanya sementara dan tidak dihitung sebagai Hostage. Jumlah pemain yang seimbang tidak otomatis membuat Hitman menang.</p>
-        <p>Voting seri atau tanpa suara tidak mengeksekusi siapa pun. Jika belum ada pemenang setelah Tribunal ronde {{ state.max_rounds || 8 }}, hasilnya seri.</p>
+        <p>
+          <b>Hitman:</b> menang jika semua warga yang masih hidup menjadi Hostage, atau tidak ada
+          warga yang masih hidup.
+        </p>
+        <p>
+          Hostage tetap hidup, tetapi tidak dapat chat, voting, atau memakai skill. Gag hanya
+          sementara dan tidak dihitung sebagai Hostage. Jumlah pemain yang seimbang tidak otomatis
+          membuat Hitman menang.
+        </p>
+        <p>
+          Voting seri atau tanpa suara tidak mengeksekusi siapa pun. Jika belum ada pemenang setelah
+          Tribunal ronde {{ state.max_rounds || 8 }}, hasilnya seri.
+        </p>
       </details>
     }
     @if (state.phase === 'day') {
@@ -55,19 +72,27 @@
     @if (state.winner) {
       <section class="result" [class.is-loss]="outcomeLabel === 'KAMU KALAH'" aria-live="polite">
         <p class="eyebrow">{{ outcomeLabel }}</p>
-        <h2>{{ state.winner === 'draw' ? 'Permainan seri.' : state.winner === 'hitman' ? 'Hitman menang.' : 'Kubu warga menang.' }}</h2>
+        <h2>
+          {{ state.winner === 'draw' ? 'Permainan seri.' : state.winner === 'hitman' ? 'Hitman menang.' : 'Kubu warga menang.' }}
+        </h2>
         <p>{{ resultExplanation }}</p>
         @if (state.result; as result) {
           <div class="result-stats">
-            <span><b>{{ result.civilians_alive }}</b> warga hidup</span>
-            <span><b>{{ result.civilians_hostage }}</b> dari warga hidup disandera</span>
-            <span><b>{{ result.civilians_eliminated }}</b> warga dieksekusi</span>
+            <span
+              ><b>{{ result.civilians_alive }}</b> warga hidup</span
+            >
+            <span
+              ><b>{{ result.civilians_hostage }}</b> dari warga hidup disandera</span
+            >
+            <span
+              ><b>{{ result.civilians_eliminated }}</b> warga dieksekusi</span
+            >
           </div>
         }
         <p>
-          Role dan status akhir semua pemain kini dibuka. Keluar dari ruangan lewat lobby untuk membuat atau bergabung ke permainan baru.
+          Role dan status akhir semua pemain kini dibuka. Keluar dari ruangan lewat lobby untuk
+          membuat atau bergabung ke permainan baru.
         </p>
-
       </section>
     }
     <div class="match-grid">
@@ -75,15 +100,15 @@
         <div class="private-card">
           <p class="eyebrow">{{ state.winner ? 'ROLE KAMU' : 'HANYA UNTUKMU' }}</p>
           @if (!state.winner) {
-          <button (click)="revealRole = !revealRole">
-            {{ revealRole ? 'Sembunyikan role' : 'Lihat role saya' }}
-          </button>
+            <button (click)="revealRole = !revealRole">
+              {{ revealRole ? 'Sembunyikan role' : 'Lihat role saya' }}
+            </button>
           }
           @if (revealRole || state.winner) {
             <h2>{{ state.me.role.toUpperCase() }}</h2>
             @if (!state.winner) {
-            <p class="objective"><b>Tujuan kubumu:</b> {{ objective }}</p>
-            <p>{{ roleHelp[state.me.role] }}</p>
+              <p class="objective"><b>Tujuan kubumu:</b> {{ objective }}</p>
+              <p>{{ roleHelp[state.me.role] }}</p>
             }
           }
           <p class="private-status">{{ privateStatus }}</p>
@@ -106,12 +131,13 @@
                 "
                 (click)="target = player.name"
               >
-                <span class="avatar">{{ player.name.slice(0, 1) }}</span
-                ><b>{{ player.name }}</b
-                ><small
-                  >{{ player.bot ? 'BOT' : 'PEMAIN'
-                  }}{{ player.name === state.me.name ? ' / YOU' : '' }}</small
-                ><small>{{ !player.alive ? 'DIEKSEKUSI' : state.winner && player.hostage ? 'HIDUP / HOSTAGE' : state.winner ? 'HIDUP / BEBAS' : 'DI MEJA' }}</small>
+                <span class="avatar">{{ player.name.slice(0, 1) }}</span>
+                <b>{{ player.name }}</b>
+                <!-- prettier-ignore -->
+                <small>{{ player.bot ? 'BOT' : 'PEMAIN' }}{{ player.name === state.me.name ? ' / YOU' : '' }}</small>
+                <small
+                  >{{ !player.alive ? 'DIEKSEKUSI' : state.winner && player.hostage ? 'HIDUP / HOSTAGE' : state.winner ? 'HIDUP / BEBAS' : 'DI MEJA' }}</small
+                >
                 @if (player.role) {
                   <strong>{{ player.role.toUpperCase() }}</strong>
                 }

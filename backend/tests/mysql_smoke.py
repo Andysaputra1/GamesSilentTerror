@@ -24,45 +24,87 @@ class MySQLIntegration(unittest.TestCase):
     def test_http_auth_and_game_queries(self):
         client = TestClient(app)
         self.assertEqual(client.get("/api/auth/me").status_code, 401)
-        self.assertEqual(client.post("/api/auth/login", json={
-            "username": "user1", "password": "wrong",
-        }).status_code, 401)
-        login = client.post("/api/auth/login", json={
-            "username": "user1", "password": "user132",
-        })
+        self.assertEqual(
+            client.post(
+                "/api/auth/login",
+                json={
+                    "username": "user1",
+                    "password": "wrong",
+                },
+            ).status_code,
+            401,
+        )
+        login = client.post(
+            "/api/auth/login",
+            json={
+                "username": "user1",
+                "password": "user132",
+            },
+        )
         self.assertEqual(login.status_code, 200)
         headers = {"Authorization": "Bearer " + login.json()["access_token"]}
         self.assertEqual(client.get("/api/auth/me", headers=headers).json()["username"], "user1")
         result = AnalysisResult("neutral", 10, 20.0, "AMAN", "Test NOX reply")
         # AI transport is unchanged; this test targets the moved controllers and real SQL.
         with patch("services.analysis_service.analysis_service.analyze", return_value=result):
-            response = client.post("/api/analyze", headers=headers, json={
-                "player_name": "spoofed", "message": "integration test", "silence_percentage": 20,
-            })
+            response = client.post(
+                "/api/analyze",
+                headers=headers,
+                json={
+                    "player_name": "spoofed",
+                    "message": "integration test",
+                    "silence_percentage": 20,
+                },
+            )
         self.assertEqual(response.status_code, 200, response.text)
         with SessionLocal() as db:
-            row = db.execute(text("SELECT sender_name FROM chat_messages ORDER BY id DESC LIMIT 1")).scalar_one()
+            row = db.execute(
+                text("SELECT sender_name FROM chat_messages ORDER BY id DESC LIMIT 1")
+            ).scalar_one()
             self.assertEqual(row, "user1")
             self.assertEqual(db.execute(text("SELECT COUNT(*) FROM ai_analyses")).scalar_one(), 1)
         username = "sql-test-" + uuid4().hex[:10]
         persistence_service.ensure_player(username)
         persistence_service.ensure_player(username)
         persistence_service.update_player_status(username=username, status="gagged")
-        persistence_service.update_player_scores(username=username, aggressiveness=12, suspicion_score=22)
-        persistence_service.record_player_message(username=username, message="'quoted'; --",
-            intent="neutral", aggressiveness=12, suspicion_score=22, status="active", llm_response="Reply")
+        persistence_service.update_player_scores(
+            username=username, aggressiveness=12, suspicion_score=22
+        )
+        persistence_service.record_player_message(
+            username=username,
+            message="'quoted'; --",
+            intent="neutral",
+            aggressiveness=12,
+            suspicion_score=22,
+            status="active",
+            llm_response="Reply",
+        )
         persistence_service.set_phase("tribunal")
         with SessionLocal() as db:
-            self.assertEqual(db.execute(text("SELECT COUNT(*) FROM players WHERE username=:name"),
-                                        {"name": username}).scalar_one(), 1)
+            self.assertEqual(
+                db.execute(
+                    text("SELECT COUNT(*) FROM players WHERE username=:name"), {"name": username}
+                ).scalar_one(),
+                1,
+            )
         # An invalid write must also roll back the player inserted earlier in the same transaction.
         bad_name = "rollback-" + uuid4().hex[:10]
         with self.assertRaises(PersistenceError):
-            persistence_service.record_player_message(username=bad_name, message="bad",
-                intent=None, aggressiveness=10, suspicion_score=10, status="INVALID")
+            persistence_service.record_player_message(
+                username=bad_name,
+                message="bad",
+                intent=None,
+                aggressiveness=10,
+                suspicion_score=10,
+                status="INVALID",
+            )
         with SessionLocal() as db:
-            self.assertEqual(db.execute(text("SELECT COUNT(*) FROM players WHERE username=:name"),
-                                        {"name": bad_name}).scalar_one(), 0)
+            self.assertEqual(
+                db.execute(
+                    text("SELECT COUNT(*) FROM players WHERE username=:name"), {"name": bad_name}
+                ).scalar_one(),
+                0,
+            )
         self.assertEqual(client.post("/api/auth/logout", headers=headers).status_code, 204)
         self.assertEqual(client.get("/api/auth/me", headers=headers).status_code, 401)
         self.assertTrue(client.get("/app-status").json()["database_ready"])

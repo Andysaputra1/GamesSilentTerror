@@ -19,7 +19,6 @@ from services.auth_service import (
 from services.fuzzy_service import calculate_suspicion, status_for_score
 from services.persistence_service import PersistenceError, PersistenceService
 
-
 logger = logging.getLogger("shadow_heist.socket")
 
 PlayerState = dict[str, int | float | str]
@@ -45,7 +44,6 @@ class SocketGameController:
         self.room_players = {}
         self.room_analysis = {}
         self.ai_pending: set[str] = set()
-
 
     # HELPER STATE: ambil/buat state pemain dalam satu ruangan setelah memastikan username tidak kosong.
     def get_player(self, username: str, room_code: str) -> PlayerState:
@@ -86,7 +84,11 @@ class SocketGameController:
         player = self.get_player(authenticated_username, code)
         PersistenceService(code).ensure_player(authenticated_username)
         await self.sio.enter_room(sid, code)
-        await self.sio.emit("room_state", room_service.snapshot(room_service.get(code, authenticated_username)), to=code)
+        await self.sio.emit(
+            "room_state",
+            room_service.snapshot(room_service.get(code, authenticated_username)),
+            to=code,
+        )
         return player
 
     # EVENT CONNECT: periksa token login dan akses ruangan sebelum mencatat identitas socket.
@@ -141,11 +143,18 @@ class SocketGameController:
                 try:
                     PersistenceService(trace["room_code"]).record_trace(trace)
                 except PersistenceError:
-                    logger.error("Checker archive could not be saved for room %s", trace["room_code"])
+                    logger.error(
+                        "Checker archive could not be saved for room %s", trace["room_code"]
+                    )
 
+    # Validasi sesi dan hak chat, simpan pesan, lalu proses analisis serta balasan NOX.
     async def _send_chat(self, sid: str, data: dict[str, Any], holder) -> None:
         if sid in self.ai_pending:
-            await self.sio.emit("system_alert", {"msg": "NOX masih memproses pesan sebelumnya. Tunggu sebentar."}, to=sid)
+            await self.sio.emit(
+                "system_alert",
+                {"msg": "NOX masih memproses pesan sebelumnya. Tunggu sebentar."},
+                to=sid,
+            )
             return
         # TAHAP 1: terima event send_chat; validasi isi pesan dan identitas sesi.
         try:
@@ -177,22 +186,38 @@ class SocketGameController:
                 else:
                     accepted = {"sender": sender, "message": message}
                     phase_token = (match.id, match.round, match.phase)
-                    candidates = [p for p in match.players.values() if p.bot and match.can_chat(p.name)]
+                    candidates = [
+                        p for p in match.players.values() if p.bot and match.can_chat(p.name)
+                    ]
                     bot_player = match.rng.choice(candidates) if candidates else None
             else:
                 accepted = {"sender": sender, "message": message}
                 bot_player = None
                 phase_token = None
         if blocked:
-            activity.record(code, 'Match.can_chat', {'username':sender}, status='rejected', result={'allowed':False})
-            await self.sio.emit("system_alert", {"msg": "Chat terkunci untukmu pada fase ini."}, to=sid)
+            activity.record(
+                code,
+                "Match.can_chat",
+                {"username": sender},
+                status="rejected",
+                result={"allowed": False},
+            )
+            await self.sio.emit(
+                "system_alert", {"msg": "Chat terkunci untukmu pada fase ini."}, to=sid
+            )
             return
         bot_name = bot_player.name if bot_player else "NOX"
         bot_role = bot_player.role if bot_player else "hitman"
         trace = checker_service.begin(code, sender, message)
         holder["trace"] = trace
         trace["match_id"] = phase_token[0] if phase_token else None
-        activity.record(code, 'SocketGameController.send_chat', {'username':sender, 'message':message}, status='received', call_id=trace['id'])
+        activity.record(
+            code,
+            "SocketGameController.send_chat",
+            {"username": sender, "message": message},
+            status="received",
+            call_id=trace["id"],
+        )
         trace["aggressiveness_before"] = int(player["aggressiveness"])
         if code not in self.room_analysis:
             local_analysis = AnalysisService()
@@ -204,7 +229,13 @@ class SocketGameController:
         try:
             # TAHAP 2: pesan diprediksi oleh SVM menjadi label intent.
             intent = analysis.predict_intent(message)
-            activity.record(code, 'AnalysisService.predict_intent', {'message':message}, result={'intent':intent}, call_id=trace['id'])
+            activity.record(
+                code,
+                "AnalysisService.predict_intent",
+                {"message": message},
+                result={"intent": intent},
+                call_id=trace["id"],
+            )
             trace["intent"] = intent
             trace["intent_weight"] = analysis.aggressiveness_for_intent(intent)
             # TAHAP 3: tambahkan bobot intent ke agresivitas pemain, maksimal 100.
@@ -219,12 +250,25 @@ class SocketGameController:
         # TAHAP 4: hitung fuzzy. Persentase diam masih tetap 20%, belum diukur.
         suspicion_score = calculate_suspicion(int(player["aggressiveness"]), 20)
         player["sus_score"] = round(suspicion_score, 2)
-        activity.record(code, 'calculate_suspicion', {'aggressiveness':int(player['aggressiveness']), 'silence_percentage':20}, result={'suspicion_score':player['sus_score']}, call_id=trace['id'])
-        trace.update(aggressiveness=int(player["aggressiveness"]),
-                     suspicion_score=player["sus_score"], suspicion_status=status_for_score(suspicion_score),
-                     stage="analyzed")
+        activity.record(
+            code,
+            "calculate_suspicion",
+            {"aggressiveness": int(player["aggressiveness"]), "silence_percentage": 20},
+            result={"suspicion_score": player["sus_score"]},
+            call_id=trace["id"],
+        )
+        trace.update(
+            aggressiveness=int(player["aggressiveness"]),
+            suspicion_score=player["sus_score"],
+            suspicion_status=status_for_score(suspicion_score),
+            stage="analyzed",
+        )
 
-        context = {"match_id": phase_token[0], "round_number": phase_token[1], "phase": phase_token[2]} if phase_token else {"phase": "lobby"}
+        context = (
+            {"match_id": phase_token[0], "round_number": phase_token[1], "phase": phase_token[2]}
+            if phase_token
+            else {"phase": "lobby"}
+        )
         try:
             # Commit pesan sebelum echo atau menunggu provider AI.
             trace["message_id"] = PersistenceService(code).record_player_message(
@@ -237,7 +281,13 @@ class SocketGameController:
                 llm_response=None,
                 context=context,
             )
-            activity.record(code, 'PersistenceService.record_player_message', {'username':sender, 'intent':intent}, result={'message_id':trace['message_id']}, call_id=trace['id'])
+            activity.record(
+                code,
+                "PersistenceService.record_player_message",
+                {"username": sender, "intent": intent},
+                result={"message_id": trace["message_id"]},
+                call_id=trace["id"],
+            )
         except PersistenceError as error:
             trace.update(stage="persistence_error", error=str(error))
             await self.sio.emit("system_alert", {"msg": str(error)}, to=sid)
@@ -250,10 +300,22 @@ class SocketGameController:
 
         if not room.bot_enabled:
             trace["stage"] = "skipped_no_bot"
-            await self.sio.emit("system_alert", {"msg": "NOX belum ditambahkan. Kembali ke lobby dan pilih + Bot untuk mendapat balasan AI."}, to=sid)
+            await self.sio.emit(
+                "system_alert",
+                {
+                    "msg": "NOX belum ditambahkan. Kembali ke lobby dan pilih + Bot untuk mendapat balasan AI."
+                },
+                to=sid,
+            )
         elif intent is None:
             trace["stage"] = "skipped_no_svm"
-            await self.sio.emit("system_alert", {"msg": "NOX belum bisa menjawab karena model SVM belum siap. Periksa model backend lalu mulai ulang backend."}, to=sid)
+            await self.sio.emit(
+                "system_alert",
+                {
+                    "msg": "NOX belum bisa menjawab karena model SVM belum siap. Periksa model backend lalu mulai ulang backend."
+                },
+                to=sid,
+            )
 
         if intent is not None and match and room.bot_enabled and not bot_player:
             trace["stage"] = "skipped_no_eligible_bot"
@@ -280,11 +342,24 @@ class SocketGameController:
                 )
                 trace["output"] = host_response
                 trace["stage"] = "llm_error" if trace["llm_error"] else "llm_complete"
-                activity.record(code, 'AnalysisService._request_host_response', {'provider':trace['provider'], 'model':trace['model']}, status=trace['stage'], result={'output':host_response}, call_id=trace['id'])
+                activity.record(
+                    code,
+                    "AnalysisService._request_host_response",
+                    {"provider": trace["provider"], "model": trace["model"]},
+                    status=trace["stage"],
+                    result={"output": host_response},
+                    call_id=trace["id"],
+                )
             except Exception:
                 trace.update(stage="error", error="Respons AI gagal diproses")
                 logger.exception("Gagal memproses respons AI di ruangan %s", code)
-                await self.sio.emit("system_alert", {"msg": "Respons AI gagal diproses. Coba kirim ulang; jika berulang, periksa log backend."}, to=sid)
+                await self.sio.emit(
+                    "system_alert",
+                    {
+                        "msg": "Respons AI gagal diproses. Coba kirim ulang; jika berulang, periksa log backend."
+                    },
+                    to=sid,
+                )
             finally:
                 self.ai_pending.discard(sid)
                 await self.sio.emit("ai_status", {"pending": False}, to=sid)
@@ -292,21 +367,38 @@ class SocketGameController:
         # Jika penyimpanan gagal, kode di atas mengirim system_alert lalu berhenti.
         if host_response is not None:
             if trace["llm_error"]:
-                await self.sio.emit("system_alert", {"msg": "Layanan AI sedang tidak tersedia; permainan tetap berjalan."}, to=sid)
+                await self.sio.emit(
+                    "system_alert",
+                    {"msg": "Layanan AI sedang tidak tersedia; permainan tetap berjalan."},
+                    to=sid,
+                )
                 return
             # Jawaban lambat tidak boleh menerobos fase malam, Gag, Hostage, atau game over.
             with room_service.lock:
                 if match:
                     match.tick()
-                    if phase_token != (match.id, match.round, match.phase) or not match.can_chat(bot_name):
+                    if phase_token != (match.id, match.round, match.phase) or not match.can_chat(
+                        bot_name
+                    ):
                         trace["stage"] = "discarded_phase_changed"
-                        activity.record(code, 'Match.can_chat', {'sender':bot_name}, status='discarded_phase_changed', call_id=trace['id'])
+                        activity.record(
+                            code,
+                            "Match.can_chat",
+                            {"sender": bot_name},
+                            status="discarded_phase_changed",
+                            call_id=trace["id"],
+                        )
                         return
                     try:
                         PersistenceService(code).record_bot_message(
-                            username=bot_name, message=host_response, context=context,
-                            reply_to_id=trace["message_id"], intent=intent,
-                            aggressiveness=int(player["aggressiveness"]), suspicion_score=suspicion_score)
+                            username=bot_name,
+                            message=host_response,
+                            context=context,
+                            reply_to_id=trace["message_id"],
+                            intent=intent,
+                            aggressiveness=int(player["aggressiveness"]),
+                            suspicion_score=suspicion_score,
+                        )
                     except PersistenceError as error:
                         trace.update(stage="persistence_error", error=str(error))
                         reply = None
@@ -315,23 +407,35 @@ class SocketGameController:
                 else:
                     try:
                         PersistenceService(code).record_bot_message(
-                            username=bot_name, message=host_response, context=context,
-                            reply_to_id=trace["message_id"], intent=intent,
-                            aggressiveness=int(player["aggressiveness"]), suspicion_score=suspicion_score)
+                            username=bot_name,
+                            message=host_response,
+                            context=context,
+                            reply_to_id=trace["message_id"],
+                            intent=intent,
+                            aggressiveness=int(player["aggressiveness"]),
+                            suspicion_score=suspicion_score,
+                        )
                     except PersistenceError as error:
                         trace.update(stage="persistence_error", error=str(error))
                         reply = None
                     else:
                         reply = {"sender": bot_name, "message": host_response}
             if reply is None:
-                await self.sio.emit("system_alert", {"msg": "Balasan bot gagal disimpan. Coba lagi."}, to=sid)
+                await self.sio.emit(
+                    "system_alert", {"msg": "Balasan bot gagal disimpan. Coba lagi."}, to=sid
+                )
                 return
-            await self.sio.emit(
-                "receive_chat", reply, to=code
-            )
+            await self.sio.emit("receive_chat", reply, to=code)
             if not trace["llm_error"]:
                 trace["stage"] = "delivered"
-                activity.record(code, 'SocketGameController.receive_chat', {'sender':bot_name}, result={'message':host_response}, status='delivered', call_id=trace['id'])
+                activity.record(
+                    code,
+                    "SocketGameController.receive_chat",
+                    {"sender": bot_name},
+                    result={"message": host_response},
+                    status="delivered",
+                    call_id=trace["id"],
+                )
 
     # KOMPATIBILITAS: aksi memakai endpoint terautentikasi dengan token fase, bukan event lama.
     async def use_gag_order(self, sid: str, data: dict[str, Any]) -> None:
@@ -339,7 +443,9 @@ class SocketGameController:
 
     # KOMPATIBILITAS: client tidak boleh memaksa server mengubah fase.
     async def start_tribunal(self, sid: str) -> None:
-        await self.sio.emit("system_alert", {"msg": "Fase berganti otomatis mengikuti timer server."}, to=sid)
+        await self.sio.emit(
+            "system_alert", {"msg": "Fase berganti otomatis mengikuti timer server."}, to=sid
+        )
 
 
 # FUNCTION WIRING: buat controller dan daftarkan method-nya sebagai handler event Socket.IO.

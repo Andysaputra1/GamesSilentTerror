@@ -1,4 +1,5 @@
 """Read-only durable transcript access, restricted to explicitly configured accounts."""
+
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import FileResponse
@@ -11,6 +12,7 @@ router = APIRouter(tags=["chat-history"])
 ASSETS = Path(__file__).resolve().parents[2] / "public" / "history"
 
 
+# Periksa daftar akun pembaca riwayat dan larang caching respons.
 def require_history_admin(response: Response, user=Depends(require_authenticated_user)):
     response.headers["Cache-Control"] = "no-store"
     allowed = {name.strip() for name in settings.history_admin_usernames.split(",") if name.strip()}
@@ -19,22 +21,29 @@ def require_history_admin(response: Response, user=Depends(require_authenticated
     return user
 
 
+# Alihkan alamat riwayat lama ke panel terpadu.
 @router.get("/history", include_in_schema=False)
 def panel_redirect():
     from fastapi.responses import RedirectResponse
+
     return RedirectResponse("/panel", status_code=307)
 
 
+# Sajikan skrip halaman riwayat lama tanpa cache.
 @router.get("/history/app.js", include_in_schema=False)
 def script():
     return FileResponse(ASSETS / "app.js", headers={"Cache-Control": "no-store"})
 
 
+# Baca riwayat dengan filter ruangan/pertandingan dan paginasi berdasarkan ID.
 @router.get("/api/history/messages")
-def messages(room_code: str | None = Query(None, max_length=36),
-             match_id: str | None = Query(None, max_length=36),
-             after_id: int = Query(0, ge=0), limit: int = Query(100, ge=1, le=500),
-             user=Depends(require_history_admin)):
+def messages(
+    room_code: str | None = Query(None, max_length=36),
+    match_id: str | None = Query(None, max_length=36),
+    after_id: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    user=Depends(require_history_admin),
+):
     conditions = ["m.id > :after_id"]
     params = dict(after_id=after_id, limit=limit + 1)
     if room_code:
@@ -43,17 +52,28 @@ def messages(room_code: str | None = Query(None, max_length=36),
     if match_id:
         conditions.append("m.match_id = :match_id")
         params["match_id"] = match_id
+
+    # Jalankan kueri berparameter dan ubah baris database menjadi objek respons.
     def read(db):
-        rows = db.execute(text("""
+        rows = db.execute(
+            text("""
             SELECT m.id, s.room_code, m.match_id, m.round_number, m.phase,
                    m.sender_kind, m.sender_name, m.message, m.reply_to_id, m.created_at,
                    m.intent, m.suspicion_score
             FROM chat_messages m LEFT JOIN game_sessions s ON s.id=m.game_session_id
-            WHERE """ + " AND ".join(conditions) + " ORDER BY m.id ASC LIMIT :limit"), params)
+            WHERE """ + " AND ".join(conditions) + " ORDER BY m.id ASC LIMIT :limit"),
+            params,
+        )
         return [dict(row) for row in rows.mappings()]
+
     try:
         rows = PersistenceService._run(read)
     except PersistenceError as error:
-        raise HTTPException(503, "Riwayat belum bisa dibaca. Periksa database dan migrasi V5.") from error
-    return {"messages": rows[:limit], "has_more": len(rows) > limit,
-            "next_after_id": rows[min(len(rows), limit)-1]["id"] if rows else after_id}
+        raise HTTPException(
+            503, "Riwayat belum bisa dibaca. Periksa database dan migrasi V5."
+        ) from error
+    return {
+        "messages": rows[:limit],
+        "has_more": len(rows) > limit,
+        "next_after_id": rows[min(len(rows), limit) - 1]["id"] if rows else after_id,
+    }

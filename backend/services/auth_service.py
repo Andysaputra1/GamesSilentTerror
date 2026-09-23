@@ -16,7 +16,6 @@ from config.settings import settings
 from models import auth_queries
 from services.password_service import verify_password
 
-
 logger = logging.getLogger("shadow_heist.auth")
 
 
@@ -92,7 +91,10 @@ class AuthService:
             token = secrets.token_urlsafe(32)
             expires_at = _utc_now() + timedelta(hours=settings.auth_session_hours)
             auth_queries.create_session(
-                database, user_id=account["id"], token_hash=_token_hash(token), expires_at=expires_at
+                database,
+                user_id=account["id"],
+                token_hash=_token_hash(token),
+                expires_at=expires_at,
             )
             return LoginResult(
                 access_token=token,
@@ -122,7 +124,9 @@ class AuthService:
 
         if row is None:
             raise SessionValidationError("Sesi login sudah tidak valid.")
-        return AuthenticatedUser(id=row["id"], username=row["username"], display_name=row["display_name"])
+        return AuthenticatedUser(
+            id=row["id"], username=row["username"], display_name=row["display_name"]
+        )
 
     # SERVICE LOGOUT: cabut token melalui transaksi database; token kosong tidak memerlukan operasi.
     def logout(self, token: str) -> None:

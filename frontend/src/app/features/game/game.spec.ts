@@ -136,8 +136,12 @@ describe('Game', () => {
   it('caps voter badges at four plus overflow, retaining all names in details', () => {
     const game = snapshot().game;
     game.phase = 'tribunal';
-    game.players = ['a','b','c','d','e','f'].map(name => ({name,bot:false,alive:true}));
-    game.tribunal_votes = [{target:'f',voters:['a','b','c','d','e']}];
+    game.players = ['a', 'b', 'c', 'd', 'e', 'f'].map((name) => ({
+      name,
+      bot: false,
+      alive: true,
+    }));
+    game.tribunal_votes = [{ target: 'f', voters: ['a', 'b', 'c', 'd', 'e'] }];
     component.game = game;
     fixture.componentRef.changeDetectorRef.markForCheck();
     fixture.detectChanges();
@@ -164,13 +168,22 @@ describe('Game', () => {
     const game = snapshot().game;
     game.phase = 'finished';
     game.winner = 'civilians';
-    game.me = {...game.me, role: 'spy', alive: false, can_chat: false, can_act: false};
-    game.result = {reason: 'hitman_executed', team: 'civilians', outcome: 'won', civilians_alive: 2, civilians_hostage: 1, civilians_eliminated: 1};
+    game.me = { ...game.me, role: 'spy', alive: false, can_chat: false, can_act: false };
+    game.result = {
+      reason: 'hitman_executed',
+      team: 'civilians',
+      outcome: 'won',
+      civilians_alive: 2,
+      civilians_hostage: 1,
+      civilians_eliminated: 1,
+    };
     component.game = game;
     fixture.componentRef.changeDetectorRef.markForCheck();
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('.result').textContent).toContain('KAMU MENANG');
-    expect(fixture.nativeElement.querySelector('.result').textContent).toContain('Hitman telah dieksekusi');
+    expect(fixture.nativeElement.querySelector('.result').textContent).toContain(
+      'Hitman telah dieksekusi',
+    );
     expect(fixture.nativeElement.querySelector('.action-panel')).toBeNull();
   });
 

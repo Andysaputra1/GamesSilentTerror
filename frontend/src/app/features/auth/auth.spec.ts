@@ -56,14 +56,14 @@ describe('Auth', () => {
     component.registerPassword = component.registerPasswordVerify = 'strong-password';
     component.register();
     const request = httpMock.expectOne('http://localhost:8000/api/auth/register');
-    request.flush({}, {status:409, statusText:'Conflict'});
+    request.flush({}, { status: 409, statusText: 'Conflict' });
     expect(component.isSubmitting).toBe(false);
     expect(component.registerError).toContain('sudah digunakan');
   });
 
   it('explains Google configuration missing without loading Google', async () => {
     const pending = component.prepareGoogle();
-    httpMock.expectOne('http://localhost:8000/api/auth/google/config').flush({client_id:''});
+    httpMock.expectOne('http://localhost:8000/api/auth/google/config').flush({ client_id: '' });
     await pending;
     expect(component.googleError).toContain('belum diaktifkan');
     expect(component.googleLoading).toBe(false);

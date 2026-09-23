@@ -14,7 +14,7 @@ services:
       - mysql_data:/var/lib/mysql
       - ./backend/deployment/mysql:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h localhost --silent"]
+      test: ['CMD-SHELL', 'mysqladmin ping -h localhost --silent']
       interval: 10s
       timeout: 5s
       retries: 20
@@ -22,8 +22,8 @@ services:
     logging:
       driver: json-file
       options:
-        max-size: "10m"
-        max-file: "3"
+        max-size: '10m'
+        max-file: '3'
 
   backend:
     build:
@@ -37,7 +37,7 @@ services:
     environment:
       APP_ENVIRONMENT: production
       MYSQL_HOST: mysql
-      MYSQL_PORT: "3306"
+      MYSQL_PORT: '3306'
       MYSQL_DATABASE: shadow_heist
       MYSQL_USER: shadow_app
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env.azure}
@@ -50,17 +50,23 @@ services:
       API_BACKEND: openrouter
       OPENROUTER_DEFAULT: ${openrouter_default:-${OPENROUTER_DEFAULT:-}}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
-      OLLAMA_MODEL: "14"
+      OLLAMA_MODEL: '14'
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://127.0.0.1:11434}
       OLLAMA_TUNNEL_TOKEN: ${OLLAMA_TUNNEL_TOKEN:-}
       INTENT_MODEL_PATH: /models/intent_classifier.pkl
-      DATABASE_POOL_SIZE: "5"
-      DATABASE_MAX_OVERFLOW: "5"
-      SQL_ECHO: "false"
+      DATABASE_POOL_SIZE: '5'
+      DATABASE_MAX_OVERFLOW: '5'
+      SQL_ECHO: 'false'
     volumes:
       - ./backend/artifacts/svm:/models:ro
     healthcheck:
-      test: ["CMD", "python", "-c", "import json,urllib.request; s=json.load(urllib.request.urlopen('http://127.0.0.1:8000/ready',timeout=5)); assert s['ready']"]
+      test:
+        [
+          'CMD',
+          'python',
+          '-c',
+          "import json,urllib.request; s=json.load(urllib.request.urlopen('http://127.0.0.1:8000/ready',timeout=5)); assert s['ready']",
+        ]
       interval: 30s
       timeout: 8s
       retries: 5
@@ -68,8 +74,8 @@ services:
     logging:
       driver: json-file
       options:
-        max-size: "10m"
-        max-file: "3"
+        max-size: '10m'
+        max-file: '3'
 
   proxy:
     image: caddy:2-alpine
@@ -80,8 +86,8 @@ services:
     environment:
       BACKEND_DOMAIN: ${BACKEND_DOMAIN:-backendthesis.andylabs.site}
     ports:
-      - "80:80"
-      - "443:443"
+      - '80:80'
+      - '443:443'
     volumes:
       - ./backend/deployment/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
@@ -89,8 +95,8 @@ services:
     logging:
       driver: json-file
       options:
-        max-size: "10m"
-        max-file: "3"
+        max-size: '10m'
+        max-file: '3'
 
 # Database and backend have no published host ports.
 volumes:

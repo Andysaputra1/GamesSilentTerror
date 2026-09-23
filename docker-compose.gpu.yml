@@ -6,14 +6,14 @@ services:
     container_name: shadow_ollama
     restart: unless-stopped
     ports:
-      - "127.0.0.1:11435:11434"
+      - '127.0.0.1:11435:11434'
     volumes:
       - ollama_data:/root/.ollama
     environment:
-      OLLAMA_CONTEXT_LENGTH: "${OLLAMA_CONTEXT_LENGTH:-2048}"
-      OLLAMA_KEEP_ALIVE: "${OLLAMA_KEEP_ALIVE:-10m}"
+      OLLAMA_CONTEXT_LENGTH: '${OLLAMA_CONTEXT_LENGTH:-2048}'
+      OLLAMA_KEEP_ALIVE: '${OLLAMA_KEEP_ALIVE:-10m}'
     healthcheck:
-      test: ["CMD", "ollama", "list"]
+      test: ['CMD', 'ollama', 'list']
       interval: 5s
       timeout: 5s
       retries: 30
@@ -32,10 +32,10 @@ services:
   # Existing models stay in ollama_data, so subsequent up commands skip them.
   ollama-models:
     image: ollama/ollama:latest
-    restart: "on-failure:3"
+    restart: 'on-failure:3'
     environment:
-      OLLAMA_HOST: "http://ollama:11434"
-      OLLAMA_MODELS_TO_PULL: "${OLLAMA_MODELS_TO_PULL:-qwen3:8b qwen3:14b}"
+      OLLAMA_HOST: 'http://ollama:11434'
+      OLLAMA_MODELS_TO_PULL: '${OLLAMA_MODELS_TO_PULL:-qwen3:8b qwen3:14b}'
     depends_on:
       ollama:
         condition: service_healthy
@@ -59,37 +59,37 @@ services:
       dockerfile: Dockerfile
     container_name: shadow_python_backend
     expose:
-      - "8000"
+      - '8000'
     environment:
-      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
-      AI_PROVIDER: "${AI_PROVIDER:-api}"
-      APP_ENVIRONMENT: "${APP_ENVIRONMENT:-development}"
-      PANEL_ENCRYPTION_KEY: "${PANEL_ENCRYPTION_KEY:-}"
-      PANEL_USERNAME: "${PANEL_USERNAME:-administrator}"
-      PANEL_PASSWORD_HASH: "${PANEL_PASSWORD_HASH:-}"
-      OPENROUTER_DEFAULT: "${openrouter_default:-${OPENROUTER_DEFAULT:-}}"
-      OPENROUTER_API_KEY: "${OPENROUTER_API_KEY:-}"
+      OPENAI_API_KEY: '${OPENAI_API_KEY:-}'
+      AI_PROVIDER: '${AI_PROVIDER:-api}'
+      APP_ENVIRONMENT: '${APP_ENVIRONMENT:-development}'
+      PANEL_ENCRYPTION_KEY: '${PANEL_ENCRYPTION_KEY:-}'
+      PANEL_USERNAME: '${PANEL_USERNAME:-administrator}'
+      PANEL_PASSWORD_HASH: '${PANEL_PASSWORD_HASH:-}'
+      OPENROUTER_DEFAULT: '${openrouter_default:-${OPENROUTER_DEFAULT:-}}'
+      OPENROUTER_API_KEY: '${OPENROUTER_API_KEY:-}'
       API_BACKEND: openrouter
-      OLLAMA_TUNNEL_TOKEN: "${OLLAMA_TUNNEL_TOKEN:-}"
-      HISTORY_ADMIN_USERNAMES: "${HISTORY_ADMIN_USERNAMES:-}"
-      ADMIN_USERNAMES: "${ADMIN_USERNAMES:-user1}"
-      GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-}"
-      OLLAMA_BASE_URL: "http://ollama:11434"
-      OLLAMA_MODEL: "${OLLAMA_MODEL:-8}"
-      OLLAMA_TIMEOUT_SECONDS: "${OLLAMA_TIMEOUT_SECONDS:-180}"
-      OLLAMA_MAX_OUTPUT_TOKENS: "${OLLAMA_MAX_OUTPUT_TOKENS:-160}"
-      OLLAMA_CONTEXT_LENGTH: "${OLLAMA_CONTEXT_LENGTH:-2048}"
-      openai_api_env: "${openai_api_env:-}"
-      OPENAI_MODEL: "${OPENAI_MODEL:-gpt-5-mini}"
-      OPENAI_REASONING_EFFORT: "${OPENAI_REASONING_EFFORT:-minimal}"
-      OPENAI_MAX_OUTPUT_TOKENS: "${OPENAI_MAX_OUTPUT_TOKENS:-320}"
-      AUTH_SESSION_HOURS: "${AUTH_SESSION_HOURS:-24}"
-      CORS_ORIGINS: "${CORS_ORIGINS:-http://localhost:4200,http://127.0.0.1:4200}"
+      OLLAMA_TUNNEL_TOKEN: '${OLLAMA_TUNNEL_TOKEN:-}'
+      HISTORY_ADMIN_USERNAMES: '${HISTORY_ADMIN_USERNAMES:-}'
+      ADMIN_USERNAMES: '${ADMIN_USERNAMES:-user1}'
+      GOOGLE_CLIENT_ID: '${GOOGLE_CLIENT_ID:-}'
+      OLLAMA_BASE_URL: 'http://ollama:11434'
+      OLLAMA_MODEL: '${OLLAMA_MODEL:-8}'
+      OLLAMA_TIMEOUT_SECONDS: '${OLLAMA_TIMEOUT_SECONDS:-180}'
+      OLLAMA_MAX_OUTPUT_TOKENS: '${OLLAMA_MAX_OUTPUT_TOKENS:-160}'
+      OLLAMA_CONTEXT_LENGTH: '${OLLAMA_CONTEXT_LENGTH:-2048}'
+      openai_api_env: '${openai_api_env:-}'
+      OPENAI_MODEL: '${OPENAI_MODEL:-gpt-5-mini}'
+      OPENAI_REASONING_EFFORT: '${OPENAI_REASONING_EFFORT:-minimal}'
+      OPENAI_MAX_OUTPUT_TOKENS: '${OPENAI_MAX_OUTPUT_TOKENS:-320}'
+      AUTH_SESSION_HOURS: '${AUTH_SESSION_HOURS:-24}'
+      CORS_ORIGINS: '${CORS_ORIGINS:-http://localhost:4200,http://127.0.0.1:4200}'
       MYSQL_HOST: mysql
-      MYSQL_PORT: "3306"
+      MYSQL_PORT: '3306'
       MYSQL_DATABASE: shadow_heist
-      MYSQL_USER: "${MYSQL_USER:-shadow_app}"
-      MYSQL_PASSWORD: "${MYSQL_PASSWORD:-shadow_app_dev_2026}"
+      MYSQL_USER: '${MYSQL_USER:-shadow_app}'
+      MYSQL_PASSWORD: '${MYSQL_PASSWORD:-shadow_app_dev_2026}'
     volumes:
       - ./backend:/app
     depends_on:
@@ -103,18 +103,18 @@ services:
     container_name: shadow_mysql
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     ports:
-      - "3307:3306"
+      - '3307:3306'
     environment:
       MYSQL_DATABASE: shadow_heist
       MYSQL_USER: ${MYSQL_USER:-shadow_app}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-shadow_app_dev_2026}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-shadow_root_dev_2026}
-      MYSQL_ROOT_HOST: "%"
+      MYSQL_ROOT_HOST: '%'
     volumes:
       - mysql_data:/var/lib/mysql
       - ./backend/migrations:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      test: ['CMD-SHELL', 'mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD --silent']
       interval: 5s
       timeout: 5s
       retries: 20
@@ -141,7 +141,7 @@ services:
     image: nginx:1.31.4-alpine3.24
     container_name: shadow_gateway
     ports:
-      - "8000:80"
+      - '8000:80'
     volumes:
       - ./proxy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
@@ -158,7 +158,7 @@ services:
       dockerfile: Dockerfile
     container_name: shadow_frontend
     ports:
-      - "4200:4200"
+      - '4200:4200'
     volumes:
       - ./frontend/src:/app/src
       - ./frontend/angular.json:/app/angular.json:ro
