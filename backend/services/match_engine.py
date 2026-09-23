@@ -4,6 +4,7 @@ RoomService memegang lock ketika memanggil engine. Snapshot selalu dibuat
 untuk satu pemain: role, Hostage, Gag, dan hasil Peek tidak masuk data publik.
 """
 
+from math import ceil
 from collections import Counter
 from dataclasses import dataclass, field
 import random
@@ -26,12 +27,23 @@ class Participant:
     intel: list[dict] = field(default_factory=list)
 
 
+# Durasi mengikuti roster awal (manusia + NPC), bukan jumlah warga bebas yang bersifat rahasia.
+def phase_durations(count, quick=False):
+    if quick:
+        return {
+            "day": ceil(count * 10 / 3),
+            "night": ceil(count * 2.5),
+            "tribunal": ceil(count * 2.5),
+        }
+    return {"day": count * 20, "night": count * 5, "tribunal": ceil(count * 7.5)}
+
+
 class Match:
     # CONSTRUCTOR: acak role di server; tepat satu Hitman, Spy, dan Stalker.
     def __init__(self, humans, bots, *, quick=False, max_rounds=8, now=None, rng=None):
         names = list(humans) + list(bots)
-        if not 6 <= len(names) <= 10 or len(set(names)) != len(names):
-            raise ValueError("Permainan membutuhkan 6–10 identitas berbeda.")
+        if not 4 <= len(names) <= 10 or len(set(names)) != len(names):
+            raise ValueError("Permainan membutuhkan 4–10 identitas berbeda.")
         if max_rounds not in {6, 8, 12}:
             raise ValueError("Pilih durasi 6, 8, atau 12 ronde.")
         self.rng = rng or random.SystemRandom()
@@ -49,11 +61,7 @@ class Match:
         self.npc_decisions = set()
         self.ai_grace_phase = None
         self.phase = "day"
-        self.durations = (
-            {"day": 20, "night": 15, "tribunal": 15}
-            if quick
-            else {"day": 120, "night": 30, "tribunal": 45}
-        )
+        self.durations = phase_durations(len(names), quick)
         self.deadline = (time.time() if now is None else now) + self.durations["day"]
         self.actions = {}
         self.votes = {}

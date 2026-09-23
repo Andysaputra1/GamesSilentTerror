@@ -61,7 +61,7 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(self.game.deadline, deadline)
 
     def test_role_distribution_and_size(self):
-        for count in range(6, 11):
+        for count in range(4, 11):
             game = Match([str(i) for i in range(count)], [])
             roles = [p.role for p in game.players.values()]
             for role in ["hitman", "spy", "stalker"]:
@@ -70,6 +70,28 @@ class EngineTests(unittest.TestCase):
         for humans in [[], ["a"] * 4, list("abcdefghijk")]:
             with self.assertRaises(ValueError):
                 Match(humans, [])
+
+    def test_four_player_mode_and_roster_based_timers(self):
+        for count in range(4, 11):
+            game = Match([str(i) for i in range(count)], [], now=0)
+            self.assertEqual(game.durations["day"], count * 20)
+            self.assertEqual(game.durations["night"], count * 5)
+            self.assertEqual(game.deadline, count * 20)
+            durations = dict(game.durations)
+            next(iter(game.players.values())).hostage = True
+            game.tick(game.deadline)
+            self.assertEqual(game.durations, durations)
+            self.assertEqual(game.deadline, count * 25)
+            fast = Match(list(game.players), [], quick=True, now=0)
+            self.assertTrue(all(fast.durations[p] < durations[p] for p in durations))
+        rooms = RoomService()
+        room = rooms.create("solo", capacity=4)
+        rooms.set_bot(room.code, "solo", True)
+        self.assertEqual(len(rooms.bot_names(room)), 3)
+        preview = rooms.snapshot(room)["phase_durations"]["standard"]
+        rooms.start(room.code, "solo")
+        self.assertEqual(len(room.match.players), 4)
+        self.assertEqual(room.match.durations, preview)
 
     def test_selected_round_limits_finish_after_final_tribunal(self):
         for limit in [6, 8, 12]:
@@ -245,7 +267,7 @@ class RoomGameTests(unittest.TestCase):
             patch("controller.api.rooms.PersistenceService"),
             TestClient(app) as client,
         ):
-            for body in [{"capacity": 5}, {"capacity": 11}, {"max_rounds": 7}]:
+            for body in [{"capacity": 3}, {"capacity": 11}, {"max_rounds": 7}]:
                 self.assertEqual(client.post("/api/rooms", json=body).status_code, 422)
             response = client.post("/api/rooms", json={"capacity": 9, "max_rounds": 6})
             self.assertEqual(response.status_code, 200)

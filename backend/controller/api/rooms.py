@@ -16,7 +16,7 @@ class JoinRoom(BaseModel):
 
 class CreateRoom(BaseModel):
     max_rounds: Literal[6, 8, 12] = 8
-    capacity: int = Field(default=6, ge=6, le=10)
+    capacity: int = Field(default=6, ge=4, le=10)
 
 
 class BotOption(BaseModel):

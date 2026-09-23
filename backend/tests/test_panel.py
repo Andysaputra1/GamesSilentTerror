@@ -150,3 +150,79 @@ class OpenRouterTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             client.post.call_args.kwargs["headers"]["Authorization"], "Bearer fixture-key"
         )
+
+
+class HistoryFilterTests(unittest.TestCase):
+    # SQLite terisolasi memeriksa SQL filter yang sama pada daftar dan CSV, tanpa data produksi.
+    def setUp(self):
+        from sqlalchemy import create_engine, text
+        from sqlalchemy.pool import StaticPool
+
+        self.engine = create_engine(
+            "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
+        )
+        with self.engine.begin() as db:
+            db.execute(text("CREATE TABLE game_sessions (id INTEGER, room_code TEXT)"))
+            db.execute(text("INSERT INTO game_sessions VALUES (1,'ABC123'),(2,'DEF456')"))
+            db.execute(
+                text(
+                    "CREATE TABLE chat_messages (id INTEGER, game_session_id INTEGER, sender_name TEXT, sender_kind TEXT, message TEXT, created_at TEXT, match_id TEXT, round_number INTEGER, phase TEXT)"
+                )
+            )
+            for i, room, kind, day in [
+                (1, 1, "human", 23),
+                (2, 1, "bot", 23),
+                (3, 1, "legacy", 23),
+                (4, 2, "bot", 23),
+                (5, 1, "bot", 20),
+            ]:
+                db.execute(
+                    text(
+                        "INSERT INTO chat_messages VALUES (:id,:room,'sender',:kind,:message,:date,'match',1,'day')"
+                    ),
+                    {
+                        "id": i,
+                        "room": room,
+                        "kind": kind,
+                        "message": f"message-{i}",
+                        "date": f"2026-09-{day} 01:00:00",
+                    },
+                )
+        self.app = FastAPI()
+        self.app.include_router(router)
+        self.app.dependency_overrides[require_panel] = lambda: "test-admin"
+        self.client = TestClient(self.app)
+
+        def transaction(operation):
+            with self.engine.begin() as db:
+                return operation(db)
+
+        self.db_patch = patch("controller.api.panel.transaction", side_effect=transaction)
+        self.db_patch.start()
+
+    def tearDown(self):
+        self.client.close()
+        self.db_patch.stop()
+        self.engine.dispose()
+
+    def test_export_and_list_share_room_date_and_sender_filters(self):
+        import csv
+        import io
+
+        for kind, expected in [("all", [1, 2, 3]), ("human", [1]), ("bot", [2]), ("legacy", [3])]:
+            query = {
+                "room_code": "ABC123",
+                "date_from": "2026-09-23",
+                "date_to": "2026-09-23",
+                "sender_kind": kind,
+            }
+            response = self.client.get("/api/panel/history", params=query)
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual([m["id"] for m in response.json()["messages"]], expected)
+            exported = self.client.get("/api/panel/history.csv", params=query)
+            self.assertEqual(exported.status_code, 200)
+            rows = list(csv.reader(io.StringIO(exported.content.decode("utf-8-sig"))))
+            self.assertEqual(rows[0], ["chat_id", "isi_chat"])
+            self.assertEqual([int(row[0]) for row in rows[1:]], expected)
+        self.assertEqual(self.client.get("/api/panel/history?sender_kind=bad").status_code, 422)
+        self.assertEqual(self.client.get("/api/panel/history.csv?sender_kind=bad").status_code, 422)

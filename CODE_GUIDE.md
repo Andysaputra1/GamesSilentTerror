@@ -68,6 +68,8 @@ file saja tidak berarti route tersebut dibuka pada aplikasi utama.
   `user_management_service.py`. Hanya sesi administrator panel yang diizinkan.
 - Tambah user membuat akun username/password dengan nama lengkap, tanpa membuat
   sesi login pemain. Akun Google dibuat melalui alur Google yang terverifikasi.
+- Edit user mengubah nama/username lewat panel. Rename ditolak jika masih di room;
+  rename mencabut sesi lama, sementara identitas Google dan arsip chat tetap utuh.
 - Reset password hanya untuk akun lokal dan mencabut seluruh sesi akun tersebut.
   Akun Google harus mengelola password melalui Google.
 - Penghapusan memerlukan konfirmasi username dan user harus keluar dari ruangan.
@@ -113,3 +115,5 @@ python -m unittest discover -s tests -p "test_*.py"
 Skrip `live_auth_smoke.py`, `live_match_smoke.py`, dan `mysql_smoke.py` adalah alat
 manual yang dapat mengakses layanan/database sesuai konfigurasinya; skrip ini
 tidak dijalankan oleh pola `test_*.py` di atas.
+
+Filter riwayat panel dan download CSV memakai tanggal WIB, room, dan sender_kind yang sama (all/human/bot/legacy). Legacy tidak ditebak sebagai manusia atau bot. CSV tetap berisi chat_id dan isi_chat.

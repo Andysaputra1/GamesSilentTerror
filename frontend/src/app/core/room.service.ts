@@ -4,6 +4,12 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { map, timeout } from 'rxjs';
 
 // INTERFACE: bentuk data ruangan dari API; hanya tipe TypeScript, bukan class atau tabel DB.
+export interface PhaseDurations {
+  day: number;
+  night: number;
+  tribunal: number;
+}
+
 export interface Room {
   code: string;
   owner: string;
@@ -12,6 +18,8 @@ export interface Room {
   bots: string[];
   phase: string;
   capacity?: number;
+  match_durations?: PhaseDurations | null;
+  phase_durations?: { standard: PhaseDurations; quick: PhaseDurations };
   max_rounds?: number;
 }
 

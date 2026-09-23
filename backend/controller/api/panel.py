@@ -331,13 +331,16 @@ def checker(
 
 
 # Bangun kondisi SQL berparameter; rentang tanggal WIB dikonversi ke UTC.
-def history_filter(room_code, date_from, date_to):
+def history_filter(room_code, date_from, date_to, sender_kind="all"):
     if date_from == date.min:
         raise HTTPException(422, "Tanggal awal terlalu kecil.")
     if date_from and date_to and date_from > date_to:
         raise HTTPException(422, "Tanggal awal harus sebelum atau sama dengan tanggal akhir.")
     clauses = ["1=1"]
     params = {}
+    if sender_kind != "all":
+        clauses.append("m.sender_kind=:sender_kind")
+        params["sender_kind"] = sender_kind
     if room_code:
         clauses.append("s.room_code=:room")
         params["room"] = room_code
@@ -359,9 +362,10 @@ def history(
     date_from: date | None = None,
     date_to: date | None = None,
     after_id: int = Query(0, ge=0),
+    sender_kind: Literal["all", "human", "bot", "legacy"] = "all",
     token=Depends(require_panel),
 ):
-    where, params = history_filter(room_code, date_from, date_to)
+    where, params = history_filter(room_code, date_from, date_to, sender_kind)
     params["after"] = after_id
     rows = transaction(
         lambda db: [
@@ -385,9 +389,13 @@ def history(
 # Ekspor snapshot riwayat menjadi CSV dengan pembacaan database per halaman.
 @router.get("/api/panel/history.csv")
 def download(
-    date_from: date | None = None, date_to: date | None = None, token=Depends(require_panel)
+    date_from: date | None = None,
+    date_to: date | None = None,
+    room_code: str | None = Query(None, max_length=36),
+    sender_kind: Literal["all", "human", "bot", "legacy"] = "all",
+    token=Depends(require_panel),
 ):
-    where, params = history_filter(None, date_from, date_to)
+    where, params = history_filter(room_code, date_from, date_to, sender_kind)
     # Build on disk beyond 1 MB; no giant in-memory transcript or long open DB transaction.
     output = SpooledTemporaryFile(max_size=1024 * 1024, mode="w+b")
 

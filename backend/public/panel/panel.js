@@ -202,7 +202,7 @@ async function checker(older = false) {
   }
 }
 // Validasi urutan tanggal dan susun parameter untuk riwayat serta ekspor CSV.
-function dateQuery() {
+function historyQuery() {
   const from = $('date-from').value,
     to = $('date-to').value;
   if (from && to && from > to)
@@ -210,11 +210,13 @@ function dateQuery() {
   const q = new URLSearchParams();
   if (from) q.set('date_from', from);
   if (to) q.set('date_to', to);
+  if ($('history-room').value) q.set('room_code', $('history-room').value);
+  q.set('sender_kind', $('history-sender').value);
   return q;
 }
 // Muat halaman riwayat dan abaikan respons dari sesi atau filter yang sudah berubah.
 async function history(reset = true) {
-  const q = dateQuery(),
+  const q = historyQuery(),
     epoch = generation;
   if (reset) {
     historyVersion++;
@@ -223,7 +225,6 @@ async function history(reset = true) {
   }
   const version = historyVersion;
   q.set('after_id', String(historyAfter));
-  if ($('history-room').value) q.set('room_code', $('history-room').value);
   const data = await request(`/api/panel/history?${q}`);
   if (epoch !== generation || !token || version !== historyVersion) return;
   for (const row of data.messages) {
@@ -327,6 +328,11 @@ async function loadUsers(reset = true) {
     }
     const actions = document.createElement('td');
     actions.dataset.label = 'Aksi';
+    const editButton = document.createElement('button');
+    editButton.className = 'secondary';
+    editButton.textContent = 'Edit user';
+    editButton.onclick = () => openUserEditor(user, 'profile');
+    actions.append(editButton);
     if (user.login_method !== 'google') {
       const passwordButton = document.createElement('button');
       passwordButton.className = 'secondary';
@@ -356,6 +362,7 @@ function closeUserEditor() {
   selectedUser = null;
   $('user-editor').hidden = true;
   $('user-password-form').reset();
+  $('user-profile-form').reset();
   $('user-delete-form').reset();
 }
 
@@ -366,10 +373,23 @@ function openUserEditor(user, action) {
   selectedUser = user;
   $('user-editor').hidden = false;
   $('user-editor-title').textContent =
-    (action === 'password' ? 'Ubah password: ' : 'Hapus akun: ') + user.username;
+    (action === 'profile'
+      ? 'Edit user: '
+      : action === 'password'
+        ? 'Ubah password: '
+        : 'Hapus akun: ') + user.username;
+  $('user-profile-form').hidden = action !== 'profile';
+  $('edit-user-username').value = user.username;
+  $('edit-user-display-name').value = user.display_name;
   $('user-password-form').hidden = action !== 'password';
   $('user-delete-form').hidden = action !== 'delete';
-  (action === 'password' ? $('user-new-password') : $('user-delete-confirmation')).focus();
+  $('user-editor').scrollIntoView({ block: 'center', behavior: 'smooth' });
+  (action === 'profile'
+    ? $('edit-user-username')
+    : action === 'password'
+      ? $('user-new-password')
+      : $('user-delete-confirmation')
+  ).focus();
 }
 
 // Cegah klik ganda dan pergantian target selama mutasi akun sedang berlangsung.
@@ -378,7 +398,12 @@ async function changeUser(action) {
   const target = selectedUser;
   const epoch = generation;
   let body;
-  if (action === 'password') {
+  if (action === 'profile') {
+    body = {
+      username: $('edit-user-username').value.trim(),
+      display_name: $('edit-user-display-name').value.trim(),
+    };
+  } else if (action === 'password') {
     if (target.login_method === 'google')
       throw new Error('Password akun Google dikelola di Google.');
     if ($('user-new-password').value !== $('user-password-confirmation').value)
@@ -393,22 +418,25 @@ async function changeUser(action) {
     body = { confirm_username: $('user-delete-confirmation').value };
   }
   userSaving = true;
-  for (const id of ['save-user-password', 'delete-user', 'cancel-user-edit']) $(id).disabled = true;
+  for (const id of ['save-user-profile', 'save-user-password', 'delete-user', 'cancel-user-edit'])
+    $(id).disabled = true;
   try {
     await request(`/api/panel/users/${target.id}/${action}`, body, 'POST');
     if (!token || epoch !== generation) return;
     closeUserEditor();
     notice(
-      action === 'password'
-        ? 'Password diganti. Semua sesi user dicabut; user perlu login ulang.'
-        : 'Akun dihapus. Riwayat chat dan analisis tetap tersimpan.',
+      action === 'profile'
+        ? 'Data user disimpan. Jika username berubah, user perlu login ulang.'
+        : action === 'password'
+          ? 'Password diganti. Semua sesi user dicabut; user perlu login ulang.'
+          : 'Akun dihapus. Riwayat chat dan analisis tetap tersimpan.',
     );
     await loadUsers();
   } finally {
     $('user-new-password').value = '';
     $('user-password-confirmation').value = '';
     userSaving = false;
-    for (const id of ['save-user-password', 'delete-user', 'cancel-user-edit'])
+    for (const id of ['save-user-profile', 'save-user-password', 'delete-user', 'cancel-user-edit'])
       $(id).disabled = false;
   }
 }
@@ -423,6 +451,7 @@ $('more-users').onclick = handle(async () => {
   }
 });
 $('cancel-user-edit').onclick = closeUserEditor;
+$('user-profile-form').onsubmit = handle(() => changeUser('profile'));
 $('user-password-form').onsubmit = handle(() => changeUser('password'));
 $('user-delete-form').onsubmit = handle(() => changeUser('delete'));
 
@@ -528,7 +557,7 @@ $('more-history').onclick = handle(async () => {
 $('download').onclick = handle(async () => {
   $('download').disabled = true;
   try {
-    const response = await fetch(`/api/panel/history.csv?${dateQuery()}`, {
+    const response = await fetch(`/api/panel/history.csv?${historyQuery()}`, {
       headers: { Authorization: `Bearer ${token}` },
       cache: 'no-store',
     });
@@ -544,7 +573,7 @@ $('download').onclick = handle(async () => {
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 60000);
-    notice('CSV semua room berhasil diunduh.');
+    notice('CSV sesuai filter tanggal, ruangan, dan pengirim berhasil diunduh.');
   } finally {
     $('download').disabled = false;
   }

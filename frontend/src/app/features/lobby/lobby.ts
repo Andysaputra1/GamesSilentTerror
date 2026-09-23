@@ -36,6 +36,23 @@ export class Lobby implements OnInit, OnDestroy {
   quick = false;
   capacity = 6;
   maxRounds = 8;
+
+  // Pratinjau memakai durasi dari server; fallback hanya untuk backend lama sebelum deployment.
+  get durations() {
+    if (this.room?.match_durations) return this.room.match_durations;
+    if (this.room?.phase_durations)
+      return this.room.phase_durations[this.quick ? 'quick' : 'standard'];
+    const count = this.room
+      ? Math.max(4, this.room.members.length + this.room.bots.length)
+      : this.capacity;
+    return this.quick
+      ? {
+          day: Math.ceil((count * 10) / 3),
+          night: Math.ceil(count * 2.5),
+          tribunal: Math.ceil(count * 2.5),
+        }
+      : { day: count * 20, night: count * 5, tribunal: Math.ceil(count * 7.5) };
+  }
   // PRIVATE PROPERTY: simpan timer polling agar dapat dihentikan ketika meninggalkan lobby.
   private timer?: ReturnType<typeof setInterval>;
 

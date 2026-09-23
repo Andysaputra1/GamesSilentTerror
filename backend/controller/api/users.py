@@ -59,6 +59,12 @@ def create_user(body: CreateUserRequest):
     return user_result(lambda: users.create_user(body.username, body.display_name, body.password))
 
 
+# Edit nama dan username akun lokal maupun Google; role admin tidak bisa diubah lewat endpoint ini.
+@router.post("/{user_id}/profile")
+def update_user(user_id: int, body: UpdateProfileRequest):
+    return user_result(lambda: users.update_user(user_id, body.display_name, body.username))
+
+
 # Admin boleh mereset password akun lokal; semua sesi lama langsung dicabut.
 @router.post("/{user_id}/password", status_code=204)
 def reset_password(user_id: int, body: ResetPasswordRequest):

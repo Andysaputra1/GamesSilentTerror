@@ -223,3 +223,49 @@ class UserManagementTests(unittest.TestCase):
         response = self.client.post("/api/panel/users/1/delete", json={"confirm_username": "alice"})
         self.assertEqual(response.status_code, 409)
         self.assertEqual(room_service.get(room.code, "alice").owner, "alice")
+
+    def test_edit_name_username_preserves_history_and_google_identity(self):
+        self.admin()
+        response = self.client.post(
+            "/api/panel/users/2/profile",
+            json={"username": "google_renamed", "display_name": "Google Baru"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["login_method"], "google")
+        with self.engine.connect() as db:
+            self.assertEqual(
+                db.execute(
+                    text("SELECT google_subject FROM account_identities WHERE user_id=2")
+                ).scalar(),
+                "subject",
+            )
+            self.assertEqual(
+                db.execute(text("SELECT COUNT(*) FROM auth_sessions WHERE user_id=2")).scalar(), 0
+            )
+            self.assertEqual(db.execute(text("SELECT COUNT(*) FROM chat_messages")).scalar(), 1)
+        self.assertEqual(
+            self.client.post(
+                "/api/panel/users/1/profile",
+                json={"username": "google_renamed", "display_name": "Conflict"},
+            ).status_code,
+            409,
+        )
+        with self.engine.connect() as db:
+            self.assertEqual(
+                db.execute(text("SELECT display_name FROM user_accounts WHERE id=1")).scalar(),
+                "Alice",
+            )
+
+    def test_edit_requires_admin_and_rejects_rename_in_room_or_invalid_name(self):
+        body = {"username": "alice_new", "display_name": "Alice Baru"}
+        self.assertEqual(self.client.post("/api/panel/users/1/profile", json=body).status_code, 401)
+        self.admin()
+        room_service.create("alice")
+        self.assertEqual(self.client.post("/api/panel/users/1/profile", json=body).status_code, 409)
+        body["username"] = "alice"
+        self.assertEqual(self.client.post("/api/panel/users/1/profile", json=body).status_code, 200)
+        self.assertEqual(
+            self.client.post("/api/panel/users/99/profile", json=body).status_code, 404
+        )
+        body["display_name"] = "   "
+        self.assertEqual(self.client.post("/api/panel/users/1/profile", json=body).status_code, 422)

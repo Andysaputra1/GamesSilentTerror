@@ -3,7 +3,7 @@
 from dataclasses import dataclass, field
 import secrets
 from threading import RLock
-from services.match_engine import Match
+from services.match_engine import Match, phase_durations
 from services.activity_service import activity, traced
 
 
@@ -27,8 +27,8 @@ class RoomService:
     # SERVICE LOBBY: buat kode unik 6 karakter, tetapkan pemilik sebagai anggota pertama, dan batasi jumlah ruangan.
     @traced
     def create(self, username: str, max_rounds=8, capacity=6) -> Room:
-        if max_rounds not in {6, 8, 12} or capacity not in range(6, 11):
-            raise ValueError("Room membutuhkan 6–10 kursi dan pilihan 6, 8, atau 12 ronde.")
+        if max_rounds not in {6, 8, 12} or capacity not in range(4, 11):
+            raise ValueError("Room membutuhkan 4–10 kursi dan pilihan 6, 8, atau 12 ronde.")
         with self.lock:
             if self.active(username):
                 raise ValueError("Selesaikan pertandingan aktif sebelum membuat ruangan lain.")
@@ -104,6 +104,15 @@ class RoomService:
                 "phase": room.match.phase if room.match else "lobby",
                 "max_rounds": room.max_rounds,
                 "capacity": room.capacity,
+                "match_durations": dict(room.match.durations) if room.match else None,
+                "phase_durations": {
+                    "standard": phase_durations(
+                        max(4, len(room.members) + len(self.bot_names(room)))
+                    ),
+                    "quick": phase_durations(
+                        max(4, len(room.members) + len(self.bot_names(room))), True
+                    ),
+                },
             }
 
     # NPC mengisi sisa kapasitas yang dipilih host; manusia yang bergabung menggantikan kursi NPC.

@@ -2,9 +2,11 @@
 
 Silent Terror adalah multiplayer social deduction berbasis web, dengan hidden role asimetris dan NPC yang memakai LLM. Fokus permainan adalah deduksi dari percakapan, alibi, dan voting. Tidak ada ekonomi, pembelian item, atau tebusan.
 
+Tambahan atas GDD awal: mode kecil 4/5 pemain dan durasi fase mengikuti jumlah peserta, sesuai permintaan terbaru.
+
 ## Ruangan dan role
 
-- **6–10 peserta**, kombinasi manusia dan NPC. Host memilih kapasitas room; permainan dapat dimulai dengan sedikitnya enam peserta.
+- **4–10 peserta**, kombinasi manusia dan NPC. Host memilih kapasitas room; permainan dapat dimulai dengan sedikitnya empat peserta.
 - **Batas 6, 8, atau 12 ronde**, dipilih saat membuat room. Kemenangan dapat terjadi lebih cepat.
 - Tepat satu Hitman, satu Spy, satu Stalker, sisanya Civilian. Role diacak server untuk manusia maupun NPC.
 - NPC mengisi kursi kosong sampai kapasitas. Manusia yang bergabung sebelum mulai menggantikan kursi NPC. Roster terkunci setelah mulai; anggota lama dapat reconnect.
@@ -18,7 +20,7 @@ Silent Terror adalah multiplayer social deduction berbasis web, dengan hidden ro
 | Malam | Layar meredup, chat terkunci. Hostage, Guard, dan Peek dipilih privat, diselesaikan bersama saat timer habis. Guard diproses sebelum Hostage. |
 | Tribunal | Rekap tanpa nama target atau hasil individual. Pemain yang punya hak suara memilih tersangka. Suara terbanyak tunggal dieksekusi. |
 
-Durasi standar siang/malam/Tribunal adalah 120/30/45 detik; mode cepat 20/15/15 detik. Timer server tetap berjalan walaupun tab ditutup. Chat kembali tersedia saat Tribunal bagi pemain yang masih boleh berbicara.
+Durasi ditetapkan dari jumlah peserta awal N (manusia + NPC), tetap selama pertandingan. Standar: siang 20N detik, malam 5N detik, Tribunal dibulatkan ke atas dari 7,5N detik. Mode cepat: siang dibulatkan ke atas dari 10N/3 detik, malam dan Tribunal masing-masing dari 2,5N detik. Contoh standar: 4 pemain 80/20/30 detik; 6 pemain 120/30/45; 10 pemain 200/50/75. Timer server tetap berjalan walaupun tab ditutup. Chat kembali tersedia saat Tribunal bagi pemain yang masih boleh berbicara.
 
 Semua manusia hidup dapat menyetujui skip siang. Hostage/Gag tetap boleh menyetujui karena ini bukan chat atau voting Tribunal. Hanya jumlah persetujuan dipublikasikan; jika belum lengkap, timer normal berlaku.
 
@@ -92,4 +94,4 @@ RoomService mengunci perubahan state. HTTP memakai bearer session; Socket.IO mem
 
 Room, role, aksi, vote, dan konteks pertandingan berada di memori satu proses. Restart menghapus pertandingan aktif; MySQL menyimpan chat/analisis, bukan pemulihan seluruh match. Multi-worker dan penggantian pemain offline otomatis belum tersedia.
 
-Tes otomatis mencakup 6–10 pemain, 6/8/12 ronde, Guard/Peek/Gag/Hostage, dominasi suara, prioritas kemenangan, privasi, voting, reconnect, serta scheduler/validasi/fallback NPC dengan respons model tiruan. Tes ini tidak membuktikan kualitas taktik atau latensi provider produksi.
+Tes otomatis mencakup 4–10 pemain, 6/8/12 ronde, Guard/Peek/Gag/Hostage, dominasi suara, prioritas kemenangan, privasi, voting, reconnect, serta scheduler/validasi/fallback NPC dengan respons model tiruan. Tes ini tidak membuktikan kualitas taktik atau latensi provider produksi.

@@ -6,7 +6,7 @@ Nama Silent Terror masih sementara. Nama repository, database, dan container mas
 
 ## Status proyek
 
-Sudah dapat dimainkan: login, main page, buat/gabung ruangan, 6–10 peserta dengan pilihan 6/8/12 ronde, bot opsional, role acak dari server, timer Day → Night → Tribunal, skill/cooldown, voting, eksekusi, dan kondisi kemenangan. Panel administrator menyediakan tambah user, reset password akun lokal, dan penghapusan akun tanpa menghapus riwayat chat. Hanya pembuat ruangan yang mengatur bot dan memulai game.
+Sudah dapat dimainkan: login, main page, buat/gabung ruangan, 4–10 peserta dengan pilihan 6/8/12 ronde, bot opsional, role acak dari server, timer Day → Night → Tribunal, skill/cooldown, voting, eksekusi, dan kondisi kemenangan. Panel administrator menyediakan tambah user, reset password akun lokal, dan penghapusan akun tanpa menghapus riwayat chat. Hanya pembuat ruangan yang mengatur bot dan memulai game.
 
 Role: **Hitman** (Hostage/Gag Order), **Spy** (Guard), **Stalker** (Peek), dan **Civilian** (observasi). Korban Hostage tetap terlihat hidup, tetapi kehilangan chat, voting, dan aksi; identitas target tidak diumumkan. Balasan bot memakai pipeline SVM → fuzzy → LLM melalui backend.
 
@@ -187,7 +187,7 @@ Alur mencoba: **Login → Main page → Enter Tribunal → Buat Ruangan / Gabung
 
 Di game, buka role privatmu. Saat Day, diskusikan alibi; Hitman dapat memilih target Gag. Saat Night, pilih kartu target lalu kunci Hostage/Guard/Peek jika tersedia. Saat Tribunal, pilih kartu tersangka lalu kunci vote. Pemain yang tidak bisa bertindak tetap dapat menonton. Setelah selesai, kembali ke lobby → Keluar ruangan → Buat ruangan baru.
 
-Timer standar 120/30/45 detik. Mode cepat di lobby memakai 20/15/15 detik, cocok untuk tes aturan. Respons Ollama yang selesai setelah fase berubah **tidak ditampilkan** agar tidak menerobos malam atau efek bungkam; gunakan durasi standar untuk mencoba chat AI.
+Timer mengikuti jumlah peserta awal. Contoh enam pemain: standar 120/30/45 detik; mode cepat 20/15/15 detik. Empat pemain: standar 80/20/30 detik. Durasi tetap selama pertandingan; rincian ada di GAME_CONCEPT.md. Respons Ollama yang selesai setelah fase berubah **tidak ditampilkan** agar tidak menerobos malam atau efek bungkam; gunakan durasi standar untuk mencoba chat AI.
 
 Saat Day, tombol **Setuju skip diskusi** mempercepat ke Night setelah seluruh manusia yang masih hidup setuju. Bot tidak dihitung. Pemain dibungkam/disandera tetap boleh menyetujui karena ini bukan chat atau vote Tribunal; status mereka tetap tidak dipublikasikan. Persetujuan tidak bisa ditarik pada ronde itu. Pemain offline belum dianggap setuju; timer normal tetap berjalan.
 

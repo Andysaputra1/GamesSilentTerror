@@ -36,6 +36,28 @@ describe('Lobby', () => {
     expect(component).toBeTruthy();
   });
 
+  it('offers four players, enables start at four, and previews roster timing', () => {
+    const options = [...fixture.nativeElement.querySelectorAll('#room-capacity option')].map(
+      (o: any) => o.textContent,
+    );
+    expect(options).toContain('4 pemain');
+    component.room = {
+      code: 'ABC123',
+      owner: component.username,
+      members: [component.username],
+      bots: ['NOX', 'ECHO', 'VEIL'],
+      bot_enabled: true,
+      phase: 'lobby',
+      capacity: 4,
+    };
+    fixture.componentRef.changeDetectorRef.markForCheck();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.start-game-btn').disabled).toBe(false);
+    expect(component.durations).toEqual({ day: 80, night: 20, tribunal: 30 });
+    component.quick = true;
+    expect(component.durations).toEqual({ day: 14, night: 10, tribunal: 10 });
+  });
+
   it('creates a room with selected capacity and round limit', () => {
     const request = vi.spyOn(TestBed.inject(RoomService), 'request').mockReturnValue(
       of({

@@ -171,7 +171,7 @@
               <h2>Riwayat percakapan</h2>
               <p>Pesan pemain dan bot dari semua room yang tercatat.</p>
             </div>
-            <button id="download">&darr; Download semua chat</button>
+            <button id="download">&darr; Download chat sesuai filter</button>
           </div>
           <form id="history-filter" class="toolbar">
             <label>Dari tanggal<input id="date-from" type="date" /></label
@@ -180,11 +180,19 @@
               >Ruangan<select id="history-room">
                 <option value="">Semua ruangan</option>
               </select></label
+            ><label
+              >Pengirim<select id="history-sender">
+                <option value="all">Semua (manusia + bot + arsip lama)</option>
+                <option value="human">Manusia saja</option>
+                <option value="bot">Bot saja</option>
+                <option value="legacy">Arsip lama (belum terklasifikasi)</option>
+              </select></label
             ><button class="secondary">Terapkan filter</button>
           </form>
           <p class="hint">
-            Tanggal opsional, zona waktu WIB. Download mencakup semua room dengan filter tanggal di
-            atas; kolom CSV: chat_id, isi_chat.
+            Tanggal opsional, zona waktu WIB. Tampilan dan download memakai filter tanggal, ruangan,
+            dan pengirim yang sama. Kolom CSV: chat_id, isi_chat. Arsip lama belum dapat dibedakan
+            manusia/bot.
           </p>
           <div class="table-scroll">
             <table>
@@ -203,7 +211,17 @@
           <button id="more-history" class="secondary" hidden>Muat berikutnya</button>
         </section>
         <section id="menu-users" class="card" hidden>
-          <details>
+          <div class="section-head">
+            <div>
+              <span class="eyebrow">PLAYER ACCOUNTS</span>
+              <h2>Manajemen user</h2>
+              <p>
+                Tambah, edit nama/username, ubah password, atau hapus akun. Riwayat chat tetap
+                disimpan.
+              </p>
+            </div>
+          </div>
+          <details open>
             <summary>+ Tambah user</summary>
             <form id="create-user-form">
               <label
@@ -247,16 +265,6 @@
               <button id="create-user-button">Tambah user</button>
             </form>
           </details>
-          <div class="section-head">
-            <div>
-              <span class="eyebrow">PLAYER ACCOUNTS</span>
-              <h2>Manajemen user</h2>
-              <p>
-                Kelola password dan akun pemain. Riwayat chat serta analisis tetap disimpan ketika
-                akun dihapus.
-              </p>
-            </div>
-          </div>
           <form id="user-search-form" class="toolbar">
             <label
               >Cari username atau nama<input id="user-search" maxlength="100" type="search"
@@ -280,6 +288,29 @@
           <button id="more-users" class="secondary" hidden>Muat berikutnya</button>
           <section id="user-editor" class="info" hidden aria-labelledby="user-editor-title">
             <h3 id="user-editor-title"></h3>
+            <form id="user-profile-form" hidden>
+              <p>
+                Username hanya dapat diubah setelah user keluar dari ruangan. Perubahan username
+                mencabut sesi login lama.
+              </p>
+              <label
+                >Username<input
+                  id="edit-user-username"
+                  required
+                  minlength="3"
+                  maxlength="40"
+                  pattern="[A-Za-z0-9_]+"
+                  autocomplete="off"
+              /></label>
+              <label
+                >Nama lengkap<input
+                  id="edit-user-display-name"
+                  required
+                  maxlength="100"
+                  autocomplete="off"
+              /></label>
+              <button id="save-user-profile">Simpan perubahan</button>
+            </form>
             <form id="user-password-form" hidden>
               <p>User harus login ulang setelah password diganti.</p>
               <label

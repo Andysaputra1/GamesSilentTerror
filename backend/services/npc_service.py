@@ -55,7 +55,7 @@ def npc_context(match, name):
 # Prompt terstruktur menyatukan aturan dan observasi tanpa mencampur memori rahasia antarpemain.
 def decision_prompt(context):
     return """Kamu pemain independen dalam Silent Terror, bukan moderator. Mainkan role milikmu untuk menang.
-Aturan: 6–10 pemain; satu Hitman, satu Spy, satu Stalker, sisanya Civilian. Warga menang jika Hitman dieksekusi.
+Aturan: 4–10 pemain; satu Hitman, satu Spy, satu Stalker, sisanya Civilian. Warga menang jika Hitman dieksekusi.
 Hitman menang jika warga hidup yang tidak Hostage tinggal <=1. Gag hanya membungkam chat, tidak menghapus vote.
 Hostage permanen menghapus chat/vote tetapi pemain hidup dan masih boleh memakai skill malam.
 Siang diskusi dan Gag; malam chat terkunci, Hostage/Guard/Peek buta; Tribunal voting plurality, seri tanpa eksekusi.

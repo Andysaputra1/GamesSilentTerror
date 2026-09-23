@@ -14,13 +14,18 @@ class UserNotFound(ValueError):
     """ID akun sudah tidak tersedia."""
 
 
-# Admin membuat akun password biasa tanpa menerbitkan sesi login atas nama pemain.
-def create_user(username, display_name, password):
+# Tolak identitas yang dicadangkan untuk NPC dan administrator sebelum membuat atau mengganti username.
+def validate_username(username):
     reserved = {"nox", "echo", "veil", "raven", "ash", "dusk", "admin", "administrator", "user1"}
     reserved.update(name.strip().casefold() for name in settings.admin_usernames.split(","))
     reserved.update(name.strip().casefold() for name in settings.history_admin_usernames.split(","))
     if username.casefold() in reserved:
         raise ValueError("Username tersebut tidak tersedia.")
+
+
+# Buat akun lokal; password disimpan sebagai hash, tidak pernah dikembalikan ke panel.
+def create_user(username, display_name, password):
+    validate_username(username)
     encoded = hash_password(password)
 
     # Constraint unik menangani dua admin yang membuat username sama secara bersamaan.
@@ -34,6 +39,27 @@ def create_user(username, display_name, password):
         return account_for_management(database, user_id)
 
     return auth_service._transaction(operation)
+
+
+# Edit identitas berdasarkan ID; arsip pengirim lama dan identitas Google tetap dipertahankan.
+def update_user(user_id, display_name, username=None):
+    def operation(database):
+        account = account_for_management(database, user_id)
+        selected = username or account["username"]
+        if selected != account["username"]:
+            validate_username(selected)
+            if room_service.current(account["username"]):
+                raise ValueError("User harus keluar dari ruangan sebelum username diganti.")
+            try:
+                auth_queries.update_username(database, user_id, selected)
+            except IntegrityError as error:
+                raise ValueError("Username sudah digunakan.") from error
+            database.execute(text("DELETE FROM auth_sessions WHERE user_id=:id"), {"id": user_id})
+        auth_queries.update_display_name(database, user_id, display_name)
+        return account_for_management(database, user_id)
+
+    with room_service.lock:
+        return auth_service._transaction(operation)
 
 
 # Baca akun terkini di dalam transaksi; password hanya dipakai menentukan metode login.
