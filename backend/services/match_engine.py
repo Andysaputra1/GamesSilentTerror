@@ -49,6 +49,7 @@ class Match:
         self.events = ["Permainan dimulai. Diskusikan alibi tanpa membocorkan identitasmu."]
         self.messages = []
         self.winner = None
+        self.winner_reason = None
         self.bot_day_done = False
         self.bot_night_done = False
         self.bot_vote_done = False
@@ -139,22 +140,45 @@ class Match:
             self.events.append("Tribunal berakhir tanpa eksekusi: suara seri atau tidak ada suara.")
         self.check_winner()
         if not self.winner and self.round >= self.max_rounds:
-            self.winner = "draw"
-            self.phase = "finished"
-            self.events.append(f"Permainan seri: batas {self.max_rounds} ronde tercapai tanpa pemenang.")
+            self.finish("draw", "round_limit", f"Batas {self.max_rounds} ronde tercapai tanpa pemenang.")
+
+    def finish(self, winner, reason, explanation):
+        """Satu hasil final untuk semua pemain; tidak berubah oleh tick berikutnya."""
+        if self.winner:
+            return
+        self.winner = winner
+        self.winner_reason = reason
+        self.phase = "finished"
+        label = {"civilians": "Kubu warga menang.", "hitman": "Hitman menang.", "draw": "Permainan seri."}[winner]
+        self.events.append(f"{label} {explanation}")
 
     # KONDISI AKHIR: kematian Hitman berarti warga menang; semua warga hidup disandera berarti Hitman menang.
     def check_winner(self):
         if self.winner:
             return
         hitman = next(player for player in self.players.values() if player.role == "hitman")
+        survivors = [p for p in self.players.values() if p.role != "hitman" and p.alive]
         if not hitman.alive:
-            self.winner = "civilians"
-        elif all(not player.alive or player.hostage for player in self.players.values() if player.role != "hitman"):
-            self.winner = "hitman"
-        if self.winner:
-            self.phase = "finished"
-            self.events.append("Permainan selesai. " + ("Warga menang." if self.winner == "civilians" else "Hitman menang."))
+            self.finish("civilians", "hitman_executed", "Hitman dieksekusi oleh Tribunal.")
+        elif not survivors:
+            self.finish("hitman", "no_civilians_alive", "Tidak ada warga yang masih hidup.")
+        elif all(p.hostage for p in survivors):
+            self.finish("hitman", "all_survivors_hostage", "Semua warga yang masih hidup telah disandera.")
+
+    def result(self, viewer):
+        """Ringkasan hanya setelah selesai; korban tetap bagian dari kubu warga."""
+        if not self.winner:
+            return None
+        team = "hitman" if self.players[viewer].role == "hitman" else "civilians"
+        civilians = [p for p in self.players.values() if p.role != "hitman"]
+        return {
+            "reason": self.winner_reason,
+            "team": team,
+            "outcome": "draw" if self.winner == "draw" else "won" if team == self.winner else "lost",
+            "civilians_alive": sum(p.alive for p in civilians),
+            "civilians_hostage": sum(p.alive and p.hostage for p in civilians),
+            "civilians_eliminated": sum(not p.alive for p in civilians),
+        }
 
     # BOT ATURAN: aksi/vote mengikuti validasi yang sama; tidak melihat role atau Hostage lawan.
     def run_bots(self):
@@ -256,10 +280,12 @@ class Match:
             },
             "id": self.id, "phase": self.phase, "round": self.round, "max_rounds": self.max_rounds, "deadline": self.deadline,
             "server_time": time.time(), "winner": self.winner, "events": list(self.events),
+            "result": self.result(viewer),
             "players": [{"name": p.name, "bot": p.bot, "alive": p.alive,
-                         **({"role": p.role} if self.winner else {})} for p in self.players.values()],
+                         **({"role": p.role, "hostage": p.hostage} if self.winner else {})} for p in self.players.values()],
             "messages": list(self.messages),
             "me": {"name": viewer, "role": player.role, "alive": player.alive,
+                   "hostage": player.hostage, "gagged": player.gagged,
                    "muted": player.hostage or player.gagged, "can_chat": self.can_chat(viewer),
                    "can_vote": self.phase == "tribunal" and player.alive and not player.hostage and not player.gagged and viewer not in self.votes,
                    "vote": self.votes.get(viewer), "ability": ability, "can_act": bool(can_act),

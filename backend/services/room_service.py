@@ -28,6 +28,8 @@ class RoomService:
         with self.lock:
             if self.active(username):
                 raise ValueError("Selesaikan pertandingan aktif sebelum membuat ruangan lain.")
+            if self.current(username):
+                raise ValueError("Keluar dari ruangan sebelumnya sebelum membuat ruangan baru.")
             if len(self.rooms) >= 500:
                 raise ValueError("Batas ruangan aktif tercapai. Hubungi pengelola.")
             code = secrets.token_hex(3).upper()
@@ -56,6 +58,9 @@ class RoomService:
             active = self.active(username)
             if active and active["code"] != code.strip().upper():
                 raise ValueError("Kembali ke pertandingan aktifmu terlebih dahulu.")
+            current = self.current(username)
+            if current and current.code != code.strip().upper():
+                raise ValueError("Keluar dari ruangan sebelumnya sebelum bergabung ke ruangan lain.")
             room = self.rooms.get(code.strip().upper())
             if room is None:
                 raise ValueError("Kode ruangan tidak ditemukan.")
@@ -112,6 +117,11 @@ class RoomService:
             return self.snapshot(room)
 
     # PEMULIHAN: cari pertandingan akun dari server, bukan mengandalkan sessionStorage tab.
+    def current(self, username):
+        """Pulihkan lobby/hasil setelah login ulang, tanpa data role privat."""
+        with self.lock:
+            return next((room for room in self.rooms.values() if username in room.members), None)
+
     def active(self, username):
         with self.lock:
             for room in self.rooms.values():

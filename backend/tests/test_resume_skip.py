@@ -104,6 +104,10 @@ class ActiveRoomTests(unittest.TestCase):
         with patch('controller.api.rooms.room_service', self.rooms), TestClient(app) as client:
             self.assertEqual(client.get('/api/rooms/active').json()['active']['code'], self.room.code)
             self.assertIsNone(client.get('/api/rooms/active', headers={'x-user':'outsider'}).json()['active'])
+            current = client.get('/api/rooms/current').json()['room']
+            self.assertEqual(current['code'], self.room.code)
+            self.assertNotIn('players', current)
+            self.assertIsNone(client.get('/api/rooms/current', headers={'x-user':'outsider'}).json()['room'])
             endpoint = '/api/rooms/' + self.room.code + '/skip-discussion'
             payload = {'match_id':self.room.match.id, 'round_number':1, 'phase':'day'}
             self.assertEqual(client.post(endpoint, json={**payload, 'match_id':'stale'}).status_code, 400)

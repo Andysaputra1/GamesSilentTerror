@@ -84,6 +84,8 @@ class PanelTests(unittest.TestCase):
             self.assertEqual(response.status_code,200)
             factory.return_value.archive_new_room.assert_called_once_with('alice')
             before=set(rooms.rooms)
+            # Akun lain menguji kegagalan arsip tanpa melanggar satu room per akun.
+            self.app.dependency_overrides[require_authenticated_user]=lambda:SimpleNamespace(username='bob')
             factory.return_value.archive_new_room.side_effect=PersistenceError('fail')
             self.assertEqual(self.client.post('/api/rooms').status_code,503)
             self.assertEqual(set(rooms.rooms),before)

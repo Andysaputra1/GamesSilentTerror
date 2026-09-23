@@ -17,16 +17,26 @@ export interface MatchView {
   deadline: number;
   server_time: number;
   winner: string | null;
+  result?: {
+    reason: 'hitman_executed' | 'all_survivors_hostage' | 'no_civilians_alive' | 'round_limit';
+    team: 'hitman' | 'civilians';
+    outcome: 'won' | 'lost' | 'draw';
+    civilians_alive: number;
+    civilians_hostage: number;
+    civilians_eliminated: number;
+  } | null;
   tribunal_votes: { target: string; voters: string[] }[];
   discussion_skip: { agreed: number; required: number; consented: boolean; can_consent: boolean };
   events: string[];
-  players: { name: string; bot: boolean; alive: boolean; role?: string }[];
+  players: { name: string; bot: boolean; alive: boolean; role?: string; hostage?: boolean }[];
   messages: GameMessage[];
   me: {
     name: string;
     role: string;
     alive: boolean;
     muted: boolean;
+    hostage?: boolean;
+    gagged?: boolean;
     can_chat: boolean;
     can_vote: boolean;
     vote: string | null;

@@ -3,11 +3,11 @@
     <div>
       <p class="eyebrow">SILENT TERROR / {{ code }}</p>
       <h1>
-        {{ game?.phase === 'finished' ? 'The final verdict.' : 'Trust is a dangerous thing.' }}
+        {{ game?.phase === 'finished' ? 'Hasil pertandingan.' : 'Meja penyelidikan.' }}
       </h1>
     </div>
     <div class="match-account">
-      <a routerLink="/lobby">← Lobby</a>
+      @if (game?.winner) { <a routerLink="/lobby">← Kembali ke lobby</a> }
       <app-profile-menu [username]="game?.me?.name || 'Pemain'" [activeMatch]="!!game && !game.winner" />
     </div>
   </header>
@@ -16,10 +16,24 @@
   }
   @if (game; as state) {
     <div class="phase-strip">
-      <b>RONDE {{ state.round }} / {{ state.max_rounds || 8 }} / {{ state.phase.toUpperCase() }}</b
+      <b>RONDE {{ state.round }} / {{ state.max_rounds || 8 }} · {{ phaseNames[state.phase] }}</b
       ><strong>{{ state.winner ? 'SELESAI' : seconds + 's' }}</strong
-      ><span>{{ connected ? 'CHAT TERHUBUNG' : 'MENYAMBUNG CHAT…' }}</span>
+      ><span>{{ state.winner ? 'RIWAYAT DISKUSI' : connected ? 'CHAT TERHUBUNG' : 'MENYAMBUNG CHAT…' }}</span>
     </div>
+    @if (!state.winner) {
+      <nav class="round-flow" aria-label="Urutan fase">
+        <span [class.current]="state.phase === 'day'">1. Diskusi</span>
+        <span [class.current]="state.phase === 'night'">2. Aksi malam</span>
+        <span [class.current]="state.phase === 'tribunal'">3. Voting Tribunal</span>
+      </nav>
+      <details class="rules-panel">
+        <summary>Cara menang dan arti status pemain</summary>
+        <p><b>Kubu warga (Spy, Stalker, Civilian):</b> menang jika Hitman dieksekusi.</p>
+        <p><b>Hitman:</b> menang jika semua warga yang masih hidup menjadi Hostage, atau tidak ada warga yang masih hidup.</p>
+        <p>Hostage tetap hidup, tetapi tidak dapat chat, voting, atau memakai skill. Gag hanya sementara dan tidak dihitung sebagai Hostage. Jumlah pemain yang seimbang tidak otomatis membuat Hitman menang.</p>
+        <p>Voting seri atau tanpa suara tidak mengeksekusi siapa pun. Jika belum ada pemenang setelah Tribunal ronde {{ state.max_rounds || 8 }}, hasilnya seri.</p>
+      </details>
+    }
     @if (state.phase === 'day') {
       <section class="skip-panel" aria-label="Persetujuan skip diskusi">
         <div>
@@ -39,14 +53,19 @@
       </section>
     }
     @if (state.winner) {
-      <section class="result" aria-live="polite">
-        @if (state.winner === 'draw') {
-          <p>Batas {{ state.max_rounds }} ronde tercapai tanpa pemenang.</p>
+      <section class="result" [class.is-loss]="outcomeLabel === 'KAMU KALAH'" aria-live="polite">
+        <p class="eyebrow">{{ outcomeLabel }}</p>
+        <h2>{{ state.winner === 'draw' ? 'Permainan seri.' : state.winner === 'hitman' ? 'Hitman menang.' : 'Kubu warga menang.' }}</h2>
+        <p>{{ resultExplanation }}</p>
+        @if (state.result; as result) {
+          <div class="result-stats">
+            <span><b>{{ result.civilians_alive }}</b> warga hidup</span>
+            <span><b>{{ result.civilians_hostage }}</b> dari warga hidup disandera</span>
+            <span><b>{{ result.civilians_eliminated }}</b> warga dieksekusi</span>
+          </div>
         }
-        <h2>{{ state.winner === 'draw' ? 'Permainan seri.' : state.winner === 'hitman' ? 'Hitman menang.' : 'Warga menang.' }}</h2>
         <p>
-          Identitas semua pemain kini dibuka. Kembali ke lobby, keluar ruangan, lalu buat permainan
-          baru.
+          Role dan status akhir semua pemain kini dibuka. Keluar dari ruangan lewat lobby untuk membuat atau bergabung ke permainan baru.
         </p>
 
       </section>
@@ -54,23 +73,24 @@
     <div class="match-grid">
       <section class="table-panel">
         <div class="private-card">
-          <p class="eyebrow">HANYA UNTUKMU</p>
+          <p class="eyebrow">{{ state.winner ? 'ROLE KAMU' : 'HANYA UNTUKMU' }}</p>
+          @if (!state.winner) {
           <button (click)="revealRole = !revealRole">
             {{ revealRole ? 'Sembunyikan role' : 'Lihat role saya' }}
           </button>
-          @if (revealRole) {
+          }
+          @if (revealRole || state.winner) {
             <h2>{{ state.me.role.toUpperCase() }}</h2>
+            @if (!state.winner) {
+            <p class="objective"><b>Tujuan kubumu:</b> {{ objective }}</p>
             <p>{{ roleHelp[state.me.role] }}</p>
+            }
           }
-          @if (!state.me.alive) {
-            <p>Kamu telah dieksekusi. Kamu tetap dapat menyaksikan permainan.</p>
-          } @else if (state.me.muted) {
-            <p>Suaramu hilang. Chat dan voting tidak tersedia untukmu.</p>
-          }
+          <p class="private-status">{{ privateStatus }}</p>
         </div>
-        <h2>At the table</h2>
+        <h2>{{ state.winner ? 'Identitas dan status akhir' : 'Pemain di meja' }}</h2>
         <p class="hint">
-          Diam bukan bukti. Tidak ada tanda publik siapa yang disandera atau dibungkam.
+          {{ state.winner ? 'Hasil mengikuti kubu, bukan siapa yang masih hidup.' : 'Diam bukan bukti. Status Hostage dan Gag pemain lain tetap rahasia.' }}
         </p>
         <div class="players">
           @for (player of state.players; track player.name) {
@@ -91,7 +111,7 @@
                 ><small
                   >{{ player.bot ? 'BOT' : 'PEMAIN'
                   }}{{ player.name === state.me.name ? ' / YOU' : '' }}</small
-                ><small>{{ player.alive ? 'DI MEJA' : 'DIEKSEKUSI' }}</small>
+                ><small>{{ !player.alive ? 'DIEKSEKUSI' : state.winner && player.hostage ? 'HIDUP / HOSTAGE' : state.winner ? 'HIDUP / BEBAS' : 'DI MEJA' }}</small>
                 @if (player.role) {
                   <strong>{{ player.role.toUpperCase() }}</strong>
                 }
@@ -179,7 +199,7 @@
             }
           </section>
         }
-        <details open>
+        <details>
           <summary>Catatan pertandingan</summary>
           @for (event of state.events; track $index) {
             <p class="event">{{ event }}</p>
@@ -187,10 +207,10 @@
         </details>
       </section>
       <aside class="chat-panel">
-        <h2>Table talk</h2>
+        <h2>Diskusi meja</h2>
         <p class="hint">
           {{
-            state.phase === 'night'
+            state.winner ? 'Pertandingan selesai. Riwayat diskusi tetap bisa dibaca.' : state.phase === 'night'
               ? 'Malam: semua chat terkunci.'
               : 'Baca alibi. Amati siapa yang menjawab, bukan sekadar siapa yang diam.'
           }}

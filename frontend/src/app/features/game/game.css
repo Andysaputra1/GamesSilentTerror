@@ -10,6 +10,17 @@
   min-height: 100dvh;
   padding: clamp(16px, 3vw, 40px);
 }
+.match-shell > * { max-width: 1440px; margin-left: auto; margin-right: auto; }
+.round-flow { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
+.round-flow span { padding: 10px 16px; border: 1px solid currentColor; border-radius: 24px; font-size: 13px; }
+.round-flow .current { background: #36564b; color: #fff7e8; border-color: #36564b; font-weight: bold; }
+.rules-panel p { line-height: 1.6; max-width: 95ch; }
+.result-stats { display: flex; gap: 12px; flex-wrap: wrap; }
+.result-stats span { padding: 12px; background: #e4e9da; border-radius: 10px; }
+.result-stats b { font-size: 22px; margin-right: 6px; }
+.result .eyebrow { font-weight: bold; color: #36564b; }
+.result.is-loss .eyebrow { color: #922e2e; }
+.private-status { padding-top: 12px; border-top: 1px solid #b6a17e; }
 .match-shell.night {
   background: #202934;
   color: #efe9dd;

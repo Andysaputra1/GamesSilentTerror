@@ -54,7 +54,8 @@ export class Lobby implements OnInit, OnDestroy {
         JSON.parse(localStorage.getItem('shadow_heist_user') ?? '{}').username || this.username;
     } catch {}
     const code = sessionStorage.getItem('shadow_heist_room');
-    if (code) this.load('GET', '/' + encodeURIComponent(code));
+    if (localStorage.getItem('shadow_heist_access_token')) this.restoreRoom();
+    else if (code) this.load('GET', '/' + encodeURIComponent(code));
     this.timer = setInterval(() => {
       if (this.room && !this.busy) this.load('GET', '/' + this.room.code);
     }, 3000);
@@ -67,12 +68,12 @@ export class Lobby implements OnInit, OnDestroy {
 
   // METHOD EVENT TOMBOL: minta backend membuat ruangan dan kode baru.
   createRoom(): void {
-    if (!this.busy) this.load('POST', '');
+    if (!this.busy && !this.room) this.load('POST', '');
   }
 
   // METHOD EVENT FORM: periksa format kode, lalu minta backend menambahkan keanggotaan.
   joinRoom(): void {
-    if (this.busy) return;
+    if (this.busy || this.room) return;
     const code = this.joinCode.trim().toUpperCase();
     if (!/^[A-F0-9]{6}$/.test(code)) {
       this.error = 'Masukkan kode ruangan 6 karakter.';
@@ -109,12 +110,40 @@ export class Lobby implements OnInit, OnDestroy {
       .subscribe({
         next: () => {
           this.room = null;
+          this.error = '';
+          this.copied = false;
           sessionStorage.removeItem('shadow_heist_room');
+          sessionStorage.removeItem('shadow_heist_room_snapshot');
+          sessionStorage.removeItem(gameEntryStorageKey);
         },
         error: (error: HttpErrorResponse) => {
           this.error = error.error?.detail || 'Gagal keluar ruangan.';
         },
       });
+  }
+
+  restoreRoom(): void {
+    if (this.busy) return;
+    this.busy = true;
+    this.rooms.current().pipe(
+      takeUntilDestroyed(this.destroy),
+      finalize(() => { this.busy = false; this.cdr.markForCheck(); }),
+    ).subscribe({
+      next: room => {
+        this.room = room;
+        this.error = '';
+        if (room) sessionStorage.setItem('shadow_heist_room', room.code);
+        else {
+          sessionStorage.removeItem('shadow_heist_room');
+          sessionStorage.removeItem('shadow_heist_room_snapshot');
+          sessionStorage.removeItem(gameEntryStorageKey);
+        }
+      },
+      error: (error: HttpErrorResponse) => {
+        this.error = 'Ruangan belum bisa dipulihkan. Coba muat ulang.';
+        if (error.status === 401) void this.router.navigateByUrl('/login');
+      },
+    });
   }
 
   // ASYNC METHOD: tunggu penyalinan kode ke clipboard; berikan pesan jika browser menolaknya.

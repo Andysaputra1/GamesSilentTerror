@@ -10,6 +10,11 @@
       <h1 class="operation-title">Ambil tempatmu.</h1>
       <p class="operation-copy">Buat ruangan, bagikan kodenya, atau gabung ke meja temanmu.</p>
     </section>
+    <section class="rules-briefing" aria-label="Ringkasan permainan">
+      <div><b>01 / SIAPKAN MEJA</b><p>4–6 peserta, termasuk bot. Host memulai setelah semua siap. Role dibagikan secara acak.</p></div>
+      <div><b>02 / CARI HITMAN</b><p>Diskusi → aksi malam → voting. Spy, Stalker, dan Civilian satu kubu; menang jika Hitman dieksekusi.</p></div>
+      <div><b>03 / WASPADAI HOSTAGE</b><p>Hitman menang jika semua warga hidup disandera atau semua warga dieksekusi. Gag sementara bukan Hostage. Maksimal 8 ronde, lalu seri.</p></div>
+    </section>
     <section class="lobby-layout">
       <article class="briefing-card">
         <p class="operation-label">YOUR PRIVATE TABLE</p>
@@ -21,13 +26,14 @@
               {{ copied ? 'Tersalin' : 'Salin kode' }}
             </button>
           </div>
-          <p>Bagikan kode ini kepada teman. Mereka harus login terlebih dahulu untuk bergabung.</p>
+          <p>{{ room.phase === 'lobby' ? 'Bagikan kode ini kepada teman. Mereka harus login terlebih dahulu untuk bergabung.' : room.phase === 'finished' ? 'Pertandingan selesai. Lihat hasil atau keluar ruangan untuk bermain lagi.' : 'Pertandingan berlangsung. Peserta terkunci sampai permainan selesai.' }}</p>
         } @else {
           <p>Mulai meja baru, lalu tentukan apakah NOX ikut bermain.</p>
           <button class="operation-primary" (click)="createRoom()" [disabled]="busy">
             BUAT RUANGAN <span>+</span>
           </button>
         }
+        @if (!room) {
         <div class="join-room">
           <label for="room-code">PUNYA KODE RUANGAN?</label>
           <form (ngSubmit)="joinRoom()">
@@ -43,14 +49,18 @@
             /><button class="operation-secondary" type="submit" [disabled]="busy">Gabung</button>
           </form>
         </div>
+        } @else {
+          <p class="entry-note">Satu akun menempati satu ruangan. Keluar dari ruangan ini sebelum pindah ke meja lain.</p>
+        }
         @if (error) {
           <p class="room-error" role="alert">{{ error }}</p>
+          <button class="operation-secondary" (click)="restoreRoom()" [disabled]="busy">Muat ulang ruangan</button>
         }
         <p class="entry-note">Ruangan aktif tersedia selama server berjalan.</p>
       </article>
       <article class="roster-card">
         <div class="roster-heading">
-          <h2>At the table</h2>
+          <h2>{{ room?.phase === 'finished' ? 'Peserta pertandingan' : 'Pemain di meja' }}</h2>
           <span>{{ room ? room.members.length + room.bots.length : 0 }} / 6 PEMAIN</span>
         </div>
         @if (room) {
@@ -76,6 +86,7 @@
               <span class="player-tag">BOT</span>
             </div>
           }
+          @if (room.phase === 'lobby') {
           <div class="bot-control">
             <div>
               <b>Isi kursi dengan bot</b>
@@ -95,6 +106,7 @@
           </div>
           @if (room.owner !== username) {
             <p class="entry-note">Bot diatur oleh pembuat ruangan.</p>
+          }
           }
           @if (room.phase === 'lobby') {
             @if (room.owner === username) {
@@ -123,7 +135,7 @@
           }
           <p class="entry-note">
             Standar: siang 120 detik, malam 30 detik, Tribunal 45 detik. Timer tetap berjalan saat
-            tab ditutup.
+            tab ditutup. Maksimal 8 ronde; kemenangan diperiksa setelah aksi malam dan voting.
           </p>
           @if (room.phase === 'lobby' || room.phase === 'finished') {
             <button class="operation-secondary" (click)="leaveRoom()" [disabled]="busy">

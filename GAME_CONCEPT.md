@@ -17,6 +17,32 @@ Tidak ada budget, pembelian item, atau tebusan. Hitman menyusup dan menyandera w
 
 Day (diskusi; Hitman dapat Gag Order) → Night (chat terkunci; aksi serentak dan tersembunyi) → Tribunal (rekap malam tanpa nama target; voting; suara terbanyak dieksekusi) → ronde berikutnya.
 
+## Kubu, status, dan kemenangan
+
+- **Kubu Hitman:** tepat satu pemain. Bot juga bisa mendapat role ini.
+- **Kubu warga:** Spy, Stalker, dan semua Civilian, baik manusia maupun bot. Kemenangan mengikuti kubu, bukan jumlah manusia yang masih hidup.
+- **Hidup (`alive`):** belum dieksekusi. Hostage tetap hidup dan tetap berada di roster.
+- **Hostage:** permanen sampai game berakhir; tidak dapat chat, voting, atau aksi malam. Korban tetap anggota kubu warga dan tetap menang jika Hitman dieksekusi.
+- **Gag Order:** hanya mengunci chat/voting sampai akhir Tribunal ronde itu. Aksi malam tetap tersedia. Gag tidak dihitung sebagai Hostage untuk kemenangan.
+- **Dieksekusi:** tidak lagi hidup dan hanya menonton. Hasil pemain tetap mengikuti kubunya.
+
+Backend memeriksa kemenangan setelah resolusi malam dan setelah eksekusi Tribunal, dengan urutan berikut:
+
+1. Hitman dieksekusi → **seluruh kubu warga menang**, termasuk yang Hostage atau sudah dieksekusi.
+2. Hitman hidup dan tidak ada warga hidup tersisa → **Hitman menang** karena semua lawan telah dieksekusi.
+3. Hitman hidup dan seluruh warga yang masih hidup sudah Hostage → **Hitman menang**. Warga yang dieksekusi tidak perlu disandera.
+4. Selain itu permainan berlanjut. Setelah Tribunal ronde 8, jika belum ada kemenangan normal → **seri**.
+
+Tidak ada kemenangan otomatis karena jumlah Hitman dan warga seimbang, karena semua manusia gugur, atau karena semua lawan sedang Gag. Satu warga hidup yang belum Hostage masih mencegah kemenangan Hitman. Guard yang berhasil melindungi warga terakhir juga mencegah kemenangan malam itu.
+
+Contoh: Spy dieksekusi, Stalker menjadi Hostage, Civilian masih bebas → pertandingan lanjut. Jika Civilian kemudian menjadi Hostage, Hitman menang. Jika Hitman justru dieksekusi di Tribunal, Spy, Stalker, dan Civilian semuanya menang.
+
+Selama game, hanya status milik sendiri yang dijelaskan secara privat; roster lawan tidak membocorkan Hostage/Gag. Setelah selesai, layar hasil menjelaskan kubu pemenang, menang/kalah/seri untuk akun sendiri, alasan akhir, jumlah warga hidup/disandera/dieksekusi, serta role dan status akhir setiap pemain.
+
+## Alur ruangan
+
+Satu akun menempati satu ruangan. Buat/gabung → tunggu 4–6 peserta → host mulai → diskusi/malam/voting → hasil → keluar ruangan sebelum membuat atau bergabung lagi. Keanggotaan lobby dan ruangan selesai dipulihkan dari server melalui `GET /api/rooms/current`, termasuk setelah logout atau tab baru. Logout mengakhiri sesi akun, bukan meninggalkan atau menghentikan pertandingan. Login ulang memulihkan pertandingan aktif. Keluar sebelum mulai memindahkan host ke anggota berikutnya; ruangan tanpa anggota dibersihkan.
+
 ## Silent terror
 
 Korban Hostage tidak mati, tetapi kehilangan kemampuan chat dan hak voting. Sistem tidak pernah mengumumkan siapa yang disandera. Diam dapat berarti Hostage, Gag Order, atau pilihan pemain sendiri. Rekap dan roster publik tidak boleh membocorkan status tersebut.
@@ -39,7 +65,7 @@ Sudah aktif: pembagian role server, timer, resolusi malam, cooldown, Hostage/Gag
 - Setiap aksi malam dan vote hanya satu pilihan final. Boleh tidak memilih sebelum timer habis. Target harus hidup; hanya Guard boleh memilih diri sendiri.
 - Suara terbanyak tunggal dieksekusi. Seri atau tanpa suara: tidak ada eksekusi.
 - Warga menang jika Hitman dieksekusi. Hitman menang jika semua warga yang masih hidup sudah Hostage.
-- Tidak ada pengumuman target Hostage, status bungkam publik, atau aksi malam orang lain dalam snapshot. Selama Tribunal, vote yang sudah dikirim bersifat publik: jumlah dan nama pemilih per target, tanpa daftar siapa yang berhak voting. Tampilan maksimal 4 badge nama lalu +N dan daftar lengkap yang bisa dibuka. Role dibuka untuk semua setelah game selesai. Status bungkam sendiri tersedia privat; hasil Peek tetap privat.
+- Tidak ada pengumuman target Hostage, status bungkam publik, atau aksi malam orang lain dalam snapshot aktif. Selama Tribunal, vote yang sudah dikirim bersifat publik: jumlah dan nama pemilih per target, tanpa daftar siapa yang berhak voting. Tampilan maksimal 4 badge nama lalu +N dan daftar lengkap yang bisa dibuka. Role dan status Hostage dibuka untuk semua setelah game selesai. Status Hostage/Gag sendiri tersedia privat; hasil Peek tetap privat.
 - Bot memilih target dari pemain hidup, tanpa membaca role/status rahasia lawan. Stalker bot boleh memakai hasil Peek miliknya sendiri saat voting. Aksi bot dijalankan di pertengahan fase.
 - Bot chat menjawab pesan manusia yang diterima, bukan percakapan otomatis antarsesama bot. LLM tidak menentukan hasil aksi/vote. Bot bungkam/mati tidak boleh membalas; balasan yang terlambat melewati fase dibuang. Kegagalan LLM tidak menghentikan timer.
 

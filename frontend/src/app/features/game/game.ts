@@ -49,6 +49,48 @@ export class Game implements OnInit, OnDestroy {
     civilian:
       'Amati percakapan, uji alibi, dan pilih tersangka saat Tribunal. Tidak punya skill malam.',
   };
+  readonly phaseNames: Record<string, string> = {
+    day: 'Siang / diskusi', night: 'Malam / aksi rahasia', tribunal: 'Tribunal / voting', finished: 'Hasil akhir',
+  };
+
+  get objective(): string {
+    return this.game?.me.role === 'hitman'
+      ? 'Sandera semua anggota kubu warga yang masih hidup. Tetap lolos dari eksekusi Tribunal.'
+      : 'Temukan dan eksekusi Hitman lewat Tribunal. Spy, Stalker, dan Civilian menang sebagai satu kubu.';
+  }
+
+  get outcomeLabel(): string {
+    if (!this.game?.winner) return '';
+    if (this.game.winner === 'draw') return 'SERI';
+    const team = this.game.me.role === 'hitman' ? 'hitman' : 'civilians';
+    return (this.game.result?.outcome ?? (team === this.game.winner ? 'won' : 'lost')) === 'won'
+      ? 'KAMU MENANG' : 'KAMU KALAH';
+  }
+
+  get resultExplanation(): string {
+    const explanations: Record<string, string> = {
+      hitman_executed: 'Hitman telah dieksekusi. Semua anggota kubu warga menang, termasuk yang menjadi Hostage atau sudah dieksekusi.',
+      all_survivors_hostage: 'Semua anggota kubu warga yang masih hidup telah menjadi Hostage. Hitman menguasai meja.',
+      no_civilians_alive: 'Seluruh anggota kubu warga telah dieksekusi. Hitman menjadi satu-satunya pemain yang masih hidup.',
+      round_limit: `Batas ${this.game?.max_rounds ?? 8} ronde tercapai. Tidak ada kubu yang memenuhi syarat kemenangan.`,
+    };
+    if (this.game?.result) return explanations[this.game.result.reason] ?? '';
+    // Kompatibel selama frontend dan backend diperbarui pada waktu berbeda.
+    return this.game?.winner === 'draw' ? explanations['round_limit']
+      : this.game?.winner === 'civilians' ? explanations['hitman_executed']
+      : 'Tidak ada lagi warga hidup yang bebas dari Hostage.';
+  }
+
+  get privateStatus(): string {
+    const me = this.game?.me;
+    if (!me) return '';
+    if (this.game?.winner) return `Status akhir: ${!me.alive ? 'dieksekusi' : me.hostage ? 'hidup sebagai Hostage' : 'masih hidup'}. Hasil menang/kalah mengikuti kubumu.`;
+    if (!me.alive) return 'Dieksekusi: kamu menjadi penonton. Hasilmu tetap mengikuti kubumu.';
+    if (me.hostage) return 'Hostage: kamu masih hidup, tetapi chat, voting, dan aksi terkunci sampai pertandingan berakhir. Kamu tetap bagian dari kubu warga.';
+    if (me.gagged) return 'Gag Order: chat dan voting terkunci sampai akhir Tribunal ronde ini. Aksi malam tetap boleh dilakukan.';
+    if (me.muted) return 'Chat dan voting terkunci untukmu.';
+    return 'Kamu masih hidup dan bebas. Hak chat, aksi, dan voting mengikuti fase permainan.';
+  }
 
   constructor(
     @Inject(PLATFORM_ID) private readonly platform: object,
@@ -125,7 +167,8 @@ export class Game implements OnInit, OnDestroy {
       .subscribe({
         next: (snapshot) => {
           this.game = snapshot.game;
-          this.seconds = Math.max(0, Math.ceil(this.game.deadline - this.game.server_time));
+          this.seconds = this.game.winner ? 0 : Math.max(0, Math.ceil(this.game.deadline - this.game.server_time));
+          if (this.game.winner) this.thinking = false;
           const phase = `${this.game.id}/${this.game.round}/${this.game.phase}`;
           if (phase !== this.loadedPhase) {
             this.target = '';

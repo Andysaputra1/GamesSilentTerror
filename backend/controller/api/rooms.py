@@ -50,6 +50,13 @@ def active(user=Depends(require_authenticated_user)):
     return {"active": room_service.active(user.username)}
 
 
+@router.get("/current")
+def current(user=Depends(require_authenticated_user)):
+    with room_service.lock:
+        room = room_service.current(user.username)
+        return {"room": room_service.snapshot(room) if room else None}
+
+
 @router.post("/{code}/skip-discussion")
 # PERSETUJUAN: bukan vote Tribunal, tidak bergantung pada status bungkam.
 def skip(code: str, body: SkipOption, user=Depends(require_authenticated_user)):

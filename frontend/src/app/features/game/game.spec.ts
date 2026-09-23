@@ -159,4 +159,42 @@ describe('Game', () => {
     component.sendMessage();
     expect(component.draft).toBe('Alibiku');
   });
+
+  it('shows a team victory for an eliminated citizen, with the server reason', () => {
+    const game = snapshot().game;
+    game.phase = 'finished';
+    game.winner = 'civilians';
+    game.me = {...game.me, role: 'spy', alive: false, can_chat: false, can_act: false};
+    game.result = {reason: 'hitman_executed', team: 'civilians', outcome: 'won', civilians_alive: 2, civilians_hostage: 1, civilians_eliminated: 1};
+    component.game = game;
+    fixture.componentRef.changeDetectorRef.markForCheck();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.result').textContent).toContain('KAMU MENANG');
+    expect(fixture.nativeElement.querySelector('.result').textContent).toContain('Hitman telah dieksekusi');
+    expect(fixture.nativeElement.querySelector('.action-panel')).toBeNull();
+  });
+
+  it('explains permanent hostage and temporary gag separately without exposing roster statuses', () => {
+    component.game = snapshot().game;
+    component.game.me.hostage = true;
+    expect(component.privateStatus).toContain('sampai pertandingan berakhir');
+    component.game.me.hostage = false;
+    component.game.me.gagged = true;
+    expect(component.privateStatus).toContain('Aksi malam tetap boleh');
+    fixture.componentRef.changeDetectorRef.markForCheck();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.players').textContent).not.toContain('HOSTAGE');
+    expect(fixture.nativeElement.querySelector('.players').textContent).not.toContain('GAG');
+  });
+
+  it('shows a loss for a hostage when Hitman wins and a neutral result for a draw', () => {
+    component.game = snapshot().game;
+    component.game.me.role = 'civilian';
+    component.game.me.hostage = true;
+    component.game.winner = 'hitman';
+    expect(component.outcomeLabel).toBe('KAMU KALAH');
+    component.game.winner = 'draw';
+    expect(component.outcomeLabel).toBe('SERI');
+    expect(component.resultExplanation).toContain('8 ronde');
+  });
 });
