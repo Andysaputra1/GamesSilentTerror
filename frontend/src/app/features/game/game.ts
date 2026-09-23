@@ -59,7 +59,7 @@ export class Game implements OnInit, OnDestroy {
   // Tampilkan tujuan kubu pemain berdasarkan role privat dari server.
   get objective(): string {
     return this.game?.me.role === 'hitman'
-      ? 'Sandera semua anggota kubu warga yang masih hidup. Tetap lolos dari eksekusi Tribunal.'
+      ? 'Kurangi warga hidup yang masih punya suara hingga tersisa paling banyak satu. Hindari eksekusi Tribunal.'
       : 'Temukan dan eksekusi Hitman lewat Tribunal. Spy, Stalker, dan Civilian menang sebagai satu kubu.';
   }
 
@@ -76,6 +76,8 @@ export class Game implements OnInit, OnDestroy {
   // Jelaskan alasan kemenangan server, dengan fallback untuk backend versi lama.
   get resultExplanation(): string {
     const explanations: Record<string, string> = {
+      vote_control:
+        'Warga hidup yang masih punya hak voting tersisa paling banyak satu. Suara warga tidak lagi melampaui suara Hitman.',
       hitman_executed:
         'Hitman telah dieksekusi. Semua anggota kubu warga menang, termasuk yang menjadi Hostage atau sudah dieksekusi.',
       all_survivors_hostage:
@@ -90,7 +92,7 @@ export class Game implements OnInit, OnDestroy {
       ? explanations['round_limit']
       : this.game?.winner === 'civilians'
         ? explanations['hitman_executed']
-        : 'Tidak ada lagi warga hidup yang bebas dari Hostage.';
+        : 'Suara warga hidup yang bebas tidak lagi melampaui suara Hitman.';
   }
 
   // Jelaskan hak pemain berdasarkan status hidup, Hostage, dan Gag Order miliknya.
@@ -101,9 +103,9 @@ export class Game implements OnInit, OnDestroy {
       return `Status akhir: ${!me.alive ? 'dieksekusi' : me.hostage ? 'hidup sebagai Hostage' : 'masih hidup'}. Hasil menang/kalah mengikuti kubumu.`;
     if (!me.alive) return 'Dieksekusi: kamu menjadi penonton. Hasilmu tetap mengikuti kubumu.';
     if (me.hostage)
-      return 'Hostage: kamu masih hidup, tetapi chat, voting, dan aksi terkunci sampai pertandingan berakhir. Kamu tetap bagian dari kubu warga.';
+      return 'Hostage: kamu masih hidup, tetapi chat dan voting terkunci sampai pertandingan berakhir. Skill malam tetap tersedia sesuai role dan cooldown. Kamu tetap bagian dari kubu warga.';
     if (me.gagged)
-      return 'Gag Order: chat dan voting terkunci sampai akhir Tribunal ronde ini. Aksi malam tetap boleh dilakukan.';
+      return 'Gag Order: chat terkunci sampai akhir Tribunal ronde ini. Voting dan aksi malam tetap boleh dilakukan.';
     if (me.muted) return 'Chat dan voting terkunci untukmu.';
     return 'Kamu masih hidup dan bebas. Hak chat, aksi, dan voting mengikuti fase permainan.';
   }

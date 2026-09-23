@@ -14,6 +14,11 @@ class JoinRoom(BaseModel):
     code: str = Field(min_length=6, max_length=6, pattern=r"^[a-fA-F0-9]{6}$")
 
 
+class CreateRoom(BaseModel):
+    max_rounds: Literal[6, 8, 12] = 8
+    capacity: int = Field(default=6, ge=6, le=10)
+
+
 class BotOption(BaseModel):
     enabled: bool
 
@@ -99,11 +104,13 @@ def result(operation):
 
 @router.post("")
 # CONTROLLER: buat ruangan untuk pengguna yang sudah login dan kembalikan kode serta roster.
-def create(user=Depends(require_authenticated_user)):
+def create(body: CreateRoom = CreateRoom(), user=Depends(require_authenticated_user)):
     def create_archived():
         with room_service.lock:
             for _ in range(10):
-                room = room_service.create(user.username)
+                room = room_service.create(
+                    user.username, max_rounds=body.max_rounds, capacity=body.capacity
+                )
                 try:
                     if PersistenceService(room.code).archive_new_room(user.username):
                         return room

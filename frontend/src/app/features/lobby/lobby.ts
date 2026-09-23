@@ -34,6 +34,8 @@ export class Lobby implements OnInit, OnDestroy {
   busy = false;
   copied = false;
   quick = false;
+  capacity = 6;
+  maxRounds = 8;
   // PRIVATE PROPERTY: simpan timer polling agar dapat dihentikan ketika meninggalkan lobby.
   private timer?: ReturnType<typeof setInterval>;
 
@@ -69,7 +71,8 @@ export class Lobby implements OnInit, OnDestroy {
 
   // METHOD EVENT TOMBOL: minta backend membuat ruangan dan kode baru.
   createRoom(): void {
-    if (!this.busy && !this.room) this.load('POST', '');
+    if (!this.busy && !this.room)
+      this.load('POST', '', { capacity: this.capacity, max_rounds: this.maxRounds });
   }
 
   // METHOD EVENT FORM: periksa format kode, lalu minta backend menambahkan keanggotaan.

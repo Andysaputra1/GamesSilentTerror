@@ -50,17 +50,18 @@ def register_account(body):
             user_id = auth_queries.create_account(
                 database,
                 username=body.username,
-                display_name=body.username,
+                display_name=body.display_name or body.username,
                 password_hash=password_hash,
             )
             # Konfirmasi email di form hanya pencocokan, bukan bukti kepemilikan.
-            auth_queries.create_identity(database, user_id, str(body.email).lower())
+            if body.email:
+                auth_queries.create_identity(database, user_id, str(body.email).lower())
             return issue_session(
                 database,
                 {
                     "id": user_id,
                     "username": body.username,
-                    "display_name": body.username,
+                    "display_name": body.display_name or body.username,
                     "is_active": True,
                 },
             )
@@ -78,10 +79,12 @@ def google_account(claims):
     def operation(database):
         account = auth_queries.account_by_google_subject(database, claims["sub"])
         if account:
+            # Pertahankan nama profil pilihan pengguna saat login Google berikutnya.
             return issue_session(database, account)
         try:
             # Username tidak berasal dari email dan tidak dapat bertabrakan dengan admin.
             username = "google_" + secrets.token_hex(8)
+            # Akun baru memakai nama dari identitas Google yang sudah diverifikasi.
             display_name = str(claims.get("name") or "Detective")[:100]
             user_id = auth_queries.create_account(
                 database, username=username, display_name=display_name, password_hash="google_only"

@@ -17,9 +17,14 @@ from services.room_service import RoomService
 class EngineTests(unittest.TestCase):
     # FIXTURE: nama sama dengan role supaya setiap skenario mudah dibaca.
     def setUp(self):
-        self.game = Match(["hitman", "spy", "stalker", "civilian"], [], now=0, rng=random.Random(7))
+        self.game = Match(
+            ["hitman", "spy", "stalker", "civilian", "civilian2", "civilian3"],
+            [],
+            now=0,
+            rng=random.Random(7),
+        )
         for name, player in self.game.players.items():
-            player.role = name
+            player.role = name if name in {"hitman", "spy", "stalker"} else "civilian"
 
     def night(self):
         self.game.phase = "night"
@@ -56,15 +61,26 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(self.game.deadline, deadline)
 
     def test_role_distribution_and_size(self):
-        for count in range(4, 7):
+        for count in range(6, 11):
             game = Match([str(i) for i in range(count)], [])
             roles = [p.role for p in game.players.values()]
             for role in ["hitman", "spy", "stalker"]:
                 self.assertEqual(roles.count(role), 1)
             self.assertEqual(roles.count("civilian"), count - 3)
-        for humans in [[], ["a"] * 4, list("abcdefg")]:
+        for humans in [[], ["a"] * 4, list("abcdefghijk")]:
             with self.assertRaises(ValueError):
                 Match(humans, [])
+
+    def test_selected_round_limits_finish_after_final_tribunal(self):
+        for limit in [6, 8, 12]:
+            game = Match(list("abcdef"), [], max_rounds=limit, now=0)
+            for _ in range(limit * 3 - 1):
+                game.tick(game.deadline)
+            self.assertEqual((game.phase, game.round, game.winner), ("tribunal", limit, None))
+            game.tick(game.deadline)
+            self.assertEqual(game.winner, "draw")
+        with self.assertRaises(ValueError):
+            Match(list("abcdef"), [], max_rounds=7)
 
     def test_blind_actions_and_guard_priority(self):
         self.night()
@@ -104,14 +120,14 @@ class EngineTests(unittest.TestCase):
         self.game.round = 3
         self.game.act("stalker", "peek", "spy")
 
-    def test_gag_blocks_chat_vote_expires_and_skips_one_round(self):
+    def test_gag_blocks_chat_only_expires_and_skips_one_round(self):
         self.game.act("hitman", "gag", "civilian")
         self.assertFalse(self.game.can_chat("civilian"))
         with self.assertRaises(ValueError):
             self.game.act("hitman", "gag", "spy")
         self.game.phase = "tribunal"
-        with self.assertRaises(ValueError):
-            self.game.vote("civilian", "hitman")
+        self.game.vote("civilian", "spy")
+        self.game.vote("hitman", "civilian")
         self.game.tick(self.game.deadline)
         self.assertEqual(self.game.round, 2)
         self.assertTrue(self.game.can_chat("civilian"))
@@ -134,7 +150,7 @@ class EngineTests(unittest.TestCase):
         for viewer in self.game.players:
             snapshot = self.game.snapshot(viewer)
             for player in snapshot["players"]:
-                self.assertEqual(set(player), {"name", "bot", "alive"})
+                self.assertEqual(set(player), {"name", "alive"})
             self.assertNotIn("civilian", " ".join(snapshot["events"]))
             self.assertNotIn("actions", snapshot)
             self.assertNotIn("votes", snapshot)
@@ -176,6 +192,8 @@ class EngineTests(unittest.TestCase):
         self.assertFalse(self.game.can_chat("spy"))
 
     def test_hitman_victory_when_remaining_citizens_hostage(self):
+        self.game.players["civilian2"].alive = False
+        self.game.players["civilian3"].alive = False
         self.game.players["spy"].alive = False
         self.game.players["stalker"].hostage = True
         self.night()
@@ -185,7 +203,7 @@ class EngineTests(unittest.TestCase):
 
     def test_timer_and_bots_complete_games_without_browser(self):
         for seed in range(30):
-            game = Match([], ["a", "b", "c", "d"], now=0, quick=True, rng=random.Random(seed))
+            game = Match([], list("abcdef"), now=0, quick=True, rng=random.Random(seed))
             game.tick(1)
             self.assertFalse(game.bot_day_done)
             phases = set()
@@ -204,10 +222,39 @@ class RoomGameTests(unittest.TestCase):
         self.room = self.rooms.create("alice")
         self.rooms.set_bot(self.room.code, "alice", True)
 
+    def test_room_options_capacity_and_bot_replacement(self):
+        room = self.rooms.create("host", capacity=10, max_rounds=12)
+        self.rooms.set_bot(room.code, "host", True)
+        self.assertEqual(len(self.rooms.bot_names(room)), 9)
+        for i in range(9):
+            self.rooms.join(room.code, f"guest{i}")
+        self.assertEqual(self.rooms.bot_names(room), [])
+        with self.assertRaises(ValueError):
+            self.rooms.join(room.code, "overflow")
+        self.rooms.start(room.code, "host")
+        self.assertEqual((len(room.match.players), room.match.max_rounds), (10, 12))
+
+    def test_create_api_validates_gdd_options(self):
+        app = FastAPI()
+        app.include_router(router)
+        app.dependency_overrides[require_authenticated_user] = lambda: SimpleNamespace(
+            username="host"
+        )
+        with (
+            patch("controller.api.rooms.room_service", self.rooms),
+            patch("controller.api.rooms.PersistenceService"),
+            TestClient(app) as client,
+        ):
+            for body in [{"capacity": 5}, {"capacity": 11}, {"max_rounds": 7}]:
+                self.assertEqual(client.post("/api/rooms", json=body).status_code, 422)
+            response = client.post("/api/rooms", json={"capacity": 9, "max_rounds": 6})
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual((response.json()["capacity"], response.json()["max_rounds"]), (9, 6))
+
     def test_bot_fill_host_start_rejoin_and_roster_lock(self):
-        self.assertEqual(len(self.rooms.snapshot(self.room)["bots"]), 3)
+        self.assertEqual(len(self.rooms.snapshot(self.room)["bots"]), 5)
         self.rooms.join(self.room.code, "bob")
-        self.assertEqual(len(self.rooms.snapshot(self.room)["bots"]), 2)
+        self.assertEqual(len(self.rooms.snapshot(self.room)["bots"]), 4)
         with self.assertRaises(ValueError):
             self.rooms.start(self.room.code, "bob")
         self.rooms.start(self.room.code, "alice")
@@ -267,7 +314,7 @@ class RoomGameTests(unittest.TestCase):
             self.assertEqual(client.get(base + "/checker").status_code, 410)
             response = client.get(base + "/game")
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(len(response.json()["game"]["players"]), 4)
+            self.assertEqual(len(response.json()["game"]["players"]), 6)
             self.assertEqual(
                 client.get(base + "/game", headers={"x-user": "outsider"}).status_code, 400
             )

@@ -44,14 +44,35 @@ file saja tidak berarti route tersebut dibuka pada aplikasi utama.
    target, fase, dan cooldown; menyelesaikan malam/Tribunal; kemudian menentukan
    hasil. `snapshot(viewer)` membatasi informasi sesuai pemain yang melihatnya.
    Aturan kemenangan dijelaskan lebih lengkap di `GAME_CONCEPT.md`.
-5. **Chat dan AI:** handler socket memeriksa sesi serta hak chat, menyimpan pesan,
-   menjalankan analisis intent dan fuzzy, lalu meminta balasan provider AI.
-   Handler memeriksa konteks permainan sebelum mengirim balasan yang terlambat.
+5. **Chat dan AI:** handler socket memeriksa sesi/hak chat, menganalisis intent dan
+   fuzzy, lalu menyimpan dan menyiarkan pesan. Pada pertandingan, `NPCService`
+   mengambil giliran mandiri dari timer: konteks privat per NPC -> model terpilih
+   -> JSON tervalidasi -> aksi/vote engine serta chat. Fase diperiksa ulang setelah
+   model merespons. Jalur balasan reaktif lama hanya untuk lobby/kompatibilitas.
 6. **Logout:** `ProfileMenu` → `SessionService` → endpoint logout. Setelah token
    dicabut atau sudah tidak berlaku, data sesi browser dibersihkan dan pengguna
    diarahkan ke login. Kegagalan jaringan ditampilkan agar dapat dicoba ulang.
 7. **Panel:** sesi administrator terpisah dari pemain. Panel membaca arsip dan
    menyimpan konfigurasi AI; nilai API key tidak dikirim kembali ke browser.
+
+## Profil dan manajemen akun
+
+- Form daftar memakai username, nama lengkap, password, dan konfirmasi password.
+  Email dari frontend lama tetap diterima API selama transisi deployment.
+- Akun Google baru memakai username acak dan nama dari token Google terverifikasi.
+  Login ulang tidak menimpa nama/username yang sudah diedit pengguna.
+- Ikon pensil profil menyimpan nama dan username melalui `POST /api/auth/me`.
+  Username hanya dapat diganti setelah keluar dari ruangan. ID akun dan identitas
+  Google tetap sama; nama pengirim pada arsip chat tetap sesuai saat pesan dikirim.
+- Menu Manajemen user di `/panel` memakai controller `api/users.py` dan service
+  `user_management_service.py`. Hanya sesi administrator panel yang diizinkan.
+- Tambah user membuat akun username/password dengan nama lengkap, tanpa membuat
+  sesi login pemain. Akun Google dibuat melalui alur Google yang terverifikasi.
+- Reset password hanya untuk akun lokal dan mencabut seluruh sesi akun tersebut.
+  Akun Google harus mengelola password melalui Google.
+- Penghapusan memerlukan konfirmasi username dan user harus keluar dari ruangan.
+  Yang dihapus hanya akun, identitas login, dan sesi. Chat, analisis, serta jejak
+  checker tetap disimpan. Fitur ini memakai tabel yang sudah ada, tanpa migrasi baru.
 
 ## Aturan penulisan
 

@@ -8,7 +8,7 @@ import hashlib
 import logging
 import secrets
 
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from module.mysql_connector import SessionLocal
@@ -127,6 +127,48 @@ class AuthService:
         return AuthenticatedUser(
             id=row["id"], username=row["username"], display_name=row["display_name"]
         )
+
+    # Username hanya boleh berganti di luar ruangan; token tetap terkait ID akun yang sama.
+    def update_profile(
+        self, user: AuthenticatedUser, display_name: str, username: str | None = None
+    ) -> AuthenticatedUser:
+        from services.room_service import room_service
+
+        selected_username = username or user.username
+        changing_username = selected_username != user.username
+        if changing_username:
+            reserved = {
+                "nox",
+                "echo",
+                "veil",
+                "raven",
+                "ash",
+                "dusk",
+                "admin",
+                "administrator",
+                "user1",
+            }
+            reserved.update(name.strip().casefold() for name in settings.admin_usernames.split(","))
+            reserved.update(
+                name.strip().casefold() for name in settings.history_admin_usernames.split(",")
+            )
+            if selected_username.casefold() in reserved:
+                raise ValueError("Username tersebut tidak tersedia.")
+
+        # Nama dan username harus disimpan bersama; benturan username membatalkan seluruh perubahan.
+        def operation(database):
+            if changing_username:
+                try:
+                    auth_queries.update_username(database, user.id, selected_username)
+                except IntegrityError as error:
+                    raise ValueError("Username sudah digunakan. Pilih username lain.") from error
+            auth_queries.update_display_name(database, user.id, display_name)
+
+        with room_service.lock:
+            if changing_username and room_service.current(user.username):
+                raise ValueError("Keluar dari ruangan terlebih dahulu sebelum mengganti username.")
+            self._transaction(operation)
+        return AuthenticatedUser(user.id, selected_username, display_name)
 
     # SERVICE LOGOUT: cabut token melalui transaksi database; token kosong tidak memerlukan operasi.
     def logout(self, token: str) -> None:

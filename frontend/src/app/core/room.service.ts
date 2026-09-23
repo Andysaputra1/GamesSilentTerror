@@ -11,6 +11,8 @@ export interface Room {
   bot_enabled: boolean;
   bots: string[];
   phase: string;
+  capacity?: number;
+  max_rounds?: number;
 }
 
 // DECORATOR: daftarkan service agar Angular dapat menyuntikkannya ke komponen.

@@ -1,7 +1,7 @@
 """Opt-in integration dengan server+MySQL nyata. Tidak ikut unittest discover.
 
 Run: docker compose exec -T ai-engine python -m tests.live_match_smoke
-Membuat empat akun QC unik, membersihkan hanya ID akun milik tes di finally.
+Membuat enam akun QC unik, membersihkan hanya ID akun milik tes di finally.
 Tes ini sengaja membaca snapshot setiap akun untuk menyiapkan skenario role;
 client game biasa hanya bisa membaca snapshot akunnya sendiri.
 """
@@ -15,10 +15,10 @@ from module.mysql_connector import SessionLocal
 from services.password_service import hash_password
 
 
-# TEST LIVE: empat sesi terpisah bermain 2 ronde, menguji skill/privasi dan kemenangan.
+# TEST LIVE: enam sesi terpisah bermain 2 ronde, menguji skill/privasi dan kemenangan.
 def main():
     prefix = "qc_" + secrets.token_hex(5)
-    accounts = [prefix + "_" + str(i) for i in range(4)]
+    accounts = [prefix + "_" + str(i) for i in range(6)]
     password = secrets.token_urlsafe(20)
     ids = []
     clients = {}
@@ -53,8 +53,8 @@ def main():
         roles = {state["me"]["role"]: name for name, state in states.items()}
         assert len(roles) == 4
         assert httpx.get("http://127.0.0.1:8000" + base + "/game").status_code == 401
-        assert owner.get(base + "/checker").status_code == 403
-        print("PASS empat login, create/join/start, privasi dan autentikasi", flush=True)
+        assert owner.get(base + "/checker").status_code == 410
+        print("PASS enam login, create/join/start, privasi dan autentikasi", flush=True)
 
         def state(name):
             response = clients[name].get(base + "/game")
@@ -97,8 +97,8 @@ def main():
         assert state(roles["stalker"])["me"]["intel"][0]["role"] == "hitman"
         for name in accounts:
             view = state(name)
-            assert all(set(p) == {"name", "bot", "alive"} for p in view["players"])
-        play("civilian", "hitman", expected=400)
+            assert all(set(p) == {"name", "alive"} for p in view["players"])
+        assert state(roles["civilian"])["me"]["can_vote"]
         # Tanpa vote ronde 1: tidak ada eksekusi. Guard harus tetap melindungi korban.
         wait_phase("day", 2)
         assert state(roles["civilian"])["me"]["can_chat"]

@@ -201,9 +201,8 @@ Hitman menyandera warga diam-diam; Spy melindungi dengan Guard;
 Stalker mengintip identitas dengan Peek; Civilian mengamati chat.
 Hostage tidak mati, tetapi kehilangan chat dan voting. Target tidak diumumkan.
 Spy, Stalker, dan Civilian satu kubu; semuanya menang jika Hitman dieksekusi,
-termasuk warga yang disandera atau sudah dieksekusi. Hitman menang bila semua
-warga yang masih hidup disandera atau tidak ada warga hidup tersisa. Gag sementara
-bukan Hostage, dan jumlah pemain seimbang bukan kemenangan otomatis.
+termasuk warga yang disandera atau sudah dieksekusi. Hitman menang bila warga hidup yang tidak Hostage tersisa paling banyak satu.
+Gag sementara hanya membatasi chat dan tidak mencabut hak voting.
 Aksi dan voting dikerjakan engine terpisah. Kamu hanya menghasilkan percakapan:
 jangan mengarang hasil aksi, role lawan, status Hostage, atau mengaku tahu siapa
 yang dibungkam. Diskusikan alibi dari chat saja, bukan bahasa tubuh atau suara.

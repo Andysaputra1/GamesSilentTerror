@@ -28,10 +28,12 @@ class Participant:
 
 class Match:
     # CONSTRUCTOR: acak role di server; tepat satu Hitman, Spy, dan Stalker.
-    def __init__(self, humans, bots, *, quick=False, now=None, rng=None):
+    def __init__(self, humans, bots, *, quick=False, max_rounds=8, now=None, rng=None):
         names = list(humans) + list(bots)
-        if not 4 <= len(names) <= 6 or len(set(names)) != len(names):
-            raise ValueError("Permainan membutuhkan 4–6 identitas berbeda.")
+        if not 6 <= len(names) <= 10 or len(set(names)) != len(names):
+            raise ValueError("Permainan membutuhkan 6–10 identitas berbeda.")
+        if max_rounds not in {6, 8, 12}:
+            raise ValueError("Pilih durasi 6, 8, atau 12 ronde.")
         self.rng = rng or random.SystemRandom()
         roles = ["hitman", "spy", "stalker"] + ["civilian"] * (len(names) - 3)
         self.rng.shuffle(roles)
@@ -40,7 +42,11 @@ class Match:
         }
         self.id = uuid4().hex
         self.round = 1
-        self.max_rounds = 8
+        self.max_rounds = max_rounds
+        self.ai_controlled = (
+            False  # Diaktifkan RoomService; unit engine tetap dapat diuji tanpa jaringan.
+        )
+        self.npc_decisions = set()
         self.ai_grace_phase = None
         self.phase = "day"
         self.durations = (
@@ -68,10 +74,10 @@ class Match:
             self.ai_grace_phase = phase
             self.deadline = max(self.deadline, now + 35)
 
-    # HELPER: hanya pemain hidup yang belum disandera dapat melakukan aksi.
+    # HELPER: Hostage menghapus suara, bukan nyawa atau skill malam milik warga.
     def actor(self, name):
         player = self.players.get(name)
-        if not player or not player.alive or player.hostage or self.phase == "finished":
+        if not player or not player.alive or self.phase == "finished":
             raise ValueError("Kamu tidak dapat melakukan aksi ini.")
         return player
 
@@ -117,10 +123,10 @@ class Match:
             raise ValueError("Peek hanya tersedia sekali setiap dua ronde.")
         self.actions[name] = {"ability": ability, "target": target_name}
 
-    # VOTE: satu pilihan final per pemain; pemilih yang dibungkam tidak punya hak vote.
+    # VOTE: satu pilihan final; hanya Hostage/kematian yang mencabut suara, bukan Gag Order.
     def vote(self, name, target_name):
         player = self.actor(name)
-        if self.phase != "tribunal" or player.gagged or name in self.votes:
+        if self.phase != "tribunal" or player.hostage or name in self.votes:
             raise ValueError("Voting tidak tersedia atau pilihan sudah dikunci.")
         self.target(player, target_name)
         self.votes[name] = target_name
@@ -184,7 +190,7 @@ class Match:
         }[winner]
         self.events.append(f"{label} {explanation}")
 
-    # KONDISI AKHIR: kematian Hitman berarti warga menang; semua warga hidup disandera berarti Hitman menang.
+    # GDD: warga menang dengan eksekusi Hitman; Hitman menang ketika suara warga bebas tidak melampaui satu.
     def check_winner(self):
         if self.winner:
             return
@@ -197,6 +203,12 @@ class Match:
         elif all(p.hostage for p in survivors):
             self.finish(
                 "hitman", "all_survivors_hostage", "Semua warga yang masih hidup telah disandera."
+            )
+        elif sum(not p.hostage for p in survivors) <= 1:
+            self.finish(
+                "hitman",
+                "vote_control",
+                "Suara warga yang masih hidup dan bebas tidak lagi melampaui suara Hitman.",
             )
 
     def result(self, viewer):
@@ -214,6 +226,7 @@ class Match:
             "civilians_alive": sum(p.alive for p in civilians),
             "civilians_hostage": sum(p.alive and p.hostage for p in civilians),
             "civilians_eliminated": sum(not p.alive for p in civilians),
+            "civilians_voters": sum(p.alive and not p.hostage for p in civilians),
         }
 
     # BOT ATURAN: aksi/vote mengikuti validasi yang sama; tidak melihat role atau Hostage lawan.
@@ -225,7 +238,9 @@ class Match:
             return
         setattr(self, flag, True)
         for player in self.players.values():
-            if not player.bot or not player.alive or player.hostage:
+            if not player.bot or not player.alive or (player.hostage and self.phase != "night"):
+                continue
+            if (self.round, self.phase, player.name) in self.npc_decisions:
                 continue
             targets = [
                 other.name
@@ -275,8 +290,8 @@ class Match:
     # TIMER SERVER: maju satu fase saat deadline; tetap berjalan walaupun semua tab ditutup.
     def tick(self, now=None):
         now = time.time() if now is None else now
-        # Bot memberi manusia waktu berinteraksi sebelum memilih di pertengahan fase.
-        if self.phase != "finished" and now >= self.deadline - self.durations[self.phase] / 2:
+        # Scheduler LLM mendapat waktu memilih; fallback aturan hanya mengisi pilihan yang kosong di deadline.
+        if self.phase != "finished" and now >= self.deadline:
             self.run_bots()
         if self.phase == "finished" or now < self.deadline:
             return
@@ -322,7 +337,7 @@ class Match:
                 else None
             )
         )
-        can_act = bool(ability and player.alive and not player.hostage and not self.winner)
+        can_act = bool(ability and player.alive and not self.winner)
         if ability == "gag":
             can_act &= self.round >= player.next_gag
         elif ability:
@@ -363,9 +378,8 @@ class Match:
             "players": [
                 {
                     "name": p.name,
-                    "bot": p.bot,
                     "alive": p.alive,
-                    **({"role": p.role, "hostage": p.hostage} if self.winner else {}),
+                    **({"role": p.role, "hostage": p.hostage, "bot": p.bot} if self.winner else {}),
                 }
                 for p in self.players.values()
             ],
@@ -381,7 +395,6 @@ class Match:
                 "can_vote": self.phase == "tribunal"
                 and player.alive
                 and not player.hostage
-                and not player.gagged
                 and viewer not in self.votes,
                 "vote": self.votes.get(viewer),
                 "ability": ability,

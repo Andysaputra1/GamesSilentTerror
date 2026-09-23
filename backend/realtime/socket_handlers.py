@@ -298,6 +298,11 @@ class SocketGameController:
         # TAHAP 5: kirim echo pesan pemain ke browser sebelum menunggu LLM.
         await self.sio.emit("receive_chat", accepted, to=code)
 
+        # Pertandingan GDD memakai scheduler NPC independen; jangan gandakan reply lama per pesan manusia.
+        if match and match.ai_controlled:
+            trace["stage"] = "analyzed_for_npc_game"
+            return
+
         if not room.bot_enabled:
             trace["stage"] = "skipped_no_bot"
             await self.sio.emit(

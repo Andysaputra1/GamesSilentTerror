@@ -14,6 +14,8 @@ class Room:
     members: list[str] = field(default_factory=list)
     bot_enabled: bool = False
     match: Match | None = None
+    max_rounds: int = 8
+    capacity: int = 6
 
 
 class RoomService:
@@ -24,7 +26,9 @@ class RoomService:
 
     # SERVICE LOBBY: buat kode unik 6 karakter, tetapkan pemilik sebagai anggota pertama, dan batasi jumlah ruangan.
     @traced
-    def create(self, username: str) -> Room:
+    def create(self, username: str, max_rounds=8, capacity=6) -> Room:
+        if max_rounds not in {6, 8, 12} or capacity not in range(6, 11):
+            raise ValueError("Room membutuhkan 6–10 kursi dan pilihan 6, 8, atau 12 ronde.")
         with self.lock:
             if self.active(username):
                 raise ValueError("Selesaikan pertandingan aktif sebelum membuat ruangan lain.")
@@ -35,7 +39,7 @@ class RoomService:
             code = secrets.token_hex(3).upper()
             while code in self.rooms:
                 code = secrets.token_hex(3).upper()
-            room = Room(code, username, [username])
+            room = Room(code, username, [username], max_rounds=max_rounds, capacity=capacity)
             self.rooms[code] = room
             return room
 
@@ -51,7 +55,7 @@ class RoomService:
                 raise ValueError("Gabung ke ruangan ini terlebih dahulu.")
             return room
 
-    # SERVICE LOBBY: tambahkan anggota tanpa duplikasi; tolak ruangan hilang atau kapasitas enam pemain penuh.
+    # SERVICE LOBBY: tambahkan anggota tanpa duplikasi; tolak ruangan hilang atau kapasitas pilihan host penuh.
     @traced
     def join(self, code: str, username: str) -> Room:
         with self.lock:
@@ -69,8 +73,8 @@ class RoomService:
             if username not in room.members:
                 if room.match is not None:
                     raise ValueError("Pertandingan sudah dimulai; buat atau gabung ruangan lain.")
-                if len(room.members) >= 6:
-                    raise ValueError("Ruangan sudah penuh (maksimal 6 pemain).")
+                if len(room.members) >= room.capacity:
+                    raise ValueError(f"Ruangan sudah penuh (maksimal {room.capacity} pemain).")
                 room.members.append(username)
             return room
 
@@ -83,7 +87,7 @@ class RoomService:
                 raise ValueError("Hanya pembuat ruangan yang dapat mengatur bot.")
             if room.match is not None:
                 raise ValueError("Bot tidak dapat diubah setelah pertandingan dimulai.")
-            if enabled and len(room.members) >= 6:
+            if enabled and len(room.members) >= room.capacity:
                 raise ValueError("Kursi penuh. Bot membutuhkan satu kursi kosong.")
             room.bot_enabled = enabled
             return room
@@ -98,18 +102,31 @@ class RoomService:
                 "bot_enabled": room.bot_enabled,
                 "bots": self.bot_names(room),
                 "phase": room.match.phase if room.match else "lobby",
+                "max_rounds": room.max_rounds,
+                "capacity": room.capacity,
             }
 
-    # Bot mengisi hingga minimal empat peserta; nama dicadangkan supaya tidak meniru manusia.
+    # NPC mengisi sisa kapasitas yang dipilih host; manusia yang bergabung menggantikan kursi NPC.
     def bot_names(self, room):
         if room.match:
             return [p.name for p in room.match.players.values() if p.bot]
         if not room.bot_enabled:
             return []
-        count = min(6 - len(room.members), max(1, 4 - len(room.members)))
+        count = room.capacity - len(room.members)
         return [
             name
-            for name in ["NOX", "ECHO", "VEIL", "RAVEN", "ASH", "DUSK"]
+            for name in [
+                "NOX",
+                "ECHO",
+                "VEIL",
+                "RAVEN",
+                "ASH",
+                "DUSK",
+                "IRIS",
+                "SAGE",
+                "ONYX",
+                "LARK",
+            ]
             if name not in room.members
         ][:count]
 
@@ -126,7 +143,10 @@ class RoomService:
                 )
             if any(self.active(name) for name in room.members):
                 raise ValueError("Ada anggota yang masih mengikuti pertandingan lain.")
-            room.match = Match(room.members, self.bot_names(room), quick=quick)
+            room.match = Match(
+                room.members, self.bot_names(room), quick=quick, max_rounds=room.max_rounds
+            )
+            room.match.ai_controlled = True
             return self.snapshot(room)
 
     # PEMULIHAN: cari pertandingan akun dari server, bukan mengandalkan sessionStorage tab.

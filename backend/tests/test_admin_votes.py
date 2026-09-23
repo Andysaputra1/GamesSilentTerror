@@ -23,19 +23,26 @@ class PublicVoteTests(unittest.TestCase):
             public = game.snapshot(viewer)
             votes = next(item for item in public["tribunal_votes"] if item["target"] == "f")
             self.assertEqual(votes["voters"], list("abcde"))
-            self.assertTrue(all(set(p) == {"name", "bot", "alive"} for p in public["players"]))
+            self.assertTrue(all(set(p) == {"name", "alive"} for p in public["players"]))
         game.phase = "day"
         self.assertEqual(game.snapshot("a")["tribunal_votes"], [])
 
-    def test_gag_and_hostage_cannot_add_public_votes(self):
-        game = Match(list("abcd"), [])
+    def test_gag_can_vote_but_hostage_cannot(self):
+        game = Match(list("abcdef"), [])
         game.phase = "tribunal"
         game.players["a"].gagged = True
         game.players["b"].hostage = True
-        for voter in "ab":
-            with self.assertRaises(ValueError):
-                game.vote(voter, "c")
-        self.assertTrue(all(not item["voters"] for item in game.snapshot("d")["tribunal_votes"]))
+        game.vote("a", "c")
+        with self.assertRaises(ValueError):
+            game.vote("b", "c")
+        self.assertEqual(
+            next(
+                item["voters"]
+                for item in game.snapshot("d")["tribunal_votes"]
+                if item["target"] == "c"
+            ),
+            ["a"],
+        )
 
 
 class AdminTests(unittest.TestCase):

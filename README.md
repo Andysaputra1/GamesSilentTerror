@@ -6,7 +6,7 @@ Nama Silent Terror masih sementara. Nama repository, database, dan container mas
 
 ## Status proyek
 
-Sudah dapat dimainkan: login, main page, buat/gabung ruangan, 4–6 peserta, bot opsional, role acak dari server, timer Day → Night → Tribunal, skill/cooldown, voting, eksekusi, dan kondisi kemenangan. Login dan desain main page dipertahankan. Hanya pembuat ruangan yang mengatur bot dan memulai game.
+Sudah dapat dimainkan: login, main page, buat/gabung ruangan, 6–10 peserta dengan pilihan 6/8/12 ronde, bot opsional, role acak dari server, timer Day → Night → Tribunal, skill/cooldown, voting, eksekusi, dan kondisi kemenangan. Panel administrator menyediakan tambah user, reset password akun lokal, dan penghapusan akun tanpa menghapus riwayat chat. Hanya pembuat ruangan yang mengatur bot dan memulai game.
 
 Role: **Hitman** (Hostage/Gag Order), **Spy** (Guard), **Stalker** (Peek), dan **Civilian** (observasi). Korban Hostage tetap terlihat hidup, tetapi kehilangan chat, voting, dan aksi; identitas target tidak diumumkan. Balasan bot memakai pipeline SVM → fuzzy → LLM melalui backend.
 

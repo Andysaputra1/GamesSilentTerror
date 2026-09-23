@@ -101,22 +101,24 @@ describe('Auth', () => {
     expect(component).toBeTruthy();
   });
 
-  it('rejects mismatched registration confirmation without a request', () => {
+  it('rejects a blank display name without a request', () => {
     component.registerName = 'detective';
-    component.registerEmail = 'test@example.com';
-    component.registerEmailVerify = 'other@example.com';
+    component.registerDisplayName = '   ';
     component.register();
-    expect(component.registerError).toContain('Email');
+    expect(component.registerError).toContain('nama lengkap');
     expect(component.isSubmitting).toBe(false);
     httpMock.expectNone('http://localhost:8000/api/auth/register');
   });
 
   it('unlocks registration after an existing-account response', () => {
     component.registerName = 'detective';
-    component.registerEmail = component.registerEmailVerify = 'test@example.com';
+    component.registerDisplayName = 'Detective Test';
     component.registerPassword = component.registerPasswordVerify = 'strong-password';
     component.register();
     const request = httpMock.expectOne('http://localhost:8000/api/auth/register');
+    expect(request.request.body.display_name).toBe('Detective Test');
+    expect(request.request.body.email).toBeUndefined();
+    expect(request.request.body.email_confirmation).toBeUndefined();
     request.flush({}, { status: 409, statusText: 'Conflict' });
     expect(component.isSubmitting).toBe(false);
     expect(component.registerError).toContain('sudah digunakan');

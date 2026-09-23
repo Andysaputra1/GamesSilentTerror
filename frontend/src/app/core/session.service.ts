@@ -4,6 +4,11 @@ import { Router } from '@angular/router';
 import { catchError, defer, finalize, of, tap, throwError, timeout } from 'rxjs';
 import { backendUrl } from './backend-url';
 
+export interface UserProfile {
+  username: string;
+  display_name: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class SessionService {
   readonly loggingOut = signal(false);
@@ -13,6 +18,32 @@ export class SessionService {
     private readonly http: HttpClient,
     private readonly router: Router,
   ) {}
+
+  // Simpan profil di server terlebih dahulu; abaikan respons jika sesi berganti saat request berjalan.
+  updateProfile(displayName: string, username?: string) {
+    const token = localStorage.getItem('shadow_heist_access_token');
+    return this.http
+      .post<UserProfile>(
+        backendUrl() + '/api/auth/me',
+        { display_name: displayName, ...(username ? { username } : {}) },
+        {
+          headers: new HttpHeaders({ Authorization: 'Bearer ' + (token ?? '') }),
+        },
+      )
+      .pipe(
+        timeout(10_000),
+        tap((profile) => {
+          if (
+            !token ||
+            this.loggingOut() ||
+            localStorage.getItem('shadow_heist_access_token') !== token
+          ) {
+            throw new Error('Sesi berubah. Silakan login kembali.');
+          }
+          localStorage.setItem('shadow_heist_user', JSON.stringify(profile));
+        }),
+      );
+  }
 
   // Hapus hanya data akun dan pointer ruangan milik aplikasi dari penyimpanan browser.
   clearLocalSession(): void {

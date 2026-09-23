@@ -170,6 +170,7 @@ button:disabled {
 }
 nav {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   border-bottom: 1px solid #293546;
   margin: 20px 0 30px;
@@ -380,5 +381,37 @@ footer span {
   }
   .toolbar button {
     width: 100%;
+  }
+  #menu-users thead {
+    display: none;
+  }
+  #menu-users table,
+  #menu-users tbody,
+  #menu-users tr,
+  #menu-users td {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  #menu-users tr {
+    border: 1px solid #29364a;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    padding: 8px;
+  }
+  #menu-users td {
+    min-width: 0;
+    border: 0;
+    padding: 8px;
+  }
+  #menu-users td::before {
+    content: attr(data-label);
+    display: block;
+    color: #93a8c0;
+    font-size: 11px;
+    margin-bottom: 4px;
+  }
+  #menu-users td button {
+    margin: 4px 4px 0 0;
   }
 }

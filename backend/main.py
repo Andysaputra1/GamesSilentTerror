@@ -23,6 +23,7 @@ from config.settings import settings
 from realtime.socket_handlers import register_socket_handlers
 from services.analysis_service import analysis_service
 from services.persistence_service import persistence_service
+from services.npc_service import NPCService
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("shadow_heist")
@@ -51,6 +52,7 @@ async def lifespan(_: FastAPI):
     async def game_clock():
         while True:
             room_service.tick_all()
+            npc_service.schedule()
             await asyncio.sleep(0.5)
 
     clock = asyncio.create_task(game_clock())
@@ -60,6 +62,7 @@ async def lifespan(_: FastAPI):
         clock.cancel()
         with suppress(asyncio.CancelledError):
             await clock
+        await npc_service.close()
         engine.dispose()
 
 
@@ -70,6 +73,7 @@ app.include_router(api_router)
 # The former Node real-time server is hosted alongside FastAPI on port 8000.
 sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins=settings.allowed_origins)
 socket_controller = register_socket_handlers(sio, analysis_service, persistence_service)
+npc_service = NPCService(sio)
 
 # Uvicorn targets this object so FastAPI and Socket.IO share one backend port.
 asgi_app = socketio.ASGIApp(sio, other_asgi_app=app)

@@ -59,8 +59,7 @@ export class Auth implements OnInit {
   isSubmitting = false;
   passwordVisible = false;
   registerName = '';
-  registerEmail = '';
-  registerEmailVerify = '';
+  registerDisplayName = '';
   registerPassword = '';
   registerPasswordVerify = '';
   registerError = '';
@@ -74,16 +73,17 @@ export class Auth implements OnInit {
     if (!isPlatformBrowser(this.platformId) || this.isSubmitting) return;
     this.registerError = '';
     const username = this.registerName.trim();
-    const email = this.registerEmail.trim().toLowerCase();
+    const displayName = this.registerDisplayName.trim();
     if (!/^[A-Za-z0-9_]{3,40}$/.test(username)) {
       this.registerError = 'Username harus 3–40 huruf, angka, atau underscore.';
       return;
     }
     if (
-      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
-      email !== this.registerEmailVerify.trim().toLowerCase()
+      !displayName ||
+      Array.from(displayName).length > 100 ||
+      /[\p{Cc}\p{Cf}\p{Cs}]/u.test(displayName)
     ) {
-      this.registerError = 'Email tidak valid atau konfirmasinya berbeda.';
+      this.registerError = 'Isi nama lengkap 1–100 karakter tanpa karakter kontrol.';
       return;
     }
     if (
@@ -98,8 +98,7 @@ export class Auth implements OnInit {
     this.http
       .post<LoginResponse>(this.backendUrl + '/api/auth/register', {
         username,
-        email,
-        email_confirmation: this.registerEmailVerify.trim(),
+        display_name: displayName,
         password: this.registerPassword,
         password_confirmation: this.registerPasswordVerify,
       })
@@ -119,7 +118,7 @@ export class Auth implements OnInit {
         error: (error: unknown) => {
           this.registerError =
             error instanceof HttpErrorResponse && error.status === 409
-              ? 'Username atau email sudah digunakan. Silakan login.'
+              ? 'Username sudah digunakan. Pilih username lain atau login.'
               : this.describeLoginError(error);
         },
       });

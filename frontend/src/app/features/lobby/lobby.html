@@ -4,6 +4,7 @@
       <a class="operation-brand" routerLink="/main"><span>♧</span> SILENT TERROR</a>
       <app-profile-menu
         [username]="username"
+        (profileChanged)="username = $event.username"
         [activeMatch]="!!room && room.phase !== 'lobby' && room.phase !== 'finished'"
       />
     </header>
@@ -17,7 +18,7 @@
       <div>
         <b>01 / SIAPKAN MEJA</b>
         <p>
-          4–6 peserta, termasuk bot. Host memulai setelah semua siap. Role dibagikan secara acak.
+          6–10 peserta, termasuk bot. Host memulai setelah semua siap. Role dibagikan secara acak.
         </p>
       </div>
       <div>
@@ -30,8 +31,9 @@
       <div>
         <b>03 / WASPADAI HOSTAGE</b>
         <p>
-          Hitman menang jika semua warga hidup disandera atau semua warga dieksekusi. Gag sementara
-          bukan Hostage. Maksimal 8 ronde, lalu seri.
+          Hitman menang saat warga hidup yang masih punya suara tersisa paling banyak satu. Gag
+          hanya membatasi chat. Pilih 6, 8, atau 12 ronde; tanpa pemenang di batas ronde berarti
+          seri.
         </p>
       </div>
     </section>
@@ -50,7 +52,25 @@
             {{ room.phase === 'lobby' ? 'Bagikan kode ini kepada teman. Mereka harus login terlebih dahulu untuk bergabung.' : room.phase === 'finished' ? 'Pertandingan selesai. Lihat hasil atau keluar ruangan untuk bermain lagi.' : 'Pertandingan berlangsung. Peserta terkunci sampai permainan selesai.' }}
           </p>
         } @else {
-          <p>Mulai meja baru, lalu tentukan apakah NOX ikut bermain.</p>
+          <p>Tentukan jumlah kursi dan batas ronde, lalu bagikan kode room.</p>
+          <div class="room-options">
+            <label for="room-capacity"
+              >Kapasitas pemain
+              <select id="room-capacity" [(ngModel)]="capacity" [disabled]="busy">
+                @for (count of [6, 7, 8, 9, 10]; track count) {
+                  <option [ngValue]="count">{{ count }} pemain</option>
+                }
+              </select>
+            </label>
+            <label for="room-rounds"
+              >Batas ronde
+              <select id="room-rounds" [(ngModel)]="maxRounds" [disabled]="busy">
+                @for (count of [6, 8, 12]; track count) {
+                  <option [ngValue]="count">{{ count }} ronde</option>
+                }
+              </select>
+            </label>
+          </div>
           <button class="operation-primary" (click)="createRoom()" [disabled]="busy">
             BUAT RUANGAN <span>+</span>
           </button>
@@ -87,7 +107,10 @@
       <article class="roster-card">
         <div class="roster-heading">
           <h2>{{ room?.phase === 'finished' ? 'Peserta pertandingan' : 'Pemain di meja' }}</h2>
-          <span>{{ room ? room.members.length + room.bots.length : 0 }} / 6 PEMAIN</span>
+          <span
+            >{{ room ? room.members.length + room.bots.length : 0 }} /
+            {{ room?.capacity ?? capacity }} PEMAIN</span
+          >
         </div>
         @if (room) {
           @for (member of room.members; track member) {
@@ -117,8 +140,8 @@
               <div>
                 <b>Isi kursi dengan bot</b>
                 <p>
-                  Minimal 4 peserta. Bot mengisi kursi, melakukan aksi malam, dan ikut voting. Role
-                  semua peserta diacak.
+                  Minimal 6 peserta. NPC mengisi kursi kosong, berdiskusi, melakukan aksi malam, dan
+                  ikut voting. Role semua peserta diacak.
                 </p>
               </div>
               <button
@@ -143,7 +166,7 @@
               <button
                 class="operation-primary start-game-btn"
                 (click)="startGame()"
-                [disabled]="busy || room.members.length + room.bots.length < 4"
+                [disabled]="busy || room.members.length + room.bots.length < 6"
               >
                 MULAI PERMAINAN ↗
               </button>
@@ -161,7 +184,8 @@
           }
           <p class="entry-note">
             Standar: siang 120 detik, malam 30 detik, Tribunal 45 detik. Timer tetap berjalan saat
-            tab ditutup. Maksimal 8 ronde; kemenangan diperiksa setelah aksi malam dan voting.
+            tab ditutup. Batas {{ room.max_rounds ?? 8 }} ronde; kemenangan diperiksa setelah aksi
+            malam dan voting.
           </p>
           @if (room.phase === 'lobby' || room.phase === 'finished') {
             <button class="operation-secondary" (click)="leaveRoom()" [disabled]="busy">

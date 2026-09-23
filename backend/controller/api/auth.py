@@ -5,7 +5,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from controller.middleware.auth import require_authenticated_user
 from schemas.auth import AuthenticatedUserResponse, LoginRequest, LoginResponse
-from schemas.auth import RegisterRequest, GoogleLoginRequest
+from schemas.auth import RegisterRequest, GoogleLoginRequest, UpdateProfileRequest
 from config.settings import settings
 from controller.middleware.auth_limits import limit_auth
 from services.account_service import register_account, google_account, AccountConflict
@@ -47,6 +47,23 @@ def current_user(
     user: AuthenticatedUser = Depends(require_authenticated_user),
 ) -> AuthenticatedUserResponse:
     return AuthenticatedUserResponse(username=user.username, display_name=user.display_name)
+
+
+# Akun yang diubah berasal dari bearer token; username baru tidak dapat memilih akun lain.
+@router.post("/me", response_model=AuthenticatedUserResponse)
+def update_profile(
+    body: UpdateProfileRequest,
+    response: Response,
+    user: AuthenticatedUser = Depends(require_authenticated_user),
+) -> AuthenticatedUserResponse:
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        updated = auth_service.update_profile(user, body.display_name, body.username)
+    except ValueError as error:
+        raise HTTPException(409, str(error)) from error
+    except AuthenticationPersistenceError as error:
+        raise HTTPException(503, "Nama belum berhasil disimpan. Coba lagi nanti.") from error
+    return AuthenticatedUserResponse(username=updated.username, display_name=updated.display_name)
 
 
 @router.post("/logout", status_code=204)

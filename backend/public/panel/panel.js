@@ -2,6 +2,10 @@
 // Ambil elemen panel berdasarkan ID.
 const $ = (id) => document.getElementById(id);
 let historyVersion = 0;
+let usersAfter = 0,
+  usersVersion = 0,
+  selectedUser = null,
+  userSaving = false;
 let keyAvailability = { default: false, custom: false };
 let token = '',
   menu = 'ai',
@@ -40,6 +44,10 @@ async function request(path, body, method = 'GET') {
 }
 // Buang token, rahasia form, dan data panel; abaikan respons dari sesi sebelumnya.
 function clearSession() {
+  $('create-user-form').reset();
+  usersVersion++;
+  $('user-rows').replaceChildren();
+  closeUserEditor();
   $('api-key').value = '';
   generation++;
   token = '';
@@ -283,11 +291,172 @@ async function selectMenu(name) {
     if (b.dataset.menu === name) b.setAttribute('aria-current', 'page');
     else b.removeAttribute('aria-current');
   }
-  for (const id of ['ai', 'checker', 'history']) $('menu-' + id).hidden = id !== name;
-  if (name !== 'ai') await loadRooms();
+  for (const id of ['ai', 'checker', 'history', 'users']) $('menu-' + id).hidden = id !== name;
+  if (name === 'checker' || name === 'history') await loadRooms();
   if (name === 'checker') await checker();
   if (name === 'history') await history();
+  if (name === 'users') await loadUsers();
 }
+
+// Muat daftar akun tanpa rahasia; versi request mencegah hasil filter lama menimpa pencarian baru.
+async function loadUsers(reset = true) {
+  const epoch = generation;
+  if (reset) {
+    usersVersion++;
+    usersAfter = 0;
+    $('user-rows').replaceChildren();
+  }
+  const version = usersVersion;
+  const query = new URLSearchParams({
+    after_id: String(usersAfter),
+    search: $('user-search').value.trim(),
+  });
+  const data = await request('/api/panel/users?' + query);
+  if (!token || epoch !== generation || version !== usersVersion) return;
+  for (const user of data.users) {
+    const row = document.createElement('tr');
+    for (const [label, value] of [
+      ['Username', user.username],
+      ['Nama tampilan', user.display_name],
+      ['Login', user.login_method === 'google' ? 'Google' : 'Password'],
+    ]) {
+      const cell = document.createElement('td');
+      cell.dataset.label = label;
+      cell.textContent = value;
+      row.append(cell);
+    }
+    const actions = document.createElement('td');
+    actions.dataset.label = 'Aksi';
+    if (user.login_method !== 'google') {
+      const passwordButton = document.createElement('button');
+      passwordButton.className = 'secondary';
+      passwordButton.textContent = 'Ubah password';
+      passwordButton.onclick = () => openUserEditor(user, 'password');
+      actions.append(passwordButton);
+    } else {
+      const note = document.createElement('small');
+      note.textContent = 'Password dikelola Google. ';
+      actions.append(note);
+    }
+    const deleteButton = document.createElement('button');
+    deleteButton.className = 'secondary';
+    deleteButton.textContent = 'Hapus akun';
+    deleteButton.onclick = () => openUserEditor(user, 'delete');
+    actions.append(deleteButton);
+    row.append(actions);
+    $('user-rows').append(row);
+  }
+  usersAfter = data.next_after_id;
+  $('more-users').hidden = !data.has_more;
+  $('users-empty').hidden = $('user-rows').children.length > 0;
+}
+
+// Bersihkan password/draft konfirmasi setiap editor ditutup atau sesi panel berakhir.
+function closeUserEditor() {
+  selectedUser = null;
+  $('user-editor').hidden = true;
+  $('user-password-form').reset();
+  $('user-delete-form').reset();
+}
+
+// Target disimpan sebagai ID; nama target ditampilkan sebelum admin mengonfirmasi tindakan.
+function openUserEditor(user, action) {
+  if (userSaving) return;
+  closeUserEditor();
+  selectedUser = user;
+  $('user-editor').hidden = false;
+  $('user-editor-title').textContent =
+    (action === 'password' ? 'Ubah password: ' : 'Hapus akun: ') + user.username;
+  $('user-password-form').hidden = action !== 'password';
+  $('user-delete-form').hidden = action !== 'delete';
+  (action === 'password' ? $('user-new-password') : $('user-delete-confirmation')).focus();
+}
+
+// Cegah klik ganda dan pergantian target selama mutasi akun sedang berlangsung.
+async function changeUser(action) {
+  if (!selectedUser || userSaving) return;
+  const target = selectedUser;
+  const epoch = generation;
+  let body;
+  if (action === 'password') {
+    if (target.login_method === 'google')
+      throw new Error('Password akun Google dikelola di Google.');
+    if ($('user-new-password').value !== $('user-password-confirmation').value)
+      throw new Error('Konfirmasi password tidak cocok.');
+    body = {
+      password: $('user-new-password').value,
+      password_confirmation: $('user-password-confirmation').value,
+    };
+  } else {
+    if ($('user-delete-confirmation').value !== target.username)
+      throw new Error('Ketik username target dengan tepat untuk menghapus akun.');
+    body = { confirm_username: $('user-delete-confirmation').value };
+  }
+  userSaving = true;
+  for (const id of ['save-user-password', 'delete-user', 'cancel-user-edit']) $(id).disabled = true;
+  try {
+    await request(`/api/panel/users/${target.id}/${action}`, body, 'POST');
+    if (!token || epoch !== generation) return;
+    closeUserEditor();
+    notice(
+      action === 'password'
+        ? 'Password diganti. Semua sesi user dicabut; user perlu login ulang.'
+        : 'Akun dihapus. Riwayat chat dan analisis tetap tersimpan.',
+    );
+    await loadUsers();
+  } finally {
+    $('user-new-password').value = '';
+    $('user-password-confirmation').value = '';
+    userSaving = false;
+    for (const id of ['save-user-password', 'delete-user', 'cancel-user-edit'])
+      $(id).disabled = false;
+  }
+}
+
+$('user-search-form').onsubmit = handle(() => loadUsers());
+$('more-users').onclick = handle(async () => {
+  $('more-users').disabled = true;
+  try {
+    await loadUsers(false);
+  } finally {
+    $('more-users').disabled = false;
+  }
+});
+$('cancel-user-edit').onclick = closeUserEditor;
+$('user-password-form').onsubmit = handle(() => changeUser('password'));
+$('user-delete-form').onsubmit = handle(() => changeUser('delete'));
+
+// Buat akun tanpa login sebagai pemain; rahasia form selalu dibersihkan setelah request.
+$('create-user-form').onsubmit = handle(async () => {
+  if ($('create-user-button').disabled) return;
+  if ($('create-password').value !== $('create-password-confirmation').value)
+    throw new Error('Konfirmasi password tidak cocok.');
+  const epoch = generation;
+  $('create-user-button').disabled = true;
+  try {
+    await request(
+      '/api/panel/users',
+      {
+        username: $('create-username').value.trim(),
+        display_name: $('create-display-name').value.trim(),
+        password: $('create-password').value,
+        password_confirmation: $('create-password-confirmation').value,
+      },
+      'POST',
+    );
+    if (!token || epoch !== generation) return;
+    $('create-user-form').reset();
+    $('user-search').value = '';
+    notice(
+      'User berhasil ditambahkan. Pemain dapat login menggunakan username dan password tersebut.',
+    );
+    await loadUsers();
+  } finally {
+    $('create-password').value = '';
+    $('create-password-confirmation').value = '';
+    $('create-user-button').disabled = false;
+  }
+});
 for (const b of document.querySelectorAll('[data-menu]'))
   b.onclick = handle(() => selectMenu(b.dataset.menu));
 $('provider').onchange = providerView;

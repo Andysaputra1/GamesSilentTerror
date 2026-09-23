@@ -13,7 +13,7 @@ from services.room_service import RoomService
 
 class SkipTests(unittest.TestCase):
     def setUp(self):
-        self.game = Match(["alice", "bob", "carol"], ["NOX"], now=0)
+        self.game = Match(["alice", "bob", "carol"], ["NOX", "ECHO", "VEIL"], now=0)
 
     def test_requires_all_humans_but_not_bot_and_duplicate_is_idempotent(self):
         self.game.skip_discussion("alice", now=1)
@@ -62,7 +62,7 @@ class SkipTests(unittest.TestCase):
         self.assertEqual(self.game.skip_consents, set())
 
     def test_single_human_can_skip_alone(self):
-        game = Match(["alice"], ["NOX", "ECHO", "VEIL"], now=0)
+        game = Match(["alice"], ["NOX", "ECHO", "VEIL", "RAVEN", "ASH"], now=0)
         game.skip_discussion("alice", now=1)
         self.assertEqual(game.phase, "night")
 

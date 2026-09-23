@@ -42,29 +42,16 @@
               [disabled]="isSubmitting"
             />
           </label>
-          <label class="paper-field" for="reg-email">
-            <span>Email</span>
+          <label class="paper-field" for="reg-display-name" style="grid-column: 1 / -1">
+            <span>Nama lengkap</span>
             <input
-              id="reg-email"
-              type="email"
-              name="email"
-              [(ngModel)]="registerEmail"
-              autocomplete="email"
-              placeholder="your@email.com"
-              maxlength="254"
-              [disabled]="isSubmitting"
-            />
-          </label>
-          <label class="paper-field" for="reg-email-verify">
-            <span>Confirm email</span>
-            <input
-              id="reg-email-verify"
-              type="email"
-              name="emailVerify"
-              [(ngModel)]="registerEmailVerify"
-              autocomplete="email"
-              placeholder="Confirm email"
-              maxlength="254"
+              id="reg-display-name"
+              type="text"
+              name="displayName"
+              [(ngModel)]="registerDisplayName"
+              autocomplete="name"
+              placeholder="Nama lengkap kamu"
+              maxlength="100"
               [disabled]="isSubmitting"
             />
           </label>

@@ -2,7 +2,7 @@
   <div class="operation-content">
     <header class="operation-header">
       <a class="operation-brand" routerLink="/main"><span>♧</span> SILENT TERROR</a>
-      <app-profile-menu [username]="username" />
+      <app-profile-menu [username]="username" (profileChanged)="username = $event.username" />
     </header>
     <section class="table-menu" aria-label="Menu permainan">
       <article class="start-card">
@@ -39,8 +39,9 @@
           targetnya: diam bisa berarti disandera, dibungkam, atau sengaja tidak membalas.
         </p>
         <p class="rules-note">
-          <b>Kubu warga menang</b> jika Hitman dieksekusi. <b>Hitman menang</b> jika semua warga
-          hidup disandera atau tidak ada warga hidup tersisa. Tanpa pemenang setelah 8 ronde: seri.
+          <b>Kubu warga menang</b> jika Hitman dieksekusi. <b>Hitman menang</b> ketika warga hidup
+          yang masih punya hak voting tersisa paling banyak satu. Gag hanya membatasi chat. Pilih
+          batas 6, 8, atau 12 ronde; tanpa pemenang di batas ronde: seri.
         </p>
       </article>
     </section>
@@ -71,7 +72,7 @@
     </section>
     <footer class="operation-footer">
       <span>DIAM BISA BERARTI APA SAJA.</span
-      ><span>4–6 peserta · Kemenangan ditentukan oleh kubu · Maksimal 8 ronde.</span>
+      ><span>6–10 peserta · Kemenangan ditentukan oleh kubu · Pilihan 6 / 8 / 12 ronde.</span>
     </footer>
   </div>
 </main>

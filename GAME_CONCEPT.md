@@ -1,101 +1,95 @@
-# Konsep game — Silent Terror (judul sementara)
+# Silent Terror — aturan permainan sesuai GDD
 
-## Zero economy
+Silent Terror adalah multiplayer social deduction berbasis web, dengan hidden role asimetris dan NPC yang memakai LLM. Fokus permainan adalah deduksi dari percakapan, alibi, dan voting. Tidak ada ekonomi, pembelian item, atau tebusan.
 
-Tidak ada budget, pembelian item, atau tebusan. Hitman menyusup dan menyandera warga secara diam-diam; warga mencari Hitman melalui observasi percakapan.
+## Ruangan dan role
 
-## Role
+- **6–10 peserta**, kombinasi manusia dan NPC. Host memilih kapasitas room; permainan dapat dimulai dengan sedikitnya enam peserta.
+- **Batas 6, 8, atau 12 ronde**, dipilih saat membuat room. Kemenangan dapat terjadi lebih cepat.
+- Tepat satu Hitman, satu Spy, satu Stalker, sisanya Civilian. Role diacak server untuk manusia maupun NPC.
+- NPC mengisi kursi kosong sampai kapasitas. Manusia yang bergabung sebelum mulai menggantikan kursi NPC. Roster terkunci setelah mulai; anggota lama dapat reconnect.
+- Satu akun menempati satu room. Keluar dari lobby/hasil sebelum pindah room. Logout mencabut sesi tanpa menghentikan pertandingan; login ulang memulihkan keanggotaan.
 
-| Role | Tujuan dan kemampuan |
+## Fase setiap ronde
+
+| Fase | Interaksi dan resolusi |
 | --- | --- |
-| Hitman | Menyandera semua warga. Malam: Hostage satu korban. Siang: Gag Order membungkam satu pemain, cooldown satu ronde. |
-| Spy | Melindungi warga. Malam: Guard satu pemain; Hostage terhadap target itu gagal. Tidak boleh memilih target sama dua malam berturut-turut. |
-| Stalker | Mencari informasi. Malam: Peek identitas asli satu pemain, sekali setiap dua ronde. |
-| Civilian | Tidak punya skill malam. Berdebat, mengamati, dan menebak Hitman. |
+| Siang | Diskusi publik. Hitman dapat menggunakan Gag Order secara instan. |
+| Malam | Layar meredup, chat terkunci. Hostage, Guard, dan Peek dipilih privat, diselesaikan bersama saat timer habis. Guard diproses sebelum Hostage. |
+| Tribunal | Rekap tanpa nama target atau hasil individual. Pemain yang punya hak suara memilih tersangka. Suara terbanyak tunggal dieksekusi. |
 
-## Alur ronde
+Durasi standar siang/malam/Tribunal adalah 120/30/45 detik; mode cepat 20/15/15 detik. Timer server tetap berjalan walaupun tab ditutup. Chat kembali tersedia saat Tribunal bagi pemain yang masih boleh berbicara.
 
-Day (diskusi; Hitman dapat Gag Order) → Night (chat terkunci; aksi serentak dan tersembunyi) → Tribunal (rekap malam tanpa nama target; voting; suara terbanyak dieksekusi) → ronde berikutnya.
+Semua manusia hidup dapat menyetujui skip siang. Hostage/Gag tetap boleh menyetujui karena ini bukan chat atau voting Tribunal. Hanya jumlah persetujuan dipublikasikan; jika belum lengkap, timer normal berlaku.
 
-## Kubu, status, dan kemenangan
+## Kemampuan dan status
 
-- **Kubu Hitman:** tepat satu pemain. Bot juga bisa mendapat role ini.
-- **Kubu warga:** Spy, Stalker, dan semua Civilian, baik manusia maupun bot. Kemenangan mengikuti kubu, bukan jumlah manusia yang masih hidup.
-- **Hidup (`alive`):** belum dieksekusi. Hostage tetap hidup dan tetap berada di roster.
-- **Hostage:** permanen sampai game berakhir; tidak dapat chat, voting, atau aksi malam. Korban tetap anggota kubu warga dan tetap menang jika Hitman dieksekusi.
-- **Gag Order:** hanya mengunci chat/voting sampai akhir Tribunal ronde itu. Aksi malam tetap tersedia. Gag tidak dihitung sebagai Hostage untuk kemenangan.
-- **Dieksekusi:** tidak lagi hidup dan hanya menonton. Hasil pemain tetap mengikuti kubunya.
+| Role | Faksi | Kemampuan |
+| --- | --- | --- |
+| Hitman | Syndicate | Hostage satu pemain saat malam. Gag Order satu pemain saat siang, cooldown satu ronde penuh: ronde 1 lalu ronde 3. |
+| Spy | Warga | Guard satu pemain, termasuk diri sendiri. Tidak boleh target sama dua malam berturut-turut. Guard mencegah serangan malam itu, tidak membebaskan Hostage lama. |
+| Stalker | Warga | Peek role asli satu pemain setelah malam selesai. Hasil privat; sekali setiap dua ronde: ronde 1 lalu ronde 3. |
+| Civilian | Warga | Tidak punya skill malam; mengamati, berdebat, dan voting. |
 
-Backend memeriksa kemenangan setelah resolusi malam dan setelah eksekusi Tribunal, dengan urutan berikut:
+**Hostage:** tetap hidup di roster, kehilangan chat dan voting permanen. Sesuai pembatasan tertulis di GDD, skill malam tetap tersedia mengikuti role/cooldown. Korban tetap faksi warga.
 
-1. Hitman dieksekusi → **seluruh kubu warga menang**, termasuk yang Hostage atau sudah dieksekusi.
-2. Hitman hidup dan tidak ada warga hidup tersisa → **Hitman menang** karena semua lawan telah dieksekusi.
-3. Hitman hidup dan seluruh warga yang masih hidup sudah Hostage → **Hitman menang**. Warga yang dieksekusi tidak perlu disandera.
-4. Selain itu permainan berlanjut. Setelah Tribunal ronde 8, jika belum ada kemenangan normal → **seri**.
+**Gag Order:** hanya membatasi chat sampai akhir ronde penggunaan. Voting dan skill malam tetap tersedia. Gag tidak mengurangi suara warga dalam kondisi kemenangan.
 
-Tidak ada kemenangan otomatis karena jumlah Hitman dan warga seimbang, karena semua manusia gugur, atau karena semua lawan sedang Gag. Satu warga hidup yang belum Hostage masih mencegah kemenangan Hitman. Guard yang berhasil melindungi warga terakhir juga mencegah kemenangan malam itu.
+**Dieksekusi:** tidak bisa chat, aksi, atau voting; menjadi penonton. Menang/kalah mengikuti faksi, termasuk bagi yang dieksekusi atau Hostage.
 
-Contoh: Spy dieksekusi, Stalker menjadi Hostage, Civilian masih bebas → pertandingan lanjut. Jika Civilian kemudian menjadi Hostage, Hitman menang. Jika Hitman justru dieksekusi di Tribunal, Spy, Stalker, dan Civilian semuanya menang.
+Aksi malam dan vote final, satu pilihan per fase. Target harus hidup; hanya Guard boleh memilih diri sendiri. Memilih pemain yang sudah Hostage diperbolehkan karena status lawan rahasia, tetapi tidak menambah korban baru.
 
-Selama game, hanya status milik sendiri yang dijelaskan secara privat; roster lawan tidak membocorkan Hostage/Gag. Setelah selesai, layar hasil menjelaskan kubu pemenang, menang/kalah/seri untuk akun sendiri, alasan akhir, jumlah warga hidup/disandera/dieksekusi, serta role dan status akhir setiap pemain.
+## Kemenangan
 
-## Alur ruangan
+Backend mengecek setelah resolusi malam dan Tribunal:
 
-Satu akun menempati satu ruangan. Buat/gabung → tunggu 4–6 peserta → host mulai → diskusi/malam/voting → hasil → keluar ruangan sebelum membuat atau bergabung lagi. Keanggotaan lobby dan ruangan selesai dipulihkan dari server melalui `GET /api/rooms/current`, termasuk setelah logout atau tab baru. Logout mengakhiri sesi akun, bukan meninggalkan atau menghentikan pertandingan. Login ulang memulihkan pertandingan aktif. Keluar sebelum mulai memindahkan host ke anggota berikutnya; ruangan tanpa anggota dibersihkan.
+1. **Warga menang** jika Hitman dieksekusi.
+2. **Hitman menang**, selama masih hidup, saat warga hidup yang tidak Hostage **paling banyak satu**. Suara warga tidak lagi melampaui satu suara Hitman. Warga dieksekusi/Hostage tidak dihitung; Gag tetap dihitung.
+3. Tanpa pemenang setelah Tribunal pada batas ronde pilihan host: **seri**.
 
-## Silent terror
+Contoh enam pemain: tiga dari lima warga Hostage, dua bebas → lanjut. Satu lagi disandera atau dieksekusi → Hitman menang. Guard berhasil sehingga dua warga tetap bebas → lanjut. Hitman dieksekusi pada Tribunal terakhir → kemenangan warga diprioritaskan atas seri.
 
-Korban Hostage tidak mati, tetapi kehilangan kemampuan chat dan hak voting. Sistem tidak pernah mengumumkan siapa yang disandera. Diam dapat berarti Hostage, Gag Order, atau pilihan pemain sendiri. Rekap dan roster publik tidak boleh membocorkan status tersebut.
+Ketentuan pelengkap untuk bagian GDD yang belum merinci: vote seri/tanpa suara tidak mengeksekusi siapa pun; batas ronde tanpa kemenangan menghasilkan seri; role korban eksekusi dirahasiakan sampai akhir.
 
-## Status implementasi
+Hasil akhir menunjukkan faksi pemenang, alasan, menang/kalah/seri akun sendiri, jumlah warga hidup/Hostage/dieksekusi/masih punya suara, serta role dan status akhir semua peserta.
 
-Sudah aktif: pembagian role server, timer, resolusi malam, cooldown, Hostage/Gag, voting, eksekusi, kemenangan, dan bot dengan aksi/vote. Login dan main page tidak diubah. Lobby/game membaca state dari backend; keputusan tidak dilakukan di frontend.
+## Blind information
 
-## Aturan operasional
+Snapshot aktif hanya memuat role, status, pilihan aksi, dan hasil Peek milik akun peminta. Roster lawan hanya berisi nama dan hidup/tidak. Tidak ada pengumuman target Hostage, Gag, Guard, atau Peek. Rekap malam sama untuk serangan berhasil, gagal, atau tanpa serangan.
 
-- Peserta 4–6; tepat 1 Hitman, 1 Spy, 1 Stalker, sisanya Civilian. Semua termasuk bot mendapat role acak.
-- Bot mengisi hingga minimal 4 peserta; dengan 4–5 manusia, opsi bot menambah satu bot. Roster terkunci setelah mulai. Anggota lama boleh reconnect, orang baru tidak boleh masuk.
-- Durasi standar: Day 120s, Night 30s, Tribunal 45s. Mode cepat: 20/15/15s. Timer server terus berjalan walaupun browser ditutup.
-- Skip diskusi hanya pada Day: semua manusia yang masih hidup harus setuju. Bot dan pemain mati tidak dihitung. Gag/Hostage tidak menghapus hak persetujuan ini (bukan chat/vote), supaya status rahasia tidak bocor lewat jumlah yang diperlukan. Persetujuan final per ronde, duplikat tidak menambah hitungan, reset saat ronde baru. Pemain offline tetap diperlukan; jika belum lengkap, timer normal berlaku. Persetujuan lengkap memajukan fase melalui engine yang sama dengan timer, termasuk kesempatan aksi siang bot.
-- Satu akun hanya boleh mengikuti satu pertandingan aktif. Endpoint privat `GET /api/rooms/active` memulihkan room pada tab baru/login ulang. Route aplikasi dan pengecekan berkala/focus mengarahkan pemain ke `/game` selama match aktif. Tidak memaksa navigasi tab situs eksternal. Pemain mati tetap kembali sebagai penonton sampai pertandingan selesai.
-- Gag aktif segera saat Day sampai Tribunal ronde itu selesai, lalu hilang pada Day berikutnya. Pemain terkena Gag tidak dapat chat/vote, tetapi masih bisa aksi malam. Dipakai ronde 1 → tersedia lagi ronde 3.
-- Peek dipakai ronde 1 → tersedia lagi ronde 3. Hasil baru muncul setelah resolusi malam dan hanya untuk Stalker tersebut.
-- Guard boleh memilih diri sendiri, tetapi tidak target yang sama pada dua malam berturut-turut. Guard diproses sebelum Hostage, terlepas urutan request.
-- Hostage permanen sampai akhir game. Korban tetap hidup namun tidak dapat chat/vote/aksi malam. Ini asumsi implementasi untuk pemain yang sedang disandera.
-- Setiap aksi malam dan vote hanya satu pilihan final. Boleh tidak memilih sebelum timer habis. Target harus hidup; hanya Guard boleh memilih diri sendiri.
-- Suara terbanyak tunggal dieksekusi. Seri atau tanpa suara: tidak ada eksekusi.
-- Warga menang jika Hitman dieksekusi. Hitman menang jika semua warga yang masih hidup sudah Hostage.
-- Tidak ada pengumuman target Hostage, status bungkam publik, atau aksi malam orang lain dalam snapshot aktif. Selama Tribunal, vote yang sudah dikirim bersifat publik: jumlah dan nama pemilih per target, tanpa daftar siapa yang berhak voting. Tampilan maksimal 4 badge nama lalu +N dan daftar lengkap yang bisa dibuka. Role dan status Hostage dibuka untuk semua setelah game selesai. Status Hostage/Gag sendiri tersedia privat; hasil Peek tetap privat.
-- Bot memilih target dari pemain hidup, tanpa membaca role/status rahasia lawan. Stalker bot boleh memakai hasil Peek miliknya sendiri saat voting. Aksi bot dijalankan di pertengahan fase.
-- Bot chat menjawab pesan manusia yang diterima, bukan percakapan otomatis antarsesama bot. LLM tidak menentukan hasil aksi/vote. Bot bungkam/mati tidak boleh membalas; balasan yang terlambat melewati fase dibuang. Kegagalan LLM tidak menghentikan timer.
+Vote yang dikirim terlihat saat Tribunal, termasuk nama pemilih per target, tanpa daftar orang yang berhak voting. Diam bisa berarti strategi, Gag, Hostage, atau offline.
+
+Label NPC tidak ditampilkan di roster pertandingan aktif. Lobby masih menampilkan kursi/konfigurasi NPC, sehingga versi ini **belum menjadi protokol eksperimen Turing Test tersamar penuh**. Eksperimen tersamar memerlukan penyamaran identitas lobby, prosedur rekrutmen, serta evaluasi tersendiri.
+
+## NPC dan single LLM
+
+`services/npc_service.py` menjalankan NPC dari timer tanpa menunggu pesan manusia. Setiap NPC mendapat satu giliran per fase relevan, memakai provider/model terpilih yang sama dari panel, dengan konteks privat terpisah.
+
+Prompt terstruktur berisi aturan, role/status sendiri, intel sendiri, aksi/target legal, chat publik terakhir, event dan vote publik. Role/status/aksi rahasia lawan tidak masuk prompt. Chat pemain diperlakukan sebagai data tidak tepercaya, bukan instruksi sistem. Request antrean memperbarui konteks sebelum memanggil model agar melihat percakapan terbaru.
+
+Model mengembalikan JSON `action`, `target`, `message`. Server memvalidasi JSON, room/match, ronde/fase, deadline, hak chat, dan legalitas aksi. Model memilih strategi; engine menentukan hasil. Balasan basi dibuang. Pesan disimpan sebelum disiarkan Socket.IO. Keputusan `wait` yang valid dihormati.
+
+Maksimal tiga request NPC bersamaan; timeout dibatasi deadline fase. Jika model/jaringan gagal atau keputusan ilegal, engine mengisi aksi/vote kosong dengan fallback aturan pada deadline, tanpa mengarang percakapan. Fallback hanya memakai roster publik dan intel sendiri. Trace menandai kegagalan; **fallback harus dibedakan dari hasil keputusan LLM dalam analisis penelitian**. Mode cepat lebih mudah mengalami timeout.
+
+SVM/fuzzy tetap menganalisis pesan manusia untuk arsip/checker. Jalur NPC memakai konteks di atas; tidak mengklaim skor fuzzy sebagai pengetahuan role. Persentase diam pada pipeline lama masih tetap 20%, bukan pengukuran aktivitas nyata. Kualitas taktik, deception, dan keberhasilan menyamar memerlukan uji model nyata serta evaluasi manusia.
 
 ## Alur kode
 
 ```text
-Lobby → POST /api/rooms /join /{code}/bot /{code}/start
-                       ↓
-controller/api/rooms.py → services/room_service.py (membership + lock)
-                       ↓
-services/match_engine.py (role, timer, aksi, vote, winner, snapshot privat)
-                       ↓
-GET /api/rooms/{code}/game → frontend/core/game.service.ts → game.ts/html/css
-
-Tombol aksi/vote → POST /api/rooms/{code}/play
-  → validasi match_id + round_number + phase → validasi aturan → snapshot baru
-
-send_chat → realtime/socket_handlers.py → engine.can_chat
-  → echo server → SVM → fuzzy → LLM sesuai role bot → MySQL → receive_chat
+Lobby -> POST /api/rooms {capacity, max_rounds} -> RoomService
+Host mulai -> Match (role acak, timer, snapshot privat)
+Timer 0,5 detik -> resolusi fase + NPCService.schedule
+NPC -> prompt privat -> single LLM -> JSON tervalidasi -> Match.act/vote
+Human -> HTTP /play -> validasi token fase + aturan -> Match.act/vote
+Human chat -> Socket.IO -> otorisasi + can_chat -> analisis + MySQL -> echo
+NPC chat -> can_chat + MySQL -> Socket.IO receive_chat
+GET /game -> snapshot akun -> Angular (polling 1 detik)
 ```
 
-`main.py` menjalankan clock 0,5 detik. Frontend polling snapshot tiap 1 detik dan memakai Socket.IO untuk chat. Header bearer mengikat HTTP ke akun; Socket.IO memeriksa token dan membership. Username pada payload tidak dapat menyamar sebagai pemain lain. `/games/checker` tetap route development tanpa login, tetapi data room aktif ditolak HTTP 403 untuk melindungi Silent Terror.
+RoomService mengunci perubahan state. HTTP memakai bearer session; Socket.IO memeriksa sesi dan keanggotaan. Checker publik lama ditutup; trace/prompt privat hanya untuk administrator panel.
 
-Persetujuan skip: `POST /api/rooms/{code}/skip-discussion` → `RoomService.skip()` → `Match.skip_discussion()`. Payload membawa `match_id`, `round_number`, dan `phase: day`; permintaan fase lama ditolak. Pemulihan UI ada di `core/active-match.service.ts` (guard + lookup), dan `app.ts` mengecek setiap 3 detik ketika berada di halaman lain serta saat tab kembali aktif. Identitas persetujuan orang lain tidak dipublikasikan; snapshot hanya membawa total dan persetujuan akun sendiri.
+## Batas operasional dan validasi
 
-## Batas versi development
+Room, role, aksi, vote, dan konteks pertandingan berada di memori satu proses. Restart menghapus pertandingan aktif; MySQL menyimpan chat/analisis, bukan pemulihan seluruh match. Multi-worker dan penggantian pemain offline otomatis belum tersedia.
 
-Ruangan/role/aksi/vote disimpan di memori satu proses backend dan hilang ketika backend restart. Reload browser memulihkan pertandingan yang masih ada serta 100 pesan terakhir. MySQL mencatat chat/analisis, bukan snapshot pertandingan; pemulihan match setelah restart dan multi-worker belum tersedia. Pemain yang menutup tab tetap di roster dan melewatkan aksi/vote sampai kembali; belum ada bot pengganti otomatis.
-
-Fuzzy masih memakai persentase diam tetap 20%, bukan pengukuran aktivitas nyata. Akurasi/balance SVM-fuzzy-LLM bukan jaminan hasil game. Aplikasi, checker, akun demo dan Compose ditujukan untuk pengembangan lokal, bukan deployment publik.
-
-- Batas pertandingan 8 ronde. Setelah Tribunal ronde 8, kemenangan normal diprioritaskan; jika belum ada pemenang, hasil seri dan semua role dibuka.
-- Permintaan AI pertama per fase diskusi/voting menyediakan sedikitnya 35 detik sejak permintaan diterima. Tambahan maksimal 35 detik per fase, tidak berulang untuk pesan berikutnya. Skip manual tetap berlaku.
+Tes otomatis mencakup 6–10 pemain, 6/8/12 ronde, Guard/Peek/Gag/Hostage, dominasi suara, prioritas kemenangan, privasi, voting, reconnect, serta scheduler/validasi/fallback NPC dengan respons model tiruan. Tes ini tidak membuktikan kualitas taktik atau latensi provider produksi.

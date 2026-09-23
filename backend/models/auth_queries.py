@@ -5,6 +5,22 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 
+# Ubah hanya nama tampilan akun terautentikasi; username dan sesi tetap menggunakan identitas lama.
+def update_display_name(database: Session, user_id: int, display_name: str):
+    database.execute(
+        text("UPDATE user_accounts SET display_name = :name WHERE id = :user_id"),
+        {"name": display_name, "user_id": user_id},
+    )
+
+
+# Username berubah berdasarkan ID akun tetap, sehingga email Google dan token tetap menunjuk akun sama.
+def update_username(database: Session, user_id: int, username: str):
+    database.execute(
+        text("UPDATE user_accounts SET username = :username WHERE id = :user_id"),
+        {"username": username, "user_id": user_id},
+    )
+
+
 # QUERY INSERT: akun baru saja; constraint unik mencegah menimpa akun yang sudah ada.
 def create_account(database: Session, *, username: str, display_name: str, password_hash: str):
     return database.execute(

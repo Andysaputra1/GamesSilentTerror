@@ -37,13 +37,12 @@
         <summary>Cara menang dan arti status pemain</summary>
         <p><b>Kubu warga (Spy, Stalker, Civilian):</b> menang jika Hitman dieksekusi.</p>
         <p>
-          <b>Hitman:</b> menang jika semua warga yang masih hidup menjadi Hostage, atau tidak ada
-          warga yang masih hidup.
+          <b>Hitman:</b> menang ketika warga hidup yang masih memiliki hak voting tersisa paling
+          banyak satu.
         </p>
         <p>
-          Hostage tetap hidup, tetapi tidak dapat chat, voting, atau memakai skill. Gag hanya
-          sementara dan tidak dihitung sebagai Hostage. Jumlah pemain yang seimbang tidak otomatis
-          membuat Hitman menang.
+          Hostage tetap hidup dan masih bisa memakai skill malam, tetapi kehilangan chat dan voting
+          permanen. Gag hanya membatasi chat sampai akhir ronde; hak voting tetap ada.
         </p>
         <p>
           Voting seri atau tanpa suara tidak mengeksekusi siapa pun. Jika belum ada pemenang setelah
@@ -78,6 +77,12 @@
         <p>{{ resultExplanation }}</p>
         @if (state.result; as result) {
           <div class="result-stats">
+            <span
+              ><b
+                >{{ result.civilians_voters ?? result.civilians_alive - result.civilians_hostage }}</b
+              >
+              warga masih punya suara</span
+            >
             <span
               ><b>{{ result.civilians_alive }}</b> warga hidup</span
             >
@@ -134,7 +139,7 @@
                 <span class="avatar">{{ player.name.slice(0, 1) }}</span>
                 <b>{{ player.name }}</b>
                 <!-- prettier-ignore -->
-                <small>{{ player.bot ? 'BOT' : 'PEMAIN' }}{{ player.name === state.me.name ? ' / YOU' : '' }}</small>
+                <small>{{ state.winner && player.bot ? 'BOT' : 'PEMAIN' }}{{ player.name === state.me.name ? ' / YOU' : '' }}</small>
                 <small
                   >{{ !player.alive ? 'DIEKSEKUSI' : state.winner && player.hostage ? 'HIDUP / HOSTAGE' : state.winner ? 'HIDUP / BEBAS' : 'DI MEJA' }}</small
                 >

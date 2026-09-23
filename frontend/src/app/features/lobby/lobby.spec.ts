@@ -36,6 +36,29 @@ describe('Lobby', () => {
     expect(component).toBeTruthy();
   });
 
+  it('creates a room with selected capacity and round limit', () => {
+    const request = vi.spyOn(TestBed.inject(RoomService), 'request').mockReturnValue(
+      of({
+        code: 'ABC123',
+        owner: 'alice',
+        members: ['alice'],
+        bots: [],
+        bot_enabled: false,
+        phase: 'lobby',
+        capacity: 10,
+        max_rounds: 12,
+      }),
+    );
+    component.capacity = 10;
+    component.maxRounds = 12;
+    component.createRoom();
+    expect(request).toHaveBeenCalledWith('POST', '', { capacity: 10, max_rounds: 12 });
+    fixture.componentRef.changeDetectorRef.markForCheck();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('10 PEMAIN');
+    expect(fixture.nativeElement.textContent).toContain('12 ronde');
+  });
+
   it('keeps typed room code and submits the normalized code', () => {
     const input = fixture.nativeElement.querySelector('#room-code') as HTMLInputElement;
     input.value = 'abc123';

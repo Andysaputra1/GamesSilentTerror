@@ -47,6 +47,7 @@
           <button data-menu="ai" aria-current="page"><span>01</span> Konfigurasi AI</button
           ><button data-menu="checker"><span>02</span> Checker</button
           ><button data-menu="history"><span>03</span> Riwayat chat</button>
+          <button data-menu="users"><span>04</span> Manajemen user</button>
         </nav>
         <section id="menu-ai" class="card">
           <div class="section-head">
@@ -200,6 +201,122 @@
           </div>
           <p id="history-empty" hidden>Belum ada percakapan untuk filter ini.</p>
           <button id="more-history" class="secondary" hidden>Muat berikutnya</button>
+        </section>
+        <section id="menu-users" class="card" hidden>
+          <details>
+            <summary>+ Tambah user</summary>
+            <form id="create-user-form">
+              <label
+                >Username<input
+                  id="create-username"
+                  required
+                  minlength="3"
+                  maxlength="40"
+                  pattern="[A-Za-z0-9_]+"
+                  autocomplete="off"
+              /></label>
+              <label
+                >Nama lengkap<input
+                  id="create-display-name"
+                  required
+                  maxlength="100"
+                  autocomplete="off"
+              /></label>
+              <label
+                >Password<input
+                  id="create-password"
+                  type="password"
+                  required
+                  minlength="10"
+                  maxlength="128"
+                  autocomplete="new-password"
+              /></label>
+              <label
+                >Konfirmasi password<input
+                  id="create-password-confirmation"
+                  type="password"
+                  required
+                  minlength="10"
+                  maxlength="128"
+                  autocomplete="new-password"
+              /></label>
+              <p>
+                Akun baru menggunakan login username/password. Akun Google dibuat lewat Login dengan
+                Google.
+              </p>
+              <button id="create-user-button">Tambah user</button>
+            </form>
+          </details>
+          <div class="section-head">
+            <div>
+              <span class="eyebrow">PLAYER ACCOUNTS</span>
+              <h2>Manajemen user</h2>
+              <p>
+                Kelola password dan akun pemain. Riwayat chat serta analisis tetap disimpan ketika
+                akun dihapus.
+              </p>
+            </div>
+          </div>
+          <form id="user-search-form" class="toolbar">
+            <label
+              >Cari username atau nama<input id="user-search" maxlength="100" type="search"
+            /></label>
+            <button class="secondary">Cari / refresh</button>
+          </form>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Username</th>
+                  <th>Nama tampilan</th>
+                  <th>Login</th>
+                  <th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="user-rows"></tbody>
+            </table>
+          </div>
+          <p id="users-empty" hidden>Belum ada user untuk pencarian ini.</p>
+          <button id="more-users" class="secondary" hidden>Muat berikutnya</button>
+          <section id="user-editor" class="info" hidden aria-labelledby="user-editor-title">
+            <h3 id="user-editor-title"></h3>
+            <form id="user-password-form" hidden>
+              <p>User harus login ulang setelah password diganti.</p>
+              <label
+                >Password baru<input
+                  id="user-new-password"
+                  type="password"
+                  autocomplete="new-password"
+                  minlength="10"
+                  maxlength="128"
+                  required
+              /></label>
+              <label
+                >Ulangi password baru<input
+                  id="user-password-confirmation"
+                  type="password"
+                  autocomplete="new-password"
+                  minlength="10"
+                  maxlength="128"
+                  required
+              /></label>
+              <button id="save-user-password">Simpan password</button>
+            </form>
+            <form id="user-delete-form" hidden>
+              <p>
+                Akun dan semua sesi login akan dihapus permanen. Riwayat chat serta analisis game
+                tetap disimpan. User harus keluar dari ruangan terlebih dahulu.
+              </p>
+              <label
+                >Ketik username akun ini untuk mengonfirmasi<input
+                  id="user-delete-confirmation"
+                  autocomplete="off"
+                  required
+              /></label>
+              <button id="delete-user">Hapus akun</button>
+            </form>
+            <button id="cancel-user-edit" type="button" class="secondary">Batal</button>
+          </section>
         </section>
       </div>
       <p id="notice" role="status" aria-live="polite"></p>

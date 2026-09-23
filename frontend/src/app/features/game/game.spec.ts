@@ -193,11 +193,12 @@ describe('Game', () => {
     expect(component.privateStatus).toContain('sampai pertandingan berakhir');
     component.game.me.hostage = false;
     component.game.me.gagged = true;
-    expect(component.privateStatus).toContain('Aksi malam tetap boleh');
+    expect(component.privateStatus).toContain('Voting dan aksi malam tetap boleh');
     fixture.componentRef.changeDetectorRef.markForCheck();
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('.players').textContent).not.toContain('HOSTAGE');
     expect(fixture.nativeElement.querySelector('.players').textContent).not.toContain('GAG');
+    expect(fixture.nativeElement.querySelector('.players').textContent).not.toContain('BOT');
   });
 
   it('shows a loss for a hostage when Hitman wins and a neutral result for a draw', () => {
