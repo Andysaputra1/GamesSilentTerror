@@ -64,8 +64,15 @@ function keySourceView() {
         ? "Key sendiri sudah tersimpan. Kosongkan kolom untuk tetap memakainya."
         : "Isi API key OpenRouter milikmu di bawah.";
 }
-async function loadConfig() {
-  const data = await request("/api/panel/config");
+function showConfig(data) {
+  const source = data.provider === "docker"
+    ? "LLM lokal (Ollama)"
+    : data.key_source === "custom" ? "OpenRouter - API key sendiri" : "OpenRouter - API default server";
+  $("active-config").textContent = `Saat ini menggunakan: ${source}. Model: ${data.model}.` +
+    (data.provider === "docker" ? ` Tujuan: ${data.endpoint}` :
+      data.api_configured ? " Key tersedia; koneksi belum diperiksa." : " Key belum tersedia; AI belum siap digunakan.");
+  $("config-draft").textContent = "Konfigurasi ini berlaku untuk pesan AI berikutnya.";
+  $("ai-status").textContent = "Belum diperiksa untuk konfigurasi ini.";
   $("provider").value = data.provider;
   $("key-source").value = data.key_source;
   keyAvailability = {
@@ -81,6 +88,14 @@ async function loadConfig() {
     : "Sumber key yang disimpan belum tersedia. Pilih sumber lalu simpan.";
   providerView();
 }
+async function loadConfig() {
+  showConfig(await request("/api/panel/config"));
+}
+function markConfigDraft() {
+  $("config-draft").textContent = "Ada perubahan formulir yang belum disimpan. Game masih memakai konfigurasi di atas.";
+}
+$("config-form").addEventListener("input", markConfigDraft);
+$("config-form").addEventListener("change", markConfigDraft);
 async function loadRooms() {
   const rooms = [];
   let after = 0;
@@ -268,35 +283,41 @@ $("key-source").onchange = () => {
   keySourceView();
 };
 $("config-form").onsubmit = handle(async () => {
-  await request(
-    "/api/panel/config",
-    {
-      provider: $("provider").value,
-      endpoint: $("provider").value === "docker" ? $("endpoint").value : "",
-      key_source: $("key-source").value,
-      api_key:
-        $("provider").value === "api" && $("key-source").value === "custom"
-          ? $("api-key").value.trim() || null
-          : null,
-    },
-    "PUT",
-  );
-  $("api-key").value = "";
-  await loadConfig();
-  $("ai-status").textContent =
-    "Konfigurasi berubah. Jalankan pengecekan kembali.";
-  notice(
-    "Konfigurasi tersimpan. Berlaku untuk pesan AI berikutnya, termasuk setelah restart.",
-  );
+  $("save-config").disabled = true;
+  $("check-ai").disabled = true;
+  try {
+    const data = await request(
+      "/api/panel/config",
+      {
+        provider: $("provider").value,
+        endpoint: $("provider").value === "docker" ? $("endpoint").value : "",
+        key_source: $("key-source").value,
+        api_key: $("provider").value === "api" && $("key-source").value === "custom"
+          ? $("api-key").value.trim() || null : null,
+      },
+      "PUT",
+    );
+    $("api-key").value = "";
+    showConfig(data);
+    notice("Konfigurasi tersimpan. Sumber AI yang sedang digunakan terlihat di bawah formulir.");
+  } finally {
+    $("save-config").disabled = false;
+    $("check-ai").disabled = false;
+  }
 });
 $("check-ai").onclick = handle(async () => {
   $("check-ai").disabled = true;
-  $("ai-status").textContent = "Mengirim prompt uji...";
+  $("save-config").disabled = true;
+  $("ai-status").textContent = "Memeriksa konfigurasi yang tersimpan di server...";
   try {
     const data = await request("/api/panel/check-ai", null, "POST");
     $("ai-status").textContent =
       (data.active ? "Aktif: " : "Tidak aktif: ") + data.message;
+  } catch (error) {
+    $("ai-status").textContent = "Pemeriksaan gagal: " + error.message;
+    throw error;
   } finally {
+    $("save-config").disabled = false;
     $("check-ai").disabled = false;
   }
 });

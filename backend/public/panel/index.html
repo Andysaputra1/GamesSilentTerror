@@ -117,12 +117,17 @@
                 >
               </p>
             </div>
-            <button>Simpan konfigurasi</button>
+            <button id="save-config">Simpan konfigurasi</button>
           </form>
+          <div class="info" role="status" aria-live="polite">
+            <strong>Konfigurasi yang sedang digunakan</strong>
+            <p id="active-config">Memuat konfigurasi server...</p>
+            <small id="config-draft"></small>
+          </div>
           <div class="health">
             <div>
               <h3>Status koneksi AI</h3>
-              <p id="ai-status">Belum diperiksa.</p>
+              <p id="ai-status" role="status" aria-live="polite">Belum diperiksa.</p>
               <small
                 >Pengecekan mengirim satu prompt pendek. Mode API menggunakan
                 saldo OpenRouter.</small
