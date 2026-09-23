@@ -5,7 +5,7 @@ database, dan AI tetap dijalankan terpisah.
 
 ## Hubungkan sekali di Vercel
 
-1. Buka https://vercel.com/new dan import `Andysaputra1/GamesShadowHeist`.
+1. Buka https://vercel.com/new dan import `Andysaputra1/GamesSilentTerror`.
 2. Pilih **Root Directory: frontend** dan **Framework Preset: Other**.
 3. Gunakan Node.js **22.x**. Konfigurasi `vercel.json` menyediakan:
    - Install Command: `npm ci`
