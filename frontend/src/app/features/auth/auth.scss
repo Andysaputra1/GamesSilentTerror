@@ -562,9 +562,40 @@
   }
 }
 
-/* Provider button tetap mengikuti branding resmi Google; panel boleh tumbuh. */
-.google-access { margin-top: 1em; min-width: 0; }
-.google-prepare { width: 100%; padding: .65em; border: 1px solid #8b5a2b; border-radius: .4em; background: #fff7e5; color: #422719; cursor: pointer; }
-.google-prepare:focus-visible { outline: 2px solid #8c3f2b; outline-offset: 3px; }
+/* Tombol pembuka Google memakai kayu dan tipografi yang sama dengan Sign In. */
+.google-access {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .5em;
+  margin-top: .65em;
+  min-width: 0;
+}
+
+.storybook-button--google {
+  width: 100%;
+  min-height: 44px;
+  aspect-ratio: 1293 / 358;
+  padding: .4em 1em;
+  background-image: url('/assets/buttons/btn-greenwood.png');
+  font-size: .85em;
+  line-height: 1.2;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+  white-space: normal;
+
+  &:disabled { font-size: .85em; letter-spacing: .02em; }
+}
+
+/* Widget resmi tetap terlihat dan dipusatkan setelah Google siap. */
+.google-provider {
+  display: flex;
+  justify-content: center;
+  max-width: 100%;
+
+  &:empty { display: none; }
+}
+
+.google-access .form-alert { align-self: stretch; }
 .unavailable-note { font-size: .85em; color: #7a5230; }
 .login-journal { min-height: 36em; }

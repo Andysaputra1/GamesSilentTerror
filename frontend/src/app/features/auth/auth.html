@@ -84,9 +84,11 @@
         </form>
         <section class="google-access" aria-label="Google sign in">
           @if (!googleReady) {
-            <button type="button" class="google-prepare" (click)="prepareGoogle()" [disabled]="isSubmitting || googleLoading">{{ googleLoading ? 'Menyiapkan Google...' : 'Login dengan Google' }}</button>
+            <button type="button" class="storybook-button storybook-button--google" (click)="prepareGoogle()" [disabled]="isSubmitting || googleLoading" [attr.aria-busy]="googleLoading">
+              {{ googleLoading ? 'Menyiapkan Google...' : 'Login dengan Google' }}
+            </button>
           }
-          <div #googleButton></div>
+          <div #googleButton class="google-provider"></div>
           @if (googleError) { <p class="form-alert" role="alert">{{ googleError }}</p> }
         </section>
       </div>
