@@ -26,7 +26,7 @@ class ProviderTests(unittest.IsolatedAsyncioTestCase):
 
     # TES ASYNC: mode API memakai klien OpenAI mock dan tidak memanggil Ollama.
     async def test_api_never_calls_ollama(self):
-        with patch("services.analysis_service.settings", Settings(_env_file=None, ai_provider="api", OPENAI_API_KEY="test")), \
+        with patch("services.analysis_service.settings", Settings(_env_file=None, ai_provider="api", api_backend="openai", OPENAI_API_KEY="test")), \
              patch("services.analysis_service.generate_reply", AsyncMock()) as local, \
              patch("services.analysis_service.AsyncOpenAI") as cloud:
             cloud.return_value.responses.create = AsyncMock(return_value=type("Response", (), {"output_text": "API reply"})())

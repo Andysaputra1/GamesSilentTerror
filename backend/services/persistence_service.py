@@ -56,16 +56,16 @@ class PersistenceService:
     # SERVICE CHAT SOCKET: simpan pesan, skor, status pemain, dan respons LLM jika tersedia.
     def record_player_message(self, *, username: str, message: str, intent: str | None,
                               aggressiveness: int, suspicion_score: float, status: str,
-                              llm_response: str | None = None) -> int:
+                              llm_response: str | None = None, context: dict | None = None) -> int:
         return self._record(
             username=username, message=message, intent=intent, aggressiveness=aggressiveness,
             suspicion_score=suspicion_score, status=status, llm_response=llm_response,
-            suspicion_status=status_for_score(suspicion_score),
+            suspicion_status=status_for_score(suspicion_score), context=context,
         )
 
     # HELPER PENYIMPANAN: gabungkan pembaruan pemain, pesan, dan analisis dalam satu transaksi atomik.
     def _record(self, *, username, message, intent, aggressiveness, suspicion_score,
-                status, llm_response, suspicion_status):
+                status, llm_response, suspicion_status, context=None):
         # CALLBACK TRANSAKSI: perbarui pemain, buat pesan, simpan analisis jika ada intent serta respons, lalu kembalikan ID pesan.
         def operation(database):
             room_id, player_id = self._player(database, username)
@@ -76,12 +76,47 @@ class PersistenceService:
                 database, room_id=room_id, player_id=player_id, username=username,
                 message=message, intent=intent, suspicion_score=suspicion_score,
             )
+            if context is not None:
+                queries.set_message_context(database, message_id, sender_kind="human", context=context)
             if intent is not None and llm_response is not None:
                 queries.insert_analysis(
                     database, message_id=message_id, intent=intent, aggressiveness=aggressiveness,
                     suspicion_score=suspicion_score, suspicion_status=suspicion_status,
                     llm_response=llm_response,
                 )
+            return message_id
+        return self._run(operation)
+
+    def archive_new_room(self, username):
+        from sqlalchemy import text
+        def operation(db):
+            inserted = db.execute(text("INSERT IGNORE INTO game_sessions(room_code,phase) VALUES(:code,'lobby')"), {"code": self.room_code}).rowcount
+            if not inserted:
+                return False
+            self._player(db, username)
+            return True
+        return self._run(operation)
+
+    def record_trace(self, trace):
+        import json
+        from sqlalchemy import text
+        self._run(lambda db: db.execute(text("""
+            INSERT INTO checker_traces(id,room_code,trace) VALUES(:id,:room,:trace)
+            ON DUPLICATE KEY UPDATE trace=:trace
+        """), {"id": trace["id"], "room": self.room_code, "trace": json.dumps(trace)}))
+
+    def record_bot_message(self, *, username, message, context, reply_to_id,
+                           intent, aggressiveness, suspicion_score):
+        def operation(db):
+            room_id = queries.ensure_room(db, self.room_code)
+            message_id = queries.insert_message(db, room_id=room_id, player_id=None,
+                username=username, message=message, intent=None, suspicion_score=0)
+            queries.set_message_context(db, message_id, sender_kind="bot",
+                context=context, reply_to_id=reply_to_id)
+            if intent is not None:
+                queries.insert_analysis(db, message_id=reply_to_id, intent=intent,
+                    aggressiveness=aggressiveness, suspicion_score=suspicion_score,
+                    suspicion_status=status_for_score(suspicion_score), llm_response=message)
             return message_id
         return self._run(operation)
 

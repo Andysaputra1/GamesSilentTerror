@@ -27,7 +27,19 @@ class Settings(MySQLSettings):
 
     app_name: str = "Shadow Heist Python Backend"
     app_environment: str = "development"
+    panel_encryption_key: SecretStr | None = None
+    panel_username: str = "administrator"
+    panel_password_hash: SecretStr | None = None
+    openrouter_api_key: SecretStr | None = None
+    openrouter_default: SecretStr | None = Field(default=None, validation_alias=AliasChoices("openrouter_default", "OPENROUTER_DEFAULT"))
+    openrouter_key_source: Literal["default", "custom"] = "default"
+    openrouter_custom_configured: bool = False
+    openrouter_model: str = "qwen/qwen3-14b"
+    ollama_tunnel_token: SecretStr | None = None
+    api_backend: Literal["openai", "openrouter"] = "openrouter"
+    history_admin_usernames: str = ""
     admin_usernames: str = "user1"
+    google_client_id: str = ""
     cors_origins: str = "http://localhost:4200,http://127.0.0.1:4200"
     ai_provider: Literal["api", "docker"] = "api"
     ollama_base_url: str = "http://localhost:11435"
@@ -64,6 +76,11 @@ class Settings(MySQLSettings):
     auth_session_hours: int = Field(default=24, ge=1, le=24 * 30)
 
     default_room_code: str = "local-lobby"
+
+    @property
+    def openrouter_api_key_value(self) -> str | None:
+        key = (self.openrouter_default or self.openrouter_api_key) if self.openrouter_key_source == "default" else self.openrouter_api_key
+        return key.get_secret_value().strip() or None if key else None
 
     @property
     # PROPERTY: pecah konfigurasi CORS menjadi daftar origin browser yang diizinkan.

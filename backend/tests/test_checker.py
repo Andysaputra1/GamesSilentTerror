@@ -21,18 +21,11 @@ class CheckerTests(unittest.TestCase):
         snapshot[0]['message'] = 'changed'
         self.assertEqual(checker.list('ABC123')[0]['message'], '104')
 
-    # TES API DEBUG: pastikan checker publik di development, tetapi format kode ruangan tetap divalidasi.
-    def test_dev_endpoint_requires_no_login_but_validates_code(self):
+    def test_old_public_checker_is_retired(self):
         app = FastAPI()
         app.include_router(router)
-        checker = CheckerService()
-        checker.begin('ABC123', 'alice', 'hello')
-        with patch('controller.api.rooms.checker_service', checker), TestClient(app) as client:
-            response = client.get('/api/rooms/abc123/checker')
-            self.assertEqual(response.status_code, 200)
-            self.assertEqual(response.json()['traces'][0]['message'], 'hello')
-            self.assertEqual(client.get('/api/rooms/FFFFFF/checker').json()['traces'], [])
-            self.assertEqual(client.get('/api/rooms/invalid/checker').status_code, 400)
+        with TestClient(app) as client:
+            self.assertEqual(client.get('/api/rooms/ABC123/checker').status_code, 410)
 
 
 class PromptTraceTests(unittest.IsolatedAsyncioTestCase):

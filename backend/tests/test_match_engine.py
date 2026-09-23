@@ -204,9 +204,9 @@ class RoomGameTests(unittest.TestCase):
         with patch('controller.api.rooms.room_service', self.rooms), TestClient(app) as client:
             base = '/api/rooms/' + self.room.code
             self.assertEqual(client.post(base + '/start', json={'quick': True}, headers={'x-user': 'outsider'}).status_code, 400)
-            self.assertEqual(client.get(base + '/checker').status_code, 200)
+            self.assertEqual(client.get(base + '/checker').status_code, 410)
             self.assertEqual(client.post(base + '/start', json={'quick': True}).status_code, 200)
-            self.assertEqual(client.get(base + '/checker').status_code, 403)
+            self.assertEqual(client.get(base + '/checker').status_code, 410)
             response = client.get(base + '/game')
             self.assertEqual(response.status_code, 200)
             self.assertEqual(len(response.json()['game']['players']), 4)
@@ -214,7 +214,7 @@ class RoomGameTests(unittest.TestCase):
             self.assertEqual(client.post(base + '/play', json={'ability': 'kill'}).status_code, 422)
             self.room.match.players[next(n for n, p in self.room.match.players.items() if p.role == 'hitman')].alive = False
             self.room.match.check_winner()
-            self.assertEqual(client.get(base + '/checker').status_code, 200)
+            self.assertEqual(client.get(base + '/checker').status_code, 410)
 
 
 class SocketGameTests(unittest.IsolatedAsyncioTestCase):

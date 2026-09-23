@@ -14,3 +14,6 @@ openai
 httpx
 joblib 
 python-socketio
+google-auth[requests]>=2.40,<3
+email-validator>=2,<3
+cryptography>=46,<51

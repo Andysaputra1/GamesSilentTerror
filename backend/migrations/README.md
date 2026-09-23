@@ -21,3 +21,5 @@ Panduan setup database baru tersedia di [README utama](../../README.md).
 ada. Hanya untuk development lokal. Database pengembang telah diberi V3 melalui
 SQL; database teman yang sudah berisi data perlu menerapkannya sendiri tanpa
 menghapus volume.
+
+`V4__account_identities.sql` menambah tabel email/Google subject, dengan constraint unik dan foreign key akun. Akun demo lama tetap bisa login username tanpa identitas tambahan. Jalankan pada database lama sebelum memakai registrasi atau login email/Google; tabel/akun lama tidak dihapus.

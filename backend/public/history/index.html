@@ -1,0 +1,9 @@
+<!doctype html><html lang="id"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Riwayat Percakapan</title>
+<h1>Riwayat Percakapan</h1><p>Arsip chat pemain dan bot. Akses hanya untuk akun admin riwayat.</p>
+<form id="login"><label>Username <input id="username" autocomplete="username" required></label>
+<label>Password <input id="password" type="password" autocomplete="current-password" required></label><button>Login</button></form>
+<section id="viewer" hidden><button id="logout">Keluar</button><form id="filters">
+<label>Kode room <input id="room" maxlength="36"></label><label>ID pertandingan <input id="match" maxlength="36"></label><button>Tampilkan dari awal</button></form>
+<p>Kolom legacy berarti metadata pesan lama belum tersedia. ID menentukan urutan penyimpanan.</p>
+<table><thead><tr><th>ID / waktu database</th><th>Room / pertandingan / ronde / fase</th><th>Pengirim</th><th>Pesan</th></tr></thead><tbody id="messages"></tbody></table>
+<button id="more" hidden>Muat berikutnya</button></section><p id="status" role="status"></p><script src="/history/app.js" defer></script></html>

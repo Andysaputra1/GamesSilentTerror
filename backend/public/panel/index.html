@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Silent Terror &middot; Panel</title>
+    <link rel="stylesheet" href="/panel/assets/panel.css" />
+    <script src="/panel/assets/panel.js" defer></script>
+  </head>
+  <body>
+    <header>
+      <a href="/panel" class="brand"
+        ><span class="mark">ST</span
+        ><span>SILENT TERROR<small>ADMINISTRATION</small></span></a
+      ><button id="logout" class="secondary" hidden>Keluar</button>
+    </header>
+    <main>
+      <section id="login-view" class="login-card">
+        <span class="eyebrow">CONTROL ROOM</span>
+        <h1>Selamat datang<br />kembali.</h1>
+        <p>
+          Masuk untuk mengelola AI, memantau checker, dan membaca arsip
+          percakapan.
+        </p>
+        <form id="login-form">
+          <label
+            >Username<input
+              id="username"
+              autocomplete="username"
+              placeholder="administrator"
+              required /></label
+          ><label
+            >Password<input
+              id="password"
+              type="password"
+              autocomplete="current-password"
+              required /></label
+          ><button id="login-button">Masuk panel <span>&rarr;</span></button>
+        </form>
+        <small>Akses khusus administrator.</small>
+      </section>
+      <div id="workspace" hidden>
+        <div class="page-title">
+          <div>
+            <span class="eyebrow">CONTROL ROOM</span>
+            <h1>Panel administrator</h1>
+          </div>
+          <span class="badge">Silent Terror</span>
+        </div>
+        <nav aria-label="Menu panel">
+          <button data-menu="ai" aria-current="page">
+            <span>01</span> Konfigurasi AI</button
+          ><button data-menu="checker"><span>02</span> Checker</button
+          ><button data-menu="history"><span>03</span> Riwayat chat</button>
+        </nav>
+        <section id="menu-ai" class="card">
+          <div class="section-head">
+            <div>
+              <span class="eyebrow">MODEL & CONNECTION</span>
+              <h2>Konfigurasi AI</h2>
+              <p>Pilih tempat Qwen3 14B menghasilkan balasan game.</p>
+            </div>
+            <span class="badge">Qwen3 &middot; 14B</span>
+          </div>
+          <form id="config-form">
+            <label
+              >Provider<select id="provider">
+                <option value="api">API &middot; OpenRouter</option>
+                <option value="docker">
+                  LLM lokal &middot; Ollama melalui tunnel
+                </option>
+              </select></label
+            >
+            <div id="local-settings" hidden>
+              <label
+                >URL tunnel Ollama<input
+                  id="endpoint"
+                  type="url"
+                  placeholder="https://ollama.domain-kamu.com"
+              /></label>
+              <p class="hint">
+                Masukkan alamat dasar tunnel, tanpa /api/chat. Model lokal:
+                qwen3:14b.
+              </p>
+            </div>
+            <div id="api-settings">
+              <label
+                >Sumber API key
+                <select id="key-source">
+                  <option value="default">Default dari server</option>
+                  <option value="custom">API key sendiri</option>
+                </select>
+              </label>
+              <p id="source-status" class="hint"></p>
+              <div id="custom-key-settings" hidden>
+                <label
+                  >API key OpenRouter
+                  <input
+                    id="api-key"
+                    type="password"
+                    autocomplete="new-password"
+                    maxlength="1024"
+                    placeholder="Tempel API key OpenRouter"
+                    spellcheck="false"
+                  />
+                </label>
+                <p class="hint">
+                  Kosongkan untuk tetap memakai key yang tersimpan. Isi key baru
+                  untuk menggantinya. Key tidak ditampilkan kembali setelah
+                  disimpan.
+                </p>
+              </div>
+              <p class="info">
+                Model otomatis: <strong>qwen/qwen3-14b</strong><br /><span
+                  id="key-status"
+                  >Memeriksa konfigurasi key...</span
+                >
+              </p>
+            </div>
+            <button>Simpan konfigurasi</button>
+          </form>
+          <div class="health">
+            <div>
+              <h3>Status koneksi AI</h3>
+              <p id="ai-status">Belum diperiksa.</p>
+              <small
+                >Pengecekan mengirim satu prompt pendek. Mode API menggunakan
+                saldo OpenRouter.</small
+              >
+            </div>
+            <button id="check-ai" class="secondary">Cek AI aktif</button>
+          </div>
+        </section>
+        <section id="menu-checker" class="card" hidden>
+          <div class="section-head">
+            <div>
+              <span class="eyebrow">LIVE & ARCHIVED</span>
+              <h2>Checker per room</h2>
+              <p>
+                Lihat pesan &rarr; SVM &rarr; fuzzy &rarr; prompt &rarr; respons
+                AI.
+              </p>
+            </div>
+            <button id="refresh-checker" class="secondary">Refresh</button>
+          </div>
+          <div class="toolbar">
+            <label
+              >Ruangan<select id="checker-room">
+                <option value="">Pilih ruangan</option>
+              </select></label
+            ><label class="check"
+              ><input id="auto-checker" type="checkbox" checked /> Update
+              otomatis / 5 detik</label
+            >
+          </div>
+          <p class="hint">
+            Prompt yang dikirim aplikasi, bukan penalaran internal model. Trace
+            selesai tersimpan; aktivitas fungsi adalah buffer live.
+          </p>
+          <div class="split">
+            <div>
+              <div id="traces" class="trace-list"></div>
+              <button id="older-traces" class="secondary" hidden>
+                Jejak lebih lama
+              </button>
+            </div>
+            <div>
+              <h3>Detail pipeline</h3>
+              <pre id="trace-detail">
+Pilih room dan pesan untuk melihat detail.</pre>
+            </div>
+          </div>
+          <details>
+            <summary>Aktivitas fungsi di room</summary>
+            <pre id="events">Belum ada aktivitas.</pre>
+          </details>
+        </section>
+        <section id="menu-history" class="card" hidden>
+          <div class="section-head">
+            <div>
+              <span class="eyebrow">CONVERSATION ARCHIVE</span>
+              <h2>Riwayat percakapan</h2>
+              <p>Pesan pemain dan bot dari semua room yang tercatat.</p>
+            </div>
+            <button id="download">&darr; Download semua chat</button>
+          </div>
+          <form id="history-filter" class="toolbar">
+            <label>Dari tanggal<input id="date-from" type="date" /></label
+            ><label>Sampai tanggal<input id="date-to" type="date" /></label
+            ><label
+              >Ruangan<select id="history-room">
+                <option value="">Semua ruangan</option>
+              </select></label
+            ><button class="secondary">Terapkan filter</button>
+          </form>
+          <p class="hint">
+            Tanggal opsional, zona waktu WIB. Download mencakup semua room
+            dengan filter tanggal di atas; kolom CSV: chat_id, isi_chat.
+          </p>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID / waktu WIB</th>
+                  <th>Room / ronde</th>
+                  <th>Pengirim</th>
+                  <th>Isi chat</th>
+                </tr>
+              </thead>
+              <tbody id="history-rows"></tbody>
+            </table>
+          </div>
+          <p id="history-empty" hidden>
+            Belum ada percakapan untuk filter ini.
+          </p>
+          <button id="more-history" class="secondary" hidden>
+            Muat berikutnya
+          </button>
+        </section>
+      </div>
+      <p id="notice" role="status" aria-live="polite"></p>
+    </main>
+    <footer>SILENT TERROR <span>Administrator workspace</span></footer>
+  </body>
+</html>

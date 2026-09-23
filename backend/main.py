@@ -38,6 +38,12 @@ async def lifespan(_: FastAPI):
     analysis_service.load_model()
     if database_is_ready():
         logger.info("Koneksi MySQL siap.")
+        from services.ai_runtime_service import load_panel_configuration
+        from services.persistence_service import PersistenceError
+        try:
+            load_panel_configuration()
+        except PersistenceError:
+            logger.error("Konfigurasi panel belum tersedia; jalankan migrasi V6.")
     else:
         logger.error("Koneksi awal MySQL gagal.")
     # Timer server tidak bergantung pada tab pemain atau kecepatan respons LLM.

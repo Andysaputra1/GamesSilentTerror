@@ -74,3 +74,12 @@ def insert_analysis(database: Session, *, message_id: int, intent: str, aggressi
 def set_phase(database: Session, room_id: int, phase: str):
     return database.execute(text("UPDATE game_sessions SET phase = :phase WHERE id = :room_id"),
                             {"room_id": room_id, "phase": phase}).rowcount
+
+
+def set_message_context(database, message_id, *, sender_kind, context, reply_to_id=None):
+    database.execute(text("""
+        UPDATE chat_messages SET sender_kind=:sender_kind, match_id=:match_id,
+            round_number=:round_number, phase=:phase, reply_to_id=:reply_to_id
+        WHERE id=:id
+    """), dict(id=message_id, sender_kind=sender_kind, match_id=context.get("match_id"),
+        round_number=context.get("round_number"), phase=context.get("phase"), reply_to_id=reply_to_id))

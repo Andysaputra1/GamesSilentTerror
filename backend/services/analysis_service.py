@@ -15,6 +15,7 @@ from openai import APIConnectionError, APIError, APITimeoutError, AsyncOpenAI, A
 
 from config.settings import settings
 from module.ollama_client import generate_reply
+from module.openrouter_client import generate_reply as openrouter_reply
 from schemas.chat import AnalysisResponse, AnalyzeChatRequest, FuzzyResult
 from services.fuzzy_service import calculate_suspicion, status_for_score
 
@@ -212,7 +213,7 @@ SVM, fuzzy logic, AI, atau status role rahasia.
         # Simpan prompt yang benar-benar digunakan, bukan rekonstruksi setelah respons.
         if trace is not None:
             trace.update(prompt=prompt, provider=selected.ai_provider,
-                         model=selected.ollama_model if selected.ai_provider == "docker" else selected.openai_model,
+                         model=selected.ollama_model if selected.ai_provider == "docker" else (selected.openrouter_model if selected.api_backend == "openrouter" else selected.openai_model),
                          stage="llm_pending")
         # docker -> Ollama; api -> OpenAI. Tidak ada fallback otomatis antarprovider.
         if trace is not None:
@@ -227,6 +228,15 @@ SVM, fuzzy logic, AI, atau status role rahasia.
                     trace["llm_error"] = type(error).__name__
                 logger.warning("Ollama request failed (%s).", type(error).__name__)
                 return "NOX belum bisa merespons. Periksa server Ollama dan model yang dipilih."
+
+        if selected.api_backend == "openrouter":
+            try:
+                return await openrouter_reply(prompt, config=selected)
+            except (httpx.HTTPError, ValueError, KeyError, IndexError, TypeError) as error:
+                if trace is not None:
+                    trace["llm_error"] = type(error).__name__
+                logger.warning("OpenRouter request failed (%s).", type(error).__name__)
+                return "AI Host sedang tidak dapat dihubungi."
 
         api_key = selected.openai_api_key_value
         if api_key is None:

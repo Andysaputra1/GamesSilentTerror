@@ -2,7 +2,7 @@
 
 from collections.abc import Generator
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, event
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -17,6 +17,12 @@ engine = create_engine(
     pool_size=settings.database_pool_size,
     max_overflow=settings.database_max_overflow,
 )
+if engine.dialect.name == "mysql":
+    @event.listens_for(engine, "connect")
+    def use_utc(dbapi_connection, _):
+        with dbapi_connection.cursor() as cursor:
+            cursor.execute("SET time_zone = '+00:00'")
+
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
 
 

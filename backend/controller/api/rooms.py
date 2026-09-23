@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 from typing import Literal
 from controller.middleware.auth import require_authenticated_user
 from services.room_service import room_service
-from services.checker_service import checker_service
+from services.persistence_service import PersistenceService, PersistenceError
 
 router = APIRouter(prefix="/api/rooms", tags=["rooms"])
 
@@ -92,7 +92,19 @@ def result(operation):
 @router.post("")
 # CONTROLLER: buat ruangan untuk pengguna yang sudah login dan kembalikan kode serta roster.
 def create(user=Depends(require_authenticated_user)):
-    return result(lambda: room_service.create(user.username))
+    def create_archived():
+        with room_service.lock:
+            for _ in range(10):
+                room = room_service.create(user.username)
+                try:
+                    if PersistenceService(room.code).archive_new_room(user.username):
+                        return room
+                except PersistenceError as error:
+                    room_service.rooms.pop(room.code, None)
+                    raise HTTPException(503, "Ruangan gagal disimpan. Coba lagi.") from error
+                room_service.rooms.pop(room.code, None)
+            raise HTTPException(503, "Kode ruangan belum tersedia. Coba lagi.")
+    return result(create_archived)
 
 
 @router.post("/join")
@@ -113,16 +125,6 @@ def bot(code: str, body: BotOption, user=Depends(require_authenticated_user)):
     return result(lambda: room_service.set_bot(code, user.username, body.enabled))
 
 
-@router.get("/{code}/checker")
-# CONTROLLER DEBUG PUBLIK: validasi format kode lalu baca jejak checker tanpa login, khusus development lokal.
+@router.get("/{code}/checker", include_in_schema=False)
 def checker(code: str):
-    # Sengaja publik untuk development lokal atas permintaan pengguna.
-    # Pasang autentikasi/otorisasi sebelum deployment; prompt membocorkan role bot.
-    code = code.strip().upper()
-    if len(code) != 6 or any(char not in "0123456789ABCDEF" for char in code):
-        raise HTTPException(status_code=400, detail="Kode ruangan harus 6 karakter heksadesimal.")
-    with room_service.lock:
-        room = room_service.rooms.get(code)
-        if room and room.match and not room.match.winner:
-            raise HTTPException(status_code=403, detail="Checker dikunci selama pertandingan untuk melindungi role dan Silent Terror.")
-    return {"room_code": code, "traces": checker_service.list(code)}
+    raise HTTPException(status_code=410, detail="Checker dipindahkan ke /panel dan memerlukan login administrator.")

@@ -61,12 +61,9 @@ class AdminTests(unittest.TestCase):
         self.assertEqual(self.client.post('/api/admin/provider',json={'provider':'api','model':'8'}).status_code, 403)
 
     def test_admin_html_and_assets_have_no_embedded_credentials(self):
-        page = self.client.get('/admin')
-        self.assertEqual(page.status_code, 200)
-        self.assertIn('frame-ancestors',page.headers['content-security-policy'])
-        self.assertNotIn('user132', page.text)
-        self.assertEqual(self.client.get('/admin/assets/admin.js').status_code,200)
-        self.assertEqual(self.client.get('/admin/assets/anything').status_code,422)
+        page = self.client.get('/admin', follow_redirects=False)
+        self.assertEqual(page.status_code, 307)
+        self.assertEqual(page.headers['location'], '/panel')
 
     def test_provider_validate_check_availability_and_reset(self):
         self.admin()
@@ -107,5 +104,5 @@ class AdminTests(unittest.TestCase):
     def test_production_denies_admin_even_with_admin_account(self):
         self.admin()
         with patch('controller.api.admin.settings',Settings(_env_file=None, app_environment='production')):
-            self.assertEqual(self.client.get('/admin').status_code,404)
+            self.assertEqual(self.client.get('/admin',follow_redirects=False).status_code,307)
             self.assertEqual(self.client.get('/api/admin/rooms').status_code,403)

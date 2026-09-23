@@ -3,6 +3,10 @@
 import httpx
 from config.settings import settings
 
+def tunnel_headers(config):
+    token = config.ollama_tunnel_token
+    return {"Authorization": "Bearer " + token.get_secret_value()} if token else {}
+
 
 # ADAPTER ASYNC: kirim prompt ke Ollama, tunggu respons penuh, lalu validasi dan ambil teks jawabannya.
 async def generate_reply(prompt: str, *, config=None) -> str:
@@ -11,6 +15,7 @@ async def generate_reply(prompt: str, *, config=None) -> str:
     async with httpx.AsyncClient(timeout=selected.ollama_timeout_seconds) as client:
         response = await client.post(
             selected.ollama_base_url.rstrip("/") + "/api/chat",
+            headers=tunnel_headers(selected),
             json={
                 "model": selected.ollama_model,
                 "messages": [{"role": "user", "content": prompt}],
@@ -37,6 +42,7 @@ async def model_available(*, config=None) -> bool:
         async with httpx.AsyncClient(timeout=3.0) as client:
             response = await client.post(
                 selected.ollama_base_url.rstrip("/") + "/api/show",
+                headers=tunnel_headers(selected),
                 json={"model": selected.ollama_model},
             )
             return response.status_code == 200

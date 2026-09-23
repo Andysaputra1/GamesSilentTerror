@@ -81,7 +81,7 @@ class AuthService:
 
         # CALLBACK TRANSAKSI LOGIN: ambil akun, verifikasi password, lalu simpan hash token baru dan kembalikan sesi.
         def operation(database: Session) -> LoginResult:
-            account = auth_queries.account_by_username(database, normalized_username)
+            account = auth_queries.account_by_login(database, normalized_username)
             if (
                 account is None
                 or not account["is_active"]

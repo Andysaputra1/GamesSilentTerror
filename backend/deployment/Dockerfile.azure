@@ -1,0 +1,10 @@
+FROM python:3.11-slim
+WORKDIR /app
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+COPY requirements.txt ./requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt && useradd --create-home --uid 10001 appuser
+COPY --chown=appuser:appuser . .
+USER appuser
+EXPOSE 8000
+# One worker: room engine, Google nonces, and AI overrides live in one process.
+CMD ["uvicorn", "main:asgi_app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--no-proxy-headers"]

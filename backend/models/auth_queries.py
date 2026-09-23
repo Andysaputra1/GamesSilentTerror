@@ -47,3 +47,30 @@ def account_for_token(database: Session, token_hash: str, now: datetime):
 def delete_session(database: Session, token_hash: str):
     sql = text("DELETE FROM auth_sessions WHERE token_hash = :token_hash")
     return database.execute(sql, {"token_hash": token_hash}).rowcount
+
+
+# Identitas tambahan dipisahkan supaya akun demo lama tetap kompatibel.
+def create_identity(database, user_id, email, google_subject=None):
+    database.execute(text('''
+        INSERT INTO account_identities (user_id, email, google_subject, email_verified)
+        VALUES (:id, :email, :subject, :verified)
+    '''), {'id': user_id, 'email': email, 'subject': google_subject, 'verified': google_subject is not None})
+
+
+def account_by_google_subject(database, subject):
+    return database.execute(text('''
+        SELECT u.id, u.username, u.display_name, u.is_active
+        FROM user_accounts u JOIN account_identities i ON i.user_id = u.id
+        WHERE i.google_subject = :subject
+    '''), {'subject': subject}).mappings().one_or_none()
+
+
+def account_by_login(database, identifier):
+    # Username lama tetap bekerja; username pendaftaran tidak mengandung @.
+    if '@' not in identifier:
+        return account_by_username(database, identifier)
+    return database.execute(text('''
+        SELECT u.id, u.username, u.display_name, u.password_hash, u.is_active
+        FROM user_accounts u JOIN account_identities i ON i.user_id = u.id
+        WHERE i.email = :email
+    '''), {'email': identifier.lower()}).mappings().one_or_none()

@@ -24,12 +24,10 @@ def require_admin(response: Response, user=Depends(require_authenticated_user)):
     return user
 
 
-@router.get('/admin', include_in_schema=False)
-def panel():
-    if settings.app_environment != 'development':
-        raise HTTPException(404)
-    return FileResponse(ASSETS / 'index.html', headers={'Cache-Control':'no-store',
-        'Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self'; frame-ancestors 'none'; base-uri 'none'"})
+@router.get("/admin", include_in_schema=False)
+def panel_redirect():
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse("/panel", status_code=307)
 
 
 @router.get('/admin/assets/{asset}', include_in_schema=False)
