@@ -38,6 +38,8 @@ class Match:
         self.players = {name: Participant(name, role, name in bots) for name, role in zip(names, roles)}
         self.id = uuid4().hex
         self.round = 1
+        self.max_rounds = 8
+        self.ai_grace_phase = None
         self.phase = "day"
         self.durations = {"day": 20, "night": 15, "tribunal": 15} if quick else {"day": 120, "night": 30, "tribunal": 45}
         self.deadline = (time.time() if now is None else now) + self.durations["day"]
@@ -50,6 +52,14 @@ class Match:
         self.bot_day_done = False
         self.bot_night_done = False
         self.bot_vote_done = False
+
+    def reserve_ai_reply(self, now=None):
+        """At most one bounded extension per phase; manual skip still takes precedence."""
+        now = time.time() if now is None else now
+        phase = (self.round, self.phase)
+        if self.phase in {"day", "tribunal"} and self.ai_grace_phase != phase:
+            self.ai_grace_phase = phase
+            self.deadline = max(self.deadline, now + 35)
 
     # HELPER: hanya pemain hidup yang belum disandera dapat melakukan aksi.
     def actor(self, name):
@@ -128,9 +138,15 @@ class Match:
         else:
             self.events.append("Tribunal berakhir tanpa eksekusi: suara seri atau tidak ada suara.")
         self.check_winner()
+        if not self.winner and self.round >= self.max_rounds:
+            self.winner = "draw"
+            self.phase = "finished"
+            self.events.append(f"Permainan seri: batas {self.max_rounds} ronde tercapai tanpa pemenang.")
 
     # KONDISI AKHIR: kematian Hitman berarti warga menang; semua warga hidup disandera berarti Hitman menang.
     def check_winner(self):
+        if self.winner:
+            return
         hitman = next(player for player in self.players.values() if player.role == "hitman")
         if not hitman.alive:
             self.winner = "civilians"
@@ -238,7 +254,7 @@ class Match:
                 "consented": viewer in self.skip_consents if self.phase == "day" else False,
                 "can_consent": self.phase == "day" and not player.bot and player.alive and viewer not in self.skip_consents,
             },
-            "id": self.id, "phase": self.phase, "round": self.round, "deadline": self.deadline,
+            "id": self.id, "phase": self.phase, "round": self.round, "max_rounds": self.max_rounds, "deadline": self.deadline,
             "server_time": time.time(), "winner": self.winner, "events": list(self.events),
             "players": [{"name": p.name, "bot": p.bot, "alive": p.alive,
                          **({"role": p.role} if self.winner else {})} for p in self.players.values()],

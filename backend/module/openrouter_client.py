@@ -16,3 +16,17 @@ async def generate_reply(prompt, *, config, max_tokens=None):
         if not isinstance(content, str) or not content.strip():
             raise ValueError("Provider tidak menghasilkan teks.")
         return content.strip()
+
+
+def failure_message(error):
+    """Safe diagnostics: never expose upstream bodies, headers, or credentials."""
+    if isinstance(error, httpx.HTTPStatusError):
+        code = error.response.status_code
+        return {401: "API key OpenRouter ditolak.", 402: "Saldo atau batas kredit OpenRouter tidak mencukupi.",
+                429: "Batas permintaan OpenRouter tercapai. Coba lagi nanti.",
+                404: "Model OpenRouter tidak tersedia."}.get(code, f"OpenRouter gagal merespons (HTTP {code}).")
+    if isinstance(error, (httpx.TimeoutException, TimeoutError)):
+        return "Waktu tunggu AI habis. Coba lagi saat awal diskusi."
+    if isinstance(error, ValueError):
+        return "AI tidak menghasilkan teks atau API key belum tersedia. Periksa konfigurasi dan coba lagi."
+    return "AI tidak dapat dihubungi. Periksa koneksi dan konfigurasi provider."

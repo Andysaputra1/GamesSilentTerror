@@ -15,7 +15,7 @@ from openai import APIConnectionError, APIError, APITimeoutError, AsyncOpenAI, A
 
 from config.settings import settings
 from module.ollama_client import generate_reply
-from module.openrouter_client import generate_reply as openrouter_reply
+from module.openrouter_client import generate_reply as openrouter_reply, failure_message
 from schemas.chat import AnalysisResponse, AnalyzeChatRequest, FuzzyResult
 from services.fuzzy_service import calculate_suspicion, status_for_score
 
@@ -234,7 +234,7 @@ SVM, fuzzy logic, AI, atau status role rahasia.
                 return await openrouter_reply(prompt, config=selected)
             except (httpx.HTTPError, ValueError, KeyError, IndexError, TypeError) as error:
                 if trace is not None:
-                    trace["llm_error"] = type(error).__name__
+                    trace["llm_error"] = failure_message(error)
                 logger.warning("OpenRouter request failed (%s).", type(error).__name__)
                 return "AI Host sedang tidak dapat dihubungi."
 

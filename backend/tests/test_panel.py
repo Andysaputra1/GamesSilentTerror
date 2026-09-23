@@ -59,6 +59,16 @@ class PanelTests(unittest.TestCase):
             self.assertFalse(result.json()['active'])
             self.assertNotIn('secret must not leak',result.text)
 
+    def test_check_ai_credit_failure_is_actionable_without_secrets(self):
+        self.app.dependency_overrides[require_panel] = lambda: 'fixture-token'
+        response = httpx.Response(402, request=httpx.Request('POST', 'https://openrouter.ai'), text='secret')
+        error = httpx.HTTPStatusError('secret', request=response.request, response=response)
+        with patch('controller.api.panel.api_reply', AsyncMock(side_effect=error)):
+            result = self.client.post('/api/panel/check-ai')
+        self.assertFalse(result.json()['active'])
+        self.assertIn('kredit', result.json()['message'])
+        self.assertNotIn('secret', result.text)
+
     def test_empty_room_is_archived_and_db_failure_removes_live_room(self):
         from types import SimpleNamespace
         from controller.api.rooms import router as room_router

@@ -70,3 +70,6 @@ Persetujuan skip: `POST /api/rooms/{code}/skip-discussion` → `RoomService.skip
 Ruangan/role/aksi/vote disimpan di memori satu proses backend dan hilang ketika backend restart. Reload browser memulihkan pertandingan yang masih ada serta 100 pesan terakhir. MySQL mencatat chat/analisis, bukan snapshot pertandingan; pemulihan match setelah restart dan multi-worker belum tersedia. Pemain yang menutup tab tetap di roster dan melewatkan aksi/vote sampai kembali; belum ada bot pengganti otomatis.
 
 Fuzzy masih memakai persentase diam tetap 20%, bukan pengukuran aktivitas nyata. Akurasi/balance SVM-fuzzy-LLM bukan jaminan hasil game. Aplikasi, checker, akun demo dan Compose ditujukan untuk pengembangan lokal, bukan deployment publik.
+
+- Batas pertandingan 8 ronde. Setelah Tribunal ronde 8, kemenangan normal diprioritaskan; jika belum ada pemenang, hasil seri dan semua role dibuka.
+- Permintaan AI pertama per fase diskusi/voting menyediakan sedikitnya 35 detik sejak permintaan diterima. Tambahan maksimal 35 detik per fase, tidak berulang untuk pesan berikutnya. Skip manual tetap berlaku.

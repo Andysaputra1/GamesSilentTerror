@@ -25,6 +25,34 @@ class EngineTests(unittest.TestCase):
         self.game.phase = 'night'
         self.game.actions.clear()
 
+    def test_idle_match_finishes_after_eight_rounds(self):
+        for _ in range(24):
+            self.game.tick(self.game.deadline)
+        self.assertEqual((self.game.round, self.game.phase, self.game.winner), (8, 'finished', 'draw'))
+        self.assertTrue(all('role' in p for p in self.game.snapshot('spy')['players']))
+        self.assertFalse(self.game.can_chat('spy'))
+        events = list(self.game.events)
+        self.game.tick(self.game.deadline + 1000)
+        self.game.check_winner()
+        self.assertEqual(self.game.events, events)
+
+    def test_final_round_execution_takes_priority_over_draw(self):
+        self.game.round = 8
+        self.game.phase = 'tribunal'
+        self.game.vote('spy', 'hitman')
+        self.game.tick(self.game.deadline)
+        self.assertEqual(self.game.winner, 'civilians')
+
+    def test_ai_grace_is_bounded_and_does_not_extend_night(self):
+        self.game.reserve_ai_reply(now=115)
+        self.assertEqual(self.game.deadline, 150)
+        self.game.reserve_ai_reply(now=149)
+        self.assertEqual(self.game.deadline, 150)
+        self.game.tick(150)
+        deadline = self.game.deadline
+        self.game.reserve_ai_reply(now=179)
+        self.assertEqual(self.game.deadline, deadline)
+
     def test_role_distribution_and_size(self):
         for count in range(4, 7):
             game = Match([str(i) for i in range(count)], [])

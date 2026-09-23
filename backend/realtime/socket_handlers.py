@@ -261,6 +261,9 @@ class SocketGameController:
         # TAHAP 6-7: susun prompt dan panggil provider LLM terpilih.
         # Jika SVM belum siap (intent=None), jalur ini belum memanggil LLM.
         if intent is not None and room.bot_enabled and (not match or bot_player):
+            if match:
+                with room_service.lock:
+                    match.reserve_ai_reply()
             self.ai_pending.add(sid)
             await self.sio.emit("ai_status", {"pending": True}, to=sid)
             try:
@@ -288,7 +291,7 @@ class SocketGameController:
         # TAHAP 9: kirim receive_chat dengan identitas bot terpilih.
         # Jika penyimpanan gagal, kode di atas mengirim system_alert lalu berhenti.
         if host_response is not None:
-            if match and trace["llm_error"]:
+            if trace["llm_error"]:
                 await self.sio.emit("system_alert", {"msg": "Layanan AI sedang tidak tersedia; permainan tetap berjalan."}, to=sid)
                 return
             # Jawaban lambat tidak boleh menerobos fase malam, Gag, Hostage, atau game over.

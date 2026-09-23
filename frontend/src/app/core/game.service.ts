@@ -13,6 +13,7 @@ export interface MatchView {
   id: string;
   phase: 'day' | 'night' | 'tribunal' | 'finished';
   round: number;
+  max_rounds: number;
   deadline: number;
   server_time: number;
   winner: string | null;

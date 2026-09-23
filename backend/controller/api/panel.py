@@ -27,7 +27,7 @@ from services.activity_service import activity
 from services.room_service import room_service
 from controller.middleware.auth_limits import limit_auth
 from module.ollama_client import generate_reply as local_reply
-from module.openrouter_client import generate_reply as api_reply
+from module.openrouter_client import generate_reply as api_reply, failure_message
 
 router = APIRouter(tags=["panel"])
 ASSETS = Path(__file__).resolve().parents[2] / "public" / "panel"
@@ -179,12 +179,12 @@ async def check_ai(token=Depends(require_panel)):
             validate_endpoint(config.ollama_base_url)
             reply = await asyncio.wait_for(local_reply("Balas hanya OK.", config=config.model_copy(update={"ollama_max_output_tokens": 16})), timeout=35)
         else:
-            reply = await asyncio.wait_for(api_reply("Balas hanya OK.", config=config, max_tokens=16), timeout=35)
+            reply = await asyncio.wait_for(api_reply("Balas hanya OK.", config=config, max_tokens=128), timeout=35)
         return {"active": True, "message": "AI aktif dan berhasil menghasilkan jawaban.", "reply": reply[:200]}
     except HTTPException:
         raise
     except Exception as error:
-        return {"active": False, "message": "AI tidak merespons. Periksa key, saldo, tunnel, dan model.", "error_type": type(error).__name__}
+        return {"active": False, "message": failure_message(error), "error_type": type(error).__name__}
 
 
 @router.get("/api/panel/rooms")

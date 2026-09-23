@@ -13,7 +13,7 @@
   }
   @if (game; as state) {
     <div class="phase-strip">
-      <b>RONDE {{ state.round }} / {{ state.phase.toUpperCase() }}</b
+      <b>RONDE {{ state.round }} / {{ state.max_rounds || 8 }} / {{ state.phase.toUpperCase() }}</b
       ><strong>{{ state.winner ? 'SELESAI' : seconds + 's' }}</strong
       ><span>{{ connected ? 'CHAT TERHUBUNG' : 'MENYAMBUNG CHAT…' }}</span>
     </div>
@@ -37,7 +37,10 @@
     }
     @if (state.winner) {
       <section class="result" aria-live="polite">
-        <h2>{{ state.winner === 'hitman' ? 'Hitman menang.' : 'Warga menang.' }}</h2>
+        @if (state.winner === 'draw') {
+          <p>Batas {{ state.max_rounds }} ronde tercapai tanpa pemenang.</p>
+        }
+        <h2>{{ state.winner === 'draw' ? 'Permainan seri.' : state.winner === 'hitman' ? 'Hitman menang.' : 'Warga menang.' }}</h2>
         <p>
           Identitas semua pemain kini dibuka. Kembali ke lobby, keluar ruangan, lalu buat permainan
           baru.
