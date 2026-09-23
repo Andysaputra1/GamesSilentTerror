@@ -2,9 +2,7 @@
   <div class="operation-content">
     <header class="operation-header">
       <a class="operation-brand" routerLink="/main"><span>♧</span> SILENT TERROR</a>
-      <div class="operation-profile">
-        <i>◈</i><b>{{ username }}</b>
-      </div>
+      <app-profile-menu [username]="username" [activeMatch]="!!room && room.phase !== 'lobby' && room.phase !== 'finished'" />
     </header>
     <section class="lobby-heading">
       <a class="operation-secondary" routerLink="/main">← Main page</a>

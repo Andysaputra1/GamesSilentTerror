@@ -2,9 +2,7 @@
   <div class="operation-content">
     <header class="operation-header">
       <a class="operation-brand" routerLink="/main"><span>♧</span> SILENT TERROR</a>
-      <div class="operation-profile">
-        <i aria-hidden="true">◈</i><b>{{ username }}</b>
-      </div>
+      <app-profile-menu [username]="username" />
     </header>
     <section class="table-menu" aria-label="Menu permainan">
       <article class="start-card">

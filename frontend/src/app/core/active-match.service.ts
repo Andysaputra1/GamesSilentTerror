@@ -4,6 +4,7 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Inject, Injectable, PLATFORM_ID, inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { catchError, map, of, timeout } from 'rxjs';
+import { SessionService } from './session.service';
 
 interface ActiveMatch {
   code: string;
@@ -15,13 +16,14 @@ interface ActiveMatch {
 export class ActiveMatchService {
   constructor(
     private readonly http: HttpClient,
+    private readonly session: SessionService,
     @Inject(PLATFORM_ID) private readonly platform: object,
   ) {}
 
   lookup() {
     if (!isPlatformBrowser(this.platform)) return of(null);
     const token = localStorage.getItem('shadow_heist_access_token');
-    if (!token) return of(null);
+    if (!token || this.session.loggingOut()) return of(null);
     const base = `${backendUrl()}/api/rooms/active`;
     return this.http
       .get<{ active: ActiveMatch | null }>(base, {
@@ -29,7 +31,8 @@ export class ActiveMatchService {
       })
       .pipe(
         timeout(10000),
-        map((result) => result.active),
+        map((result) => !this.session.loggingOut() && localStorage.getItem('shadow_heist_access_token') === token
+          ? result.active : null),
       );
   }
 

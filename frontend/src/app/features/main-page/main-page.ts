@@ -1,11 +1,12 @@
 import { isPlatformBrowser } from '@angular/common';
 import { Component, Inject, OnInit, PLATFORM_ID } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { ProfileMenu } from '../../core/profile-menu';
 
 // DECORATOR: hubungkan MainPage dengan HTML/CSS dan aktifkan link navigasi Angular.
 @Component({
   selector: 'app-main-page',
-  imports: [RouterLink],
+  imports: [RouterLink, ProfileMenu],
   templateUrl: './main-page.html',
   styleUrl: './main-page.css',
 })

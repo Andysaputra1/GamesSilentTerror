@@ -26,6 +26,7 @@
   border-bottom: 2px solid currentColor;
   padding-bottom: 20px;
 }
+.match-account { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 h1 {
   font: 800 clamp(24px, 3vw, 38px) var(--font-title);
   margin: 8px 0;

@@ -3,6 +3,7 @@ import { RouterOutlet, Router } from '@angular/router';
 import { isPlatformBrowser } from '@angular/common';
 import { catchError, exhaustMap, filter, fromEvent, merge, of, Subscription, timer } from 'rxjs';
 import { ActiveMatchService } from './core/active-match.service';
+import { SessionService } from './core/session.service';
 
 // DECORATOR: hubungkan komponen dengan selector HTML, template, dan fitur router.
 @Component({
@@ -14,15 +15,25 @@ import { ActiveMatchService } from './core/active-match.service';
 // CLASS KOMPONEN: wadah utama halaman; router-outlet di app.html menampilkan route aktif.
 export class App implements OnInit, OnDestroy {
   private monitor?: Subscription;
+  private storageMonitor?: Subscription;
   constructor(
     private readonly matches: ActiveMatchService,
     private readonly router: Router,
+    private readonly session: SessionService,
     @Inject(PLATFORM_ID) private readonly platform: object,
   ) {}
 
   // Host bisa memulai ketika anggota masih di main/lobby. Cek juga saat kembali ke tab.
   ngOnInit(): void {
     if (!isPlatformBrowser(this.platform)) return;
+    this.storageMonitor = fromEvent<StorageEvent>(window, 'storage').pipe(
+      filter(event => event.storageArea === localStorage &&
+        (event.key === 'shadow_heist_access_token' || event.key === null) &&
+        !localStorage.getItem('shadow_heist_access_token')),
+    ).subscribe(() => {
+      this.session.clearLocalSession();
+      void this.router.navigateByUrl('/login', { replaceUrl: true });
+    });
     this.monitor = merge(
       timer(0, 3000),
       fromEvent(window, 'focus'),
@@ -42,6 +53,7 @@ export class App implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.monitor?.unsubscribe();
+    this.storageMonitor?.unsubscribe();
   }
   // PROPERTY SIGNAL: nilai reaktif; perubahan melalui API signal dapat memperbarui tampilan.
   protected readonly title = signal('frontend');

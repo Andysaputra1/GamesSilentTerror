@@ -16,11 +16,12 @@ import { Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { io, Socket } from 'socket.io-client';
 import { GameMessage, GameService, MatchView } from '../../core/game.service';
+import { ProfileMenu } from '../../core/profile-menu';
 
 // KOMPONEN: render snapshot privat server; tidak mengacak role atau memutuskan hasil aksi di browser.
 @Component({
   selector: 'app-game',
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, ProfileMenu],
   templateUrl: './game.html',
   styleUrl: './game.css',
 })

@@ -46,6 +46,7 @@ describe('Game', () => {
         id: 'match-1',
         phase: 'day',
         round: 1,
+        max_rounds: 8,
         deadline: 120,
         server_time: 100,
         winner: null,

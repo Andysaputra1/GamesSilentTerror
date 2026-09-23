@@ -15,11 +15,12 @@ import { Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { gameEntryStorageKey } from '../../core/flow.guard';
 import { Room, RoomService } from '../../core/room.service';
+import { ProfileMenu } from '../../core/profile-menu';
 
 // DECORATOR: hubungkan Lobby dengan template, CSS, navigasi, dan binding form.
 @Component({
   selector: 'app-lobby',
-  imports: [RouterLink, FormsModule],
+  imports: [RouterLink, FormsModule, ProfileMenu],
   templateUrl: './lobby.html',
   styleUrl: './lobby.css',
 })

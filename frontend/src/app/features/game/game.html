@@ -6,7 +6,10 @@
         {{ game?.phase === 'finished' ? 'The final verdict.' : 'Trust is a dangerous thing.' }}
       </h1>
     </div>
-    <a routerLink="/lobby">← Lobby</a>
+    <div class="match-account">
+      <a routerLink="/lobby">← Lobby</a>
+      <app-profile-menu [username]="game?.me?.name || 'Pemain'" [activeMatch]="!!game && !game.winner" />
+    </div>
   </header>
   @if (error) {
     <p class="alert" role="alert">{{ error }} <button (click)="error = ''">Tutup</button></p>
