@@ -94,3 +94,22 @@ Kerjakan perubahan pada branch sendiri agar push teman tidak langsung men-deploy
 - Backend tidak bisa dihubungi: buka `https://backendthesis.andylabs.site/ready`. VM harus menyala.
 
 Referensi: [Docker Compose](https://docs.docker.com/reference/cli/docker/compose/) dan [konfigurasi environment Angular](https://angular.dev/tools/cli/environments).
+
+## Alternatif tanpa Docker: semua perintah dari root repo
+
+Install Git dan Node.js 24, lalu:
+
+```bash
+git clone https://github.com/Andysaputra1/GamesSilentTerror.git
+cd GamesSilentTerror
+npm install
+```
+
+Buat `.env` di folder paling luar, sejajar dengan `package.json` dan folder `frontend`:
+
+```dotenv
+BACKEND_URL=https://backendthesis.andylabs.site
+FRONTEND_PORT=4200
+```
+
+Jalankan `npm start`, lalu buka http://localhost:4200. Root npm install otomatis memasang dependency frontend sesuai lockfile. Env root dibaca saat startup, jadi restart npm start setelah mengubah env. Tidak perlu pindah ke folder frontend atau menjalankan Docker. CORS dan Google origins localhost pada panduan di atas tetap berlaku. Jika sudah punya env backend di root, cukup tambahkan dua variabel publik tersebut tanpa menghapus isi lainnya.
