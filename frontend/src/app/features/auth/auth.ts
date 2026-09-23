@@ -9,11 +9,24 @@ import {
   PLATFORM_ID,
   ElementRef,
   ViewChild,
+  OnInit,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { finalize, TimeoutError, timeout, firstValueFrom } from 'rxjs';
+import {
+  catchError,
+  exhaustMap,
+  finalize,
+  firstValueFrom,
+  fromEvent,
+  interval,
+  map,
+  merge,
+  of,
+  TimeoutError,
+  timeout,
+} from 'rxjs';
 import { loadGoogleIdentity } from '../../core/google-identity';
 
 // INTERFACE: bentuk respons login yang diharapkan dari API Python.
@@ -31,7 +44,13 @@ interface LoginResponse {
   styleUrl: './auth.scss',
 })
 // CLASS KOMPONEN: mengatur perilaku halaman login, bukan memeriksa password di database.
-export class Auth {
+export class Auth implements OnInit {
+  backendStatus: 'checking' | 'online' | 'offline' = 'checking';
+  readonly serverContactUrl =
+    'https://wa.me/6281995247372?text=' +
+    encodeURIComponent(
+      'Bro Andy, tolong nyalakan server Silent Terror ya. Status di halaman login sedang offline. Terima kasih!',
+    );
   // STATE/PROPERTY: data input dan status UI yang dibaca oleh auth.html.
   username = '';
   password = '';
@@ -195,7 +214,6 @@ export class Auth {
   private readonly loginTimeoutMs = 15_000;
 
   // CONSTRUCTOR: Angular menyediakan HTTP, router, lifecycle, pembaruan view, dan platform.
-  // function Object() { [native code] }
   constructor(
     private readonly http: HttpClient,
     private readonly router: Router,
@@ -204,11 +222,41 @@ export class Auth {
     @Inject(PLATFORM_ID) private readonly platformId: object,
   ) {}
 
-  // GETTER: menghasilkan label dari state saat ini; template membacanya seperti property.
+  // Periksa kesiapan backend saat halaman dibuka, tiap 30 detik, dan saat koneksi/fokus kembali.
+  // Request tidak ditumpuk; teardown komponen membatalkan polling dan request yang masih berjalan.
+  ngOnInit(): void {
+    if (!isPlatformBrowser(this.platformId)) return;
+    merge(
+      of(null),
+      interval(30_000),
+      fromEvent(window, 'online'),
+      fromEvent(window, 'offline'),
+      fromEvent(window, 'focus'),
+    )
+      .pipe(
+        exhaustMap(() =>
+          this.http
+            .get<{ ready?: boolean }>(`${this.backendUrl}/ready`, {
+              params: { check: Date.now() },
+            })
+            .pipe(
+              timeout(8_000),
+              map((response) => response?.ready === true),
+              catchError(() => of(false)),
+            ),
+        ),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((ready) => {
+        this.backendStatus = ready ? 'online' : 'offline';
+        this.changeDetector.markForCheck();
+      });
+  }
+
+  // Status koneksi hanya mengikuti respons readiness, bukan hasil validasi akun pengguna.
   get statusLabel(): string {
-    if (this.isSubmitting) return 'VERIFYING IDENTITY';
-    if (this.errorMessage) return 'ACCESS CHECK FAILED';
-    return 'SYSTEM ONLINE';
+    if (this.backendStatus === 'checking') return 'MEMERIKSA SERVER…';
+    return this.backendStatus === 'online' ? 'SYSTEM ONLINE' : 'SYSTEM OFFLINE';
   }
 
   // METHOD EVENT FORM: validasi input, kirim POST login, lalu tangani sukses/gagal.

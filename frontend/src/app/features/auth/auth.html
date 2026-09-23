@@ -203,5 +203,27 @@
     </section>
   </section>
 
-  <p class="secure-note"><span></span>{{ statusLabel }} · All cases remain confidential</p>
+  <div role="status" aria-live="polite">
+    <p class="secure-note">
+      <span
+        aria-hidden="true"
+        [style.background]="backendStatus === 'online' ? null : backendStatus === 'offline' ? '#e28b80' : '#d9bd79'"
+        [style.box-shadow]="backendStatus === 'online' ? null : 'none'"
+      ></span>
+      {{ statusLabel }} · All cases remain confidential
+    </p>
+    @if (backendStatus === 'offline') {
+      <p class="secure-note">
+        Server belum bisa dihubungi atau belum siap. Periksa koneksimu. Jika tetap offline, hubungi
+        <a
+          [href]="serverContactUrl"
+          target="_blank"
+          rel="noopener noreferrer"
+          style="color: inherit"
+          >Andy Saputra</a
+        >
+        / Janice Tiffany Wijono / Kimberly Joseph Wirawan untuk menyalakan server.
+      </p>
+    }
+  </div>
 </main>
