@@ -1,59 +1,99 @@
-<main class="auth-shell">
-  <div class="auth-glow auth-glow--cyan"></div>
-  <div class="auth-glow auth-glow--red"></div>
-  <div class="auth-grid"></div>
+<main class="storybook-auth">
+  <header class="storybook-brand" aria-label="Silent Terror">
+    <p>Private investigation bureau</p>
+    <h1><span>Silent</span><i aria-hidden="true">◆</i><span>Terror</span></h1>
+  </header>
 
-  <section class="auth-layout" aria-label="Silent Terror login">
-    <aside class="briefing-panel" aria-label="Mission briefing">
-      <div class="brand-lockup">
-        <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
-        <span class="brand-code">ST//01</span>
+  <section class="auth-table" aria-label="Silent Terror account access">
+    <section class="register-sheet left-column" aria-labelledby="register-heading">
+      <img class="decoration decoration--gears" src="/assets/decorations/gears/gear-trio.png" alt="" />
+      <img class="decoration decoration--map" src="/assets/decorations/maps/world-map-double-scroll.png" alt="" />
+      <img class="decoration decoration--glasses" src="/assets/decorations/objects/round-glasses.png" alt="" />
+
+      <div class="paper-content">
+        <header class="form-heading">
+          <p>New detective application</p>
+          <h2 id="register-heading">Register</h2>
+        </header>
+
+        <form class="storybook-form register-form" (ngSubmit)="register()" novalidate>
+          <label class="paper-field" for="reg-name">
+            <span>Username</span>
+            <input id="reg-name" type="text" name="name" [(ngModel)]="registerName" autocomplete="username" placeholder="3–40 huruf, angka, underscore" maxlength="40" [disabled]="isSubmitting" />
+          </label>
+          <label class="paper-field" for="reg-email">
+            <span>Email</span>
+            <input id="reg-email" type="email" name="email" [(ngModel)]="registerEmail" autocomplete="email" placeholder="your@email.com" maxlength="254" [disabled]="isSubmitting" />
+          </label>
+          <label class="paper-field" for="reg-email-verify">
+            <span>Confirm email</span>
+            <input id="reg-email-verify" type="email" name="emailVerify" [(ngModel)]="registerEmailVerify" autocomplete="email" placeholder="Confirm email" maxlength="254" [disabled]="isSubmitting" />
+          </label>
+          <label class="paper-field" for="reg-password">
+            <span>Password</span>
+            <input id="reg-password" type="password" name="password" [(ngModel)]="registerPassword" autocomplete="new-password" placeholder="Minimal 10 karakter" maxlength="128" [disabled]="isSubmitting" />
+          </label>
+          <label class="paper-field" for="reg-password-verify">
+            <span>Confirm password</span>
+            <input id="reg-password-verify" type="password" name="passwordVerify" [(ngModel)]="registerPasswordVerify" autocomplete="new-password" placeholder="Confirm password" maxlength="128" [disabled]="isSubmitting" />
+          </label>
+
+          @if (registerError) {
+            <p class="form-alert" role="alert">{{ registerError }}</p>
+          }
+
+          <button class="storybook-button storybook-button--signup" type="submit" [disabled]="isSubmitting">
+            {{ isSubmitting ? 'PROCESSING...' : 'SIGN UP' }}
+          </button>
+        </form>
       </div>
-      <p class="eyebrow">SECURE INFILTRATION NETWORK</p>
-      <h1>SILENT<br><em>TERROR</em></h1>
-      <p class="briefing-copy">Masuk ke ruang operasi. Baca gerak-gerik, jaga alibi, dan jangan biarkan bayanganmu memberi terlalu banyak jawaban.</p>
-      <div class="briefing-meta"><span><i></i> LIVE OPERATION</span><span>NODE 08 / JAKARTA</span></div>
-    </aside>
+    </section>
 
-    <section class="login-card" aria-labelledby="login-title">
-      <header class="card-header">
-        <div class="status-line"><span class="status-pulse" [class.status-pulse--busy]="isSubmitting"></span><span>{{ statusLabel }}</span></div>
-        <p class="sequence">ACCESS SEQUENCE / 01</p>
-        <h2 id="login-title">Identify<br>yourself.</h2>
-        <p>Gunakan identitas operatif untuk memasuki permainan.</p>
-      </header>
+    <section class="login-journal right-column" aria-labelledby="login-heading">
+      <div class="journal-content">
+        <header class="form-heading">
+          <p>Access your case files</p>
+          <h2 id="login-heading">Log In</h2>
+        </header>
 
-      <form class="login-form" (ngSubmit)="submit()" novalidate>
-        <label class="field" [class.field--invalid]="hasAttemptedSubmit && !username">
-          <span>USERNAME</span>
-          <span class="field-control">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-4.42 0-8 2.01-8 4.5V21h16v-2.5c0-2.49-3.58-4.5-8-4.5Z"/></svg>
-            <input type="text" id="username" name="username" [(ngModel)]="username" (input)="clearError()" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Masukkan username" [disabled]="isSubmitting" aria-describedby="username-help" />
-          </span>
-          <small id="username-help">IDENTITAS OPERATIF</small>
-        </label>
+        <form class="storybook-form login-form" (ngSubmit)="submit()" novalidate>
+          <label class="paper-field" for="username">
+            <span>Email / username</span>
+            <input id="username" type="text" name="username" [(ngModel)]="username" (input)="clearError()" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Your detective name" [disabled]="isSubmitting" />
+          </label>
+          <label class="paper-field" for="password">
+            <span>Password</span>
+            <span class="password-line">
+              <input id="password" [type]="passwordVisible ? 'text' : 'password'" name="password" [(ngModel)]="password" (input)="clearError()" autocomplete="current-password" placeholder="Your secret password" [disabled]="isSubmitting" />
+              <button class="password-toggle" type="button" (click)="togglePasswordVisibility()" [disabled]="isSubmitting">{{ passwordVisible ? 'Hide' : 'Show' }}</button>
+            </span>
+          </label>
 
-        <label class="field" [class.field--invalid]="hasAttemptedSubmit && !password">
-          <span>PASSWORD</span>
-          <span class="field-control">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 9h-1V7a4 4 0 0 0-8 0v2H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2Zm-7-2a2 2 0 1 1 4 0v2h-4V7Zm2 10a2 2 0 1 1 0-4 2 2 0 0 1 0 4Z"/></svg>
-            <input [type]="passwordVisible ? 'text' : 'password'" id="password" name="password" [(ngModel)]="password" (input)="clearError()" autocomplete="current-password" placeholder="Masukkan password" [disabled]="isSubmitting" aria-describedby="password-help" />
-            <button class="password-toggle" type="button" (click)="togglePasswordVisibility()" [disabled]="isSubmitting" [attr.aria-label]="passwordVisible ? 'Sembunyikan password' : 'Tampilkan password'">{{ passwordVisible ? 'HIDE' : 'SHOW' }}</button>
-          </span>
-          <small id="password-help">ENCRYPTED CREDENTIAL</small>
-        </label>
+          <div class="journal-links">
+            <button type="button" (click)="useDevelopmentCredentials()" [disabled]="isSubmitting">Use demo account</button>
+            <span class="unavailable-note">Lupa password? Hubungi pengelola.</span>
+          </div>
 
-        @if (errorMessage) {
-          <div class="form-alert" role="alert" aria-live="assertive"><span>!</span><p>{{ errorMessage }}</p></div>
-        }
+          @if (errorMessage) {
+            <p class="form-alert" role="alert" aria-live="assertive">{{ errorMessage }}</p>
+          }
 
-        <button class="submit-button" type="submit" [disabled]="isSubmitting">
-          @if (isSubmitting) { <span class="button-spinner" aria-hidden="true"></span> VERIFYING... } @else { MASUK KE PERMAINAN <span aria-hidden="true">→</span> }
-        </button>
-      </form>
+          <button class="storybook-button storybook-button--signin submit-button" type="submit" [disabled]="isSubmitting">
+            {{ isSubmitting ? 'VERIFYING...' : 'SIGN IN' }}
+          </button>
+        </form>
+        <section class="google-access" aria-label="Google sign in">
+          @if (!googleReady) {
+            <button type="button" class="google-prepare" (click)="prepareGoogle()" [disabled]="isSubmitting || googleLoading">{{ googleLoading ? 'Menyiapkan Google...' : 'Login dengan Google' }}</button>
+          }
+          <div #googleButton></div>
+          @if (googleError) { <p class="form-alert" role="alert">{{ googleError }}</p> }
+        </section>
+      </div>
 
-      <div class="demo-access"><div><span>DEVELOPMENT ACCESS</span><strong>user1 / user132</strong></div><button type="button" (click)="useDevelopmentCredentials()" [disabled]="isSubmitting">USE</button></div>
-      <footer class="card-footer"><span>SESSION IS PROTECTED</span><span>v0.1.0 // SILENT TERROR</span></footer>
+      <img class="decoration decoration--books" src="/assets/decorations/objects/detective-book-stack.png" alt="" />
     </section>
   </section>
+
+  <p class="secure-note"><span></span>{{ statusLabel }} · All cases remain confidential</p>
 </main>

@@ -1,3 +1,4 @@
+import { backendUrl } from '../../core/backend-url';
 import { isPlatformBrowser, DatePipe, JsonPipe } from '@angular/common';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import {
@@ -103,7 +104,7 @@ export class Checker implements OnInit, OnDestroy {
   refresh(): void {
     if (!this.activeCode || this.busy) return;
     this.busy = true;
-    const url = `${window.location.protocol}//${window.location.hostname}:8000/api/rooms/${this.activeCode}/checker`;
+    const url = `${backendUrl()}/api/rooms/${this.activeCode}/checker`;
     this.http
       .get<{ traces: Trace[] }>(url)
       .pipe(

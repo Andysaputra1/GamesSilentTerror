@@ -1,3 +1,4 @@
+import { backendUrl } from './backend-url';
 import { isPlatformBrowser } from '@angular/common';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Inject, Injectable, PLATFORM_ID, inject } from '@angular/core';
@@ -21,7 +22,7 @@ export class ActiveMatchService {
     if (!isPlatformBrowser(this.platform)) return of(null);
     const token = localStorage.getItem('shadow_heist_access_token');
     if (!token) return of(null);
-    const base = `${location.protocol}//${location.hostname}:8000/api/rooms/active`;
+    const base = `${backendUrl()}/api/rooms/active`;
     return this.http
       .get<{ active: ActiveMatch | null }>(base, {
         headers: new HttpHeaders({ Authorization: 'Bearer ' + token }),

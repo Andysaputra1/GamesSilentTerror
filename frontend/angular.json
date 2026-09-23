@@ -31,13 +31,20 @@
             "server": "src/main.server.ts",
             "outputMode": "server",
             "security": {
-              "allowedHosts": []
+              "allowedHosts": ["localhost", "127.0.0.1", "192.168.40.176"]
             },
             "ssr": {
               "entry": "src/server.ts"
             }
           },
           "configurations": {
+            "vercel": {
+              "outputMode": "static",
+              "fileReplacements": [{
+                "replace": "src/environments/environment.ts",
+                "with": "src/environments/environment.vercel.ts"
+              }]
+            },
             "production": {
               "budgets": [
                 {
@@ -47,8 +54,8 @@
                 },
                 {
                   "type": "anyComponentStyle",
-                  "maximumWarning": "8kB",
-                  "maximumError": "8kB"
+                  "maximumWarning": "10kB",
+                  "maximumError": "12kB"
                 }
               ],
               "outputHashing": "all"
@@ -64,7 +71,7 @@
         "serve": {
           "builder": "@angular/build:dev-server",
           "options": {
-            "allowedHosts": ["localhost"]
+            "allowedHosts": ["localhost", "127.0.0.1", "192.168.40.176"]
           },
           "configurations": {
             "production": {

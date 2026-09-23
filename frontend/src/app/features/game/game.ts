@@ -1,3 +1,4 @@
+import { backendUrl } from '../../core/backend-url';
 import { isPlatformBrowser } from '@angular/common';
 import {
   ChangeDetectorRef,
@@ -66,7 +67,7 @@ export class Game implements OnInit, OnDestroy {
     }
     this.refresh();
     this.poll = setInterval(() => this.refresh(), 1000);
-    this.socket = io(`${window.location.protocol}//${window.location.hostname}:8000`, {
+    this.socket = io(`${backendUrl()}`, {
       auth: { token: localStorage.getItem('shadow_heist_access_token'), room_code: this.code },
       transports: ['websocket', 'polling'],
     });

@@ -17,6 +17,11 @@ Mulai dari **src/styles.css**, bagian DESIGN TOKENS:
 | --radius-panel | Lengkungan sudut panel |
 
 Setiap halaman memiliki HTML dan CSS terpisah di src/app/features/.
+Khusus auth sekarang memakai `auth.html` dan `auth.scss` dari desain Kimberly:
+meja kayu, kertas register, dan binder login. Asetnya di `public/assets/`.
+Ubah `--em`, padding `.register-sheet`/`.login-journal`, dan breakpoint 899px
+untuk proporsi desktop/mobile. Google memakai tombol resmi GIS. Jangan mengedit
+file `auth_kim.*` atau CSS lama karena sudah digantikan.
 Tidak ada style inline di template Main atau Lobby.
 CSS diformat multiline; bagian responsive ada di bawah file.
 

@@ -1,0 +1,570 @@
+/* ==========================================================================
+   Silent Terror — halaman Auth (Register + Log In)
+
+   Cara kerja layout:
+   - Semua ukuran di dalam panel memakai `em`, dan 1em dihitung dari lebar
+     layar (--em). Jadi seluruh "meja" mengecil/membesar bersama, proporsi
+     aset tidak pernah gepeng.
+   - >= 900px : kertas Register di kiri menimpa binder Login di kanan.
+   - <  900px : ditumpuk vertikal (Login di atas), form satu kolom.
+
+   Ukuran asli aset (jangan diubah kalau ganti gambar, sesuaikan angkanya):
+     register-paper.png  1410 x 870
+     login-binder.png     730 x 900
+     btn-wood.png        1335 x 436   (dipakai untuk papan judul)
+     btn-greenwood.png   1293 x 358
+     btn-leather.png     1354 x 673
+   ========================================================================== */
+
+
+:host {
+  display: block;
+  min-height: 100dvh;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* ---------- Halaman ---------- */
+.storybook-auth {
+  --ink: #422719;
+  --cream: #fff7e5;
+  --pad-x: clamp(20px, 4vw, 56px);
+  /* 1em untuk semua panel: mengikuti lebar layar, tapi juga tinggi layar
+     supaya papan + meja + footer muat tanpa scroll di laptop. */
+  --em: max(12px, min(16px, 1.4cqw, calc((100dvh - 290px) / 33.3)));
+
+  position: relative;
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(20px, 3.6vh, 38px);
+  min-height: 100dvh;
+  padding: clamp(20px, 4vh, 44px) var(--pad-x);
+  overflow-x: hidden;
+  color: var(--ink);
+  background: #4a2b18 url('/assets/backgrounds/backwood.jpg') center / cover no-repeat;
+}
+
+/* ---------- Judul: papan kayu ---------- */
+.storybook-brand {
+  position: relative;
+  z-index: 4;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: .32em;
+  width: min(100%, 25em);
+  aspect-ratio: 1335 / 436;
+  padding: 0 2.4em;
+  font-size: var(--em);
+  text-align: center;
+  background: url('/assets/buttons/btn-wood.png') center / 100% 100% no-repeat;
+  filter: drop-shadow(0 .5em .55em rgba(14, 6, 2, .55));
+  transform: rotate(-.7deg);
+
+  /* paku di kiri & kanan papan */
+  &::before,
+  &::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    width: .72em;
+    height: .72em;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #ecd09a 0 16%, #a3743f 46%, #4a2b14 100%);
+    box-shadow: 0 .12em .14em rgba(0, 0, 0, .5);
+    transform: translateY(-50%);
+  }
+  &::before { left: 1.25em; }
+  &::after { right: 1.25em; }
+
+  h1 {
+    order: 1;
+    display: flex;
+    align-items: center;
+    gap: .3em;
+    margin: 0;
+    color: #fbeacb;
+    font-family: 'Fraunces', Georgia, serif;
+    font-weight: 800;
+    font-size: min(2.55em, 8vw);
+    line-height: 1;
+    font-variation-settings: 'SOFT' 100, 'WONK' 1;
+    letter-spacing: -.005em;
+    white-space: nowrap;
+    text-shadow: 0 .05em 0 #3a200f, 0 .1em .14em rgba(0, 0, 0, .4);
+
+    i {
+      color: #e8c073;
+      font-size: .3em;
+      font-style: normal;
+      text-shadow: 0 .16em 0 #3a200f;
+    }
+  }
+
+  p {
+    order: 2;
+    margin: 0;
+    color: #f2dbb0;
+    font: 1.05em / 1 'Patrick Hand', cursive;
+    letter-spacing: .05em;
+    text-shadow: 0 .08em 0 rgba(34, 16, 6, .8);
+  }
+}
+
+/* ---------- Meja: kertas + binder ---------- */
+.auth-table {
+  position: relative;
+  flex: none;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  width: 100%;
+}
+
+.register-sheet,
+.login-journal {
+  position: relative;
+  isolation: isolate;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  font-size: var(--em);
+}
+
+/* KERTAS REGISTER — 9-slice: sudut & tepi sobek tidak pernah melar, hanya
+   bagian tengah yang memanjang. Tingginya mengikuti binder (align-items:
+   stretch) supaya sisi kiri binder yang terpotong tertutup rapat oleh kertas. */
+.register-sheet {
+  --edge: 1.81em; /* 60px slice x (lebar panel / 1410) */
+  z-index: 3;
+  width: 42.5em;
+  padding: 3.3em 3.2em 3em 3.6em;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    border: var(--edge) solid transparent;
+    border-image: url('/assets/auth/register-paper.png') 60 fill / var(--edge) stretch;
+    filter: drop-shadow(.4em .6em .9em rgba(20, 10, 5, .4));
+  }
+}
+
+/* BINDER LOGIN — rasio dikunci, jadi cincin & sampul tidak melar. */
+.login-journal {
+  z-index: 2;
+  align-self: center;
+  width: 27em;
+  aspect-ratio: 730 / 900;
+  margin-left: -2.7em; /* ujung kiri binder terselip di bawah kertas */
+  /* isi hanya di halaman kanan binder: lewati cincin, hindari sampul kulit */
+  padding: 3.5em 5.9em 4.3em 6.1em;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: url('/assets/auth/login-binder.png') center / 100% 100% no-repeat;
+    filter: drop-shadow(.5em .75em 1.1em rgba(15, 8, 4, .5));
+  }
+}
+
+.paper-content,
+.journal-content {
+  position: relative;
+  z-index: 5;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.form-heading {
+  margin-bottom: .8em;
+
+  p {
+    margin: 0 0 .15em;
+    color: #7f5a37;
+    font: 1.05em / 1.1 'Patrick Hand', cursive;
+  }
+
+  h2 {
+    margin: 0;
+    color: #5b311b;
+    font: 700 2.15em / 1 'Fraunces', Georgia, serif;
+    font-variation-settings: 'SOFT' 100;
+    letter-spacing: -.01em;
+  }
+}
+
+.storybook-form {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+
+/* Login: isi binder di-center secara vertikal */
+.login-journal .journal-content { justify-content: center; }
+.journal-content .login-form { flex: none; }
+.journal-content .storybook-button--signin { margin-top: .8em; }
+
+/* ---------- Field ---------- */
+.paper-field {
+  display: block;
+  min-width: 0;
+  margin-bottom: .9em;
+
+  > span:first-child {
+    display: block;
+    margin-bottom: .25em;
+    color: var(--ink);
+    font: 1.1em / 1.1 'Patrick Hand', cursive;
+  }
+
+  input {
+    display: block;
+    width: 100%;
+    height: 2.3em;
+    padding: 0 .75em;
+    background: rgba(255, 255, 255, .45);
+    border: 1.5px solid rgba(139, 90, 43, .5);
+    border-radius: .35em;
+    outline: 0;
+    color: var(--ink);
+    font: 1.1em / 1 'Patrick Hand', cursive;
+    transition: border-color .2s ease, background .2s ease, box-shadow .2s ease;
+
+    &::placeholder { color: rgba(107, 75, 42, .62); }
+
+    &:focus {
+      border-color: #8c3f2b;
+      background: rgba(255, 255, 255, .72);
+      box-shadow: 0 0 0 .16em rgba(140, 63, 43, .22);
+    }
+
+    &:disabled { opacity: .6; }
+
+    /* autofill browser jangan merusak warna kertas */
+    &:-webkit-autofill {
+      -webkit-text-fill-color: var(--ink);
+      box-shadow: 0 0 0 40px #f6ead0 inset;
+    }
+  }
+}
+
+.password-line {
+  position: relative;
+  display: block;
+
+  input { padding-right: 3.2em; }
+}
+
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: .35em;
+  padding: .3em .45em;
+  border: 0;
+  background: transparent;
+  color: #7a5230;
+  font: 1em / 1 'Patrick Hand', cursive;
+  cursor: pointer;
+  transform: translateY(-50%);
+
+  &:hover:not(:disabled) { color: #a43d25; }
+}
+
+.journal-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: .3em .8em;
+  margin: .2em 0 1em;
+
+  button,
+  a {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #7a5230;
+    font: 1em / 1.2 'Patrick Hand', cursive;
+    text-decoration: none;
+    cursor: pointer;
+  }
+
+  button { text-decoration: underline dashed; text-underline-offset: .2em; }
+  button:hover:not(:disabled),
+  a:hover { color: #a43d25; }
+}
+
+.form-alert {
+  margin: 0 0 .5em;
+  color: #9d321f;
+  font: 1.05em / 1.15 'Patrick Hand', cursive;
+}
+
+/* ---------- Tombol: pakai aset PNG, rasio dikunci ---------- */
+.storybook-button {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: center / 100% 100% no-repeat;
+  color: var(--cream);
+  font: 800 1.2em / 1 'Fraunces', Georgia, serif;
+  font-variation-settings: 'SOFT' 100;
+  letter-spacing: .06em;
+  white-space: nowrap;
+  text-shadow: 0 .08em 0 rgba(30, 14, 6, .75), 0 .12em .2em rgba(0, 0, 0, .35);
+  cursor: pointer;
+  filter: drop-shadow(0 .25em .3em rgba(20, 9, 3, .4));
+  transition: transform .18s ease, filter .18s ease;
+
+  &:hover:not(:disabled) {
+    transform: translateY(-.12em);
+    filter: drop-shadow(0 .4em .45em rgba(20, 9, 3, .45));
+  }
+
+  &:active:not(:disabled) { transform: translateY(.06em); }
+
+  /* saat submit, label berubah jadi lebih panjang ("PROCESSING...", "VERIFYING...")
+     — kecilkan sedikit supaya tetap muat di dalam aset tombol */
+  &:disabled {
+    font-size: .8em;
+    letter-spacing: .01em;
+    cursor: not-allowed;
+    opacity: .7;
+  }
+}
+
+.storybook-button--signup {
+  align-self: center;
+  width: 32%;
+  aspect-ratio: 1354 / 673;
+  background-image: url('/assets/buttons/btn-leather.png');
+}
+
+.storybook-button--signin {
+  align-self: center;
+  width: 64%;
+  aspect-ratio: 1293 / 358;
+
+  margin-top: auto;
+  background-image: url('/assets/buttons/btn-greenwood.png');
+}
+
+/* Fokus keyboard yang jelas */
+.storybook-button:focus-visible,
+.password-toggle:focus-visible,
+.journal-links button:focus-visible,
+.journal-links a:focus-visible {
+  outline: .14em dashed #f6d9a4;
+  outline-offset: .25em;
+}
+
+.journal-links button:focus-visible,
+.journal-links a:focus-visible,
+.password-toggle:focus-visible {
+  outline-color: #8c3f2b;
+}
+
+/* ---------- Login: field agak lega ---------- */
+.login-form .paper-field { margin-bottom: 1.15em; }
+
+/* ---------- Register: grid 2 kolom di kertas landscape ---------- */
+.register-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(3, auto) auto 1fr; /* 3 baris field, baris alert, sisa ruang untuk tombol */
+  column-gap: 1.5em;
+  row-gap: 1em;
+
+  .paper-field { margin: 0; }
+  .paper-field:first-of-type { grid-column: 1 / -1; } /* Name selebar kertas */
+  .form-alert { grid-column: 1 / -1; grid-row: 4; margin: 0; }
+  .storybook-button--signup {
+    grid-column: 1 / -1;
+    grid-row: 5;
+    align-self: center;
+    justify-self: center;
+  }
+}
+
+/* ---------- Dekorasi ---------- */
+.decoration {
+  position: absolute;
+  z-index: 4;
+  height: auto;
+  pointer-events: none;
+}
+
+.register-sheet {
+  .decoration--gears {
+    top: 2em;
+    right: 2em;
+    width: 6em;
+    transform: rotate(-5deg);
+  }
+  .decoration--map {
+    bottom: -7em;
+    left: -3em;
+    width: 10em;
+    transform: translateY(-50%) rotate(-8deg);
+  }
+  .decoration--glasses {
+    bottom: 2em;
+    left: 5.5em;
+    width: 7em;
+    transform: rotate(40deg);
+  }
+}
+
+.login-journal .decoration--books {
+  right: -1.8em;
+  bottom: -1.5em;
+  z-index: 6;
+  width: 7.2em;
+}
+
+/* ---------- Footer ---------- */
+.secure-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: .5em;
+  margin: 0;
+  color: #dcc6ad;
+  font-family: 'Patrick Hand', cursive;
+  font-size: clamp(13px, calc(var(--em) * .95), 15px);
+  line-height: 1.3;
+  text-align: center;
+
+  span {
+    flex: none;
+    width: .5em;
+    height: .5em;
+    border-radius: 50%;
+    background: #83b071;
+    box-shadow: 0 0 0 .18em rgba(131, 176, 113, .28);
+  }
+}
+
+/* ==========================================================================
+   < 900px — tablet & HP: ditumpuk, Login di atas, form satu kolom
+   ========================================================================== */
+@media (max-width: 899px) {
+  .storybook-auth {
+    --pad-x: 14px;
+    --em: 15px;
+    justify-content: flex-start;
+    gap: 24px;
+    padding-top: 22px;
+    padding-bottom: 30px;
+  }
+
+  .storybook-brand {
+    width: min(100%, 25em);
+    font-size: 14px;
+  }
+
+  .auth-table {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 46px;
+  }
+
+  /* Binder menempel ke tepi kiri layar, jadi potongan kirinya
+     tidak kelihatan seperti terpotong. */
+  .login-journal {
+    order: -1;
+    align-self: flex-start;
+    width: 23.5em;
+    max-width: none;
+    margin: 0 0 0 calc(var(--pad-x) * -1);
+    font-size: min(16px, calc((100vw - 8px) / 23.5));
+    padding: 3.5em 5.9em 4.3em 6.1em;
+  }
+
+  .register-sheet {
+    --edge: 1.25em;
+    align-self: flex-end;
+    width: min(100%, 30em);
+    padding: 2.6em 2.3em 2.7em 2.5em;
+  }
+
+  .register-form {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+    grid-auto-rows: auto;
+    row-gap: .75em;
+    align-content: start;
+
+    .form-alert,
+    .storybook-button--signup { grid-row: auto; }
+
+    .storybook-button--signup {
+      width: 68%;
+      margin-top: .9em;
+    }
+  }
+
+  .storybook-button--signin { width: 62%; }
+
+  .register-sheet {
+    .decoration--gears {
+      top: -1.7em;
+      right: .4em;
+      left: auto;
+      width: 4.8em;
+    }
+    .decoration--map { display: none; }
+    .decoration--glasses {
+      bottom: -1em;
+      left: 1em;
+      width: 4.6em;
+    }
+  }
+
+  .login-journal .decoration--books {
+    right: -.3em;
+    bottom: -.9em;
+    width: 5.6em;
+    transform: translateY(-50%) rotate(-8deg);
+  }
+}
+
+/* tablet lebar: kertas sedikit menimpa binder supaya komposisinya rapat */
+@media (min-width: 780px) and (max-width: 899px) {
+  .register-sheet { margin-top: -8em; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .storybook-button,
+  .paper-field input {
+    transition: none;
+  }
+}
+
+/* Provider button tetap mengikuti branding resmi Google; panel boleh tumbuh. */
+.google-access { margin-top: 1em; min-width: 0; }
+.google-prepare { width: 100%; padding: .65em; border: 1px solid #8b5a2b; border-radius: .4em; background: #fff7e5; color: #422719; cursor: pointer; }
+.google-prepare:focus-visible { outline: 2px solid #8c3f2b; outline-offset: 3px; }
+.unavailable-note { font-size: .85em; color: #7a5230; }
+.login-journal { min-height: 36em; }

@@ -40,6 +40,35 @@ describe('Auth', () => {
     expect(component).toBeTruthy();
   });
 
+  it('rejects mismatched registration confirmation without a request', () => {
+    component.registerName = 'detective';
+    component.registerEmail = 'test@example.com';
+    component.registerEmailVerify = 'other@example.com';
+    component.register();
+    expect(component.registerError).toContain('Email');
+    expect(component.isSubmitting).toBe(false);
+    httpMock.expectNone('http://localhost:8000/api/auth/register');
+  });
+
+  it('unlocks registration after an existing-account response', () => {
+    component.registerName = 'detective';
+    component.registerEmail = component.registerEmailVerify = 'test@example.com';
+    component.registerPassword = component.registerPasswordVerify = 'strong-password';
+    component.register();
+    const request = httpMock.expectOne('http://localhost:8000/api/auth/register');
+    request.flush({}, {status:409, statusText:'Conflict'});
+    expect(component.isSubmitting).toBe(false);
+    expect(component.registerError).toContain('sudah digunakan');
+  });
+
+  it('explains Google configuration missing without loading Google', async () => {
+    const pending = component.prepareGoogle();
+    httpMock.expectOne('http://localhost:8000/api/auth/google/config').flush({client_id:''});
+    await pending;
+    expect(component.googleError).toContain('belum diaktifkan');
+    expect(component.googleLoading).toBe(false);
+  });
+
   // TES: simulasikan HTTP 401 untuk memastikan form tidak macet setelah password salah.
   it('keeps the form usable after an invalid-password response', () => {
     component.username = 'user1';

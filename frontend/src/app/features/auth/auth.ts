@@ -1,10 +1,12 @@
+import { backendUrl } from '../../core/backend-url';
 import { isPlatformBrowser } from '@angular/common';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectorRef, Component, DestroyRef, Inject, PLATFORM_ID } from '@angular/core';
+import { ChangeDetectorRef, Component, DestroyRef, Inject, PLATFORM_ID, ElementRef, ViewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { finalize, TimeoutError, timeout } from 'rxjs';
+import { finalize, TimeoutError, timeout, firstValueFrom } from 'rxjs';
+import { loadGoogleIdentity } from '../../core/google-identity';
 
 // INTERFACE: bentuk respons login yang diharapkan dari API Python.
 interface LoginResponse {
@@ -18,7 +20,7 @@ interface LoginResponse {
   selector: 'app-auth',
   imports: [FormsModule],
   templateUrl: './auth.html',
-  styleUrl: './auth.css',
+  styleUrl: './auth.scss',
 })
 // CLASS KOMPONEN: mengatur perilaku halaman login, bukan memeriksa password di database.
 export class Auth {
@@ -29,6 +31,100 @@ export class Auth {
   hasAttemptedSubmit = false;
   isSubmitting = false;
   passwordVisible = false;
+  registerName = '';
+  registerEmail = '';
+  registerEmailVerify = '';
+  registerPassword = '';
+  registerPasswordVerify = '';
+  registerError = '';
+  googleError = '';
+  googleLoading = false;
+  googleReady = false;
+  @ViewChild('googleButton') googleButton!: ElementRef<HTMLElement>;
+
+  // REGISTER: validasi konfirmasi; backend tetap memvalidasi dan menangani duplikat.
+  register(): void {
+    if (!isPlatformBrowser(this.platformId) || this.isSubmitting) return;
+    this.registerError = '';
+    const username = this.registerName.trim();
+    const email = this.registerEmail.trim().toLowerCase();
+    if (!/^[A-Za-z0-9_]{3,40}$/.test(username)) {
+      this.registerError = 'Username harus 3–40 huruf, angka, atau underscore.'; return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email !== this.registerEmailVerify.trim().toLowerCase()) {
+      this.registerError = 'Email tidak valid atau konfirmasinya berbeda.'; return;
+    }
+    if (this.registerPassword.length < 10 || this.registerPassword.length > 128
+        || this.registerPassword !== this.registerPasswordVerify) {
+      this.registerError = 'Password 10–128 karakter dan konfirmasinya harus sama.'; return;
+    }
+    this.isSubmitting = true;
+    this.http.post<LoginResponse>(this.backendUrl + '/api/auth/register', {
+      username, email, email_confirmation: this.registerEmailVerify.trim(),
+      password: this.registerPassword, password_confirmation: this.registerPasswordVerify,
+    }).pipe(timeout(15000), takeUntilDestroyed(this.destroyRef), finalize(() => {
+      this.isSubmitting = false; this.changeDetector.markForCheck();
+    })).subscribe({
+      next: response => {
+        this.registerPassword = this.registerPasswordVerify = '';
+        this.completeLogin(response);
+      },
+      error: (error: unknown) => {
+        this.registerError = error instanceof HttpErrorResponse && error.status === 409
+          ? 'Username atau email sudah digunakan. Silakan login.'
+          : this.describeLoginError(error);
+      },
+    });
+  }
+
+  private get backendUrl(): string {
+    return backendUrl();
+  }
+
+  // GIS memverifikasi identitas di Google; backend memverifikasi token + nonce lagi.
+  async prepareGoogle(): Promise<void> {
+    if (!isPlatformBrowser(this.platformId) || this.googleLoading || this.isSubmitting) return;
+    this.googleError = '';
+    this.googleLoading = true;
+    try {
+      if (location.protocol !== 'https:' && !['localhost', '127.0.0.1'].includes(location.hostname)) {
+        throw new Error('Login Google perlu localhost atau domain HTTPS. Untuk LAN HTTP gunakan login biasa.');
+      }
+      const config = await firstValueFrom(this.http.get<{client_id: string}>(this.backendUrl + '/api/auth/google/config').pipe(timeout(15000)));
+      if (!config.client_id) throw new Error('Login Google belum diaktifkan pengelola.');
+      const challenge = await firstValueFrom(this.http.post<{nonce: string}>(this.backendUrl + '/api/auth/google/challenge', {}).pipe(timeout(15000)));
+      const identity = await loadGoogleIdentity();
+      if (this.destroyRef.destroyed) return;
+      identity.initialize({client_id: config.client_id, nonce: challenge.nonce, auto_select: false,
+        callback: result => this.submitGoogle(result.credential, challenge.nonce)});
+      // Icon resmi Google tidak memaksa binder kecil menjadi lebih lebar.
+      identity.renderButton(this.googleButton.nativeElement, {theme: 'outline', size: 'large', type: 'icon'});
+      this.googleReady = true;
+    } catch (error) {
+      this.googleError = error instanceof HttpErrorResponse ? this.describeLoginError(error)
+        : error instanceof Error ? error.message : 'Login Google gagal disiapkan.';
+    } finally {
+      this.googleLoading = false; this.changeDetector.markForCheck();
+    }
+  }
+
+  private submitGoogle(credential: string, nonce: string): void {
+    if (this.destroyRef.destroyed || this.isSubmitting) return;
+    this.isSubmitting = true;
+    this.http.post<LoginResponse>(this.backendUrl + '/api/auth/google', {credential, nonce})
+      .pipe(timeout(20000), takeUntilDestroyed(this.destroyRef), finalize(() => {
+        this.isSubmitting = false; this.googleReady = false;
+        this.googleButton?.nativeElement.replaceChildren();
+        this.changeDetector.markForCheck();
+      })).subscribe({
+        next: response => this.completeLogin(response),
+        error: (error: unknown) => {
+          this.googleError = error instanceof HttpErrorResponse && error.status === 409
+            ? 'Email sudah terdaftar. Gunakan metode login awal.'
+            : 'Login Google gagal atau kedaluwarsa. Silakan coba lagi.';
+        },
+      });
+  }
 
   // CONSTANT MILIK INSTANCE: batas tunggu login; private berarti dipakai di dalam class.
   private readonly loginTimeoutMs = 15_000;
@@ -60,9 +156,9 @@ export class Auth {
     if (this.errorMessage) return;
 
     this.isSubmitting = true;
-    const backendUrl = `${window.location.protocol}//${window.location.hostname}:8000`;
+    const baseUrl = backendUrl();
     this.http
-      .post<LoginResponse>(`${backendUrl}/api/auth/login`, {
+      .post<LoginResponse>(`${baseUrl}/api/auth/login`, {
         username: this.username,
         password: this.password,
       })

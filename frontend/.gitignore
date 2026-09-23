@@ -1,0 +1,4 @@
+
+# Generated public deployment configuration
+/src/environments/environment.vercel.ts
+/.vercel/

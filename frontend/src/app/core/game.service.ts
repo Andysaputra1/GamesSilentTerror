@@ -1,3 +1,4 @@
+import { backendUrl } from './backend-url';
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { timeout } from 'rxjs';
@@ -47,7 +48,7 @@ export interface GameSnapshot {
 export class GameService {
   constructor(private readonly http: HttpClient) {}
   request(code: string, body?: unknown, action = 'play') {
-    const base = `${window.location.protocol}//${window.location.hostname}:8000/api/rooms/${encodeURIComponent(code)}`;
+    const base = `${backendUrl()}/api/rooms/${encodeURIComponent(code)}`;
     const headers = new HttpHeaders({
       Authorization: 'Bearer ' + (localStorage.getItem('shadow_heist_access_token') ?? ''),
     });
