@@ -10,6 +10,7 @@ import {
   ElementRef,
   ViewChild,
   OnInit,
+  signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
@@ -28,6 +29,7 @@ import {
   timeout,
 } from 'rxjs';
 import { loadGoogleIdentity } from '../../core/google-identity';
+import { profileCountdown, PROFILE_COUNTDOWN_TARGET } from '../../core/profile-countdown';
 
 // INTERFACE: bentuk respons login yang diharapkan dari API Python.
 interface LoginResponse {
@@ -45,6 +47,9 @@ interface LoginResponse {
 })
 // CLASS KOMPONEN: mengatur perilaku halaman login, bukan memeriksa password di database.
 export class Auth implements OnInit {
+  readonly countdown = signal(['--', '--', '--', '--', '--']);
+  readonly countdownEnded = signal(false);
+  readonly countdownLabels = ['BULAN', 'HARI', 'JAM', 'MENIT', 'DETIK'];
   backendStatus: 'checking' | 'online' | 'offline' = 'checking';
   readonly serverContactUrl =
     'https://wa.me/6281995247372?text=' +
@@ -225,6 +230,15 @@ export class Auth implements OnInit {
   // Request tidak ditumpuk; teardown komponen membatalkan polling dan request yang masih berjalan.
   ngOnInit(): void {
     if (!isPlatformBrowser(this.platformId)) return;
+    const updateCountdown = () => {
+      const now = Date.now();
+      this.countdown.set(profileCountdown(now));
+      this.countdownEnded.set(now >= PROFILE_COUNTDOWN_TARGET);
+    };
+    updateCountdown();
+    // Hitung ulang dari waktu absolut; hentikan timer saat halaman login ditinggalkan.
+    const countdownTimer = setInterval(updateCountdown, 1000);
+    this.destroyRef.onDestroy(() => clearInterval(countdownTimer));
     merge(
       of(null),
       interval(30_000),

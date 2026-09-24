@@ -52,6 +52,63 @@
 }
 
 /* ---------- Judul: papan kayu ---------- */
+.auth-topbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 24px;
+  width: 100%;
+
+  .storybook-brand { grid-column: 2; }
+}
+
+.auth-countdown {
+  justify-self: end;
+  width: 280px;
+  max-width: 100%;
+  color: #fbeacb;
+  text-shadow: 0 2px 3px #241006;
+  text-align: center;
+}
+
+.countdown-heading {
+  margin: 0;
+  color: #fbeacb;
+  font: 700 20px/1.2 'Fraunces', Georgia, serif;
+}
+
+.countdown-date {
+  margin: 4px 0 12px;
+  color: #f2dbb0;
+  font: 13px/1.2 'Patrick Hand', cursive;
+  letter-spacing: .06em;
+}
+
+.countdown-digits {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.countdown-unit {
+  display: grid;
+  gap: 5px;
+  min-width: 30px;
+
+  b { font: 700 24px/1 'Fraunces', Georgia, serif; font-variant-numeric: tabular-nums; }
+  small { font: 11px/1 'Patrick Hand', cursive; letter-spacing: .04em; }
+}
+
+.countdown-separator { color: #e8c073; font: 20px/24px Georgia, serif; }
+
+@media (max-width: 1100px) {
+  .auth-topbar {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+}
+
 .storybook-brand {
   position: relative;
   z-index: 4;

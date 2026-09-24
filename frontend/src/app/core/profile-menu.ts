@@ -18,27 +18,15 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { finalize } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { SessionService, UserProfile } from './session.service';
-import { profileCountdown, PROFILE_COUNTDOWN_TARGET } from './profile-countdown';
 
 @Component({
   selector: 'app-profile-menu',
   imports: [FormsModule],
   template: `
-    <div class="profile-bar">
-      <section class="profile-countdown" aria-label="Hitung mundur menuju 8 Januari 2027 pukul 23.59 WIB">
-        <p class="countdown-heading">{{ countdownEnded() ? 'WAKTU TERCAPAI' : 'COUNTDOWN' }} <span>08 JAN 2027 · 23:59 WIB</span></p>
-        <div class="countdown-digits" role="timer" aria-live="off">
-          @for (label of countdownLabels; track label; let index = $index) {
-            <div class="countdown-unit"><b>{{ countdown()[index] }}</b><small>{{ label }}</small></div>
-            @if (index < 4) { <span class="countdown-separator" aria-hidden="true">:</span> }
-          }
-        </div>
-      </section>
     <button #trigger class="profile-trigger" type="button" [attr.aria-expanded]="open()"
       aria-controls="profile-actions" (click)="toggle()" [disabled]="session.loggingOut()">
       <i aria-hidden="true">◈</i><b>{{ displayName }}</b><span aria-hidden="true">⌄</span>
     </button>
-    </div>
     @if (open()) {
       <section id="profile-actions" class="profile-actions" aria-label="Menu akun">
         <p>AKUN SAYA</p>
@@ -82,18 +70,6 @@ import { profileCountdown, PROFILE_COUNTDOWN_TARGET } from './profile-countdown'
   `,
   styles: `
     :host { position: relative; display: block; z-index: 20; max-width: 100%; }
-    .profile-bar { display: flex; align-items: center; justify-content: flex-end; gap: 16px; flex-wrap: wrap; }
-    .profile-countdown { padding: 9px 13px; border: 1px solid #817357; border-radius: 12px;
-      background: #f5eee0; color: #28251e; }
-    .countdown-heading { display: flex; align-items: center; gap: 12px; margin: 0 0 6px;
-      font: 700 9px var(--font-body, 'Segoe UI', sans-serif); letter-spacing: .1em; }
-    .countdown-heading span { font-size: 8px; font-weight: 500; color: #716038; letter-spacing: .04em; }
-    .countdown-digits { display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; }
-    .countdown-unit { display: grid; gap: 3px; text-align: center; min-width: 29px; }
-    .countdown-unit b { font: 700 20px/1 Consolas, monospace; font-variant-numeric: tabular-nums; }
-    .countdown-unit small { font-size: 7px; line-height: 1; letter-spacing: .09em; color: #716038; }
-    .countdown-separator { font: 16px/20px Consolas, monospace; color: #8b7c64; }
-    @media (max-width: 600px) { .profile-bar { gap: 8px; }.profile-countdown { padding: 8px 10px; }.countdown-unit b { font-size: 18px; } }
     button { font: inherit; cursor: pointer; }
     button:focus-visible { outline: 3px solid #34768e; outline-offset: 3px; }
     button:disabled { cursor: wait; opacity: .65; }
@@ -138,9 +114,6 @@ export class ProfileMenu implements OnInit {
   readonly editing = signal(false);
   readonly saving = signal(false);
   readonly saved = signal(false);
-  readonly countdown = signal(['--', '--', '--', '--', '--']);
-  readonly countdownEnded = signal(false);
-  readonly countdownLabels = ['BULAN', 'HARI', 'JAM', 'MENIT', 'DETIK'];
   private readonly profileName = signal('');
   private readonly profileUsername = signal('');
   draftName = '';
@@ -163,16 +136,6 @@ export class ProfileMenu implements OnInit {
   // Muat cache profil hasil login/update; render SSR tidak mengakses storage browser.
   ngOnInit(): void {
     this.readProfile();
-    if (!isPlatformBrowser(this.platform)) return;
-    const update = () => {
-      const now = Date.now();
-      this.countdown.set(profileCountdown(now));
-      this.countdownEnded.set(now >= PROFILE_COUNTDOWN_TARGET);
-    };
-    update();
-    // Hitung ulang dari waktu absolut agar tetap akurat setelah tab kembali aktif.
-    const timer = setInterval(update, 1000);
-    this.destroy.onDestroy(() => clearInterval(timer));
   }
 
   // Nama tampilan dapat berubah tanpa mengganti identifier yang dipakai lobby dan pertandingan.
