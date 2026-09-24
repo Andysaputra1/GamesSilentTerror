@@ -4,12 +4,12 @@ describe('profile countdown in WIB', () => {
   it('uses calendar months and the exact January deadline', () => {
     expect(profileCountdown(Date.parse('2026-09-24T23:59:00+07:00'))).toEqual([
       '03',
-      '15',
+      '14',
       '00',
       '00',
       '00',
     ]);
-    expect(profileCountdown(Date.parse('2026-12-08T23:59:00+07:00'))).toEqual([
+    expect(profileCountdown(Date.parse('2026-12-07T23:59:00+07:00'))).toEqual([
       '01',
       '00',
       '00',
@@ -30,8 +30,8 @@ describe('profile countdown in WIB', () => {
       expect(profileCountdown(now)).toEqual(['00', '00', '00', '00', '00']);
   });
   it('does not depend on the timezone notation of the same instant', () => {
-    expect(profileCountdown(Date.parse('2027-01-08T16:58:00Z'))).toEqual(
-      profileCountdown(Date.parse('2027-01-08T23:58:00+07:00')),
+    expect(profileCountdown(Date.parse('2027-01-07T16:58:00Z'))).toEqual(
+      profileCountdown(Date.parse('2027-01-07T23:58:00+07:00')),
     );
   });
 });

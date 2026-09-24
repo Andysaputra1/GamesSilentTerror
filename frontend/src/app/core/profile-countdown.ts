@@ -1,5 +1,6 @@
 // Target absolut WIB: sama pada perangkat dengan zona waktu berbeda.
-export const PROFILE_COUNTDOWN_TARGET = Date.parse('2027-01-08T23:59:00+07:00');
+// Countdown berakhir sehari sebelum deadline 8 Januari yang ditampilkan sebagai jeda cadangan.
+export const PROFILE_COUNTDOWN_TARGET = Date.parse('2027-01-07T23:59:00+07:00');
 const WIB_OFFSET = 7 * 60 * 60 * 1000;
 
 export function profileCountdown(now: number): string[] {
