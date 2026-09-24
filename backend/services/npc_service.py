@@ -3,6 +3,7 @@
 import asyncio
 import json
 import time
+from time import perf_counter
 from typing import Literal
 
 from openai import AsyncOpenAI
@@ -14,6 +15,7 @@ from services.ai_runtime_service import ai_runtime
 from services.checker_service import checker_service
 from services.persistence_service import PersistenceService, PersistenceError
 from services.room_service import room_service
+from services.ai_diagnostics import capture_exchange, record_request, record_response
 
 
 class NPCDecision(BaseModel):
@@ -80,22 +82,34 @@ async def request_decision(prompt, config):
     elif config.api_backend == "openrouter":
         raw = await openrouter_reply(prompt, config=config)
     else:
+        payload = {
+            "model": config.openai_model,
+            "input": prompt,
+            "reasoning": {"effort": config.openai_reasoning_effort},
+            "max_output_tokens": config.openai_max_output_tokens,
+            "store": False,
+        }
+        record_request("https://api.openai.com/v1/responses", payload)
         async with AsyncOpenAI(api_key=config.openai_api_key_value, timeout=20) as client:
-            response = await client.responses.create(
-                model=config.openai_model,
-                input=prompt,
-                reasoning={"effort": config.openai_reasoning_effort},
-                max_output_tokens=config.openai_max_output_tokens,
-                store=False,
-            )
+            response = await client.responses.create(**payload)
             raw = response.output_text
+            record_response(
+                200,
+                {
+                    "id": response.id,
+                    "model": response.model,
+                    "output": raw,
+                    "usage": response.usage.model_dump() if response.usage else None,
+                },
+            )
     return NPCDecision.model_validate_json(raw.strip())
 
 
 class NPCService:
     # Batasi request bersamaan dan lacak fase agar satu NPC tidak melakukan aksi ganda.
-    def __init__(self, sio):
+    def __init__(self, sio, *, broadcast=None):
         self.sio = sio
+        self.broadcast = broadcast or sio.emit
         self.tasks = set()
         self.issued = set()
         self.limit = asyncio.Semaphore(3)
@@ -129,6 +143,7 @@ class NPCService:
 
     # Validasi ulang fase dan izin setelah LLM selesai; balasan basi tidak boleh masuk fase baru.
     async def turn(self, code, match, key, context):
+        started = perf_counter()
         trace = checker_service.begin(code, key[3], "NPC structured decision")
         trace.update(match_id=match.id, prompt=decision_prompt(context), stage="npc_pending")
         decision_applied = False
@@ -163,9 +178,13 @@ class NPCService:
                         )
                     ),
                 )
-                decision = await asyncio.wait_for(
-                    request_decision(trace["prompt"], config), timeout=min(20, remaining - 0.5)
+                trace.setdefault("timings", {})["queue_ms"] = round(
+                    (perf_counter() - started) * 1000, 2
                 )
+                with capture_exchange(trace):
+                    decision = await asyncio.wait_for(
+                        request_decision(trace["prompt"], config), timeout=min(20, remaining - 0.5)
+                    )
             trace["output"] = decision.model_dump_json()
             reply = None
             with room_service.lock:
@@ -207,7 +226,7 @@ class NPCService:
                     reply = match.add_message(key[3], decision.message.strip())
                 trace["stage"] = "npc_complete"
             if reply:
-                await self.sio.emit("receive_chat", reply, to=code)
+                await self.broadcast("receive_chat", reply, to=code)
         except asyncio.CancelledError:
             raise
         except Exception as error:
@@ -217,6 +236,7 @@ class NPCService:
                 llm_error=type(error).__name__,
             )
         finally:
+            trace["duration_ms"] = round((perf_counter() - started) * 1000, 2)
             try:
                 PersistenceService(code).record_trace(trace)
             except PersistenceError:

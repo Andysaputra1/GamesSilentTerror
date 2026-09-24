@@ -70,9 +70,11 @@ a {
   gap: 20px;
 }
 .operation-header {
+  flex-wrap: wrap;
   padding-bottom: 24px;
   border-bottom: 1px solid var(--color-line);
 }
+.operation-header > app-profile-menu { margin-left: auto; }
 .operation-brand {
   font-size: 13px;
   font-weight: 800;

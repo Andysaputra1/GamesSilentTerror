@@ -73,7 +73,7 @@ app.include_router(api_router)
 # The former Node real-time server is hosted alongside FastAPI on port 8000.
 sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins=settings.allowed_origins)
 socket_controller = register_socket_handlers(sio, analysis_service, persistence_service)
-npc_service = NPCService(sio)
+npc_service = NPCService(sio, broadcast=socket_controller.emit_room)
 
 # Uvicorn targets this object so FastAPI and Socket.IO share one backend port.
 asgi_app = socketio.ASGIApp(sio, other_asgi_app=app)

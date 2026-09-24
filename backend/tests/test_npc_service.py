@@ -75,6 +75,15 @@ class NPCTests(unittest.IsolatedAsyncioTestCase):
         self.sio.emit.assert_awaited_once()
         self.assertEqual(self.match.messages[0]["sender"], "VEIL")
 
+    async def test_npc_chat_uses_authorized_broadcast_when_configured(self):
+        broadcast = AsyncMock()
+        self.service = NPCService(self.sio, broadcast=broadcast)
+        await self.turn("NOX", NPCDecision(message="Siapa yang punya alibi?"))
+        broadcast.assert_awaited_once_with(
+            "receive_chat", self.match.messages[0], to=self.room.code
+        )
+        self.sio.emit.assert_not_awaited()
+
     async def test_illegal_action_does_not_change_state_and_fallback_can_act(self):
         self.match.phase = "night"
         await self.turn("NOX", NPCDecision(action="hostage", target="outsider"))

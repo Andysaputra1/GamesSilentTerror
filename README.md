@@ -8,9 +8,9 @@ Nama Silent Terror masih sementara. Nama repository, database, dan container mas
 
 Sudah dapat dimainkan: login, main page, buat/gabung ruangan, 4–10 peserta dengan pilihan 6/8/12 ronde, bot opsional, role acak dari server, timer Day → Night → Tribunal, skill/cooldown, voting, eksekusi, dan kondisi kemenangan. Panel administrator menyediakan tambah user, reset password akun lokal, dan penghapusan akun tanpa menghapus riwayat chat. Hanya pembuat ruangan yang mengatur bot dan memulai game.
 
-Role: **Hitman** (Hostage/Gag Order), **Spy** (Guard), **Stalker** (Peek), dan **Civilian** (observasi). Korban Hostage tetap terlihat hidup, tetapi kehilangan chat, voting, dan aksi; identitas target tidak diumumkan. Balasan bot memakai pipeline SVM → fuzzy → LLM melalui backend.
+Role: **Hitman** (Hostage/Gag Order), **Spy** (Guard), **Stalker** (Peek), dan **Civilian** (observasi). Korban Hostage tetap hidup dan kehilangan chat serta voting permanen, tetapi skill malam tetap tersedia sesuai role/cooldown; identitas target tidak diumumkan.
 
-Engine menjadi sumber kebenaran, bukan browser/LLM. Bot memilih aksi/vote menggunakan aturan, sementara LLM menghasilkan percakapan sesuai role bot tersebut. Baca [aturan, alur kode, dan batas implementasi](GAME_CONCEPT.md).
+Engine menjadi sumber kebenaran, bukan browser/LLM. NPC mengambil giliran mandiri: model terpilih memilih aksi, vote, dan percakapan dari konteks privat masing-masing. Engine memvalidasi keputusan; fallback aturan mengisi aksi yang kosong jika model gagal. Keputusan `wait` yang valid tetap dihormati. SVM/fuzzy menganalisis pesan manusia untuk arsip. Baca [aturan, alur kode, dan batas implementasi](GAME_CONCEPT.md).
 
 ## Persiapan
 
@@ -46,7 +46,7 @@ cp .env.example .env
 
 Lakukan penyalinan hanya saat setup awal; jangan menimpa `.env` yang sudah dikonfigurasi. File ini menyimpan konfigurasi lokal dan secret, sehingga tidak boleh di-commit.
 
-### 3. Siapkan model SVM — diperlukan untuk balasan bot
+### 3. Siapkan model SVM — untuk analisis intent dan balasan lobby lama
 
 Minta artifact terlatih `intent_classifier.pkl` kepada pengelola proyek, lalu letakkan di:
 
@@ -56,7 +56,7 @@ backend/artifacts/svm/intent_classifier.pkl
 
 File `.pkl` sengaja diabaikan Git dan **tidak tersedia hanya dengan clone repository**. Gunakan hanya artifact tepercaya karena pemuatan pickle dapat menjalankan kode.
 
-Pada implementasi saat ini, tanpa model SVM yang berhasil dimuat, pesan pemain masih bisa diteruskan tetapi jalur balasan NOX tidak memanggil LLM. Ini berlaku untuk mode Ollama maupun API. Lihat [panduan artifact SVM](backend/artifacts/svm/README.md).
+Tanpa model SVM, pesan pemain masih bisa diteruskan dan scheduler NPC pertandingan tetap dapat memanggil LLM. Analisis intent dan balasan reaktif NOX di lobby lama memerlukan SVM. Ini berlaku untuk mode Ollama maupun API. Lihat [panduan artifact SVM](backend/artifacts/svm/README.md).
 
 ## Menjalankan aplikasi
 
@@ -183,7 +183,7 @@ Login aplikasi development: **`user1` / `user132`**. Akun ini disiapkan oleh mig
 
 Akun demo tambahan: **`janice` / `user132`** dan **`kimberly` / `user132`** melalui migration `V3__add_demo_players.sql`. Database lama perlu menerapkan V3; startup backend tidak otomatis menjalankan migration. Migration tidak menimpa password akun yang sudah ada. Ketiga akun/password bersama ini hanya untuk development, bukan deployment publik.
 
-Alur mencoba: **Login → Main page → Enter Tribunal → Buat Ruangan / Gabung → + Bot → Mulai Permainan**. Bot mengisi kursi sampai minimal 4 peserta sehingga bisa dicoba sendiri. Tanpa bot, siapkan minimal 4 akun berbeda. Pemilik ruangan menekan Mulai; anggota lain menekan Masuk Permainan ketika game sudah dimulai.
+Alur mencoba: **Login → Main page → Enter Tribunal → Buat Ruangan / Gabung → + Bot → Mulai Permainan**. Bot mengisi semua kursi kosong sampai kapasitas pilihan host sehingga bisa dicoba sendiri. Tanpa bot, siapkan minimal 4 akun berbeda. Pemilik ruangan menekan Mulai; anggota lain menekan Masuk Permainan ketika game sudah dimulai.
 
 Di game, buka role privatmu. Saat Day, diskusikan alibi; Hitman dapat memilih target Gag. Saat Night, pilih kartu target lalu kunci Hostage/Guard/Peek jika tersedia. Saat Tribunal, pilih kartu tersangka lalu kunci vote. Pemain yang tidak bisa bertindak tetap dapat menonton. Setelah selesai, kembali ke lobby → Keluar ruangan → Buat ruangan baru.
 
@@ -272,7 +272,7 @@ proxy/             Gateway Nginx
 docker-compose.yml Service development dan volume
 ```
 
-Alur analisis chat: **pesan → SVM intent → bobot agresivitas → fuzzy suspicion → LLM NOX → penyimpanan MySQL → balasan chat**. Persentase diam pada fuzzy masih nilai tetap, bukan observasi diam pemain yang sesungguhnya.
+Alur chat pertandingan: **pesan → otorisasi → SVM/fuzzy → validasi ulang fase/hak chat → penyimpanan MySQL → broadcast**. Secara terpisah, timer menjalankan **NPC → konteks privat → LLM → validasi keputusan → aksi/vote/chat**. Persentase diam pada fuzzy masih nilai tetap, bukan observasi diam pemain yang sesungguhnya.
 
 Dengan container aplikasi sudah berjalan:
 
@@ -320,24 +320,12 @@ dikonfigurasi dalam `angular.json`; jangan menganggapnya sebagai tes siap pakai.
 
 ## Catatan keamanan
 
-### Pipeline checker (development saja)
+### Pipeline checker
 
-Buka `http://localhost:4200/games/checker`, masukkan kode ruangan setelah pertandingan
-selesai. Link **Lihat analisis pertandingan** di hasil game mengisi kode
-secara otomatis. Checker dikunci selama pertandingan aktif (HTTP 403) supaya prompt
-tidak membocorkan role bot. Monitor menampilkan pesan, intent SVM, bobot/agresivitas,
-input/output fuzzy, prompt persis yang diberikan ke LLM, provider/model,
-output/fallback, status proses, dan ID pesan MySQL. Ini bukan chain-of-thought
-internal model; hanya input/output dan tahap aplikasi yang dapat diamati.
-
-Auto refresh setiap 2 detik, dengan 100 jejak terbaru per ruangan di memori.
-Jejak lama sebelum fitur aktif tidak direkonstruksi dari DB dan jejak hilang saat
-backend restart. Silence fuzzy masih konstan 20%, bukan pengukuran pemain.
-
-**Sesuai kebutuhan development, route ini dan GET `/api/rooms/{code}/checker`
-tidak memakai guard/autentikasi, tetapi menolak pertandingan aktif.** Setelah game selesai,
-siapa pun dengan kode ruangan dapat membaca chat dan prompt berisi role bot. Jangan expose aplikasi/API ini ke
-internet; wajib tambahkan pembatasan akses atau nonaktifkan checker sebelum
-deployment publik. Monitor tidak mengirim token/API key konfigurasi ke browser.
+Endpoint checker publik lama `GET /api/rooms/{code}/checker` sudah ditutup (HTTP 410).
+Trace/prompt hanya tersedia lewat `/panel` dengan sesi administrator. Data ini dapat
+berisi role dan intel privat NPC, sehingga administrator harus dipisahkan dari peserta
+eksperimen. Trace menunjukkan input/output aplikasi, bukan chain-of-thought internal model.
+Silence fuzzy masih konstan 20%, bukan pengukuran aktivitas pemain.
 
 Compose ini untuk development lokal, bukan deployment publik siap pakai. Ganti kredensial default dan akun demo sebelum deployment; batasi akses port database/phpMyAdmin, serta siapkan HTTPS dan pengamanan deployment. Jangan commit `.env`, API key, file upload pengguna, atau artifact privat. Folder referensi desain `communicationfolder/` juga diabaikan Git.

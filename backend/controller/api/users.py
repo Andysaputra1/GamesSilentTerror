@@ -7,9 +7,13 @@ from controller.api.panel import require_panel
 from services.auth_service import AuthenticationPersistenceError
 from services import user_management_service as users
 from schemas.auth import UpdateProfileRequest
+from controller.middleware.safe_validation import SafeValidationRoute
 
 router = APIRouter(
-    prefix="/api/panel/users", tags=["panel-users"], dependencies=[Depends(require_panel)]
+    prefix="/api/panel/users",
+    tags=["panel-users"],
+    dependencies=[Depends(require_panel)],
+    route_class=SafeValidationRoute,
 )
 
 

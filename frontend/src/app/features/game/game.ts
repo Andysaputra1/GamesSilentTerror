@@ -157,7 +157,7 @@ export class Game implements OnInit, OnDestroy {
     });
     this.socket.on('receive_chat', (message: GameMessage) => {
       if (this.game && !this.game.messages.some((item) => item.id === message.id))
-        this.game.messages.push(message);
+        this.game.messages = [...this.game.messages, message].slice(-100);
       this.cdr.markForCheck();
     });
   }
@@ -176,6 +176,7 @@ export class Game implements OnInit, OnDestroy {
   // Sinkronkan snapshot/aksi server, reset pilihan fase lama, dan tampilkan kegagalan request.
   private request(body?: unknown, action = 'play'): void {
     this.busy = true;
+    const messagesAtRequest = new Set(this.game?.messages.map((message) => message.id));
     this.api
       .request(this.code, body, action)
       .pipe(
@@ -187,6 +188,17 @@ export class Game implements OnInit, OnDestroy {
       )
       .subscribe({
         next: (snapshot) => {
+          // Echo socket dapat tiba sesudah snapshot server dibuat tetapi sebelum HTTP selesai.
+          // Pertahankan pesan baru itu, tanpa menghidupkan lagi riwayat lama yang sudah dipangkas.
+          const receivedDuringRequest =
+            this.game?.id === snapshot.game.id
+              ? this.game.messages.filter((message) => !messagesAtRequest.has(message.id))
+              : [];
+          const snapshotIds = new Set(snapshot.game.messages.map((message) => message.id));
+          snapshot.game.messages = [
+            ...snapshot.game.messages,
+            ...receivedDuringRequest.filter((message) => !snapshotIds.has(message.id)),
+          ].slice(-100);
           this.game = snapshot.game;
           this.seconds = this.game.winner
             ? 0

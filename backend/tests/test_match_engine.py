@@ -400,6 +400,7 @@ class SocketGameTests(unittest.IsolatedAsyncioTestCase):
         room = rooms.create("alice")
         rooms.set_bot(room.code, "alice", True)
         rooms.start(room.code, "alice")
+        room.match.ai_controlled = False  # Uji jalur balasan legacy, bukan scheduler NPC.
         sio = Mock(emit=AsyncMock(), enter_room=AsyncMock())
         analysis = Mock()
         analysis.predict_intent.return_value = "neutral"
@@ -420,5 +421,6 @@ class SocketGameTests(unittest.IsolatedAsyncioTestCase):
         ):
             await controller.send_chat("sid", {"username": "alice", "message": "halo"})
         self.assertEqual(len(room.match.messages), 1)
+        analysis.create_host_response.assert_awaited_once()
         self.assertEqual(room.match.messages[0]["sender"], "alice")
         self.assertEqual(controller.ai_pending, set())

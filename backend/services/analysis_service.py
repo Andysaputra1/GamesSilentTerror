@@ -3,6 +3,7 @@
 from __future__ import annotations
 from services.ai_runtime_service import ai_runtime
 from services.activity_service import activity
+from services.ai_diagnostics import capture_exchange, record_request, record_response
 
 from collections import deque
 from dataclasses import dataclass
@@ -162,17 +163,18 @@ class AnalysisService:
         """Add context and ask the selected provider to speak as NOX."""
         # TAHAP 6: simpan konteks pesan pemain (maksimal 10 pesan di memori).
         self._chat_history.append(f"{player_name}: {message}")
-        return await self._request_host_response(
-            player_name=player_name,
-            message=message,
-            intent=intent,
-            aggressiveness=aggressiveness,
-            suspicion_score=suspicion_score,
-            suspicion_status=suspicion_status,
-            trace=trace,
-            bot_name=bot_name,
-            bot_role=bot_role,
-        )
+        with capture_exchange(trace):
+            return await self._request_host_response(
+                player_name=player_name,
+                message=message,
+                intent=intent,
+                aggressiveness=aggressiveness,
+                suspicion_score=suspicion_score,
+                suspicion_status=suspicion_status,
+                trace=trace,
+                bot_name=bot_name,
+                bot_role=bot_role,
+            )
 
     # HELPER ASYNC LLM: susun prompt, catat trace bila diminta, panggil provider, dan kembalikan teks atau pesan fallback.
     async def _request_host_response(
@@ -276,15 +278,18 @@ SVM, fuzzy logic, AI, atau status role rahasia.
 
         unavailable_response = "AI Host sedang tidak dapat dihubungi."
         client = AsyncOpenAI(api_key=api_key, timeout=selected.openai_timeout_seconds)
+        payload = {
+            "model": selected.openai_model,
+            "input": prompt,
+            "reasoning": {"effort": selected.openai_reasoning_effort},
+            "max_output_tokens": selected.openai_max_output_tokens,
+            "store": False,
+        }
+        record_request("https://api.openai.com/v1/responses", payload)
         try:
-            response = await client.responses.create(
-                model=selected.openai_model,
-                input=prompt,
-                reasoning={"effort": selected.openai_reasoning_effort},
-                max_output_tokens=selected.openai_max_output_tokens,
-                store=False,
-            )
+            response = await client.responses.create(**payload)
             response_text = response.output_text.strip()
+            record_response(200, {"output": response_text, "model": selected.openai_model})
             if response_text:
                 return response_text
             logger.warning(

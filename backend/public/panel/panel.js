@@ -18,9 +18,14 @@ let token = '',
 // Tampilkan pesan status sebagai teks agar isi dinamis tidak dianggap HTML.
 const notice = (text) => {
   $('notice').textContent = text;
+  clearTimeout(notice.timer);
+  notice.timer = setTimeout(() => {
+    $('notice').textContent = '';
+  }, 8000);
 };
 // Kirim request panel dan hapus sesi lokal jika server menyatakan token tidak valid.
 async function request(path, body, method = 'GET') {
+  const epoch = generation;
   const response = await fetch(path, {
     method,
     cache: 'no-store',
@@ -29,9 +34,11 @@ async function request(path, body, method = 'GET') {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: body ? JSON.stringify(body) : undefined,
+    signal: AbortSignal.timeout(path.endsWith('/test-ai') ? 45000 : 15000),
   });
+  if (epoch !== generation) throw new Error('Sesi telah berubah. Respons lama diabaikan.');
   if (response.status === 204) return {};
-  const data = await response.json();
+  const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     if (response.status === 401 && token) clearSession();
     throw new Error(
@@ -58,7 +65,100 @@ function clearSession() {
   $('traces').replaceChildren();
   $('trace-detail').textContent = '';
   $('events').textContent = '';
+  $('probe-result').replaceChildren();
+  $('ai-status').textContent = 'Belum diperiksa.';
+  $('probe-progress').textContent = '';
+  historyVersion++;
   traces = [];
+}
+
+function node(tag, text, className = '') {
+  const element = document.createElement(tag);
+  if (text !== undefined) element.textContent = text;
+  element.className = className;
+  return element;
+}
+function duration(value) {
+  if (typeof value !== 'number') return 'Belum tercatat';
+  return value >= 1000 ? `${(value / 1000).toFixed(2)} dtk` : `${value.toFixed(1)} ms`;
+}
+function renderReport(container, trace) {
+  container.replaceChildren();
+  container.classList.remove('empty-state');
+  const metrics = node('div', undefined, 'metric-grid');
+  const success = trace.active ?? ['complete', 'delivered', 'npc_complete'].includes(trace.stage);
+  for (const [label, value] of [
+    ['Status', trace.active === undefined ? trace.stage : success ? 'AI merespons' : 'AI gagal'],
+    ['Total proses', duration(trace.duration_ms)],
+    ['Waktu LLM', duration(trace.timings?.llm_ms)],
+    ['Provider', trace.provider || 'Belum dipanggil'],
+    ['Model', trace.model || '—'],
+    [
+      'HTTP / validasi',
+      `${trace.response?.status_code ?? '—'}${trace.valid_decision === undefined ? '' : trace.valid_decision ? ' · valid' : ' · tidak valid'}`,
+    ],
+  ]) {
+    const metric = node('div', undefined, 'metric');
+    metric.append(
+      node('small', label),
+      node('strong', value, label === 'Status' ? (success ? 'status-good' : 'status-pending') : ''),
+    );
+    metrics.append(metric);
+  }
+  container.append(metrics);
+  if (trace.message_status)
+    container.append(node('p', trace.message_status, success ? 'status-good' : 'status-bad'));
+  const steps = node('div', undefined, 'steps');
+  for (const [key, value] of Object.entries(trace.timings || {}))
+    steps.append(node('span', `${key.replace('_ms', '')}: ${duration(value)}`, 'step'));
+  container.append(
+    steps,
+    node('h4', 'INPUT PEMAIN', 'report-title'),
+    node('pre', trace.message || '—'),
+  );
+  container.append(
+    node('h4', 'OUTPUT / KEPUTUSAN', 'report-title'),
+    node(
+      'pre',
+      typeof trace.output === 'string'
+        ? trace.output
+        : trace.output
+          ? JSON.stringify(trace.output, null, 2)
+          : trace.response?.body?.output || 'Belum ada output. Lihat status atau error di bawah.',
+      'output',
+    ),
+  );
+  const sections = [
+    [
+      'Analisis SVM / fuzzy',
+      trace.analysis || {
+        intent: trace.intent,
+        aggressiveness: trace.aggressiveness,
+        suspicion_score: trace.suspicion_score,
+        silence_percentage: trace.silence_percentage,
+      },
+    ],
+    [
+      'Request LLM · endpoint & parameter',
+      trace.request || 'Tidak tercatat pada trace ini. Trace lama tidak direkonstruksi.',
+    ],
+    ['Response LLM · status, output & usage', trace.response || 'Tidak tercatat pada trace ini.'],
+    ['Prompt yang dikirim', trace.prompt || 'Belum mengirim prompt.'],
+    [
+      'Konteks skenario / NPC',
+      trace.context || 'Lihat prompt untuk konteks NPC pada trace pertandingan.',
+    ],
+    ['Seluruh trace JSON', trace],
+  ];
+  for (const [title, value] of sections) {
+    const detail = node('details');
+    detail.append(
+      node('summary', title),
+      node('pre', typeof value === 'string' ? value : JSON.stringify(value, null, 2)),
+    );
+    container.append(detail);
+  }
+  if (trace.note) container.append(node('p', trace.note, 'hint'));
 }
 // Tampilkan kolom konfigurasi yang sesuai dengan provider pilihan form.
 function providerView() {
@@ -80,6 +180,9 @@ function keySourceView() {
 }
 // Sinkronkan form dan ringkasan dengan konfigurasi yang tersimpan di server.
 function showConfig(data) {
+  $('probe-result').replaceChildren();
+  $('probe-result').classList.add('empty-state');
+  $('probe-result').textContent = 'Jalankan pengujian untuk memeriksa konfigurasi ini.';
   const source =
     data.provider === 'docker'
       ? 'LLM lokal (Ollama)'
@@ -157,13 +260,13 @@ function renderTraces() {
   }
   const active = traces.find((t) => t.id === selectedTrace) || traces[0];
   selectedTrace = active.id;
-  $('trace-detail').textContent = JSON.stringify(active, null, 2);
+  renderReport($('trace-detail'), active);
   for (const trace of traces) {
     const b = document.createElement('button');
     b.className = 'trace' + (trace.id === active.id ? ' selected' : '');
-    b.textContent = `${trace.sender}: ${trace.message}`;
+    b.append(node('span', `${trace.sender}: ${trace.message}`, 'trace-title'));
     const small = document.createElement('small');
-    small.textContent = `${trace.stage} | ${trace.model || 'belum memanggil AI'}`;
+    small.textContent = `${trace.stage} · ${duration(trace.duration_ms)}\n${trace.model || 'belum memanggil AI'}`;
     b.append(small);
     b.onclick = () => {
       selectedTrace = trace.id;
@@ -323,32 +426,36 @@ async function loadUsers(reset = true) {
     ]) {
       const cell = document.createElement('td');
       cell.dataset.label = label;
-      cell.textContent = value;
+      if (label === 'Login') cell.append(node('span', value, 'login-method'));
+      else cell.textContent = value;
       row.append(cell);
     }
     const actions = document.createElement('td');
     actions.dataset.label = 'Aksi';
+    const actionGroup = node('div', undefined, 'user-actions');
     const editButton = document.createElement('button');
     editButton.className = 'secondary';
     editButton.textContent = 'Edit user';
     editButton.onclick = () => openUserEditor(user, 'profile');
-    actions.append(editButton);
+    actionGroup.append(editButton);
     if (user.login_method !== 'google') {
       const passwordButton = document.createElement('button');
       passwordButton.className = 'secondary';
       passwordButton.textContent = 'Ubah password';
       passwordButton.onclick = () => openUserEditor(user, 'password');
-      actions.append(passwordButton);
+      actionGroup.append(passwordButton);
     } else {
       const note = document.createElement('small');
       note.textContent = 'Password dikelola Google. ';
-      actions.append(note);
+      note.className = 'google-password-note';
+      actionGroup.append(note);
     }
     const deleteButton = document.createElement('button');
-    deleteButton.className = 'secondary';
+    deleteButton.className = 'danger';
     deleteButton.textContent = 'Hapus akun';
     deleteButton.onclick = () => openUserEditor(user, 'delete');
-    actions.append(deleteButton);
+    actionGroup.append(deleteButton);
+    actions.append(actionGroup);
     row.append(actions);
     $('user-rows').append(row);
   }
@@ -360,6 +467,7 @@ async function loadUsers(reset = true) {
 // Bersihkan password/draft konfirmasi setiap editor ditutup atau sesi panel berakhir.
 function closeUserEditor() {
   selectedUser = null;
+  if ($('user-editor').open) $('user-editor').close();
   $('user-editor').hidden = true;
   $('user-password-form').reset();
   $('user-profile-form').reset();
@@ -383,7 +491,7 @@ function openUserEditor(user, action) {
   $('edit-user-display-name').value = user.display_name;
   $('user-password-form').hidden = action !== 'password';
   $('user-delete-form').hidden = action !== 'delete';
-  $('user-editor').scrollIntoView({ block: 'center', behavior: 'smooth' });
+  $('user-editor').showModal();
   (action === 'profile'
     ? $('edit-user-username')
     : action === 'password'
@@ -451,6 +559,10 @@ $('more-users').onclick = handle(async () => {
   }
 });
 $('cancel-user-edit').onclick = closeUserEditor;
+$('user-editor').addEventListener('cancel', (event) => {
+  event.preventDefault();
+  if (!userSaving) closeUserEditor();
+});
 $('user-profile-form').onsubmit = handle(() => changeUser('profile'));
 $('user-password-form').onsubmit = handle(() => changeUser('password'));
 $('user-delete-form').onsubmit = handle(() => changeUser('delete'));
@@ -518,17 +630,37 @@ $('config-form').onsubmit = handle(async () => {
     $('check-ai').disabled = false;
   }
 });
-$('check-ai').onclick = handle(async () => {
+$('probe-form').onsubmit = handle(async () => {
+  if ($('check-ai').disabled) return;
   $('check-ai').disabled = true;
   $('save-config').disabled = true;
-  $('ai-status').textContent = 'Memeriksa konfigurasi yang tersimpan di server...';
+  const epoch = generation,
+    started = performance.now();
+  $('ai-status').textContent = 'Memproses teks, menyusun prompt, lalu menunggu provider...';
+  $('probe-result').textContent = 'Pengujian sedang berjalan. Hasil sebelumnya telah dibersihkan.';
+  const timer = setInterval(() => {
+    $('probe-progress').textContent =
+      `${((performance.now() - started) / 1000).toFixed(1)} dtk berjalan`;
+  }, 100);
   try {
-    const data = await request('/api/panel/check-ai', null, 'POST');
-    $('ai-status').textContent = (data.active ? 'Aktif: ' : 'Tidak aktif: ') + data.message;
+    const data = await request(
+      '/api/panel/test-ai',
+      { message: $('probe-message').value.trim(), scenario: $('probe-scenario').value },
+      'POST',
+    );
+    if (epoch !== generation || !token) return;
+    $('ai-status').textContent = data.message_status;
+    renderReport($('probe-result'), data);
   } catch (error) {
-    $('ai-status').textContent = 'Pemeriksaan gagal: ' + error.message;
+    if (epoch === generation) {
+      $('ai-status').textContent = 'Pemeriksaan gagal: ' + error.message;
+      $('probe-result').textContent =
+        'Hasil belum tersedia. Periksa koneksi lalu jalankan ulang pengujian.';
+    }
     throw error;
   } finally {
+    clearInterval(timer);
+    $('probe-progress').textContent = '';
     $('save-config').disabled = false;
     $('check-ai').disabled = false;
   }
@@ -579,11 +711,13 @@ $('download').onclick = handle(async () => {
   }
 });
 $('logout').onclick = handle(async () => {
+  $('logout').disabled = true;
   try {
     await request('/api/panel/logout', null, 'POST');
-  } finally {
     clearSession();
     notice('Kamu sudah keluar dari panel.');
+  } finally {
+    $('logout').disabled = false;
   }
 });
 setInterval(() => {

@@ -1,6 +1,7 @@
 """OpenRouter chat completions; never routes through another API on failure."""
 
 import httpx
+from services.ai_diagnostics import record_request, record_response
 
 
 # Kirim prompt ke Qwen melalui OpenRouter dan tolak respons tanpa teks.
@@ -8,22 +9,38 @@ async def generate_reply(prompt, *, config, max_tokens=None):
     key = config.openrouter_api_key_value
     if not key:
         raise ValueError("API key OpenRouter untuk sumber yang dipilih belum tersedia.")
+    endpoint = "https://openrouter.ai/api/v1/chat/completions"
+    payload = {
+        "model": "qwen/qwen3-14b",
+        # Qwen3 also requires its prompt-level switch on providers that ignore the flag.
+        "messages": [{"role": "user", "content": prompt + "\n/no_think"}],
+        "max_tokens": max_tokens or config.openai_max_output_tokens,
+        "reasoning": {"enabled": False},
+        "stream": False,
+    }
+    record_request(endpoint, payload)
     async with httpx.AsyncClient(
         timeout=config.openai_timeout_seconds, follow_redirects=False
     ) as client:
         response = await client.post(
-            "https://openrouter.ai/api/v1/chat/completions",
+            endpoint,
             headers={"Authorization": "Bearer " + key},
-            json={
-                "model": "qwen/qwen3-14b",
-                "messages": [{"role": "user", "content": prompt}],
-                "max_tokens": max_tokens or config.openai_max_output_tokens,
-                "reasoning": {"enabled": False},
-                "stream": False,
+            json=payload,
+        )
+        record_response(response.status_code)
+        response.raise_for_status()
+        data = response.json()
+        content = data["choices"][0]["message"]["content"]
+        record_response(
+            response.status_code,
+            {
+                "id": data.get("id"),
+                "model": data.get("model"),
+                "usage": data.get("usage"),
+                "output": content,
+                "finish_reason": data["choices"][0].get("finish_reason"),
             },
         )
-        response.raise_for_status()
-        content = response.json()["choices"][0]["message"]["content"]
         if not isinstance(content, str) or not content.strip():
             raise ValueError("Provider tidak menghasilkan teks.")
         return content.strip()

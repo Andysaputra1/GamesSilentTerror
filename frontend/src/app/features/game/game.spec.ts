@@ -3,7 +3,7 @@ import { provideRouter, Router } from '@angular/router';
 
 import { Game } from './game';
 import { provideHttpClient } from '@angular/common/http';
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import { GameService, GameSnapshot } from '../../core/game.service';
 
 // TEST SUITE: kelompok pengujian otomatis, bukan logika yang dijalankan halaman production.
@@ -112,6 +112,29 @@ describe('Game', () => {
     );
     expect(component.notice).toContain('dikunci');
     expect(component.busy).toBe(false);
+  });
+
+  it('keeps chat received during polling without duplicates or cross-match messages', () => {
+    component.game = snapshot().game;
+    component.code = 'ABC123';
+    const response = new Subject<GameSnapshot>();
+    vi.spyOn(TestBed.inject(GameService), 'request').mockReturnValue(response);
+    component.refresh();
+    const message = { id: 'new-chat', sender: 'NOX', message: 'Alibimu?' };
+    component.game.messages.push(message);
+    response.next(snapshot());
+    response.complete();
+    expect(component.game.messages).toEqual([message]);
+
+    const state = snapshot();
+    state.game.messages = [message];
+    vi.spyOn(TestBed.inject(GameService), 'request').mockReturnValue(of(state));
+    component.refresh();
+    expect(component.game.messages).toEqual([message]);
+
+    state.game = { ...state.game, id: 'match-2', messages: [] };
+    component.refresh();
+    expect(component.game.messages).toEqual([]);
   });
 
   it('releases loading on network errors so retry remains available', () => {

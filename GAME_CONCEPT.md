@@ -90,6 +90,8 @@ GET /game -> snapshot akun -> Angular (polling 1 detik)
 
 RoomService mengunci perubahan state. HTTP memakai bearer session; Socket.IO memeriksa sesi dan keanggotaan. Checker publik lama ditutup; trace/prompt privat hanya untuk administrator panel.
 
+Chat manusia diperiksa ulang setelah analisis, lalu disimpan bersama pembaruan riwayat di dalam lock agar perubahan fase/Gag tidak diterobos. Balasan reaktif dari lobby dibuang jika room atau pertandingan sudah berubah. Sebelum broadcast chat manusia maupun NPC, socket penerima yang sudah keluar room atau sesinya dicabut dikeluarkan dari kanal. Frontend mempertahankan echo chat baru yang tiba ketika polling masih berjalan, tanpa duplikasi dan dengan batas 100 pesan.
+
 ## Batas operasional dan validasi
 
 Room, role, aksi, vote, dan konteks pertandingan berada di memori satu proses. Restart menghapus pertandingan aktif; MySQL menyimpan chat/analisis, bukan pemulihan seluruh match. Multi-worker dan penggantian pemain offline otomatis belum tersedia.

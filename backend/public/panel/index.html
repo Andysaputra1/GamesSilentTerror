@@ -54,77 +54,102 @@
             <div>
               <span class="eyebrow">MODEL & CONNECTION</span>
               <h2>Konfigurasi AI</h2>
-              <p>Pilih tempat Qwen3 14B menghasilkan balasan game.</p>
+              <p>
+                Atur koneksi model, lalu uji satu putaran keputusan NPC dari teks hingga output.
+              </p>
             </div>
             <span class="badge">Qwen3 &middot; 14B</span>
           </div>
-          <form id="config-form">
-            <label
-              >Provider<select id="provider">
-                <option value="api">API &middot; OpenRouter</option>
-                <option value="docker">LLM lokal &middot; Ollama melalui tunnel</option>
-              </select></label
-            >
-            <div id="local-settings" hidden>
-              <label
-                >URL tunnel Ollama<input
-                  id="endpoint"
-                  type="url"
-                  placeholder="https://ollama.domain-kamu.com"
-              /></label>
-              <p class="hint">
-                Masukkan alamat dasar tunnel, tanpa /api/chat. Model lokal: qwen3:14b.
-              </p>
-            </div>
-            <div id="api-settings">
-              <label
-                >Sumber API key
-                <select id="key-source">
-                  <option value="default">Default dari server</option>
-                  <option value="custom">API key sendiri</option>
-                </select>
-              </label>
-              <p id="source-status" class="hint"></p>
-              <div id="custom-key-settings" hidden>
+          <div class="ai-layout">
+            <section class="config-panel" aria-label="Pengaturan koneksi">
+              <h3>01 / Koneksi model</h3>
+              <form id="config-form">
                 <label
-                  >API key OpenRouter
-                  <input
-                    id="api-key"
-                    type="password"
-                    autocomplete="new-password"
-                    maxlength="1024"
-                    placeholder="Tempel API key OpenRouter"
-                    spellcheck="false"
-                  />
-                </label>
-                <p class="hint">
-                  Kosongkan untuk tetap memakai key yang tersimpan. Isi key baru untuk menggantinya.
-                  Key tidak ditampilkan kembali setelah disimpan.
-                </p>
-              </div>
-              <p class="info">
-                Model otomatis: <strong>qwen/qwen3-14b</strong><br /><span id="key-status"
-                  >Memeriksa konfigurasi key...</span
+                  >Provider<select id="provider">
+                    <option value="api">API &middot; OpenRouter</option>
+                    <option value="docker">LLM lokal &middot; Ollama melalui tunnel</option>
+                  </select></label
                 >
+                <div id="local-settings" hidden>
+                  <label
+                    >URL tunnel Ollama<input
+                      id="endpoint"
+                      type="url"
+                      placeholder="https://ollama.domain-kamu.com"
+                  /></label>
+                  <p class="hint">
+                    Masukkan alamat dasar tunnel, tanpa /api/chat. Model lokal: qwen3:14b.
+                  </p>
+                </div>
+                <div id="api-settings">
+                  <label
+                    >Sumber API key
+                    <select id="key-source">
+                      <option value="default">Default dari server</option>
+                      <option value="custom">API key sendiri</option>
+                    </select>
+                  </label>
+                  <p id="source-status" class="hint"></p>
+                  <div id="custom-key-settings" hidden>
+                    <label
+                      >API key OpenRouter
+                      <input
+                        id="api-key"
+                        type="password"
+                        autocomplete="new-password"
+                        maxlength="1024"
+                        placeholder="Tempel API key OpenRouter"
+                        spellcheck="false"
+                      />
+                    </label>
+                    <p class="hint">
+                      Kosongkan untuk tetap memakai key yang tersimpan. Isi key baru untuk
+                      menggantinya. Key tidak ditampilkan kembali setelah disimpan.
+                    </p>
+                  </div>
+                  <p class="info">
+                    Model otomatis: <strong>qwen/qwen3-14b</strong><br /><span id="key-status"
+                      >Memeriksa konfigurasi key...</span
+                    >
+                  </p>
+                </div>
+                <button id="save-config">Simpan konfigurasi</button>
+              </form>
+              <div class="info" role="status" aria-live="polite">
+                <strong>Konfigurasi yang sedang digunakan</strong>
+                <p id="active-config">Memuat konfigurasi server...</p>
+                <small id="config-draft"></small>
+              </div>
+            </section>
+            <section class="probe-panel" aria-label="Pengujian AI">
+              <h3>02 / Uji skenario game</h3>
+              <p class="hint">
+                Menggunakan konfigurasi yang sudah tersimpan. Skenario ini terpisah dari room
+                pemain. Satu tes mengirim satu request LLM; mode API memakai saldo provider.
               </p>
-            </div>
-            <button id="save-config">Simpan konfigurasi</button>
-          </form>
-          <div class="info" role="status" aria-live="polite">
-            <strong>Konfigurasi yang sedang digunakan</strong>
-            <p id="active-config">Memuat konfigurasi server...</p>
-            <small id="config-draft"></small>
-          </div>
-          <div class="health">
-            <div>
-              <h3>Status koneksi AI</h3>
+              <form id="probe-form">
+                <label
+                  >Skenario<select id="probe-scenario">
+                    <option value="discussion">Diskusi siang · respons alibi</option>
+                    <option value="vote">Tribunal · keputusan voting</option>
+                    <option value="night">Malam · keputusan Guard</option>
+                  </select></label
+                >
+                <label
+                  >Teks pemain<textarea id="probe-message" rows="4" maxlength="1000" required>
+Aku melihat Pemain_B menghindari pertanyaan. Apa alibimu?</textarea>
+                </label>
+                <div class="form-actions">
+                  <button id="check-ai" type="submit">Jalankan pengujian</button
+                  ><span id="probe-progress" class="hint" role="status"></span>
+                </div>
+              </form>
               <p id="ai-status" role="status" aria-live="polite">Belum diperiksa.</p>
-              <small
-                >Pengecekan mengirim satu prompt pendek. Mode API menggunakan saldo
-                OpenRouter.</small
-              >
-            </div>
-            <button id="check-ai" class="secondary">Cek AI aktif</button>
+              <div id="probe-result" class="report empty-state">
+                Hasil tes akan menampilkan status AI, durasi, request, respons, dan keputusan yang
+                dihasilkan.
+              </div>
+            </section>
           </div>
         </section>
         <section id="menu-checker" class="card" hidden>
@@ -132,7 +157,7 @@
             <div>
               <span class="eyebrow">LIVE & ARCHIVED</span>
               <h2>Checker per room</h2>
-              <p>Lihat pesan &rarr; SVM &rarr; fuzzy &rarr; prompt &rarr; respons AI.</p>
+              <p>Telusuri input, parameter request, waktu proses, dan hasil setiap jejak.</p>
             </div>
             <button id="refresh-checker" class="secondary">Refresh</button>
           </div>
@@ -156,7 +181,9 @@
             </div>
             <div>
               <h3>Detail pipeline</h3>
-              <pre id="trace-detail">Pilih room dan pesan untuk melihat detail.</pre>
+              <div id="trace-detail" class="report empty-state">
+                Pilih room dan pesan untuk melihat detail.
+              </div>
             </div>
           </div>
           <details>
@@ -221,9 +248,9 @@
               </p>
             </div>
           </div>
-          <details open>
+          <details class="create-user">
             <summary>+ Tambah user</summary>
-            <form id="create-user-form">
+            <form id="create-user-form" class="form-grid">
               <label
                 >Username<input
                   id="create-username"
@@ -258,7 +285,7 @@
                   maxlength="128"
                   autocomplete="new-password"
               /></label>
-              <p>
+              <p class="full-width hint">
                 Akun baru menggunakan login username/password. Akun Google dibuat lewat Login dengan
                 Google.
               </p>
@@ -286,7 +313,7 @@
           </div>
           <p id="users-empty" hidden>Belum ada user untuk pencarian ini.</p>
           <button id="more-users" class="secondary" hidden>Muat berikutnya</button>
-          <section id="user-editor" class="info" hidden aria-labelledby="user-editor-title">
+          <dialog id="user-editor" hidden aria-labelledby="user-editor-title">
             <h3 id="user-editor-title"></h3>
             <form id="user-profile-form" hidden>
               <p>
@@ -344,10 +371,10 @@
                   autocomplete="off"
                   required
               /></label>
-              <button id="delete-user">Hapus akun</button>
+              <button id="delete-user" class="danger">Hapus akun permanen</button>
             </form>
             <button id="cancel-user-edit" type="button" class="secondary">Batal</button>
-          </section>
+          </dialog>
         </section>
       </div>
       <p id="notice" role="status" aria-live="polite"></p>

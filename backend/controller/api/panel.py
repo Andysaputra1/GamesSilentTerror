@@ -29,8 +29,9 @@ from services.room_service import room_service
 from controller.middleware.auth_limits import limit_auth
 from module.ollama_client import generate_reply as local_reply
 from module.openrouter_client import generate_reply as api_reply, failure_message
+from controller.middleware.safe_validation import SafeValidationRoute
 
-router = APIRouter(tags=["panel"])
+router = APIRouter(tags=["panel"], route_class=SafeValidationRoute)
 ASSETS = Path(__file__).resolve().parents[2] / "public" / "panel"
 bearer = HTTPBearer(auto_error=False)
 
@@ -159,7 +160,16 @@ def config_view():
     return {
         "provider": config.ai_provider,
         "endpoint": config.ollama_base_url,
-        "model": "qwen/qwen3-14b" if config.ai_provider == "api" else "qwen3:14b",
+        "model": (
+            config.ollama_model
+            if config.ai_provider == "docker"
+            else (
+                config.openrouter_model
+                if config.api_backend == "openrouter"
+                else config.openai_model
+            )
+        ),
+        "api_backend": config.api_backend,
         "api_configured": bool(config.openrouter_api_key_value),
         "key_source": config.openrouter_key_source,
         "default_configured": bool(settings.openrouter_default or settings.openrouter_api_key),
@@ -267,6 +277,24 @@ async def check_ai(token=Depends(require_panel)):
 
 
 # Gabungkan arsip ruangan berhalaman dengan penanda ruangan yang masih aktif.
+class AIProbe(BaseModel):
+    message: str = Field(
+        default="Aku melihat Pemain_B menghindari pertanyaan. Apa alibimu?",
+        min_length=1,
+        max_length=1000,
+    )
+    scenario: Literal["discussion", "vote", "night"] = "discussion"
+
+
+@router.post("/api/panel/test-ai", dependencies=[Depends(limit_auth)])
+async def test_ai(body: AIProbe, token=Depends(require_panel)):
+    from services.ai_probe_service import run_probe
+
+    if not body.message.strip():
+        raise HTTPException(422, "Teks skenario tidak boleh kosong.")
+    return await run_probe(body.message.strip(), body.scenario)
+
+
 @router.get("/api/panel/rooms")
 def rooms(after_id: int = Query(0, ge=0), token=Depends(require_panel)):
     rows = transaction(
