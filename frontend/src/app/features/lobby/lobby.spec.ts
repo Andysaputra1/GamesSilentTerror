@@ -58,7 +58,7 @@ describe('Lobby', () => {
     expect(component.durations).toEqual({ day: 14, night: 10, tribunal: 10 });
   });
 
-  it('creates a room with selected capacity and round limit', () => {
+  it('creates a room with selected capacity and no round limit option', () => {
     const request = vi.spyOn(TestBed.inject(RoomService), 'request').mockReturnValue(
       of({
         code: 'ABC123',
@@ -68,17 +68,16 @@ describe('Lobby', () => {
         bot_enabled: false,
         phase: 'lobby',
         capacity: 10,
-        max_rounds: 12,
       }),
     );
     component.capacity = 10;
-    component.maxRounds = 12;
     component.createRoom();
-    expect(request).toHaveBeenCalledWith('POST', '', { capacity: 10, max_rounds: 12 });
+    expect(request).toHaveBeenCalledWith('POST', '', { capacity: 10 });
     fixture.componentRef.changeDetectorRef.markForCheck();
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('10 PEMAIN');
-    expect(fixture.nativeElement.textContent).toContain('12 ronde');
+    expect(fixture.nativeElement.textContent).toContain('Tanpa batas ronde');
+    expect(fixture.nativeElement.querySelector('#room-rounds')).toBeNull();
   });
 
   it('keeps typed room code and submits the normalized code', () => {

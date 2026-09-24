@@ -16,6 +16,7 @@ import { Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { io, Socket } from 'socket.io-client';
 import { GameMessage, GameService, MatchView } from '../../core/game.service';
+import { gameEntryStorageKey } from '../../core/flow.guard';
 import { ProfileMenu } from '../../core/profile-menu';
 
 // KOMPONEN: render snapshot privat server; tidak mengacak role atau memutuskan hasil aksi di browser.
@@ -63,10 +64,9 @@ export class Game implements OnInit, OnDestroy {
       : 'Temukan dan eksekusi Hitman lewat Tribunal. Spy, Stalker, dan Civilian menang sebagai satu kubu.';
   }
 
-  // Terjemahkan pemenang tim menjadi hasil pribadi, termasuk kondisi seri.
+  // Terjemahkan pemenang tim menjadi hasil pribadi.
   get outcomeLabel(): string {
     if (!this.game?.winner) return '';
-    if (this.game.winner === 'draw') return 'SERI';
     const team = this.game.me.role === 'hitman' ? 'hitman' : 'civilians';
     return (this.game.result?.outcome ?? (team === this.game.winner ? 'won' : 'lost')) === 'won'
       ? 'KAMU MENANG'
@@ -84,15 +84,12 @@ export class Game implements OnInit, OnDestroy {
         'Semua anggota kubu warga yang masih hidup telah menjadi Hostage. Hitman menguasai meja.',
       no_civilians_alive:
         'Seluruh anggota kubu warga telah dieksekusi. Hitman menjadi satu-satunya pemain yang masih hidup.',
-      round_limit: `Batas ${this.game?.max_rounds ?? 8} ronde tercapai. Tidak ada kubu yang memenuhi syarat kemenangan.`,
     };
     if (this.game?.result) return explanations[this.game.result.reason] ?? '';
     // Kompatibel selama frontend dan backend diperbarui pada waktu berbeda.
-    return this.game?.winner === 'draw'
-      ? explanations['round_limit']
-      : this.game?.winner === 'civilians'
-        ? explanations['hitman_executed']
-        : 'Suara warga hidup yang bebas tidak lagi melampaui suara Hitman.';
+    return this.game?.winner === 'civilians'
+      ? explanations['hitman_executed']
+      : 'Suara warga hidup yang bebas tidak lagi melampaui suara Hitman.';
   }
 
   // Jelaskan hak pemain berdasarkan status hidup, Hostage, dan Gag Order miliknya.
@@ -216,6 +213,19 @@ export class Game implements OnInit, OnDestroy {
           }
         },
         error: (error: HttpErrorResponse) => {
+          // GET /game menolak room hilang, keanggotaan lama, atau match belum dimulai.
+          // Pulihkan lewat lobby; kesalahan aksi dan jaringan tidak boleh mengeluarkan pemain.
+          if (!body && error.status === 400) {
+            if (this.poll) clearInterval(this.poll);
+            this.socket?.disconnect();
+            this.game = null;
+            this.code = '';
+            sessionStorage.removeItem('shadow_heist_room');
+            sessionStorage.removeItem('shadow_heist_room_snapshot');
+            sessionStorage.removeItem(gameEntryStorageKey);
+            void this.router.navigateByUrl('/lobby');
+            return;
+          }
           this.error =
             typeof error.error?.detail === 'string'
               ? error.error.detail

@@ -13,19 +13,13 @@ export interface MatchView {
   id: string;
   phase: 'day' | 'night' | 'tribunal' | 'finished';
   round: number;
-  max_rounds: number;
   deadline: number;
   server_time: number;
-  winner: string | null;
+  winner: 'hitman' | 'civilians' | null;
   result?: {
-    reason:
-      | 'hitman_executed'
-      | 'all_survivors_hostage'
-      | 'no_civilians_alive'
-      | 'round_limit'
-      | 'vote_control';
+    reason: 'hitman_executed' | 'all_survivors_hostage' | 'no_civilians_alive' | 'vote_control';
     team: 'hitman' | 'civilians';
-    outcome: 'won' | 'lost' | 'draw';
+    outcome: 'won' | 'lost';
     civilians_alive: number;
     civilians_hostage: number;
     civilians_eliminated: number;

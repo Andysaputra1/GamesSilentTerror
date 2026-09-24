@@ -30,21 +30,16 @@ class EngineTests(unittest.TestCase):
         self.game.phase = "night"
         self.game.actions.clear()
 
-    def test_idle_match_finishes_after_eight_rounds(self):
-        for _ in range(24):
+    def test_idle_match_keeps_running_without_a_round_limit(self):
+        for _ in range(60):
             self.game.tick(self.game.deadline)
-        self.assertEqual(
-            (self.game.round, self.game.phase, self.game.winner), (8, "finished", "draw")
-        )
-        self.assertTrue(all("role" in p for p in self.game.snapshot("spy")["players"]))
-        self.assertFalse(self.game.can_chat("spy"))
-        events = list(self.game.events)
-        self.game.tick(self.game.deadline + 1000)
-        self.game.check_winner()
-        self.assertEqual(self.game.events, events)
+        self.assertEqual((self.game.round, self.game.phase, self.game.winner), (21, "day", None))
+        self.assertTrue(all("role" not in p for p in self.game.snapshot("spy")["players"]))
+        self.assertTrue(self.game.can_chat("spy"))
+        self.assertIsNone(self.game.snapshot("spy")["result"])
 
-    def test_final_round_execution_takes_priority_over_draw(self):
-        self.game.round = 8
+    def test_execution_wins_even_after_many_rounds(self):
+        self.game.round = 25
         self.game.phase = "tribunal"
         self.game.vote("spy", "hitman")
         self.game.tick(self.game.deadline)
@@ -93,16 +88,16 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(len(room.match.players), 4)
         self.assertEqual(room.match.durations, preview)
 
-    def test_selected_round_limits_finish_after_final_tribunal(self):
-        for limit in [6, 8, 12]:
-            game = Match(list("abcdef"), [], max_rounds=limit, now=0)
-            for _ in range(limit * 3 - 1):
-                game.tick(game.deadline)
-            self.assertEqual((game.phase, game.round, game.winner), ("tribunal", limit, None))
-            game.tick(game.deadline)
-            self.assertEqual(game.winner, "draw")
-        with self.assertRaises(ValueError):
-            Match(list("abcdef"), [], max_rounds=7)
+    def test_tied_votes_continue_into_next_round_without_a_winner(self):
+        for round_number in range(1, 26):
+            self.game.tick(self.game.deadline)
+            self.game.tick(self.game.deadline)
+            self.game.vote("spy", "hitman")
+            self.game.vote("hitman", "spy")
+            self.game.tick(self.game.deadline)
+            self.assertEqual((self.game.phase, self.game.round), ("day", round_number + 1))
+            self.assertIsNone(self.game.winner)
+            self.assertTrue(all(p.alive for p in self.game.players.values()))
 
     def test_blind_actions_and_guard_priority(self):
         self.night()
@@ -245,7 +240,7 @@ class RoomGameTests(unittest.TestCase):
         self.rooms.set_bot(self.room.code, "alice", True)
 
     def test_room_options_capacity_and_bot_replacement(self):
-        room = self.rooms.create("host", capacity=10, max_rounds=12)
+        room = self.rooms.create("host", capacity=10)
         self.rooms.set_bot(room.code, "host", True)
         self.assertEqual(len(self.rooms.bot_names(room)), 9)
         for i in range(9):
@@ -254,7 +249,8 @@ class RoomGameTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.rooms.join(room.code, "overflow")
         self.rooms.start(room.code, "host")
-        self.assertEqual((len(room.match.players), room.match.max_rounds), (10, 12))
+        self.assertEqual(len(room.match.players), 10)
+        self.assertNotIn("max_rounds", self.rooms.snapshot(room))
 
     def test_create_api_validates_gdd_options(self):
         app = FastAPI()
@@ -267,11 +263,13 @@ class RoomGameTests(unittest.TestCase):
             patch("controller.api.rooms.PersistenceService"),
             TestClient(app) as client,
         ):
-            for body in [{"capacity": 3}, {"capacity": 11}, {"max_rounds": 7}]:
+            for body in [{"capacity": 3}, {"capacity": 11}]:
                 self.assertEqual(client.post("/api/rooms", json=body).status_code, 422)
             response = client.post("/api/rooms", json={"capacity": 9, "max_rounds": 6})
             self.assertEqual(response.status_code, 200)
-            self.assertEqual((response.json()["capacity"], response.json()["max_rounds"]), (9, 6))
+            self.assertEqual(response.json()["capacity"], 9)
+            # Payload frontend lama boleh diterima, tetapi tidak menetapkan batas ronde.
+            self.assertNotIn("max_rounds", response.json())
 
     def test_bot_fill_host_start_rejoin_and_roster_lock(self):
         self.assertEqual(len(self.rooms.snapshot(self.room)["bots"]), 5)

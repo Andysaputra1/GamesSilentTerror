@@ -40,12 +40,10 @@ def phase_durations(count, quick=False):
 
 class Match:
     # CONSTRUCTOR: acak role di server; tepat satu Hitman, Spy, dan Stalker.
-    def __init__(self, humans, bots, *, quick=False, max_rounds=8, now=None, rng=None):
+    def __init__(self, humans, bots, *, quick=False, now=None, rng=None):
         names = list(humans) + list(bots)
         if not 4 <= len(names) <= 10 or len(set(names)) != len(names):
             raise ValueError("Permainan membutuhkan 4–10 identitas berbeda.")
-        if max_rounds not in {6, 8, 12}:
-            raise ValueError("Pilih durasi 6, 8, atau 12 ronde.")
         self.rng = rng or random.SystemRandom()
         roles = ["hitman", "spy", "stalker"] + ["civilian"] * (len(names) - 3)
         self.rng.shuffle(roles)
@@ -54,7 +52,6 @@ class Match:
         }
         self.id = uuid4().hex
         self.round = 1
-        self.max_rounds = max_rounds
         self.ai_controlled = (
             False  # Diaktifkan RoomService; unit engine tetap dapat diuji tanpa jaringan.
         )
@@ -179,10 +176,6 @@ class Match:
         else:
             self.events.append("Tribunal berakhir tanpa eksekusi: suara seri atau tidak ada suara.")
         self.check_winner()
-        if not self.winner and self.round >= self.max_rounds:
-            self.finish(
-                "draw", "round_limit", f"Batas {self.max_rounds} ronde tercapai tanpa pemenang."
-            )
 
     def finish(self, winner, reason, explanation):
         """Satu hasil final untuk semua pemain; tidak berubah oleh tick berikutnya."""
@@ -194,7 +187,6 @@ class Match:
         label = {
             "civilians": "Kubu warga menang.",
             "hitman": "Hitman menang.",
-            "draw": "Permainan seri.",
         }[winner]
         self.events.append(f"{label} {explanation}")
 
@@ -228,9 +220,7 @@ class Match:
         return {
             "reason": self.winner_reason,
             "team": team,
-            "outcome": (
-                "draw" if self.winner == "draw" else "won" if team == self.winner else "lost"
-            ),
+            "outcome": "won" if team == self.winner else "lost",
             "civilians_alive": sum(p.alive for p in civilians),
             "civilians_hostage": sum(p.alive and p.hostage for p in civilians),
             "civilians_eliminated": sum(not p.alive for p in civilians),
@@ -377,7 +367,6 @@ class Match:
             "id": self.id,
             "phase": self.phase,
             "round": self.round,
-            "max_rounds": self.max_rounds,
             "deadline": self.deadline,
             "server_time": time.time(),
             "winner": self.winner,

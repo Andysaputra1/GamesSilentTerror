@@ -35,7 +35,6 @@ export class Lobby implements OnInit, OnDestroy {
   copied = false;
   quick = false;
   capacity = 6;
-  maxRounds = 8;
 
   // Pratinjau memakai durasi dari server; fallback hanya untuk backend lama sebelum deployment.
   get durations() {
@@ -88,8 +87,7 @@ export class Lobby implements OnInit, OnDestroy {
 
   // METHOD EVENT TOMBOL: minta backend membuat ruangan dan kode baru.
   createRoom(): void {
-    if (!this.busy && !this.room)
-      this.load('POST', '', { capacity: this.capacity, max_rounds: this.maxRounds });
+    if (!this.busy && !this.room) this.load('POST', '', { capacity: this.capacity });
   }
 
   // METHOD EVENT FORM: periksa format kode, lalu minta backend menambahkan keanggotaan.

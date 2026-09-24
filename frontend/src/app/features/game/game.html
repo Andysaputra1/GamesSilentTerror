@@ -21,7 +21,7 @@
   }
   @if (game; as state) {
     <div class="phase-strip">
-      <b>RONDE {{ state.round }} / {{ state.max_rounds || 8 }} · {{ phaseNames[state.phase] }}</b
+      <b>RONDE {{ state.round }} · {{ phaseNames[state.phase] }}</b
       ><strong>{{ state.winner ? 'SELESAI' : seconds + 's' }}</strong
       ><span
         >{{ state.winner ? 'RIWAYAT DISKUSI' : connected ? 'CHAT TERHUBUNG' : 'MENYAMBUNG CHAT…' }}</span
@@ -45,8 +45,8 @@
           permanen. Gag hanya membatasi chat sampai akhir ronde; hak voting tetap ada.
         </p>
         <p>
-          Voting seri atau tanpa suara tidak mengeksekusi siapa pun. Jika belum ada pemenang setelah
-          Tribunal ronde {{ state.max_rounds || 8 }}, hasilnya seri.
+          Voting seri atau tanpa suara tidak mengeksekusi siapa pun. Ronde berikutnya dimulai jika
+          belum ada pemenang. Tidak ada batas ronde atau hasil seri pertandingan.
         </p>
       </details>
     }
@@ -72,7 +72,7 @@
       <section class="result" [class.is-loss]="outcomeLabel === 'KAMU KALAH'" aria-live="polite">
         <p class="eyebrow">{{ outcomeLabel }}</p>
         <h2>
-          {{ state.winner === 'draw' ? 'Permainan seri.' : state.winner === 'hitman' ? 'Hitman menang.' : 'Kubu warga menang.' }}
+          {{ state.winner === 'hitman' ? 'Hitman menang.' : 'Kubu warga menang.' }}
         </h2>
         <p>{{ resultExplanation }}</p>
         @if (state.result; as result) {

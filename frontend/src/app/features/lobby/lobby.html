@@ -32,8 +32,7 @@
         <b>03 / WASPADAI HOSTAGE</b>
         <p>
           Hitman menang saat warga hidup yang masih punya suara tersisa paling banyak satu. Gag
-          hanya membatasi chat. Pilih 6, 8, atau 12 ronde; tanpa pemenang di batas ronde berarti
-          seri.
+          hanya membatasi chat. Tidak ada batas ronde; permainan berlanjut sampai satu kubu menang.
         </p>
       </div>
     </section>
@@ -52,21 +51,13 @@
             {{ room.phase === 'lobby' ? 'Bagikan kode ini kepada teman. Mereka harus login terlebih dahulu untuk bergabung.' : room.phase === 'finished' ? 'Pertandingan selesai. Lihat hasil atau keluar ruangan untuk bermain lagi.' : 'Pertandingan berlangsung. Peserta terkunci sampai permainan selesai.' }}
           </p>
         } @else {
-          <p>Tentukan jumlah kursi dan batas ronde, lalu bagikan kode room.</p>
+          <p>Tentukan jumlah kursi, lalu bagikan kode room. Ronde berlanjut sampai ada pemenang.</p>
           <div class="room-options">
             <label for="room-capacity"
               >Kapasitas pemain
               <select id="room-capacity" [(ngModel)]="capacity" [disabled]="busy">
                 @for (count of [4, 5, 6, 7, 8, 9, 10]; track count) {
                   <option [ngValue]="count">{{ count }} pemain</option>
-                }
-              </select>
-            </label>
-            <label for="room-rounds"
-              >Batas ronde
-              <select id="room-rounds" [(ngModel)]="maxRounds" [disabled]="busy">
-                @for (count of [6, 8, 12]; track count) {
-                  <option [ngValue]="count">{{ count }} ronde</option>
                 }
               </select>
             </label>
@@ -185,8 +176,8 @@
           <p class="entry-note">
             Durasi fase: siang {{ durations.day }} detik, malam {{ durations.night }} detik,
             Tribunal {{ durations.tribunal }} detik. Durasi ditetapkan dari jumlah peserta saat
-            mulai. Timer tetap berjalan saat tab ditutup. Batas {{ room.max_rounds ?? 8 }} ronde;
-            kemenangan diperiksa setelah aksi malam dan voting.
+            mulai. Timer tetap berjalan saat tab ditutup. Tanpa batas ronde; kemenangan diperiksa
+            setelah aksi malam dan voting.
           </p>
           @if (room.phase === 'lobby' || room.phase === 'finished') {
             <button class="operation-secondary" (click)="leaveRoom()" [disabled]="busy">

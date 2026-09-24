@@ -122,7 +122,8 @@ def main():
         result = wait_phase("finished", 2)
         assert result["winner"] == "civilians"
         assert all("role" in p for p in result["players"])
-        assert owner.get(base + "/checker").status_code == 200
+        # Checker lama tetap ditutup setelah selesai; hasil dibaca dari snapshot game.
+        assert owner.get(base + "/checker").status_code == 410
         print(
             "PASS Hostage diam/tetap hidup, vote satu kali, eksekusi Hitman, WARGA MENANG. Room "
             + code,

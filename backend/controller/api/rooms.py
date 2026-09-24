@@ -15,7 +15,6 @@ class JoinRoom(BaseModel):
 
 
 class CreateRoom(BaseModel):
-    max_rounds: Literal[6, 8, 12] = 8
     capacity: int = Field(default=6, ge=4, le=10)
 
 
@@ -108,9 +107,7 @@ def create(body: CreateRoom = CreateRoom(), user=Depends(require_authenticated_u
     def create_archived():
         with room_service.lock:
             for _ in range(10):
-                room = room_service.create(
-                    user.username, max_rounds=body.max_rounds, capacity=body.capacity
-                )
+                room = room_service.create(user.username, capacity=body.capacity)
                 try:
                     if PersistenceService(room.code).archive_new_room(user.username):
                         return room

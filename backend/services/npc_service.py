@@ -43,7 +43,6 @@ def npc_context(match, name):
         legal["vote"] = [p["name"] for p in view["players"] if p["alive"] and p["name"] != name]
     return {
         "round": match.round,
-        "max_rounds": match.max_rounds,
         "phase": match.phase,
         "me": me,
         "players": [{"name": p["name"], "alive": p["alive"]} for p in view["players"]],
@@ -59,6 +58,7 @@ def decision_prompt(context):
     return """Kamu pemain independen dalam Silent Terror, bukan moderator. Mainkan role milikmu untuk menang.
 Aturan: 4–10 pemain; satu Hitman, satu Spy, satu Stalker, sisanya Civilian. Warga menang jika Hitman dieksekusi.
 Hitman menang jika warga hidup yang tidak Hostage tinggal <=1. Gag hanya membungkam chat, tidak menghapus vote.
+Tidak ada batas ronde atau hasil seri pertandingan; lanjutkan sampai salah satu kubu menang.
 Hostage permanen menghapus chat/vote tetapi pemain hidup dan masih boleh memakai skill malam.
 Siang diskusi dan Gag; malam chat terkunci, Hostage/Guard/Peek buta; Tribunal voting plurality, seri tanpa eksekusi.
 Guard tidak boleh target sama dua malam berturut-turut. Peek dan Gag tersedia tiap dua ronde.

@@ -113,8 +113,8 @@ class VictoryRulesTests(unittest.TestCase):
         self.assertEqual(self.game.winner_reason, "no_civilians_alive")
         self.assertEqual(self.game.snapshot("hitman")["result"]["civilians_alive"], 0)
 
-    def test_final_round_normal_win_precedes_draw_and_finish_is_immutable(self):
-        self.game.round = 8
+    def test_win_after_many_rounds_is_immutable(self):
+        self.game.round = 25
         self.game.phase = "tribunal"
         self.game.vote("spy", "hitman")
         self.game.tick(self.game.deadline)
@@ -126,13 +126,16 @@ class VictoryRulesTests(unittest.TestCase):
         self.assertFalse(self.game.snapshot("spy")["me"]["can_vote"])
         self.assertFalse(self.game.snapshot("spy")["me"]["can_act"])
 
-    def test_draw_has_no_winning_team(self):
-        self.game.round = 8
+    def test_no_winner_after_many_rounds_keeps_roles_private(self):
+        self.game.round = 25
         self.game.phase = "tribunal"
         self.game.tick(self.game.deadline)
         for viewer in self.game.players:
-            self.assertEqual(self.game.snapshot(viewer)["result"]["outcome"], "draw")
-        self.assertEqual(self.game.winner_reason, "round_limit")
+            view = self.game.snapshot(viewer)
+            self.assertIsNone(view["result"])
+            self.assertTrue(all("role" not in p for p in view["players"]))
+        self.assertIsNone(self.game.winner)
+        self.assertEqual((self.game.round, self.game.phase), (26, "day"))
 
     def test_active_snapshot_keeps_other_hostages_private(self):
         self.game.players["spy"].hostage = True

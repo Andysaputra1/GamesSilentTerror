@@ -46,7 +46,6 @@ describe('Game', () => {
         id: 'match-1',
         phase: 'day',
         round: 1,
-        max_rounds: 8,
         deadline: 120,
         server_time: 100,
         winner: null,
@@ -147,6 +146,51 @@ describe('Game', () => {
     expect(component.error).toBe('Server belum bisa dihubungi.');
   });
 
+  it('returns to the lobby when the server no longer has the current match', () => {
+    component.game = snapshot().game;
+    component.code = 'ABC123';
+    for (const key of [
+      'shadow_heist_room',
+      'shadow_heist_room_snapshot',
+      'shadow_heist_game_entry',
+    ])
+      sessionStorage.setItem(key, 'stale');
+    const request = vi
+      .spyOn(TestBed.inject(GameService), 'request')
+      .mockReturnValue(
+        throwError(() => ({ status: 400, error: { detail: 'Ruangan tidak ditemukan.' } })),
+      );
+    component.refresh();
+    expect(TestBed.inject(Router).navigateByUrl).toHaveBeenCalledWith('/lobby');
+    expect(component.game).toBeNull();
+    expect(component.busy).toBe(false);
+    for (const key of [
+      'shadow_heist_room',
+      'shadow_heist_room_snapshot',
+      'shadow_heist_game_entry',
+    ])
+      expect(sessionStorage.getItem(key)).toBeNull();
+    component.refresh();
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the current match when an action is rejected after a phase change', () => {
+    component.game = snapshot().game;
+    component.code = 'ABC123';
+    component.target = 'NOX';
+    const navigate = vi.mocked(TestBed.inject(Router).navigateByUrl);
+    navigate.mockClear();
+    vi.spyOn(TestBed.inject(GameService), 'request').mockReturnValue(
+      throwError(() => ({ status: 400, error: { detail: 'Fase sudah berubah.' } })),
+    );
+    component.act();
+    expect(component.code).toBe('ABC123');
+    expect(component.game).not.toBeNull();
+    expect(component.error).toBe('Fase sudah berubah.');
+    expect(component.busy).toBe(false);
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
   it('only allows self target for Guard and excludes consecutive target', () => {
     component.game = snapshot().game;
     expect(component.canTarget('alice')).toBe(false);
@@ -224,14 +268,11 @@ describe('Game', () => {
     expect(fixture.nativeElement.querySelector('.players').textContent).not.toContain('BOT');
   });
 
-  it('shows a loss for a hostage when Hitman wins and a neutral result for a draw', () => {
+  it('shows a loss for a hostage when Hitman wins', () => {
     component.game = snapshot().game;
     component.game.me.role = 'civilian';
     component.game.me.hostage = true;
     component.game.winner = 'hitman';
     expect(component.outcomeLabel).toBe('KAMU KALAH');
-    component.game.winner = 'draw';
-    expect(component.outcomeLabel).toBe('SERI');
-    expect(component.resultExplanation).toContain('8 ronde');
   });
 });

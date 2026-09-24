@@ -20,7 +20,6 @@ export interface Room {
   capacity?: number;
   match_durations?: PhaseDurations | null;
   phase_durations?: { standard: PhaseDurations; quick: PhaseDurations };
-  max_rounds?: number;
 }
 
 // DECORATOR: daftarkan service agar Angular dapat menyuntikkannya ke komponen.

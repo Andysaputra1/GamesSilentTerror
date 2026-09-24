@@ -7,7 +7,7 @@ Tambahan atas GDD awal: mode kecil 4/5 pemain dan durasi fase mengikuti jumlah p
 ## Ruangan dan role
 
 - **4–10 peserta**, kombinasi manusia dan NPC. Host memilih kapasitas room; permainan dapat dimulai dengan sedikitnya empat peserta.
-- **Batas 6, 8, atau 12 ronde**, dipilih saat membuat room. Kemenangan dapat terjadi lebih cepat.
+- **Tanpa batas ronde**. Host hanya memilih kapasitas; permainan berlanjut sampai salah satu kubu menang.
 - Tepat satu Hitman, satu Spy, satu Stalker, sisanya Civilian. Role diacak server untuk manusia maupun NPC.
 - NPC mengisi kursi kosong sampai kapasitas. Manusia yang bergabung sebelum mulai menggantikan kursi NPC. Roster terkunci setelah mulai; anggota lama dapat reconnect.
 - Satu akun menempati satu room. Keluar dari lobby/hasil sebelum pindah room. Logout mencabut sesi tanpa menghentikan pertandingan; login ulang memulihkan keanggotaan.
@@ -47,13 +47,14 @@ Backend mengecek setelah resolusi malam dan Tribunal:
 
 1. **Warga menang** jika Hitman dieksekusi.
 2. **Hitman menang**, selama masih hidup, saat warga hidup yang tidak Hostage **paling banyak satu**. Suara warga tidak lagi melampaui satu suara Hitman. Warga dieksekusi/Hostage tidak dihitung; Gag tetap dihitung.
-3. Tanpa pemenang setelah Tribunal pada batas ronde pilihan host: **seri**.
 
-Contoh enam pemain: tiga dari lima warga Hostage, dua bebas → lanjut. Satu lagi disandera atau dieksekusi → Hitman menang. Guard berhasil sehingga dua warga tetap bebas → lanjut. Hitman dieksekusi pada Tribunal terakhir → kemenangan warga diprioritaskan atas seri.
+Tidak ada hasil seri pertandingan. Jika kedua kondisi kemenangan belum terpenuhi, lanjutkan ke ronde berikutnya.
 
-Ketentuan pelengkap untuk bagian GDD yang belum merinci: vote seri/tanpa suara tidak mengeksekusi siapa pun; batas ronde tanpa kemenangan menghasilkan seri; role korban eksekusi dirahasiakan sampai akhir.
+Contoh enam pemain: tiga dari lima warga Hostage, dua bebas → lanjut. Satu lagi disandera atau dieksekusi → Hitman menang. Guard berhasil sehingga dua warga tetap bebas → lanjut. Hitman dieksekusi pada Tribunal ronde berapa pun → warga menang dan permainan selesai.
 
-Hasil akhir menunjukkan faksi pemenang, alasan, menang/kalah/seri akun sendiri, jumlah warga hidup/Hostage/dieksekusi/masih punya suara, serta role dan status akhir semua peserta.
+Ketentuan pelengkap untuk bagian GDD yang belum merinci: vote seri/tanpa suara tidak mengeksekusi siapa pun dan permainan dilanjutkan jika belum ada pemenang; role korban eksekusi dirahasiakan sampai akhir.
+
+Hasil akhir menunjukkan faksi pemenang, alasan, menang/kalah akun sendiri, jumlah warga hidup/Hostage/dieksekusi/masih punya suara, serta role dan status akhir semua peserta.
 
 ## Blind information
 
@@ -78,7 +79,7 @@ SVM/fuzzy tetap menganalisis pesan manusia untuk arsip/checker. Jalur NPC memaka
 ## Alur kode
 
 ```text
-Lobby -> POST /api/rooms {capacity, max_rounds} -> RoomService
+Lobby -> POST /api/rooms {capacity} -> RoomService
 Host mulai -> Match (role acak, timer, snapshot privat)
 Timer 0,5 detik -> resolusi fase + NPCService.schedule
 NPC -> prompt privat -> single LLM -> JSON tervalidasi -> Match.act/vote
@@ -96,4 +97,4 @@ Chat manusia diperiksa ulang setelah analisis, lalu disimpan bersama pembaruan r
 
 Room, role, aksi, vote, dan konteks pertandingan berada di memori satu proses. Restart menghapus pertandingan aktif; MySQL menyimpan chat/analisis, bukan pemulihan seluruh match. Multi-worker dan penggantian pemain offline otomatis belum tersedia.
 
-Tes otomatis mencakup 4–10 pemain, 6/8/12 ronde, Guard/Peek/Gag/Hostage, dominasi suara, prioritas kemenangan, privasi, voting, reconnect, serta scheduler/validasi/fallback NPC dengan respons model tiruan. Tes ini tidak membuktikan kualitas taktik atau latensi provider produksi.
+Tes otomatis mencakup 4–10 pemain, permainan tanpa pemenang melewati ronde 25, Guard/Peek/Gag/Hostage, dominasi suara, prioritas kemenangan, privasi, voting, reconnect, serta scheduler/validasi/fallback NPC dengan respons model tiruan. Tes ini tidak membuktikan kualitas taktik atau latensi provider produksi.

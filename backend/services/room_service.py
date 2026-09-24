@@ -14,7 +14,6 @@ class Room:
     members: list[str] = field(default_factory=list)
     bot_enabled: bool = False
     match: Match | None = None
-    max_rounds: int = 8
     capacity: int = 6
 
 
@@ -26,9 +25,9 @@ class RoomService:
 
     # SERVICE LOBBY: buat kode unik 6 karakter, tetapkan pemilik sebagai anggota pertama, dan batasi jumlah ruangan.
     @traced
-    def create(self, username: str, max_rounds=8, capacity=6) -> Room:
-        if max_rounds not in {6, 8, 12} or capacity not in range(4, 11):
-            raise ValueError("Room membutuhkan 4–10 kursi dan pilihan 6, 8, atau 12 ronde.")
+    def create(self, username: str, capacity=6) -> Room:
+        if capacity not in range(4, 11):
+            raise ValueError("Room membutuhkan 4–10 kursi.")
         with self.lock:
             if self.active(username):
                 raise ValueError("Selesaikan pertandingan aktif sebelum membuat ruangan lain.")
@@ -39,7 +38,7 @@ class RoomService:
             code = secrets.token_hex(3).upper()
             while code in self.rooms:
                 code = secrets.token_hex(3).upper()
-            room = Room(code, username, [username], max_rounds=max_rounds, capacity=capacity)
+            room = Room(code, username, [username], capacity=capacity)
             self.rooms[code] = room
             return room
 
@@ -102,7 +101,6 @@ class RoomService:
                 "bot_enabled": room.bot_enabled,
                 "bots": self.bot_names(room),
                 "phase": room.match.phase if room.match else "lobby",
-                "max_rounds": room.max_rounds,
                 "capacity": room.capacity,
                 "match_durations": dict(room.match.durations) if room.match else None,
                 "phase_durations": {
@@ -152,9 +150,7 @@ class RoomService:
                 )
             if any(self.active(name) for name in room.members):
                 raise ValueError("Ada anggota yang masih mengikuti pertandingan lain.")
-            room.match = Match(
-                room.members, self.bot_names(room), quick=quick, max_rounds=room.max_rounds
-            )
+            room.match = Match(room.members, self.bot_names(room), quick=quick)
             room.match.ai_controlled = True
             return self.snapshot(room)
 
