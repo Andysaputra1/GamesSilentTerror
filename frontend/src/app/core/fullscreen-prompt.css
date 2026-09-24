@@ -1,0 +1,86 @@
+:host {
+  font-family: Arial, sans-serif;
+}
+
+.fullscreen-prompt {
+  position: fixed;
+  z-index: 1000;
+  bottom: max(20px, env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  box-sizing: border-box;
+  width: min(680px, calc(100% - 32px));
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 18px 22px;
+  border: 1px solid #b68a49;
+  border-radius: 12px;
+  color: #f7ead3;
+  background: #241b15;
+  box-shadow: 0 12px 40px #0008;
+}
+
+h2 {
+  margin: 0 0 6px;
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+p {
+  margin: 0;
+  color: #d9c8ac;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.fullscreen-error {
+  margin-top: 8px;
+  color: #ffc4a6;
+}
+
+.fullscreen-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+button {
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid #b68a49;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+button:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+}
+
+button:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.fullscreen-enter {
+  color: #241b15;
+  background: #e8c073;
+  font-weight: 700;
+}
+
+.fullscreen-later {
+  color: #f7ead3;
+  background: transparent;
+}
+
+@media (max-width: 600px) {
+  .fullscreen-prompt {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 14px;
+    padding: 16px;
+  }
+}

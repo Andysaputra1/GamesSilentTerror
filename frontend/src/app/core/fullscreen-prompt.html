@@ -1,0 +1,22 @@
+@if (visible()) {
+  <aside class="fullscreen-prompt" aria-labelledby="fullscreen-title">
+    <div class="fullscreen-copy">
+      <h2 id="fullscreen-title">Main lebih nyaman di layar penuh</h2>
+      <p>Perluas tampilan permainan. Tekan Esc untuk keluar.</p>
+      @if (error()) {
+        <p class="fullscreen-error" role="status">{{ error() }}</p>
+      }
+    </div>
+    <div class="fullscreen-actions">
+      <button
+        type="button"
+        class="fullscreen-enter"
+        (click)="enterFullscreen()"
+        [disabled]="pending()"
+      >
+        {{ pending() ? 'Membuka…' : 'Masuk layar penuh' }}
+      </button>
+      <button type="button" class="fullscreen-later" (click)="dismiss()">Nanti</button>
+    </div>
+  </aside>
+}
