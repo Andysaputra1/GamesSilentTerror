@@ -5,7 +5,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from controller.middleware.auth import require_authenticated_user
 from schemas.auth import AuthenticatedUserResponse, LoginRequest, LoginResponse
-from schemas.auth import RegisterRequest, GoogleLoginRequest, UpdateProfileRequest
+from schemas.auth import RegisterRequest, GoogleLoginRequest, UpdateProfileRequest, UpdateSkinRequest
 from config.settings import settings
 from controller.middleware.auth_limits import limit_auth
 from services.account_service import register_account, google_account, AccountConflict
@@ -37,6 +37,7 @@ def login(request: LoginRequest) -> LoginResponse:
         user=AuthenticatedUserResponse(
             username=result.user.username,
             display_name=result.user.display_name,
+            skin_id=result.user.skin_id,
         ),
     )
 
@@ -46,7 +47,11 @@ def login(request: LoginRequest) -> LoginResponse:
 def current_user(
     user: AuthenticatedUser = Depends(require_authenticated_user),
 ) -> AuthenticatedUserResponse:
-    return AuthenticatedUserResponse(username=user.username, display_name=user.display_name)
+    return AuthenticatedUserResponse(
+        username=user.username,
+        display_name=user.display_name,
+        skin_id=user.skin_id,
+    )
 
 
 # Akun yang diubah berasal dari bearer token; username baru tidak dapat memilih akun lain.
@@ -63,7 +68,26 @@ def update_profile(
         raise HTTPException(409, str(error)) from error
     except AuthenticationPersistenceError as error:
         raise HTTPException(503, "Nama belum berhasil disimpan. Coba lagi nanti.") from error
-    return AuthenticatedUserResponse(username=updated.username, display_name=updated.display_name)
+    return AuthenticatedUserResponse(
+        username=updated.username,
+        display_name=updated.display_name,
+        skin_id=updated.skin_id,
+    )
+
+
+@router.put("/skin")
+# CONTROLLER: ubah skin preference dari token autentikasi; user tidak bisa mengubah skin user lain.
+def update_skin(
+    body: UpdateSkinRequest,
+    user: AuthenticatedUser = Depends(require_authenticated_user),
+):
+    try:
+        skin_id = auth_service.update_skin(user, body.skin_id)
+    except ValueError as error:
+        raise HTTPException(400, str(error)) from error
+    except AuthenticationPersistenceError as error:
+        raise HTTPException(503, "Skin gagal disimpan. Coba lagi.") from error
+    return {"skin_id": skin_id}
 
 
 @router.post("/logout", status_code=204)
@@ -92,7 +116,9 @@ def account_response(operation):
         access_token=result.access_token,
         expires_at=result.expires_at,
         user=AuthenticatedUserResponse(
-            username=result.user.username, display_name=result.user.display_name
+            username=result.user.username,
+            display_name=result.user.display_name,
+            skin_id=result.user.skin_id,
         ),
     )
 

@@ -7,6 +7,7 @@ import { backendUrl } from './backend-url';
 export interface UserProfile {
   username: string;
   display_name: string;
+  skin_id?: string;
 }
 
 @Injectable({ providedIn: 'root' })

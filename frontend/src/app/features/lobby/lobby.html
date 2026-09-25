@@ -72,7 +72,7 @@
             <form (ngSubmit)="joinRoom()">
               <input
                 id="room-code"
-                name="roomCode"
+                Name="roomCode"
                 [value]="joinCode"
                 (input)="joinCode = $any($event.target).value"
                 maxlength="6"
@@ -104,14 +104,14 @@
           >
         </div>
         @if (room) {
-          @for (member of room.members; track member) {
+          @for (member of room.members; track member.name) {
             <div class="player-row">
               <span class="player-avatar">◈</span>
               <div>
-                <b>{{ member }}</b
-                ><small>{{ member === room.owner ? 'PEMBUAT RUANGAN' : 'PEMAIN' }}</small>
+                <b>{{ member.name }}</b
+                ><small>{{ member.name === room.owner ? 'PEMBUAT RUANGAN' : 'PEMAIN' }}</small>
               </div>
-              @if (member === username) {
+              @if (member.name === username) {
                 <span class="player-tag">YOU</span>
               }
             </div>

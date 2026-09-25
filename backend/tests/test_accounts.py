@@ -22,7 +22,7 @@ class AccountTests(unittest.TestCase):
         with self.engine.begin() as db:
             db.execute(
                 text(
-                    "CREATE TABLE user_accounts (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, display_name TEXT, password_hash TEXT, is_active BOOLEAN DEFAULT 1)"
+                    "CREATE TABLE user_accounts (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, display_name TEXT, skin_id TEXT DEFAULT 'dexter', password_hash TEXT, is_active BOOLEAN DEFAULT 1)"
                 )
             )
             db.execute(
@@ -75,7 +75,7 @@ class AccountTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers["cache-control"], "no-store")
         self.assertEqual(
-            response.json(), {"username": self.body["username"], "display_name": "Andy Saputra"}
+            response.json(), {"username": self.body["username"], "display_name": "Andy Saputra", "skin_id": "dexter"}
         )
         self.assertEqual(
             self.client.get("/api/auth/me", headers=headers).json()["display_name"], "Andy Saputra"
@@ -275,7 +275,7 @@ class AccountTests(unittest.TestCase):
         self.assertEqual(changed.status_code, 200)
         again, _ = self.google()
         self.assertEqual(
-            again.json()["user"], {"username": "new_detective", "display_name": "New Name"}
+            again.json()["user"], {"username": "new_detective", "display_name": "New Name", "skin_id": "dexter"}
         )
         self.register(username="taken_name")
         for name in ["taken_name", "NOX", "admin"]:
@@ -289,7 +289,7 @@ class AccountTests(unittest.TestCase):
             )
         self.assertEqual(
             self.client.get("/api/auth/me", headers=headers).json(),
-            {"username": "new_detective", "display_name": "New Name"},
+            {"username": "new_detective", "display_name": "New Name", "skin_id": "dexter"},
         )
 
     def test_google_mismatched_nonce_unverified_and_no_email_linking(self):

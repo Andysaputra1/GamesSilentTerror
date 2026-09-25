@@ -36,6 +36,7 @@ class AuthenticatedUser:
     id: int
     username: str
     display_name: str
+    skin_id: str = "dexter"
 
 
 @dataclass(frozen=True)
@@ -125,7 +126,10 @@ class AuthService:
         if row is None:
             raise SessionValidationError("Sesi login sudah tidak valid.")
         return AuthenticatedUser(
-            id=row["id"], username=row["username"], display_name=row["display_name"]
+            id=row["id"],
+            username=row["username"],
+            display_name=row["display_name"],
+            skin_id=row["skin_id"],
         )
 
     # Username hanya boleh berganti di luar ruangan; token tetap terkait ID akun yang sama.
@@ -168,7 +172,20 @@ class AuthService:
             if changing_username and room_service.current(user.username):
                 raise ValueError("Keluar dari ruangan terlebih dahulu sebelum mengganti username.")
             self._transaction(operation)
-        return AuthenticatedUser(user.id, selected_username, display_name)
+        return AuthenticatedUser(user.id, selected_username, display_name, user.skin_id)
+
+    # SERVICE: ubah skin preference pengguna; validasi daftar skin yang diizinkan.
+    def update_skin(self, user: AuthenticatedUser, skin_id: str) -> str:
+        from services.skin_constants import ALL_SKINS
+
+        if skin_id not in ALL_SKINS:
+            raise ValueError(f"Skin tidak valid. Pilihan: {', '.join(ALL_SKINS)}")
+
+        def operation(database):
+            auth_queries.update_skin(database, user.id, skin_id)
+
+        self._transaction(operation)
+        return skin_id
 
     # SERVICE LOGOUT: cabut token melalui transaksi database; token kosong tidak memerlukan operasi.
     def logout(self, token: str) -> None:

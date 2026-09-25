@@ -1,8 +1,10 @@
 """Live lobby registry for a single backend process. Restart clears active rooms."""
 
 from dataclasses import dataclass, field
+from sqlalchemy import text
 import secrets
 from threading import RLock
+from module.mysql_connector import SessionLocal
 from services.match_engine import Match, phase_durations
 from services.activity_service import activity, traced
 
@@ -12,6 +14,7 @@ class Room:
     code: str
     owner: str
     members: list[str] = field(default_factory=list)
+    members_skin: dict[str, str] = field(default_factory=dict)
     bot_enabled: bool = False
     match: Match | None = None
     capacity: int = 6
@@ -22,6 +25,27 @@ class RoomService:
     def __init__(self):
         self.rooms: dict[str, Room] = {}
         self.lock = RLock()
+
+    # HELPER: ambil skin_id dari user_accounts untuk daftar username.
+    def _fetch_skin_ids(self, usernames: list[str]) -> dict[str, str]:
+        if not usernames:
+            return {}
+        database = SessionLocal()
+        try:
+            placeholders = ', '.join([f':u{i}' for i in range(len(usernames))])
+            params = {f'u{i}': name for i, name in enumerate(usernames)}
+            sql = text(f"""
+                SELECT username, skin_id FROM user_accounts
+                WHERE username IN ({placeholders})
+            """)
+            result = database.execute(sql, params)
+            skin_map = {row.username: row.skin_id for row in result}
+            for name in usernames:
+                if name not in skin_map:
+                    skin_map[name] = "dexter"
+            return skin_map
+        finally:
+            database.close()
 
     # SERVICE LOBBY: buat kode unik 6 karakter, tetapkan pemilik sebagai anggota pertama, dan batasi jumlah ruangan.
     @traced
@@ -39,6 +63,7 @@ class RoomService:
             while code in self.rooms:
                 code = secrets.token_hex(3).upper()
             room = Room(code, username, [username], capacity=capacity)
+            room.members_skin = self._fetch_skin_ids([username])
             self.rooms[code] = room
             return room
 
@@ -75,6 +100,7 @@ class RoomService:
                 if len(room.members) >= room.capacity:
                     raise ValueError(f"Ruangan sudah penuh (maksimal {room.capacity} pemain).")
                 room.members.append(username)
+                room.members_skin[username] = self._fetch_skin_ids([username]).get(username, "dexter")
             return room
 
     # SERVICE LOBBY: periksa kepemilikan lalu aktifkan/nonaktifkan NOX pada ruangan.
@@ -94,10 +120,14 @@ class RoomService:
     # METHOD SERIALISASI: salin data publik ruangan dan roster untuk respons API/socket.
     def snapshot(self, room: Room):
         with self.lock:
+            members_with_skin = [
+                {"name": name, "skin_id": room.members_skin.get(name, "dexter")}
+                for name in room.members
+            ]
             return {
                 "code": room.code,
                 "owner": room.owner,
-                "members": list(room.members),
+                "members": members_with_skin,
                 "bot_enabled": room.bot_enabled,
                 "bots": self.bot_names(room),
                 "phase": room.match.phase if room.match else "lobby",
@@ -150,7 +180,9 @@ class RoomService:
                 )
             if any(self.active(name) for name in room.members):
                 raise ValueError("Ada anggota yang masih mengikuti pertandingan lain.")
-            room.match = Match(room.members, self.bot_names(room), quick=quick)
+            room.members_skin = self._fetch_skin_ids(room.members)
+            room.match = Match(room.members, self.bot_names(room),
+                             skin_map=room.members_skin, quick=quick)
             room.match.ai_controlled = True
             return self.snapshot(room)
 
@@ -239,6 +271,7 @@ class RoomService:
                     "Tidak dapat keluar dari pertandingan aktif. Kamu bisa menyambung kembali setelah menutup tab."
                 )
             room.members.remove(username)
+            room.members_skin.pop(username, None)
             if not room.members:
                 del self.rooms[room.code]
             elif username == room.owner:

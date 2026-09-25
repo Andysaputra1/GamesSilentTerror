@@ -14,6 +14,11 @@ class LoginRequest(BaseModel):
 class AuthenticatedUserResponse(BaseModel):
     username: str
     display_name: str
+    skin_id: str
+
+
+class UpdateSkinRequest(BaseModel):
+    skin_id: str = Field(min_length=1, max_length=20)
 
 
 class UpdateProfileRequest(BaseModel):

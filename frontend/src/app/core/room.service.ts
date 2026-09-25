@@ -10,10 +10,15 @@ export interface PhaseDurations {
   tribunal: number;
 }
 
+export interface RoomMember {
+  name: string;
+  skin_id: string;
+}
+
 export interface Room {
   code: string;
   owner: string;
-  members: string[];
+  members: RoomMember[];
   bot_enabled: boolean;
   bots: string[];
   phase: string;

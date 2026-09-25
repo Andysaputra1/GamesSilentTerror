@@ -11,6 +11,8 @@ import random
 import time
 from uuid import uuid4
 
+from services.skin_constants import ALL_SKINS, SKIN_BY_BOT
+
 
 @dataclass
 class Participant:
@@ -25,6 +27,7 @@ class Participant:
     last_guard: str | None = None
     last_guard_round: int = 0
     intel: list[dict] = field(default_factory=list)
+    skin_id: str = "dexter"
 
 
 # Durasi mengikuti roster awal (manusia + NPC), bukan jumlah warga bebas yang bersifat rahasia.
@@ -40,16 +43,21 @@ def phase_durations(count, quick=False):
 
 class Match:
     # CONSTRUCTOR: acak role di server; tepat satu Hitman, Spy, dan Stalker.
-    def __init__(self, humans, bots, *, quick=False, now=None, rng=None):
+    def __init__(self, humans, bots, *, quick=False, now=None, rng=None,
+                 skin_map: dict[str, str] | None = None):
         names = list(humans) + list(bots)
         if not 4 <= len(names) <= 10 or len(set(names)) != len(names):
             raise ValueError("Permainan membutuhkan 4–10 identitas berbeda.")
         self.rng = rng or random.SystemRandom()
         roles = ["hitman", "spy", "stalker"] + ["civilian"] * (len(names) - 3)
         self.rng.shuffle(roles)
-        self.players = {
-            name: Participant(name, role, name in bots) for name, role in zip(names, roles)
-        }
+        self.players = {}
+        for name, role in zip(names, roles):
+            if name in bots:
+                skin = SKIN_BY_BOT.get(name, self.rng.choice(ALL_SKINS))
+            else:
+                skin = skin_map.get(name, "dexter") if skin_map else "dexter"
+            self.players[name] = Participant(name, role, name in bots, skin_id=skin)
         self.id = uuid4().hex
         self.round = 1
         self.ai_controlled = (
@@ -78,6 +86,11 @@ class Match:
         if self.phase in {"day", "tribunal"} and self.ai_grace_phase != phase:
             self.ai_grace_phase = phase
             self.deadline = max(self.deadline, now + 35)
+
+    # GETTER: ambil skin_id pemain, aman dipanggil dari luar Match.
+    def get_skin(self, name: str) -> str:
+        player = self.players.get(name)
+        return player.skin_id if player else "dexter"
 
     # HELPER: Hostage menghapus suara, bukan nyawa atau skill malam milik warga.
     def actor(self, name):
