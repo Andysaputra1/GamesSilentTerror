@@ -51,10 +51,17 @@ export class Auth implements OnInit {
   readonly countdownEnded = signal(false);
   readonly countdownLabels = ['BULAN', 'HARI', 'JAM', 'MENIT', 'DETIK'];
   backendStatus: 'checking' | 'online' | 'offline' = 'checking';
-  readonly serverContactUrl =
+  
+  // KONTAK WA: link ke WhatsApp untuk menyalakan server jika halaman login offline.
+  readonly serverContactUrlAndy =
     'https://wa.me/6281995247372?text=' +
     encodeURIComponent(
       'Bro Andy, tolong nyalakan server Silent Terror ya. Status di halaman login sedang offline. Terima kasih!',
+    );
+    readonly serverContactUrlKimberly =
+    'https://wa.me/6281230242435?text=' +
+    encodeURIComponent(
+      'Hi Kim, offline nih server game Silent Terrornya. Tolong bantu nyalakan dong, thanks!',
     );
   // STATE/PROPERTY: data input dan status UI yang dibaca oleh auth.html.
   username = '';

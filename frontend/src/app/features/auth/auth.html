@@ -1,7 +1,7 @@
 <main class="storybook-auth">
   <div class="auth-topbar">
     <header class="storybook-brand" aria-label="Silent Terror">
-      <p>Private investigation bureau</p>
+      <p>Social Deduction Party Game</p>
       <h1><span>Silent</span><i aria-hidden="true">◆</i><span>Terror</span></h1>
     </header>
     <section
@@ -44,7 +44,7 @@
 
       <div class="paper-content">
         <header class="form-heading">
-          <p>New detective application</p>
+          <!-- <p>New detective application</p> -->
           <h2 id="register-heading">Register</h2>
         </header>
 
@@ -120,7 +120,7 @@
     <section class="login-journal right-column" aria-labelledby="login-heading">
       <div class="journal-content">
         <header class="form-heading">
-          <p>Access your case files</p>
+          <!-- <p>Access your case files</p> -->
           <h2 id="login-heading">Log In</h2>
         </header>
 
@@ -165,9 +165,9 @@
           </label>
 
           <div class="journal-links">
-            <button type="button" (click)="useDevelopmentCredentials()" [disabled]="isSubmitting">
+            <!-- <button type="button" (click)="useDevelopmentCredentials()" [disabled]="isSubmitting">
               Use demo account
-            </button>
+            </button> -->
             <span class="unavailable-note">Lupa password? Hubungi pengelola.</span>
           </div>
 
@@ -223,13 +223,21 @@
       <p class="secure-note">
         Server belum bisa dihubungi atau belum siap. Periksa koneksimu. Jika tetap offline, hubungi
         <a
-          [href]="serverContactUrl"
+          [href]="serverContactUrlAndy"
           target="_blank"
           rel="noopener noreferrer"
           style="color: inherit"
-          >Andy Saputra</a
+          >Andy</a
         >
-        / Janice Tiffany Wijono / Kimberly Joseph Wirawan untuk menyalakan server.
+        / Janice / 
+        <a
+          [href]="serverContactUrlKimberly"
+          target="_blank"
+          rel="noopener noreferrer"
+          style="color: inherit"
+          >Kimberly</a
+          >
+          untuk menyalakan server.
       </p>
     }
   </div>
