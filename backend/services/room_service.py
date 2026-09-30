@@ -252,6 +252,12 @@ class RoomService:
                 raise ValueError(
                     "Tidak dapat keluar dari pertandingan aktif. Kamu bisa menyambung kembali setelah menutup tab."
                 )
+            if room.match:
+                # Survei akhir tetap bisa dikirim setelah keluar (room mungkin segera dibersihkan).
+                # Impor lambat: survey_service mengimpor modul ini.
+                from services.survey_service import survey_service
+
+                survey_service.ingat_pertandingan(room)
             room.members.remove(username)
             if not room.members:
                 del self.rooms[room.code]

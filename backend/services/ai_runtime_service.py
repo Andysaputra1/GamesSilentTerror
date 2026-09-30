@@ -28,6 +28,11 @@ class AIRuntimeService:
         with self.lock:
             self.override = None
 
+    # Apakah nilai field berasal dari konfigurasi panel (bukan .env), mis. URL tunnel LLM.
+    def diatur_panel(self, field):
+        with self.lock:
+            return bool(self.override and self.override.get(field))
+
 
 ai_runtime = AIRuntimeService()
 

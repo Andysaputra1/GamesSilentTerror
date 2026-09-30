@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
@@ -13,6 +14,13 @@ from config.mysql import MySQLSettings
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 PROJECT_DIR = BACKEND_DIR.parent
+
+# Jalur rantai penulis kalimat NPC (sama dengan JALUR_PENULIS di notebook npc_nlg; diuji di test_npc_writer).
+JALUR_PENULIS_NPC = ("claude_bedrock", "claude_api", "openrouter", "tautan")
+# penyedia/model (mis. anthropic/claude-opus-5.5); segmen tidak boleh diawali titik agar path URL tetap lurus.
+POLA_MODEL_OPENROUTER = re.compile(r"[a-z0-9][a-z0-9._-]*/[A-Za-z0-9_:-][A-Za-z0-9._:-]*")
+# Region AWS (mis. us-east-1): disisipkan ke host endpoint Bedrock, jadi harus berbentuk region.
+POLA_REGION_AWS = re.compile(r"[a-z]{2}(-[a-z]+)+-\d+")
 
 
 class Settings(MySQLSettings):
@@ -79,8 +87,13 @@ class Settings(MySQLSettings):
     # OTAK NPC (hasil ekspor notebook skripsi): metode penalaran, penulis kalimat, dan lokasi IndoBERT.
     # campuran = bot dalam satu room dibagi bergiliran ke fuzzy, utility, dan behavior tree.
     npc_method: Literal["campuran", "fuzzy", "utility", "bt", "llm"] = "campuran"
-    # otomatis = Claude jika ada key, selain itu templat; templat = tanpa LLM sama sekali.
+    # otomatis = rantai penulis LLM (urutan di bawah, bisa diubah di panel), semua gagal → templat;
+    # templat = tanpa LLM sama sekali; claude = nilai lama, diperlakukan seperti otomatis.
     npc_writer: Literal["otomatis", "claude", "templat"] = "otomatis"
+    # Prioritas awal rantai penulis: Bedrock → Claude API → OpenRouter → LLM sendiri lewat link (Docker/tunnel).
+    npc_writer_order: str = ",".join(JALUR_PENULIS_NPC)
+    # Model OpenRouter penulis kalimat; kosong = Claude Opus yang sama dengan notebook.
+    npc_openrouter_model: str = ""
     npc_validate_nlg: bool = True
     npc_intent_model_dir: Path | None = None
     npc_target_model_dir: Path | None = None
@@ -101,6 +114,32 @@ class Settings(MySQLSettings):
     # VALIDATOR: nilai kosong di .env berarti "tidak diatur", bukan folder kerja atau key kosong.
     def empty_as_none(cls, value: object) -> object:
         return None if isinstance(value, str) and not value.strip() else value
+
+    @field_validator("npc_writer_order", mode="before")
+    @classmethod
+    # VALIDATOR: daftar jalur dipisah koma tanpa duplikat; nama yang tidak dikenal ditolak saat startup.
+    def validate_writer_order(cls, value: object) -> str:
+        jalur = [j.strip() for j in str(value or "").split(",") if j.strip()]
+        if not set(jalur) <= set(JALUR_PENULIS_NPC) or len(set(jalur)) != len(jalur):
+            raise ValueError("NPC_WRITER_ORDER hanya boleh berisi " + ", ".join(JALUR_PENULIS_NPC))
+        return ",".join(jalur)
+
+    @field_validator("npc_openrouter_model", mode="before")
+    @classmethod
+    # VALIDATOR: model OpenRouter berbentuk penyedia/model, mis. anthropic/claude-opus-5.5.
+    def validate_openrouter_model(cls, value: object) -> str:
+        model = str(value or "").strip()
+        if model and not POLA_MODEL_OPENROUTER.fullmatch(model):
+            raise ValueError("NPC_OPENROUTER_MODEL harus berbentuk penyedia/model.")
+        return model
+
+    @field_validator("npc_bedrock_region")
+    @classmethod
+    # VALIDATOR: region masuk ke host Bedrock; nilai selain bentuk region AWS ditolak saat startup.
+    def validate_bedrock_region(cls, value: str) -> str:
+        if not POLA_REGION_AWS.fullmatch(value):
+            raise ValueError("NPC_BEDROCK_REGION harus berbentuk region AWS, mis. us-east-1.")
+        return value
 
     auth_session_hours: int = Field(default=24, ge=1, le=24 * 30)
 

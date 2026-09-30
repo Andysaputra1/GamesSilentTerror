@@ -3,14 +3,21 @@
 from __future__ import annotations
 
 import re
+import threading
+import time
+
+from sqlalchemy.exc import IntegrityError
 
 from models import survey_queries as queries
-from services.persistence_service import PersistenceService
+from services.persistence_service import PersistenceError, PersistenceService
 from services.room_service import room_service
 
 JENIS = {"stars", "scale", "choice", "text"}
 NILAI_SKALA_MAKS = 10
 PANJANG_TEKS = 1000
+# Pemain yang sudah keluar room tetap bisa mengirim survei selama ini (hanya di memori).
+BERLAKU_SELESAI_DETIK = 30 * 60
+KODE_DUPLIKAT_MYSQL = 1062
 KOLOM_PUBLIK = (
     "id",
     "code",
@@ -125,11 +132,66 @@ def validate_answers(questions: dict[int, dict], answers: list[dict]) -> list[tu
     return rows
 
 
+# Kiriman kedua yang bersamaan melanggar UNIQUE (uq_survey_answer): sama dengan "sudah dikirim".
+def _kiriman_ganda(error: PersistenceError) -> bool:
+    cause = error.__cause__
+    return isinstance(cause, IntegrityError) and (
+        getattr(cause.orig, "args", (None,))[:1] == (KODE_DUPLIKAT_MYSQL,)
+    )
+
+
 class SurveyService:
+    def __init__(self):
+        # Registri pertandingan selesai: match_id → room, batas berlaku, dan konteks tiap pemain manusia.
+        self._selesai: dict[str, dict] = {}
+        self._kunci = threading.Lock()
+
+    # Dipanggil saat anggota keluar dari room pertandingan yang sudah selesai: survei tetap bisa dikirim
+    # sesudahnya walau room sudah dibersihkan. Hanya di memori; restart server menghapusnya.
+    def ingat_pertandingan(self, room):
+        match = room.match
+        if not match or not match.winner:
+            return
+        pemain = {}
+        for player in match.players.values():
+            if not player.bot:
+                hasil = match.result(player.name)
+                pemain[player.name] = {"role": player.role, "team": hasil["team"],
+                                       "outcome": hasil["outcome"]}  # fmt: skip
+        with self._kunci:
+            self._buang_kedaluwarsa()
+            self._selesai[match.id] = {"room_code": room.code, "pemain": pemain,
+                                       "sampai": time.monotonic() + BERLAKU_SELESAI_DETIK}  # fmt: skip
+
+    def _buang_kedaluwarsa(self):
+        sekarang = time.monotonic()
+        for match_id in [m for m, data in self._selesai.items() if data["sampai"] <= sekarang]:
+            del self._selesai[match_id]
+
+    # Konteks dari registri: pertandingan selesai terbaru di room itu yang diikuti akun ini.
+    def _context_selesai(self, code, username, match_id):
+        with self._kunci:
+            self._buang_kedaluwarsa()
+            cocok = [
+                (mid, data) for mid, data in self._selesai.items()
+                if data["room_code"] == code and username in data["pemain"]
+                and match_id in (None, mid)
+            ]  # fmt: skip
+        if not cocok:
+            return None
+        mid, data = cocok[-1]
+        return {"match_id": mid, "room_code": data["room_code"], **data["pemain"][username]}
+
     # KONTEKS: survei hanya untuk manusia peserta pertandingan yang sudah selesai.
     def _context(self, code, username, match_id=None):
         with room_service.lock:
-            room = room_service.get(code, username)
+            live = room_service.rooms.get(code.strip().upper())
+            if live is None or username not in live.members:
+                # Sudah keluar room (mungkin room sudah dibersihkan): pakai registri pertandingan selesai.
+                context = self._context_selesai(code.strip().upper(), username, match_id)
+                if context is not None:
+                    return context
+            room = room_service.get(code, username)  # pesan standar: room hilang atau bukan anggota
             match = room.match
             if not match or not match.winner:
                 raise ValueError("Survei tersedia setelah pertandingan selesai.")
@@ -189,7 +251,14 @@ class SurveyService:
                 )
             return len(rows)
 
-        return {"submitted": True, "answers": PersistenceService._run(operation)}
+        try:
+            return {"submitted": True, "answers": PersistenceService._run(operation)}
+        except PersistenceError as error:
+            if _kiriman_ganda(error):
+                raise SurveyAlreadySubmitted(
+                    "Survei untuk pertandingan ini sudah dikirim. Terima kasih!"
+                ) from error
+            raise
 
     # PANEL: semua pertanyaan, termasuk yang nonaktif.
     def all_questions(self):

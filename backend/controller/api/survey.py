@@ -94,7 +94,9 @@ def panel_summary(token=Depends(require_panel)):
 
 
 @router.get("/api/panel/survey/responses.csv")
-# PANEL: ekspor seluruh jawaban untuk analisis penelitian.
+# PANEL: ekspor seluruh jawaban untuk analisis penelitian. UTF-8 dengan BOM (dibaca benar oleh Excel).
+# Nilai disimpan persis demi data penelitian, sama seperti CSV riwayat chat: teks bebas pemain tidak
+# di-escape, jadi saat membuka di spreadsheet impor kolom teks sebagai teks (bukan formula).
 def panel_export(token=Depends(require_panel)):
     rows = survey_call(survey_service.export_rows)
     buffer = io.StringIO()
@@ -109,7 +111,7 @@ def panel_export(token=Depends(require_panel)):
         snapshot = json.loads(snapshot) if isinstance(snapshot, str) else (snapshot or {})
         writer.writerow({**row, "prompt": snapshot.get("prompt", "")})
     return Response(
-        buffer.getvalue(),
+        "﻿" + buffer.getvalue(),
         media_type="text/csv; charset=utf-8",
         headers={
             "Content-Disposition": 'attachment; filename="survei_silent_terror.csv"',

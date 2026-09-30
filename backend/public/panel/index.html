@@ -57,8 +57,8 @@
               <span class="eyebrow">NPC BRAIN</span>
               <h2>Otak NPC</h2>
               <p>
-                Metode penalaran bot (hasil notebook skripsi), penulis kalimat, dan status NLU
-                IndoBERT.
+                Metode penalaran bot (hasil notebook skripsi), rantai penulis kalimat, dan status
+                NLU IndoBERT.
               </p>
             </div>
             <button id="refresh-npc" class="secondary">Refresh</button>
@@ -69,16 +69,39 @@
               <form id="npc-form">
                 <label>Metode penalaran<select id="npc-method"></select></label>
                 <label>Penulis kalimat<select id="npc-writer"></select></label>
+                <fieldset id="npc-chain-box" class="chain-box">
+                  <legend>Prioritas rantai penulis</legend>
+                  <p class="hint">
+                    Jalur dicoba dari atas. Jalur yang ditolak (key salah, kredit habis, model tidak
+                    ada) dilewati sampai dicek ulang; yang gagal sementara diistirahatkan. Templat
+                    selalu menjadi cadangan terakhir.
+                  </p>
+                  <ol id="npc-chain" class="chain-list"></ol>
+                  <label
+                    >Model OpenRouter<input
+                      id="npc-openrouter-model"
+                      maxlength="100"
+                      autocomplete="off"
+                      spellcheck="false"
+                      placeholder="anthropic/claude-opus-5.5"
+                  /></label>
+                </fieldset>
                 <label class="check"
                   ><input id="npc-validate" type="checkbox" checked /> Validasi ulang kalimat bot
                   dengan IndoBERT</label
                 >
                 <p class="hint">
-                  Berlaku untuk pertandingan yang dimulai setelah disimpan. Key Claude
-                  (ANTHROPIC_API_KEY atau AMAZON_API_KEY) dibaca dari environment server dan tidak
-                  pernah ditampilkan.
+                  Metode berlaku untuk pertandingan berikutnya; rantai penulis langsung dipakai. Key
+                  Claude (AMAZON_API_KEY, ANTHROPIC_API_KEY) dibaca dari environment server; key
+                  OpenRouter dan link LLM (Docker/tunnel) diatur di menu Konfigurasi AI. Nilai key
+                  tidak pernah ditampilkan.
                 </p>
-                <button id="save-npc">Simpan otak NPC</button>
+                <div class="form-actions">
+                  <button id="save-npc">Simpan otak NPC</button
+                  ><button id="check-writers" type="button" class="secondary">
+                    Cek ulang penulis
+                  </button>
+                </div>
               </form>
             </section>
             <section class="probe-panel" aria-label="Status otak NPC">
@@ -180,8 +203,8 @@
           </details>
           <h3>Rata-rata per metode bot</h3>
           <p class="hint">
-            Jawaban dari pertandingan yang memuat bot dengan metode tersebut. Pertandingan campuran
-            dihitung pada setiap metode yang ikut bermain.
+            Setiap jawaban dihitung sekali. Pertandingan yang semua botnya memakai satu metode masuk
+            ke metode itu; pertandingan dengan beberapa metode masuk kelompok "campuran".
           </p>
           <div class="table-scroll">
             <table>
@@ -305,7 +328,10 @@ Aku melihat Pemain_B menghindari pertanyaan. Apa alibimu?</textarea>
             <div>
               <span class="eyebrow">LIVE & ARCHIVED</span>
               <h2>Checker per room</h2>
-              <p>Telusuri input, parameter request, waktu proses, dan hasil setiap jejak.</p>
+              <p>
+                Pilih room untuk melihat setiap bot: role, metode (Fuzzy, Utility AI, Behavior
+                Tree), parameter yang dibaca, cara metodenya menalar, dan keputusan yang diambil.
+              </p>
             </div>
             <button id="refresh-checker" class="secondary">Refresh</button>
           </div>
@@ -314,23 +340,39 @@ Aku melihat Pemain_B menghindari pertanyaan. Apa alibimu?</textarea>
               >Ruangan<select id="checker-room">
                 <option value="">Pilih ruangan</option>
               </select></label
+            ><label
+              >Tampilkan<select id="checker-filter">
+                <option value="">Semua jejak</option>
+              </select></label
             ><label class="check"
               ><input id="auto-checker" type="checkbox" checked /> Update otomatis / 5 detik</label
             >
           </div>
+          <section
+            id="room-summary"
+            class="room-summary"
+            aria-label="Ringkasan room"
+            hidden
+          ></section>
+          <details class="room-legend">
+            <summary>Arti parameter dan cara membaca tiap metode</summary>
+            <div id="checker-legend"></div>
+          </details>
           <p class="hint">
-            Prompt yang dikirim aplikasi, bukan penalaran internal model. Trace selesai tersimpan;
-            aktivitas fungsi adalah buffer live.
+            Jejak otak bot berisi parameter dan penalaran metode (bukan LLM). Jejak LLM berisi
+            prompt yang dikirim aplikasi. Jejak selesai tersimpan; aktivitas fungsi adalah buffer
+            live.
           </p>
           <div class="split">
             <div>
+              <h3>Linimasa jejak</h3>
               <div id="traces" class="trace-list"></div>
               <button id="older-traces" class="secondary" hidden>Jejak lebih lama</button>
             </div>
             <div>
-              <h3>Detail pipeline</h3>
+              <h3>Detail</h3>
               <div id="trace-detail" class="report empty-state">
-                Pilih room dan pesan untuk melihat detail.
+                Pilih room dan jejak untuk melihat detail.
               </div>
             </div>
           </div>

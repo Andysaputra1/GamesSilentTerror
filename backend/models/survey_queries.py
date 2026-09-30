@@ -102,6 +102,8 @@ def record_match_bot(database: Session, row: dict) -> None:
 
 
 # QUERY RINGKASAN: jumlah, rata-rata, dan sebaran nilai per pertanyaan, serta rata-rata per metode bot.
+# Setiap jawaban dihitung sekali: pertandingan yang semua botnya satu metode masuk ke metode itu,
+# pertandingan dengan beberapa metode masuk kelompok "campuran" (tidak dibagi ke tiap metode).
 def summary(database: Session) -> dict:
     distribusi = database.execute(text("""
         SELECT question_id, value_number, COUNT(*) AS n FROM survey_responses
@@ -110,7 +112,11 @@ def summary(database: Session) -> dict:
     per_metode = database.execute(text("""
         SELECT r.question_id, b.method, COUNT(*) AS n, AVG(r.value_number) AS rata
         FROM survey_responses r
-        JOIN (SELECT DISTINCT match_id, method FROM match_bots) b ON b.match_id = r.match_id
+        JOIN (
+            SELECT match_id,
+                   CASE WHEN COUNT(DISTINCT method) = 1 THEN MIN(method) ELSE 'campuran' END AS method
+            FROM match_bots GROUP BY match_id
+        ) b ON b.match_id = r.match_id
         WHERE r.value_number IS NOT NULL
         GROUP BY r.question_id, b.method
     """)).all()

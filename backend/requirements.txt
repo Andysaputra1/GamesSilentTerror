@@ -19,6 +19,8 @@ email-validator>=2,<3
 cryptography>=46,<51
 # Otak NPC hasil notebook skripsi (lihat services/npc_brain).
 pandas
-torch
+# Sama dengan versi yang diuji (games_venv 2.14.0+cpu). Dockerfile memasang torch CPU lebih dulu;
+# pin versi yang sama di sana agar pip tidak menggantinya dengan build lain saat rilis baru.
+torch==2.14.0
 transformers==4.46.3
 anthropic

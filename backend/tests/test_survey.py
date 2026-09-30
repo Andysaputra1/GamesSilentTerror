@@ -1,16 +1,24 @@
 """Survei akhir: pertanyaan dan skala dari database, validasi jawaban, dan satu kali kirim per pertandingan."""
 
+import time
 import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 
 from fastapi import FastAPI, Header
 from fastapi.testclient import TestClient
+from sqlalchemy import create_engine, text
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
+from controller.api.panel import require_panel
 from controller.api.survey import router
 from controller.middleware.auth import require_authenticated_user
+from models import survey_queries
+from services.persistence_service import PersistenceError
 from services.room_service import RoomService
 from services.survey_service import (
+    BERLAKU_SELESAI_DETIK,
     SurveyAlreadySubmitted,
     SurveyService,
     validate_answers,
@@ -177,6 +185,48 @@ class SurveyServiceTests(unittest.TestCase):
             self.client.post(endpoint, json=bad, headers={"x-user": "bob"}).status_code, 422
         )
 
+    # Pemain yang keluar room setelah pertandingan selesai tetap bisa mengirim survei (registri memori).
+    def test_player_who_left_the_room_can_still_submit_until_the_window_ends(self):
+        self.finish()
+        self.enterContext(patch("services.survey_service.survey_service", self.service))
+        self.rooms.leave(self.room.code, "alice")
+        self.rooms.leave(self.room.code, "bob")
+        self.assertNotIn(self.room.code, self.rooms.rooms)  # room sudah dibersihkan
+        status = self.service.status(self.room.code, "alice")
+        self.assertEqual((status["match_id"], status["submitted"]), (self.match.id, False))
+        result = self.service.submit(self.room.code, "alice", self.match.id, self.answers())
+        self.assertEqual(result["answers"], 4)
+        self.assertEqual(self.fake.answers[0]["role"], self.match.players["alice"].role)
+        with self.assertRaises(ValueError):
+            self.service.status(self.room.code, "mallory")  # bukan peserta
+        with self.assertRaises(ValueError):
+            self.service.submit(self.room.code, "bob", "match-lain", self.answers())
+        nanti = time.monotonic() + BERLAKU_SELESAI_DETIK + 1
+        with patch("services.survey_service.time.monotonic", return_value=nanti):
+            with self.assertRaises(ValueError):
+                self.service.status(self.room.code, "bob")
+
+    # Dua kiriman bersamaan: yang kedua melanggar UNIQUE → "sudah dikirim" (409), bukan 503.
+    def test_concurrent_duplicate_submit_is_reported_as_already_submitted(self):
+        self.finish()
+
+        def gagal(kode):
+            raise PersistenceError("fixture") from IntegrityError(
+                "INSERT", {}, Exception(kode, "fixture")
+            )
+
+        with patch("services.survey_service.PersistenceService._run",
+                   side_effect=lambda operation: gagal(1062)):  # fmt: skip
+            with self.assertRaises(SurveyAlreadySubmitted):
+                self.service.submit(self.room.code, "alice", self.match.id, self.answers())
+            body = {"match_id": self.match.id, "answers": self.answers()}
+            response = self.client.post(f"/api/rooms/{self.room.code}/survey", json=body)
+            self.assertEqual(response.status_code, 409)
+        with patch("services.survey_service.PersistenceService._run",
+                   side_effect=lambda operation: gagal(1452)):  # fmt: skip
+            with self.assertRaises(PersistenceError):  # pelanggaran lain tetap error database
+                self.service.submit(self.room.code, "alice", self.match.id, self.answers())
+
     def test_panel_question_management_keeps_codes_unique(self):
         created = self.service.create_question(
             {"code": "strategi", "prompt": "Strategi bot masuk akal?", "kind": "scale",
@@ -193,3 +243,56 @@ class SurveyServiceTests(unittest.TestCase):
             )
         self.service.update_question(1, {**question(1), "code": "q1", "active": False})
         self.assertNotIn(1, [q["id"] for q in self.fake.list_questions(None)])
+
+
+class SurveyExportTests(unittest.TestCase):
+    def setUp(self):
+        app = FastAPI()
+        app.include_router(router)
+        app.dependency_overrides[require_panel] = lambda: "fixture-token"
+        self.client = TestClient(app)
+
+    # CSV: UTF-8 dengan BOM, kolom tetap, dan nilai persis (tanpa escape) seperti CSV riwayat chat.
+    def test_csv_has_bom_fixed_columns_and_exact_values(self):
+        rows = [{"created_at": "2026-09-30 10:00:00", "match_id": "m1", "room_code": "ABC123",
+                 "username": "alice", "role": "spy", "team": "civilians", "outcome": "won",
+                 "code": "saran", "question_snapshot": '{"prompt": "Saran untuk game?"}',
+                 "value_number": None, "value_text": "=1+1 seru banget 👍",
+                 "bots": "NOX:fuzzy:santai"}]  # fmt: skip
+        with patch("controller.api.survey.survey_service.export_rows", return_value=rows):
+            response = self.client.get("/api/panel/survey/responses.csv")
+        self.assertEqual(response.status_code, 200)
+        body = response.content.decode("utf-8")
+        self.assertTrue(body.startswith("﻿"))
+        header, line = body.lstrip("﻿").splitlines()[:2]
+        self.assertEqual(header, "created_at,match_id,room_code,username,role,team,outcome,code,"
+                                 "prompt,value_number,value_text,bots")  # fmt: skip
+        self.assertIn(",Saran untuk game?,,=1+1 seru banget 👍,NOX:fuzzy:santai", line)
+
+
+class SurveySummarySqlTests(unittest.TestCase):
+    """SQL ringkasan dijalankan sungguhan (SQLite) agar semantik per metode teruji."""
+
+    def test_each_answer_counts_once_by_match_method_or_mixed(self):
+        engine = create_engine("sqlite://")
+        with Session(engine) as database:
+            database.execute(text("CREATE TABLE match_bots (match_id TEXT, method TEXT)"))
+            database.execute(text(
+                "CREATE TABLE survey_responses (match_id TEXT, question_id INT, value_number INT, "
+                "value_text TEXT)"
+            ))  # fmt: skip
+            bots = [
+                ("tunggal", "fuzzy"),
+                ("tunggal", "fuzzy"),
+                ("campur", "fuzzy"),
+                ("campur", "bt"),
+            ]
+            for match_id, method in bots:
+                database.execute(text("INSERT INTO match_bots VALUES (:m, :method)"),
+                                 {"m": match_id, "method": method})  # fmt: skip
+            for match_id, nilai in [("tunggal", 5), ("campur", 3), ("tanpa_bot", 1)]:
+                database.execute(text("INSERT INTO survey_responses VALUES (:m, 1, :v, NULL)"),
+                                 {"m": match_id, "v": nilai})  # fmt: skip
+            hasil = survey_queries.summary(database)
+        per_metode = {row["method"]: (row["n"], row["rata"]) for row in hasil["per_method"]}
+        self.assertEqual(per_metode, {"fuzzy": (1, 5.0), "campuran": (1, 3.0)})

@@ -125,4 +125,6 @@ def events(code: str | None = None, user=Depends(require_admin)):
 def traces(code: str, user=Depends(require_admin)):
     if len(code) != 6 or any(c not in "0123456789ABCDEF" for c in code.upper()):
         raise HTTPException(400, "Kode room harus 6 karakter heksadesimal.")
-    return {"traces": checker_service.list(code.upper())}
+    # Penjelasan dan ringkasan keputusan (berisi role bot) hanya untuk panel admin, bukan jalur development.
+    jejak = checker_service.list(code.upper())
+    return {"traces": [{k: v for k, v in t.items() if k != "ringkas"} for t in jejak]}

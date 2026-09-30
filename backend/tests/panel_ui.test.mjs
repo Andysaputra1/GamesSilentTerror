@@ -135,25 +135,74 @@ test('user editor uses selected account, clears secrets, and separates destructi
   assert.equal(w.document.querySelector('#user-rows .danger').textContent, 'Hapus akun');
 });
 
-test('NPC brain menu shows server status and saves the selected method', async (t) => {
+test('NPC brain menu shows the writer chain, reorders it, and saves method and priority', async (t) => {
+  const chain = [
+    {
+      jalur: 'claude_bedrock',
+      keadaan: 'ditolak',
+      status: 'key ditolak (401)',
+      model: 'anthropic.claude-opus-5-5',
+      panggilan: 0,
+    },
+    {
+      jalur: 'openrouter',
+      keadaan: 'dipakai',
+      status: 'siap',
+      model: '<b>anthropic/claude-opus-5.5</b>',
+      panggilan: 3,
+      token_masuk: 900,
+      token_keluar: 60,
+    },
+    {
+      jalur: 'tautan',
+      keadaan: 'istirahat',
+      status: 'tidak terhubung',
+      model: 'qwen3:14b',
+      panggilan: 0,
+      alamat: { host: 'llm-uji.trycloudflare.com', sumber: 'panel' },
+    },
+    {
+      jalur: 'claude_api',
+      keadaan: 'nonaktif',
+      status: 'dinonaktifkan',
+      model: null,
+      panggilan: 0,
+    },
+  ];
   const status = {
     siap: true,
     gagal: false,
     detail: 'AI siap.',
     nlu: 'indobert',
-    penulis: 'templat',
+    penulis: 'openrouter',
+    model_penulis: 'anthropic/claude-opus-5.5',
     metode: 'campuran',
     penulis_diminta: 'otomatis',
     validasi: true,
-    penulis_aktif: false,
+    penulis_aktif: true,
+    urutan_penulis: ['claude_bedrock', 'openrouter', 'tautan'],
+    model_openrouter: '',
+    rantai_penulis: chain,
+    sedang_cek_penulis: true, // cek berjalan di latar → panel menjadwalkan refresh otomatis
     pertandingan_aktif: 2,
   };
   const pilihan = {
     metode: { campuran: 'Campuran', fuzzy: 'Fuzzy', utility: 'Utility', bt: 'BT', llm: 'LLM' },
-    penulis: { otomatis: 'Otomatis', claude: 'Claude', templat: 'Templat' },
+    penulis: { otomatis: 'Rantai LLM', templat: 'Templat' },
+    jalur_penulis: {
+      claude_bedrock: { label: 'Claude · Amazon Bedrock', sumber: 'AMAZON_API_KEY di server' },
+      claude_api: { label: 'Claude API · Anthropic', sumber: 'ANTHROPIC_API_KEY di server' },
+      openrouter: { label: 'OpenRouter', sumber: 'API key di menu Konfigurasi AI' },
+      tautan: { label: 'LLM sendiri lewat link', sumber: 'URL tunnel di menu Konfigurasi AI' },
+    },
   };
-  let saved;
+  let saved,
+    checked = 0;
   const w = setup(t, (path, options) => {
+    if (path === '/api/panel/npc/cek-penulis') {
+      checked++;
+      return response({ status, pilihan });
+    }
     if (path !== '/api/panel/npc') return undefined;
     if (options.method === 'PUT') {
       saved = JSON.parse(options.body);
@@ -161,14 +210,72 @@ test('NPC brain menu shows server status and saves the selected method', async (
     }
     return response({ status, pilihan });
   });
+  // Refresh otomatis 3 detik ditangkap dan dijalankan manual agar tes cepat dan deterministik.
+  const refreshes = [];
+  w.setTimeout = (fn, ms) => (ms === 3000 ? refreshes.push(fn) : 0);
+  w.clearTimeout = () => {};
   await login(w);
   await w.document.querySelector('[data-menu=npc]').onclick({ preventDefault() {} });
-  assert.match(w.document.querySelector('#npc-status').textContent, /IndoBERT/);
-  assert.equal(w.document.querySelector('#npc-method').value, 'campuran');
-  w.document.querySelector('#npc-method').value = 'bt';
-  await w.document.querySelector('#npc-form').onsubmit({ preventDefault() {} });
-  assert.deepEqual(saved, { metode: 'bt', penulis: 'otomatis', validasi: true });
-  assert.equal(w.document.querySelector('#npc-method').value, 'bt');
+  const doc = w.document;
+  assert.match(doc.querySelector('#npc-status').textContent, /IndoBERT/);
+  assert.match(
+    doc.querySelector('#npc-status').textContent,
+    /OpenRouter \(anthropic\/claude-opus-5.5\)/,
+  );
+  assert.equal(doc.querySelector('#npc-method').value, 'campuran');
+  const rows = () => [...doc.querySelectorAll('#npc-chain li')];
+  assert.deepEqual(
+    rows().map((row) => row.querySelector('strong').textContent),
+    [
+      '1. Claude · Amazon Bedrock',
+      '2. OpenRouter',
+      '3. LLM sendiri lewat link',
+      'Claude API · Anthropic',
+    ],
+  );
+  assert.match(rows()[0].textContent, /Ditolak.*key ditolak \(401\)/);
+  assert.match(rows()[1].textContent, /3 panggilan · token 900\/60 sejak cek terakhir/);
+  assert.match(rows()[2].textContent, /qwen3:14b · llm-uji\.trycloudflare\.com \(panel\)/);
+  assert.match(rows()[2].textContent, /Istirahat.*tidak terhubung/);
+  assert.equal(doc.querySelector('#npc-chain b'), null); // data server dirender sebagai teks
+  // OpenRouter dinaikkan ke prioritas pertama, link LLM dimatikan, Claude API dinyalakan.
+  rows()[1].querySelector('button[aria-label^="Naikkan"]').click();
+  const toggle = (label) => {
+    const box = rows()
+      .find((row) => row.textContent.includes(label))
+      .querySelector('input');
+    box.checked = !box.checked;
+    box.onchange();
+  };
+  toggle('LLM sendiri');
+  toggle('Claude API');
+  doc.querySelector('#npc-method').value = 'bt';
+  doc.querySelector('#npc-method').dispatchEvent(new w.Event('change'));
+  doc.querySelector('#npc-openrouter-model').value = ' anthropic/claude-sonnet-5.5 ';
+  doc.querySelector('#npc-openrouter-model').dispatchEvent(new w.Event('input'));
+  // Refresh otomatis (cek di latar) hanya memperbarui status; editan yang belum disimpan tetap.
+  assert.ok(refreshes.length > 0);
+  refreshes.splice(0).forEach((refresh) => refresh());
+  await settle();
+  assert.equal(doc.querySelector('#npc-method').value, 'bt');
+  assert.equal(doc.querySelector('#npc-openrouter-model').value, ' anthropic/claude-sonnet-5.5 ');
+  assert.equal(rows()[0].querySelector('strong').textContent, '1. OpenRouter');
+  // Cek ulang memakai konfigurasi tersimpan: selama ada editan, diminta simpan dulu tanpa request.
+  await doc.querySelector('#check-writers').onclick({ preventDefault() {} });
+  assert.equal(checked, 0);
+  assert.match(doc.querySelector('#notice').textContent, /Simpan perubahan dulu/);
+  await doc.querySelector('#npc-form').onsubmit({ preventDefault() {} });
+  assert.deepEqual(saved, {
+    metode: 'bt',
+    penulis: 'otomatis',
+    validasi: true,
+    urutan_penulis: ['openrouter', 'claude_bedrock', 'claude_api'],
+    model_openrouter: 'anthropic/claude-sonnet-5.5',
+  });
+  assert.equal(doc.querySelector('#npc-method').value, 'bt');
+  await doc.querySelector('#check-writers').onclick({ preventDefault() {} });
+  assert.equal(checked, 1);
+  assert.equal(doc.querySelector('#check-writers').disabled, false);
 });
 
 test('survey menu renders questions as text and edits scale meaning from the panel', async (t) => {
@@ -215,4 +322,154 @@ test('survey menu renders questions as text and edits scale meaning from the pan
   assert.equal(saved.label_max, 'Seru sekali');
   assert.equal(saved.kind, 'stars');
   assert.equal(w.document.querySelector('#survey-editor-box').open, false);
+});
+
+test('checker room shows bots, filters per bot, and explains decisions as text', async (t) => {
+  const evil = '<img src=x onerror=alert(1)>';
+  const bot = (nama, role, metode, fase) => ({
+    nama,
+    role,
+    metode,
+    persona: 'santai',
+    ronde: 2,
+    fase,
+  });
+  const nox = {
+    id: 'a'.repeat(32),
+    created_at: '2026-09-30T10:00:00+00:00',
+    sender: 'NOX',
+    message: 'vote',
+    stage: 'npc_brain',
+    provider: 'otak:fuzzy',
+    ringkas: { bot: bot('NOX', 'hitman', 'fuzzy', 'tribunal'), keputusan: ['vote → ECHO'] },
+  };
+  const echo = {
+    id: 'b'.repeat(32),
+    created_at: '2026-09-30T09:59:00+00:00',
+    sender: 'ECHO',
+    message: evil,
+    stage: 'npc_brain',
+    provider: 'otak:bt',
+    ringkas: { bot: bot('ECHO', 'spy', 'bt', 'day'), keputusan: [`chat tuduh → ${evil}`] },
+  };
+  const human = { id: 'c'.repeat(32), sender: 'human', message: 'Halo', stage: 'complete' };
+  const room = {
+    kode: 'ROOM01',
+    status: 'live',
+    ronde: 2,
+    fase: 'tribunal',
+    komposisi: { hitman: 1, spy: 1, stalker: 1, civilian: 3 },
+    manusia: 1,
+    bot: [
+      { ...bot('NOX', 'hitman', 'fuzzy'), status: 'aktif' },
+      { ...bot('ECHO', 'spy', 'bt'), status: 'disandera' },
+    ],
+  };
+  const fuzzyVote = {
+    judul: 'Vote Tribunal',
+    hasil: 'vote → ECHO (skor 0.85)',
+    kandidat: { kolom: ['pemain', 'kambing_hitam'], baris: [['ECHO', 0.85]] },
+    sistem: [
+      {
+        nama: 'kambing',
+        arti: 'Kambing hitam terbaik.',
+        input: [
+          {
+            nama: 'kecurigaan_publik',
+            nilai: 0.685,
+            derajat: { rendah: 0, sedang: 0.383, tinggi: 0.617 },
+          },
+          { nama: 'dukungan_suara', nilai: 1, derajat: { rendah: 0, sedang: 0, tinggi: 1 } },
+        ],
+        aturan: [['kecurigaan_publik=tinggi DAN dukungan_suara=tinggi', 'tinggi', 0.617]],
+        keluaran: 85,
+      },
+    ],
+    ambang: [['VOTE_TUNGGU_FRAKSI', 0.5, 'Hitman menunggu arah suara']],
+  };
+  const penjelasan = {
+    nox: {
+      bot: nox.ringkas.bot,
+      keputusan: { vote: { aksi: 'vote', target: 'ECHO', skor: 0.85, alasan: [`ECHO ${evil}`] } },
+      tersangka: { judul: 'Citra publik', kolom: ['pemain', 'tekanan'], baris: [['ECHO', 0.5]] },
+      penalaran: { vote: fuzzyVote },
+      engine: { action: 'vote', target: 'ECHO', ditolak: null },
+      nlg: { status: 'tidak ada chat', keterangan: 'Chat hanya saat siang dan Tribunal.' },
+    },
+    echo: {
+      bot: echo.ringkas.bot,
+      keputusan: { chat: { kirim: true, aksi: 'tuduh', target: 'VEIL', alasan: [evil] } },
+      penalaran: {
+        chat: {
+          judul: 'Chat',
+          hasil: 'tuduh → VEIL',
+          status_akar: 'SUKSES',
+          cabang: 'tuduh (kuat)',
+          jalur: {
+            kolom: ['node', 'jenis', 'status'],
+            baris: [
+              ['bot dituduh baru', 'kondisi', 'GAGAL'],
+              ['tuduh (kuat)', 'aksi', 'SUKSES'],
+            ],
+          },
+        },
+      },
+      engine: { action: 'wait', target: null, ditolak: null },
+      nlg: { status: 'terkirim', teks: evil, sumber: 'llm', penulis: 'openrouter', nlu: null },
+    },
+  };
+  let detailCalls = 0;
+  const w = setup(t, (path) => {
+    if (path.startsWith('/api/panel/rooms'))
+      return response({ rooms: [{ room_code: 'ROOM01', message_count: 3, live: true }] });
+    if (path === '/api/panel/checker/ROOM01')
+      return response({ traces: [nox, echo, human], events: [], room, has_more: false });
+    if (path === `/api/panel/checker/ROOM01/jejak/${nox.id}`) {
+      detailCalls++;
+      return response({ ...nox, penjelasan: penjelasan.nox });
+    }
+    if (path === `/api/panel/checker/ROOM01/jejak/${echo.id}`)
+      return response({ ...echo, penjelasan: penjelasan.echo });
+    return undefined;
+  });
+  await login(w);
+  await w.document.querySelector('[data-menu=checker]').onclick({ preventDefault() {} });
+  const select = w.document.querySelector('#checker-room');
+  select.value = 'ROOM01';
+  await select.onchange({ preventDefault() {} });
+  await settle();
+  const summary = w.document.querySelector('#room-summary');
+  const detail = w.document.querySelector('#trace-detail');
+  assert.equal(summary.hidden, false);
+  assert.match(summary.textContent, /Hitman × 1/);
+  assert.match(summary.textContent, /Fuzzy Mamdani/);
+  assert.match(summary.textContent, /vote → ECHO/); // keputusan terakhir NOX
+  assert.match(detail.textContent, /Diterapkan ke engine/);
+  const tabs = [...detail.querySelectorAll('.decision-tab')];
+  assert.deepEqual(
+    tabs.map((b) => b.textContent),
+    ['Keputusan', 'Parameter', 'Penalaran Fuzzy Mamdani', 'NLG', 'Teknis'],
+  );
+  tabs[2].click();
+  assert.match(detail.textContent, /kecurigaan_publik=tinggi DAN dukungan_suara=tinggi/);
+  assert.match(detail.textContent, /Keluaran defuzzifikasi \(centroid, 0–100\): 85/);
+  assert.equal(detail.querySelectorAll('meter').length, 6);
+  // Klik nama bot di ringkasan: linimasa hanya berisi jejak bot itu, tab penalaran tetap terbuka.
+  [...summary.querySelectorAll('.room-bot')].find((b) => b.textContent === 'ECHO').click();
+  await settle();
+  assert.equal(w.document.querySelector('#checker-filter').value, 'bot:ECHO');
+  assert.equal(w.document.querySelectorAll('#traces .trace').length, 1);
+  assert.match(detail.textContent, /Penalaran Behavior Tree/);
+  assert.match(detail.textContent, /✗Syarat: bot dituduh baru/);
+  assert.match(detail.textContent, /aksi terpilih: tuduh \(kuat\)/);
+  [...detail.querySelectorAll('.decision-tab')].find((b) => b.textContent === 'NLG').click();
+  assert.match(detail.textContent, /openrouter/);
+  assert.equal(w.document.querySelector('#menu-checker img'), null);
+  // Refresh dan kembali ke NOX tidak memuat ulang penjelasan yang sudah ada di cache.
+  w.document.querySelector('#checker-filter').value = '';
+  w.document.querySelector('#checker-filter').onchange();
+  await w.document.querySelector('#refresh-checker').onclick({ preventDefault() {} });
+  await settle();
+  assert.equal(detailCalls, 1);
+  assert.equal(w.document.querySelectorAll('#traces .trace').length, 3);
 });

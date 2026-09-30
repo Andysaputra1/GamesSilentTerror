@@ -34,7 +34,8 @@ async function request(path, body, method = 'GET') {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: body ? JSON.stringify(body) : undefined,
-    signal: AbortSignal.timeout(path.endsWith('/test-ai') ? 45000 : 15000),
+    // Uji AI dan cek rantai penulis menunggu provider; request lain cukup 15 detik.
+    signal: AbortSignal.timeout(/\/(test-ai|cek-penulis)$/.test(path) ? 60000 : 15000),
   });
   if (epoch !== generation) throw new Error('Sesi telah berubah. Respons lama diabaikan.');
   if (response.status === 204) return {};
@@ -65,6 +66,7 @@ function clearSession() {
   $('traces').replaceChildren();
   $('trace-detail').textContent = '';
   $('events').textContent = '';
+  resetChecker();
   $('probe-result').replaceChildren();
   $('ai-status').textContent = 'Belum diperiksa.';
   $('probe-progress').textContent = '';
@@ -253,31 +255,560 @@ async function loadRooms() {
   }
   return rooms;
 }
-// Render daftar jejak dan detail terpilih menggunakan textContent.
-function renderTraces() {
-  const box = $('traces');
+// CHECKER ROOM: ringkasan room, linimasa jejak per bot, dan kartu penjelasan keputusan otak.
+// Semua isi dari server ditulis lewat textContent/Option, tidak pernah sebagai HTML.
+let checkerRoom = null,
+  traceFilter = '', // '' semua jejak | 'bot' semua keputusan bot | 'bot:NAMA'
+  detailTab = 'keputusan',
+  renderedDetail = ''; // jejak yang sedang tampil: tidak dirender ulang tiap auto-refresh
+const traceDetails = new Map(); // id → jejak lengkap (dengan penjelasan), dimuat saat dibuka
+const METODE_LABEL = {
+  fuzzy: 'Fuzzy Mamdani',
+  utility: 'Utility AI (IAUS)',
+  bt: 'Behavior Tree',
+  llm: 'LLM (mode lama)',
+};
+const METODE_CARA = {
+  fuzzy:
+    'Setiap nilai 0–1 difuzzifikasi menjadi rendah/sedang/tinggi. Aturan JIKA–MAKA menyala dengan kekuatan min(derajat input), keluaran digabung (max) lalu didefuzzifikasi centroid menjadi 0–100 dan dibandingkan ambang.',
+  utility:
+    'Setiap pilihan diberi pertimbangan 0–1 lewat kurva. Utilitas = bobot × Π(n + (1 − n)(1 − 1/k)n) (kompensasi IAUS, k = jumlah pertimbangan). Pilihan terbesar dipakai bila melewati ambang atau utilitas diam.',
+  bt: 'Pohon dibaca dari atas. Selector mencoba cabang berurutan dan berhenti di cabang pertama yang berhasil; Sequence berhenti di syarat pertama yang gagal. Aksi pada cabang yang berhasil menjadi keputusan.',
+  llm: 'Satu prompt LLM memutuskan aksi dan pesan sekaligus; tidak ada penalaran metode.',
+};
+const ROLE_LABEL = { hitman: 'Hitman', spy: 'Spy', stalker: 'Stalker', civilian: 'Civilian' };
+const FASE_LABEL = {
+  preparing: 'Persiapan',
+  day: 'Siang',
+  night: 'Malam',
+  tribunal: 'Tribunal',
+  finished: 'Selesai',
+};
+const STATUS_ROOM = {
+  live: ['Live', 'status-good'],
+  selesai: ['Selesai', 'status-pending'],
+  lobby: ['Lobby', 'status-muted'],
+  arsip: ['Arsip', 'status-muted'],
+};
+const SUMBER_NLG = {
+  llm: 'LLM (lolos aturan dan IndoBERT)',
+  templat: 'Templat (lolos aturan dan IndoBERT)',
+  templat_cadangan: 'Templat cadangan (tidak ada varian yang lolos IndoBERT)',
+};
+// Arti parameter: dipakai legenda dan keterangan judul kolom tabel.
+const PARAMETER = {
+  kecurigaan: 'Seberapa kuat pemain dianggap Hitman (0–1), hasil akhir metode.',
+  tekanan:
+    'Tuduhan dan vote pemain lain ke pemain ini, dibagi jumlah pemain lain yang hidup; meluruh per ronde.',
+  dukungan: 'Pembelaan pemain lain, termasuk klaim bersih dari pengaku Stalker.',
+  inkonsistensi: 'Berganti sikap ke target yang sama, atau vote tidak sesuai ucapannya.',
+  pengalihan: 'Setelah dituduh, malah menuduh orang lain alih-alih membela diri.',
+  dituduh_korban: 'Pernah dituduh pemain yang kemudian di-Gag atau disandera (jejak aksi Hitman).',
+  dorong_salah_eksekusi:
+    'Ikut mendorong eksekusi warga: vote, ikut menuduh, atau penuduh pertama, dikali kepastian korban warga (1 bila game berlanjut di room satu Hitman atau jumlah Hitman yang diumumkan tetap; selain itu 1 − k/(N − 1)). Tidak dihitung bila korban diketahui Hitman.',
+  serang_bersih: 'Menuduh atau vote pemain yang pasti bersih menurut bot.',
+  klaim: 'Klaim role bermasalah: bentrok, dibantah, atau hasil Peek palsu.',
+  p_sandera:
+    'Dugaan pemain sedang disandera (tidak aktif sejak malam); tinggi berarti bukan Hitman.',
+  diam: 'Belum bicara di ronde ini (0–1 menurut waktu yang lewat).',
+  urgensi: 'Makin sedikit warga bebas, makin mendesak (0–1).',
+  porsi_fase: 'Bagian fase yang sudah berjalan (0–1).',
+  keunggulan: 'Selisih kecurigaan tersangka teratas dari tersangka kedua (0–1).',
+  keyakinan: 'Fuzzy vote: keyakinan pada kandidat teratas (0–1).',
+  kesiapan: 'Fuzzy vote: kesiapan mengunci vote (0–100) dari keyakinan dan urgensi.',
+  prioritas: 'Keluaran fuzzy 0–100 untuk tindakan chat atau aksi rahasia.',
+  utilitas: 'Skor Utility AI 0–1. Nilai pertimbangan sudah melalui kurva.',
+  poin: 'Behavior Tree: jumlah poin bendera merah yang aktif; kecurigaan = poin / 5.',
+  bendera: 'Behavior Tree: bendera merah aktif bila nilai bukti ≥ ambangnya.',
+  ancaman: 'Hitman: seberapa berbahaya pemain (menuduh, berpengaruh, mengaku role penting).',
+  kambing_hitam: 'Hitman: seberapa mudah pemain dijadikan tersangka oleh warga.',
+  terancam: 'Spy: seberapa mungkin pemain diincar Hitman malam ini.',
+  kepercayaan: 'Seberapa bisa dipercaya (1 = pasti bersih).',
+};
+// Nilai → teks ringkas: angka dibulatkan, boolean ya/tidak, kosong menjadi —.
+function teks(value) {
+  if (value === null || value === undefined || value === '') return '—';
+  if (typeof value === 'number')
+    return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(3)));
+  if (typeof value === 'boolean') return value ? 'ya' : 'tidak';
+  if (Array.isArray(value)) return value.length ? value.map(teks).join(', ') : '—';
+  if (typeof value === 'object')
+    return (
+      Object.entries(value)
+        .map(([k, v]) => `${k}: ${teks(v)}`)
+        .join(' · ') || '—'
+    );
+  return String(value);
+}
+function roleClass(role) {
+  return role === 'hitman' ? 'status-bad' : role === 'civilian' ? 'status-muted' : 'status-pending';
+}
+function chip(text, className) {
+  return node('span', text, `chip ${className}`);
+}
+// Tabel {kolom, baris}; judul kolom diberi keterangan arti parameter bila ada.
+function dataTable(data) {
+  const wrap = node('div', undefined, 'table-scroll decision-table');
+  const table = document.createElement('table');
+  const head = document.createElement('tr');
+  for (const kolom of data.kolom || []) {
+    const th = node('th', String(kolom).replaceAll('_', ' '));
+    if (PARAMETER[kolom]) th.title = PARAMETER[kolom];
+    head.append(th);
+  }
+  table.createTHead().append(head);
+  const body = table.createTBody();
+  for (const baris of data.baris || []) {
+    const tr = body.insertRow();
+    for (const nilai of baris) tr.insertCell().textContent = teks(nilai);
+  }
+  wrap.append(table);
+  return wrap;
+}
+function keyValues(pairs) {
+  const dl = node('dl', undefined, 'status-list decision-kv');
+  for (const [label, value] of pairs) {
+    const dt = node('dt', String(label).replaceAll('_', ' '));
+    if (PARAMETER[label]) dt.title = PARAMETER[label];
+    dl.append(dt, node('dd', teks(value)));
+  }
+  return dl;
+}
+function listOf(items, className = 'decision-list') {
+  const ul = node('ul', undefined, className);
+  for (const item of items) ul.append(node('li', item));
+  return ul;
+}
+// Legenda statis: cara membaca tiap metode dan arti parameter.
+function renderLegend() {
+  $('checker-legend').append(
+    node('h4', 'Metode', 'report-title'),
+    keyValues(Object.entries(METODE_LABEL).map(([id, label]) => [label, METODE_CARA[id]])),
+    node('h4', 'Parameter', 'report-title'),
+    keyValues(Object.entries(PARAMETER)),
+  );
+}
+renderLegend();
+function traceBot(trace) {
+  return trace.ringkas?.bot?.nama || (trace.provider?.startsWith('otak:') ? trace.sender : null);
+}
+function visibleTraces() {
+  if (!traceFilter) return traces;
+  if (traceFilter === 'bot') return traces.filter(traceBot);
+  return traces.filter((t) => traceBot(t) === traceFilter.slice(4));
+}
+function waktu(iso) {
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime())
+    ? ''
+    : date.toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' });
+}
+function lastDecision(nama) {
+  const trace = traces.find((t) => traceBot(t) === nama);
+  if (!trace) return '—';
+  return trace.ringkas?.keputusan?.length ? trace.ringkas.keputusan.join(' · ') : trace.message;
+}
+// Ringkasan room: status pertandingan, komposisi role, dan tabel bot (klik nama untuk memfilter).
+function renderRoomSummary() {
+  const box = $('room-summary'),
+    room = checkerRoom;
   box.replaceChildren();
-  if (!traces.length) {
-    box.textContent = 'Belum ada jejak AI di room ini.';
-    $('trace-detail').textContent = 'Belum ada data.';
+  box.hidden = !room;
+  if (!room) return;
+  const [label, kelas] = STATUS_ROOM[room.status] || [room.status, 'status-muted'];
+  const head = node('div', undefined, 'room-head');
+  const posisi = [
+    room.ronde && `Ronde ${room.ronde}`,
+    FASE_LABEL[room.fase] || room.fase,
+    room.pemenang && `Pemenang: ${room.pemenang === 'hitman' ? 'Hitman' : 'Warga'}`,
+  ].filter(Boolean);
+  head.append(chip(label, kelas), node('strong', `Room ${room.kode}`));
+  if (posisi.length) head.append(node('span', posisi.join(' · '), 'room-meta'));
+  box.append(head);
+  if (room.komposisi) {
+    const counts = node('div', undefined, 'room-composition');
+    for (const [role, jumlah] of Object.entries(room.komposisi))
+      counts.append(node('span', `${ROLE_LABEL[role] || role} × ${jumlah}`, 'room-count'));
+    if (typeof room.manusia === 'number')
+      counts.append(node('span', `${room.manusia} manusia`, 'room-count'));
+    box.append(counts);
+  }
+  if (!room.bot?.length) {
+    box.append(node('p', 'Belum ada data bot untuk room ini.', 'hint'));
     return;
   }
-  const active = traces.find((t) => t.id === selectedTrace) || traces[0];
-  selectedTrace = active.id;
-  renderReport($('trace-detail'), active);
-  for (const trace of traces) {
-    const b = document.createElement('button');
-    b.className = 'trace' + (trace.id === active.id ? ' selected' : '');
-    b.append(node('span', `${trace.sender}: ${trace.message}`, 'trace-title'));
-    const small = document.createElement('small');
-    small.textContent = `${trace.stage} · ${duration(trace.duration_ms)}\n${trace.model || 'belum memanggil AI'}`;
-    b.append(small);
-    b.onclick = () => {
-      selectedTrace = trace.id;
+  const table = dataTable({
+    kolom: ['bot', 'role', 'metode', 'persona', 'status', 'keputusan terakhir'],
+    baris: room.bot.map((b) => [
+      b.nama,
+      ROLE_LABEL[b.role] || b.role,
+      METODE_LABEL[b.metode] || b.metode,
+      b.persona,
+      b.status,
+      lastDecision(b.nama),
+    ]),
+  });
+  // Nama bot menjadi tombol filter linimasa.
+  table.querySelectorAll('tbody tr').forEach((tr, index) => {
+    const nama = room.bot[index].nama;
+    const button = node('button', nama, 'room-bot');
+    button.type = 'button';
+    button.title = `Tampilkan jejak ${nama} saja`;
+    button.onclick = () => {
+      traceFilter = `bot:${nama}`;
+      selectedTrace = '';
       renderTraces();
     };
-    box.append(b);
+    tr.cells[0].replaceChildren(button);
+  });
+  box.append(table);
+}
+// Pilihan filter: semua jejak, semua keputusan bot, lalu tiap bot di room ini.
+function renderFilter() {
+  const select = $('checker-filter');
+  const names = [
+    ...new Set([...(checkerRoom?.bot || []).map((b) => b.nama), ...traces.map(traceBot)]),
+  ]
+    .filter(Boolean)
+    .sort();
+  select.replaceChildren(
+    new Option('Semua jejak', ''),
+    new Option('Semua keputusan bot', 'bot'),
+    ...names.map((nama) => new Option(`Bot ${nama}`, `bot:${nama}`)),
+  );
+  if (![...select.options].some((option) => option.value === traceFilter)) traceFilter = '';
+  select.value = traceFilter;
+}
+function traceItem(trace, selected) {
+  const b = node('button', undefined, 'trace' + (selected ? ' selected' : ''));
+  const r = trace.ringkas;
+  if (r) {
+    const head = node('span', undefined, 'trace-head');
+    head.append(node('strong', r.bot?.nama || trace.sender));
+    if (r.bot?.metode) head.append(chip(METODE_LABEL[r.bot.metode] || r.bot.metode, 'status-good'));
+    if (r.bot?.role) head.append(chip(ROLE_LABEL[r.bot.role] || r.bot.role, roleClass(r.bot.role)));
+    const meta = [
+      `Ronde ${r.bot?.ronde ?? '?'} · ${FASE_LABEL[r.bot?.fase] || r.bot?.fase || '—'}`,
+      waktu(trace.created_at),
+      r.ditolak && 'ditolak engine',
+      r.nlg === 'ditunda' && 'chat ditunda',
+    ].filter(Boolean);
+    b.append(
+      head,
+      node('span', r.keputusan?.length ? r.keputusan.join(' · ') : trace.message, 'trace-title'),
+      node('small', meta.join(' · ')),
+    );
+  } else {
+    b.append(
+      node('span', `${trace.sender}: ${trace.message}`, 'trace-title'),
+      node(
+        'small',
+        `${trace.stage} · ${duration(trace.duration_ms)}\n${trace.model || 'belum memanggil AI'}`,
+      ),
+    );
   }
+  b.onclick = () => {
+    selectedTrace = trace.id;
+    renderTraces();
+  };
+  return b;
+}
+// Render daftar jejak (sesuai filter) dan detail jejak terpilih.
+function renderTraces() {
+  renderFilter();
+  const box = $('traces');
+  box.replaceChildren();
+  const list = visibleTraces();
+  if (!list.length) {
+    box.textContent = traces.length
+      ? 'Tidak ada jejak untuk filter ini.'
+      : 'Belum ada jejak AI di room ini.';
+    $('trace-detail').textContent = 'Belum ada data.';
+    renderedDetail = '';
+    return;
+  }
+  const active = list.find((t) => t.id === selectedTrace) || list[0];
+  selectedTrace = active.id;
+  for (const trace of list) box.append(traceItem(trace, trace.id === active.id));
+  showDetail(active).catch((error) => notice(error.message));
+}
+// Jejak otak bot dimuat lengkap sekali (cache); jejak lain memakai laporan pipeline lama.
+async function showDetail(trace) {
+  const container = $('trace-detail');
+  const key = `${trace.id}|${trace.stage}|${trace.duration_ms}`;
+  if (renderedDetail === key) return;
+  renderedDetail = key;
+  if (!trace.ringkas) {
+    renderReport(container, trace);
+    return;
+  }
+  if (traceDetails.has(trace.id)) {
+    renderDecision(container, traceDetails.get(trace.id));
+    return;
+  }
+  container.classList.remove('empty-state');
+  container.textContent = 'Memuat penjelasan keputusan…';
+  const code = $('checker-room').value,
+    epoch = generation;
+  try {
+    const data = await request(
+      `/api/panel/checker/${encodeURIComponent(code)}/jejak/${encodeURIComponent(trace.id)}`,
+    );
+    if (epoch !== generation || !token || code !== $('checker-room').value) return;
+    if (traceDetails.size >= 200) traceDetails.delete(traceDetails.keys().next().value);
+    traceDetails.set(trace.id, data);
+    if (selectedTrace === trace.id) renderDecision(container, data);
+  } catch (error) {
+    if (selectedTrace === trace.id) {
+      renderedDetail = '';
+      container.textContent = error.message;
+    }
+  }
+}
+// Kartu keputusan bertab: Keputusan · Parameter · Penalaran metode · NLG · Teknis.
+function renderDecision(container, trace) {
+  const p = trace.penjelasan;
+  container.replaceChildren();
+  container.classList.remove('empty-state');
+  if (!p) {
+    renderReport(container, trace);
+    return;
+  }
+  const bot = p.bot || {};
+  const head = node('div', undefined, 'decision-head');
+  head.append(node('strong', bot.nama || trace.sender));
+  if (bot.role) head.append(chip(ROLE_LABEL[bot.role] || bot.role, roleClass(bot.role)));
+  if (bot.metode) head.append(chip(METODE_LABEL[bot.metode] || bot.metode, 'status-good'));
+  const meta = [
+    bot.persona && `persona ${bot.persona}`,
+    bot.ronde && `ronde ${bot.ronde}`,
+    FASE_LABEL[bot.fase] || bot.fase,
+    bot.langkah && `langkah ${bot.langkah}`,
+    waktu(trace.created_at),
+  ].filter(Boolean);
+  head.append(node('span', meta.join(' · '), 'room-meta'));
+  container.append(head);
+  if (p.catatan?.length) container.append(node('p', p.catatan.join(' '), 'hint status-pending'));
+  const tabs = [
+    ['keputusan', 'Keputusan', () => decisionTab(p)],
+    ['parameter', 'Parameter', () => parameterTab(p)],
+    ['penalaran', `Penalaran ${METODE_LABEL[bot.metode] || ''}`.trim(), () => reasoningTab(p)],
+    ['nlg', 'NLG', () => nlgTab(p)],
+    [
+      'teknis',
+      'Teknis',
+      () => {
+        const box = node('div', undefined, 'report');
+        renderReport(box, trace);
+        return box;
+      },
+    ],
+  ];
+  const bar = node('div', undefined, 'decision-tabs');
+  bar.setAttribute('role', 'tablist');
+  const panel = node('div', undefined, 'decision-panel');
+  panel.setAttribute('role', 'tabpanel');
+  const show = (id) => {
+    detailTab = id;
+    for (const b of bar.children) b.setAttribute('aria-selected', String(b.dataset.tab === id));
+    panel.replaceChildren((tabs.find((tab) => tab[0] === id) || tabs[0])[2]());
+  };
+  for (const [id, label] of tabs) {
+    const b = node('button', label, 'decision-tab');
+    b.type = 'button';
+    b.dataset.tab = id;
+    b.setAttribute('role', 'tab');
+    b.onclick = () => show(id);
+    bar.append(b);
+  }
+  container.append(bar, panel);
+  show(tabs.some((tab) => tab[0] === detailTab) ? detailTab : 'keputusan');
+}
+const DIAM = ['tunggu', 'abstain', 'tidak_bisa']; // keputusan tanpa aksi
+function planText(r, chat = false) {
+  if (!r?.aksi) return '—';
+  if (chat && !r.kirim) return `diam — ${r.alasan?.[0] || ''}`;
+  if (DIAM.includes(r.aksi)) return `${r.aksi.replace('_', ' ')} — ${r.alasan?.[0] || ''}`;
+  const intent = chat && r.intent ? ` (${r.intent}${r.klaim ? ', mengaku role' : ''})` : '';
+  const skor = typeof r.skor === 'number' ? ` · skor ${teks(r.skor)}` : '';
+  return `${r.aksi}${r.target ? ` → ${r.target}` : ''}${intent}${skor}`;
+}
+function engineText(e) {
+  if (!e) return '—';
+  const aksi =
+    e.action === 'wait' ? 'tidak ada vote/aksi' : `${e.action}${e.target ? ` → ${e.target}` : ''}`;
+  return e.ditolak ? `${aksi} (ditolak engine: ${e.ditolak})` : aksi;
+}
+function decisionTab(p) {
+  const box = node('div');
+  const k = p.keputusan || {};
+  box.append(
+    keyValues([
+      ['Chat', planText(k.chat, true)],
+      ['Vote', planText(k.vote)],
+      ['Aksi rahasia', planText(k.aksi)],
+      ['Diterapkan ke engine', engineText(p.engine)],
+      ['Kalimat', p.nlg?.status === 'terkirim' ? p.nlg.teks : p.nlg?.status],
+    ]),
+  );
+  const ringkasan = Object.values(p.penalaran || {})
+    .filter((blok) => blok?.hasil)
+    .map((blok) => `${blok.judul}: ${blok.hasil}`);
+  if (ringkasan.length)
+    box.append(node('h4', 'Ringkasan penalaran', 'report-title'), listOf(ringkasan));
+  for (const [label, r] of [
+    ['Alasan chat', k.chat],
+    ['Alasan vote', k.vote],
+    ['Alasan aksi rahasia', k.aksi],
+  ])
+    // Alasan tunggu/abstain/tidak bisa sudah tertulis di baris keputusan.
+    if (r?.alasan?.length && r.kirim !== false && !DIAM.includes(r.aksi))
+      box.append(node('h4', label, 'report-title'), listOf(r.alasan));
+  return box;
+}
+function parameterTab(p) {
+  const box = node('div');
+  if (p.tersangka) {
+    box.append(
+      node('h4', p.tersangka.judul || 'Tersangka', 'report-title'),
+      dataTable(p.tersangka),
+    );
+    // Siapa menuduh/membela tersangka teratas; pemain tanpa interaksi tidak ditampilkan.
+    const rincian = (p.tersangka.rincian || [])
+      .filter((r) => r.penuduh?.length || r.pembela?.length || r.diserang?.length)
+      .map(
+        (r) =>
+          `${r.pemain}: dituduh ${teks(r.penuduh)} · dibela ${teks(r.pembela)}` +
+          (r.diserang?.length ? ` · menyerang ${teks(r.diserang)}` : ''),
+      );
+    if (rincian.length) box.append(listOf(rincian));
+  }
+  if (p.khusus_peran)
+    box.append(node('h4', p.khusus_peran.judul, 'report-title'), dataTable(p.khusus_peran));
+  if (p.konteks)
+    box.append(
+      node('h4', 'Konteks permainan', 'report-title'),
+      keyValues(Object.entries(p.konteks)),
+    );
+  if (p.pengetahuan)
+    box.append(
+      node('h4', 'Pengetahuan pasti milik bot', 'report-title'),
+      keyValues(Object.entries(p.pengetahuan)),
+    );
+  return box;
+}
+// Satu sistem fuzzy: derajat keanggotaan input, aturan yang menyala, dan keluaran centroid.
+function fuzzySystem(s) {
+  const box = node('div', undefined, 'fuzzy-system');
+  box.append(node('strong', `Sistem "${s.nama}"`));
+  if (s.arti) box.append(node('p', s.arti, 'hint'));
+  for (const masukan of s.input || []) {
+    const row = node('div', undefined, 'fuzzy-input');
+    row.append(node('span', `${masukan.nama} = ${teks(masukan.nilai)}`, 'fuzzy-name'));
+    for (const [tingkat, derajat] of Object.entries(masukan.derajat || {})) {
+      const meter = document.createElement('meter');
+      meter.setAttribute('min', '0');
+      meter.setAttribute('max', '1');
+      meter.setAttribute('value', String(derajat ?? 0));
+      const degree = node('span', undefined, 'fuzzy-degree');
+      degree.append(node('span', `${tingkat} ${teks(derajat)}`), meter);
+      row.append(degree);
+    }
+    box.append(row);
+  }
+  if (s.aturan?.length)
+    box.append(dataTable({ kolom: ['jika', 'maka', 'kekuatan'], baris: s.aturan }));
+  box.append(
+    node('p', `Keluaran defuzzifikasi (centroid, 0–100): ${teks(s.keluaran)}`, 'decision-result'),
+  );
+  if (s.catatan) box.append(node('p', s.catatan, 'hint'));
+  return box;
+}
+// Jalur Behavior Tree: syarat/aksi yang dievaluasi berurutan dengan status berhasil/gagal.
+function btPath(blok) {
+  const box = node('div', undefined, 'bt-path');
+  box.append(
+    node(
+      'small',
+      `Jalur evaluasi · status akar ${blok.status_akar || '—'}${blok.cabang ? ` · aksi terpilih: ${blok.cabang}` : ''}`,
+    ),
+  );
+  const ol = node('ol');
+  for (const [nama, jenis, status] of blok.jalur.baris || []) {
+    const li = node('li', undefined, `bt-${String(status).toLowerCase()}`);
+    const ikon = status === 'SUKSES' ? '✓' : status === 'GAGAL' ? '✗' : '…';
+    li.append(
+      node('span', ikon, 'bt-icon'),
+      node('span', `${jenis === 'aksi' ? 'Aksi' : 'Syarat'}: ${nama}`),
+    );
+    ol.append(li);
+  }
+  box.append(ol);
+  return box;
+}
+function reasoningTab(p) {
+  const box = node('div');
+  box.append(node('p', METODE_CARA[p.bot?.metode] || '', 'hint'));
+  for (const key of ['kecurigaan', 'chat', 'vote', 'aksi']) {
+    const blok = p.penalaran?.[key];
+    if (!blok) continue;
+    const section = node('section', undefined, 'decision-block');
+    section.append(
+      node('h4', blok.judul, 'report-title'),
+      node('p', blok.hasil, 'decision-result'),
+    );
+    for (const [data, keterangan] of [
+      [blok.hierarki, 'Hierarki sistem fuzzy (nilai 0–1)'],
+      [blok.komponen, 'Komponen noisy-OR'],
+      [blok.bendera, 'Bendera merah'],
+      [blok.kandidat, 'Kandidat yang dinilai (terbaik di atas)'],
+    ])
+      if (data) section.append(node('small', keterangan), dataTable(data));
+    for (const sistem of blok.sistem || []) section.append(fuzzySystem(sistem));
+    if (blok.jalur) section.append(btPath(blok));
+    if (blok.ambang?.length)
+      section.append(
+        node('small', 'Ambang'),
+        dataTable({ kolom: ['konstanta', 'nilai', 'arti'], baris: blok.ambang }),
+      );
+    if (blok.catatan) section.append(node('p', blok.catatan, 'hint'));
+    box.append(section);
+  }
+  return box;
+}
+function nlgTab(p) {
+  const n = p.nlg,
+    box = node('div');
+  if (!n) {
+    box.append(node('p', 'Jejak ini tidak memuat data NLG.', 'hint'));
+    return box;
+  }
+  if (n.status !== 'terkirim') {
+    box.append(
+      keyValues([
+        ['Status', n.status],
+        ['Keterangan', n.keterangan],
+      ]),
+    );
+    return box;
+  }
+  box.append(
+    node('pre', n.teks || '', 'output'),
+    keyValues([
+      ['Sumber kalimat', SUMBER_NLG[n.sumber] || n.sumber],
+      ['Penulis LLM', n.penulis || 'tidak ada (templat)'],
+      ['Persona', n.persona],
+      ['Lolos aturan', n.lolos_aturan],
+      ['Lolos validasi IndoBERT', n.lolos_nlu ?? 'tidak divalidasi'],
+      ['Intent terbaca', n.nlu ? `${n.nlu.intent_prediksi} (${teks(n.nlu.confidence)})` : null],
+      ['Target terbaca', n.nlu?.target_prediksi?.map(([nama, relasi]) => `${nama}: ${relasi}`)],
+      ['Pelanggaran aturan', n.pelanggaran],
+      ['Percobaan LLM', n.percobaan_llm],
+      ['Varian templat dicoba', n.percobaan_templat],
+      ['Waktu tulis (dtk)', n.detik],
+    ]),
+  );
+  return box;
 }
 // Muat jejak terbaru/lama; tolak respons basi setelah logout atau pergantian ruangan.
 async function checker(older = false) {
@@ -285,6 +816,8 @@ async function checker(older = false) {
   const code = $('checker-room').value;
   if (!code) {
     traces = [];
+    checkerRoom = null;
+    renderRoomSummary();
     renderTraces();
     $('events').textContent = 'Pilih room.';
     $('older-traces').hidden = true;
@@ -302,11 +835,25 @@ async function checker(older = false) {
       : data.traces;
     traceBefore = data.next_before;
     $('older-traces').hidden = !data.has_more;
-    if (!older) $('events').textContent = JSON.stringify(data.events, null, 2);
+    if (!older) {
+      $('events').textContent = JSON.stringify(data.events, null, 2);
+      checkerRoom = data.room || null;
+    }
+    renderRoomSummary();
     renderTraces();
   } finally {
     busy = false;
   }
+}
+// Pergantian room atau sesi: buang filter, cache penjelasan, dan tampilan detail lama.
+function resetChecker() {
+  checkerRoom = null;
+  traceFilter = '';
+  selectedTrace = '';
+  renderedDetail = '';
+  traceDetails.clear();
+  $('room-summary').replaceChildren();
+  $('room-summary').hidden = true;
 }
 // Validasi urutan tanggal dan susun parameter untuk riwayat serta ekspor CSV.
 function historyQuery() {
@@ -420,32 +967,139 @@ function fillSelect(select, options, value) {
   );
   select.value = value;
 }
+// RANTAI PENULIS: urutan dan jalur aktif diubah di panel, dikirim saat Simpan; status dari server.
+// npcDirty: ada editan form yang belum disimpan; refresh otomatis dan hasil cek tidak menimpanya.
+let npcChain = [],
+  npcPaths = {},
+  npcChainStatus = {},
+  npcDirty = false;
+const WRITER_STATE = {
+  dipakai: ['Dipakai', 'status-good'],
+  siap: ['Siap', 'status-good'],
+  istirahat: ['Istirahat', 'status-pending'],
+  ditolak: ['Ditolak', 'status-bad'],
+  tidak_ada: ['Belum diatur', 'status-muted'],
+  nonaktif: ['Nonaktif', 'status-muted'],
+};
+function writerLabel(path) {
+  return npcPaths[path]?.label ?? path;
+}
+function moveWriter(index, step) {
+  const target = index + step;
+  if (target < 0 || target >= npcChain.length) return;
+  [npcChain[index], npcChain[target]] = [npcChain[target], npcChain[index]];
+  npcDirty = true;
+  renderChain();
+}
+// Satu baris per jalur: aktif/nonaktif, nama, asal key/link, status cek terakhir, dan tombol prioritas.
+function renderChain() {
+  let priority = 0;
+  $('npc-chain').replaceChildren(
+    ...npcChain.map((item, index) => {
+      const info = npcPaths[item.jalur] ?? {};
+      const last = npcChainStatus[item.jalur] ?? {};
+      const row = node('li', undefined, item.dipakai ? 'chain-item' : 'chain-item off');
+      const toggle = document.createElement('input');
+      toggle.type = 'checkbox';
+      toggle.checked = item.dipakai;
+      toggle.setAttribute('aria-label', `Pakai ${writerLabel(item.jalur)}`);
+      toggle.onchange = () => {
+        item.dipakai = toggle.checked;
+        npcDirty = true;
+        renderChain();
+      };
+      const text = node('div', undefined, 'chain-text');
+      const order = item.dipakai ? `${++priority}. ` : '';
+      // Link LLM: host yang benar-benar dipakai dan asalnya (panel atau .env bawaan server).
+      const address = last.alamat ? `${last.alamat.host} (${last.alamat.sumber})` : '';
+      text.append(
+        node('strong', order + writerLabel(item.jalur)),
+        node('small', [last.model, address, info.sumber].filter(Boolean).join(' · ')),
+      );
+      const move = node('div', undefined, 'chain-move');
+      for (const [step, symbol, verb] of [
+        [-1, '▲', 'Naikkan'],
+        [1, '▼', 'Turunkan'],
+      ]) {
+        const button = node('button', symbol, 'secondary');
+        button.type = 'button';
+        button.disabled = index + step < 0 || index + step >= npcChain.length;
+        button.setAttribute('aria-label', `${verb} prioritas ${writerLabel(item.jalur)}`);
+        button.onclick = () => moveWriter(index, step);
+        move.append(button);
+      }
+      const [stateLabel, stateClass] = WRITER_STATE[last.keadaan] ?? [
+        'Belum dicek',
+        'status-pending',
+      ];
+      const state = node('div', undefined, 'chain-state');
+      state.append(node('span', stateLabel, `chip ${stateClass}`));
+      if (last.status) state.append(node('small', last.status));
+      if (last.panggilan || last.token_masuk)
+        state.append(
+          node(
+            'small',
+            `${last.panggilan} panggilan · token ${last.token_masuk}/${last.token_keluar} sejak cek terakhir`,
+          ),
+        );
+      row.append(toggle, text, move, state);
+      return row;
+    }),
+  );
+  $('npc-chain-box').classList.toggle('muted', $('npc-writer').value === 'templat');
+}
+// Cek jalur berjalan di latar setelah simpan/startup: muat ulang sekali agar hasilnya terlihat.
+function scheduleNpcRefresh(status) {
+  clearTimeout(scheduleNpcRefresh.timer);
+  if (!status.sedang_cek_penulis) return;
+  scheduleNpcRefresh.timer = setTimeout(() => {
+    if (token && menu === 'npc') loadNpc({ form: false }).catch(() => {});
+  }, 3000);
+}
 // Tampilkan status pemuatan otak, sumber NLU, dan penulis kalimat yang benar-benar aktif.
-function showNpc(data) {
+// form=false (refresh otomatis, hasil cek) hanya memperbarui status; isi form dan urutan rantai lokal tetap.
+function showNpc(data, { form = true } = {}) {
   const status = data.status;
-  fillSelect($('npc-method'), data.pilihan.metode, status.metode);
-  fillSelect($('npc-writer'), data.pilihan.penulis, status.penulis_diminta);
-  $('npc-validate').checked = status.validasi;
+  npcPaths = data.pilihan.jalur_penulis ?? {};
+  const chain = status.rantai_penulis ?? [];
+  npcChainStatus = Object.fromEntries(chain.map((row) => [row.jalur, row]));
+  if (form || !npcChain.length) {
+    fillSelect($('npc-method'), data.pilihan.metode, status.metode);
+    fillSelect($('npc-writer'), data.pilihan.penulis, status.penulis_diminta);
+    $('npc-validate').checked = status.validasi;
+    npcChain = chain.map((row) => ({
+      jalur: row.jalur,
+      dipakai: (status.urutan_penulis ?? []).includes(row.jalur),
+    }));
+    $('npc-openrouter-model').value = status.model_openrouter ?? '';
+    npcDirty = false;
+  }
+  renderChain();
   const nlu = {
     indobert: 'IndoBERT (intent + target)',
     cadangan: 'Cadangan: SVM + nama yang disebut (IndoBERT tidak ditemukan)',
   };
+  const writer = status.penulis_aktif
+    ? writerLabel(status.penulis) + (status.model_penulis ? ` (${status.model_penulis})` : '')
+    : 'Templat bervariasi (tanpa LLM)';
   const rows = [
     ['Status', status.siap ? 'Siap' : status.gagal ? 'Gagal dimuat' : 'Memuat…'],
     ['Keterangan', status.detail],
     ['NLU', nlu[status.nlu] ?? '—'],
-    ['Penulis aktif', status.penulis_aktif ? status.penulis : 'Templat bervariasi (tanpa LLM)'],
+    ['Penulis kalimat sekarang', writer],
+    ['Cek rantai penulis', status.sedang_cek_penulis ? 'Sedang dicek…' : 'Selesai'],
     ['Pertandingan dengan otak aktif', String(status.pertandingan_aktif)],
   ];
   $('npc-status').replaceChildren(
     ...rows.flatMap(([label, value]) => [node('dt', label), node('dd', value || '—')]),
   );
+  scheduleNpcRefresh(status);
 }
-async function loadNpc() {
+async function loadNpc(options) {
   const epoch = generation;
   const data = await request('/api/panel/npc');
   if (!token || epoch !== generation) return;
-  showNpc(data);
+  showNpc(data, options);
 }
 
 // SURVEI: pertanyaan, jenis, skala, dan arti skala sepenuhnya diatur dari panel.
@@ -839,9 +1493,14 @@ $('refresh-checker').onclick = handle(async () => {
   await checker();
 });
 $('checker-room').onchange = handle(() => {
-  selectedTrace = '';
+  resetChecker();
   return checker();
 });
+$('checker-filter').onchange = () => {
+  traceFilter = $('checker-filter').value;
+  selectedTrace = '';
+  renderTraces();
+};
 $('older-traces').onclick = handle(async () => {
   $('auto-checker').checked = false;
   await checker(true);
@@ -888,16 +1547,42 @@ $('npc-form').onsubmit = handle(async () => {
         metode: $('npc-method').value,
         penulis: $('npc-writer').value,
         validasi: $('npc-validate').checked,
+        urutan_penulis: npcChain.filter((item) => item.dipakai).map((item) => item.jalur),
+        model_openrouter: $('npc-openrouter-model').value.trim(),
       },
       'PUT',
     );
     showNpc(data);
-    notice('Otak NPC tersimpan. Berlaku untuk pertandingan yang dimulai berikutnya.');
+    notice(
+      'Otak NPC tersimpan. Metode berlaku untuk pertandingan berikutnya; rantai penulis langsung.',
+    );
   } finally {
     $('save-npc').disabled = false;
   }
 });
-$('refresh-npc').onclick = handle(loadNpc);
+// Refresh manual memuat ulang form dari server (editan yang belum disimpan dibuang).
+$('refresh-npc').onclick = handle(() => loadNpc());
+for (const id of ['npc-method', 'npc-writer', 'npc-validate', 'npc-openrouter-model'])
+  for (const type of ['input', 'change'])
+    $(id).addEventListener(type, () => {
+      npcDirty = true;
+      if (id === 'npc-writer') renderChain();
+    });
+// Cek ulang semua jalur dengan key/link terbaru (Claude dan OpenRouter: satu pesan pendek; link: daftar model).
+// Cek memakai konfigurasi tersimpan, jadi editan harus disimpan dulu.
+$('check-writers').onclick = handle(async () => {
+  if (npcDirty) {
+    notice('Simpan perubahan dulu: cek ulang memakai konfigurasi yang tersimpan.');
+    return;
+  }
+  $('check-writers').disabled = true;
+  try {
+    showNpc(await request('/api/panel/npc/cek-penulis', {}, 'POST'), { form: false });
+    notice('Rantai penulis sudah dicek. Lihat status tiap jalur.');
+  } finally {
+    $('check-writers').disabled = false;
+  }
+});
 $('survey-form').onsubmit = handle(async () => {
   $('save-survey').disabled = true;
   try {

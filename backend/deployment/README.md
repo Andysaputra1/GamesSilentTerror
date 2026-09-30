@@ -146,7 +146,9 @@ Lokal: Qwen3 `qwen3:14b`, masukkan URL dasar tunnel HTTPS di panel. Endpoint har
 meneruskan POST /api/chat ke Ollama dan model harus sudah diunduh pada mesin lokal.
 Jika tunnel menggunakan Bearer auth, set OLLAMA_TUNNEL_TOKEN pada backend.
 Konfigurasi provider/URL tersimpan di MySQL dan dimuat ulang saat startup.
-Tidak ada fallback otomatis ke provider lain. Tombol Cek AI mengirim prompt pendek
+Tidak ada fallback otomatis ke provider lain untuk mode chat LLM lama. Rantai penulis kalimat
+otak NPC (menu Otak NPC) berbeda: jalurnya dicoba sesuai prioritas panel dan jalur yang ditolak
+dilewati; key OpenRouter dan URL tunnel di menu ini ikut dipakai rantai tersebut. Tombol Cek AI mengirim prompt pendek
 untuk benar-benar menguji jawaban; mode API memakai saldo OpenRouter.
 
 Riwayat menampilkan semua pesan chat yang tercatat, pemain dan bot. Download

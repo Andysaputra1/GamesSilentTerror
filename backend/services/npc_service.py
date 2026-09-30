@@ -18,6 +18,8 @@ from module.ollama_client import generate_reply as ollama_reply
 from module.openrouter_client import generate_reply as openrouter_reply
 from services.ai_runtime_service import ai_runtime
 from services.checker_service import checker_service
+from services.npc_brain.penjelasan import lengkapi as lengkapi_penjelasan
+from services.npc_brain.penjelasan import ringkas as ringkas_penjelasan
 from services.npc_brain.runtime import brain_runtime
 from services.persistence_service import PersistenceService, PersistenceError
 from services.room_service import room_service
@@ -29,8 +31,11 @@ logger = logging.getLogger("shadow_heist.npc")
 
 # Aksi rahasia yang dipetakan dari keputusan otak ke Match.act.
 AKSI_RAHASIA = {"gag", "hostage", "guard", "peek"}
-# Batas waktu satu langkah otak (keputusan + tulis kalimat) agar bot tidak menggantung.
+# Batas waktu keputusan otak dan penulisan kalimat (termasuk rantai LLM) agar bot tidak menggantung.
 BATAS_LANGKAH_DETIK = 25
+BATAS_TULIS_DETIK = 25
+# Cadangan saat penulis LLM melewati batas: kalimat templat (tetap divalidasi IndoBERT) jauh lebih cepat.
+BATAS_TEMPLAT_DETIK = 10
 
 
 class NPCDecision(BaseModel):
@@ -47,12 +52,15 @@ def npc_context(match, name):
     legal = {}
     if me["can_act"]:
         ability = me["ability"]
+        # Hostage/Gag tidak boleh ke rekan Syndicate (me.allies hanya terisi untuk Hitman).
+        allies = set(me["allies"])
         legal[ability] = [
             p["name"]
             for p in view["players"]
             if p["alive"]
             and (p["name"] != name or ability == "guard")
             and not (ability == "guard" and p["name"] == me["last_guard"])
+            and p["name"] not in allies
         ]
     if me["can_vote"]:
         legal["vote"] = [p["name"] for p in view["players"] if p["alive"] and p["name"] != name]
@@ -60,6 +68,8 @@ def npc_context(match, name):
         "round": match.round,
         "phase": match.phase,
         "me": me,
+        "composition": view["composition"],
+        "hitman_remaining": view["hitman_remaining"],
         "players": [{"name": p["name"], "alive": p["alive"]} for p in view["players"]],
         "legal_actions": legal,
         "public_votes": view["tribunal_votes"],
@@ -71,8 +81,12 @@ def npc_context(match, name):
 # Prompt terstruktur menyatukan aturan dan observasi tanpa mencampur memori rahasia antarpemain.
 def decision_prompt(context):
     return """Kamu pemain independen dalam Silent Terror, bukan moderator. Mainkan role milikmu untuk menang.
-Aturan: 4–10 pemain; satu Hitman, satu Spy, satu Stalker, sisanya Civilian. Warga menang jika Hitman dieksekusi.
-Hitman menang jika warga hidup yang tidak Hostage tinggal <=1. Gag hanya membungkam chat, tidak menghapus vote.
+Aturan: 4–10 pemain; jumlah tiap role ada di composition (Hitman dan Spy bisa lebih dari satu, Stalker satu).
+Warga menang jika semua Hitman dieksekusi. Hitman (Syndicate) menang jika warga hidup yang tidak Hostage tidak
+lebih banyak dari Hitman hidup. Gag hanya membungkam chat, tidak menghapus vote.
+Syndicate: satu Hostage per malam (target pilihan terbanyak Hitman, seri = pilihan pertama) dan satu Gag per siang.
+Hitman tahu rekannya (me.allies), tidak boleh Hostage/Gag rekan, dan sebaiknya mengikuti target di me.ally_actions.
+Jika Hitman lebih dari satu, hitman_remaining = Hitman hidup, diumumkan setelah eksekusi (tetap = korban warga).
 Tidak ada batas ronde atau hasil seri pertandingan; lanjutkan sampai salah satu kubu menang.
 Hostage permanen menghapus chat/vote tetapi pemain hidup dan masih boleh memakai skill malam.
 Siang diskusi dan Gag; malam chat terkunci, Hostage/Guard/Peek buta; Tribunal voting plurality, seri tanpa eksekusi.
@@ -251,8 +265,6 @@ class NPCService:
                 key = (match.id, match.round, match.phase)
                 snapshot = match.snapshot(otak.nama)
                 terlihat = match.messages[-1]["id"] if match.messages else None
-                # Otak memegang fase ini: tunggu/abstain miliknya dihormati, bukan diganti aksi acak.
-                match.npc_decisions.add((match.round, match.phase, otak.nama))
             now = time.time()
             otak.langkah += 1
             loop = asyncio.get_running_loop()
@@ -271,22 +283,21 @@ class NPCService:
             ditunda = hasil["nlg"] is not None and not self._ambil_lantai(match, otak, terlihat)
             if hasil["nlg"] is not None and not ditunda:
                 bicara = True
-                tulisan = await asyncio.wait_for(
-                    loop.run_in_executor(
-                        self.runtime.eksekutor_nlg, self.runtime.tulis, otak, hasil["nlg"], konteks
-                    ),
-                    timeout=BATAS_LANGKAH_DETIK,
-                )
+                tulisan = await self._tulis_kalimat(loop, otak, hasil["nlg"], konteks)
                 # Jeda mengetik: balasan instan terasa seperti mesin.
                 typing = min(4.0, max(1.0, len(tulisan["teks"]) / 30))
                 if match.deadline - time.time() > typing + 1:
                     await asyncio.sleep(typing)
                 reply = self._kirim_chat(code, match, key, otak, view, rencana, tulisan)
+            trace = None
             if reply or npc["action"] != "wait" or penolakan:
-                self._trace(code, match, otak, npc, rencana, tulisan if reply else None,
-                            penolakan, started, ditunda=ditunda)  # fmt: skip
+                trace = self._trace(code, match, otak, npc, rencana, tulisan if reply else None,
+                                    penolakan, started, ditunda=ditunda,
+                                    penjelasan=hasil.get("penjelasan"))  # fmt: skip
             if reply:
                 await self.broadcast("receive_chat", reply, to=code)
+            if trace is not None:
+                await self._simpan_trace(code, trace)
         except asyncio.CancelledError:
             raise
         except Exception as error:
@@ -298,6 +309,28 @@ class NPCService:
                 del self.lantai[match.id]
             otak.sibuk = False
             otak.langkah_terakhir = time.time()
+
+    # NLG dengan batas waktu. Jika penulis LLM terlalu lama, kalimat tetap dikirim dari templat (tetap
+    # divalidasi IndoBERT) agar rencana bot tidak hilang. Thread LLM yang tertinggal selesai sendiri;
+    # rantai penulis mencatat hasilnya (mis. mengistirahatkan jalur yang lambat) untuk kalimat berikutnya.
+    async def _tulis_kalimat(self, loop, otak, payload, konteks):
+        try:
+            return await asyncio.wait_for(
+                loop.run_in_executor(
+                    self.runtime.eksekutor_nlg, self.runtime.tulis, otak, payload, konteks
+                ),
+                timeout=BATAS_TULIS_DETIK,
+            )
+        except TimeoutError:
+            logger.warning("Kalimat %s melewati %s detik; memakai templat.", otak.nama,
+                           BATAS_TULIS_DETIK)  # fmt: skip
+        # Thread bawaan, bukan eksekutor NLG: jangan antre di belakang panggilan LLM yang tertahan.
+        tulisan = await asyncio.wait_for(
+            asyncio.to_thread(self.runtime.tulis, otak, payload, konteks, False),
+            timeout=BATAS_TEMPLAT_DETIK,
+        )
+        batas = {"sumber": "llm", "status": f"melewati batas {BATAS_TULIS_DETIK} detik"}
+        return {**tulisan, "percobaan": [batas, *tulisan["percobaan"]]}
 
     # Keputusan masih berlaku jika room, pertandingan, dan fasenya sama serta deadline belum lewat.
     def _berlaku(self, code, match, key):
@@ -315,6 +348,10 @@ class NPCService:
         with room_service.lock:
             if not self._berlaku(code, match, key):
                 return False, None
+            # Otak sudah memutuskan fase ini: tunggu/abstain miliknya dihormati, bukan diganti aksi acak
+            # engine. Ditandai setelah keputusan ada, sehingga langkah yang error/timeout sebelum pernah
+            # memutuskan apa pun tetap mendapat aksi cadangan engine di akhir fase.
+            match.npc_decisions.add((key[1], key[2], otak.nama))
             try:
                 if npc["action"] == "vote":
                     match.vote(otak.nama, npc["target"])
@@ -369,7 +406,10 @@ class NPCService:
             return reply
 
     # Jejak untuk panel checker: metode, persona, keputusan, dan asal kalimat (tanpa role pemain lain).
-    def _trace(self, code, match, otak, npc, rencana, tulisan, penolakan, started, ditunda=False):
+    # `penjelasan` (identitas, parameter, penalaran metode, keputusan, NLG) hanya dibaca panel admin.
+    def _trace(self, code, match, otak, npc, rencana, tulisan, penolakan, started, ditunda=False,
+               penjelasan=None):  # fmt: skip
+        penjelasan = lengkapi_penjelasan(penjelasan, npc, rencana, tulisan, penolakan, ditunda)
         trace = checker_service.begin(
             code, otak.nama, tulisan["teks"] if tulisan else npc["action"]
         )
@@ -403,9 +443,16 @@ class NPCService:
             ),  # fmt: skip
             error=penolakan,
             duration_ms=round((perf_counter() - started) * 1000, 2),
+            penjelasan=penjelasan,
+            ringkas=ringkas_penjelasan(penjelasan),  # untuk daftar jejak tanpa memuat penjelasan
         )
+        return trace
+
+    # Simpan jejak otak ke database di thread latar: tulisan DB (hingga ±12 KB penjelasan per jejak)
+    # tidak menahan event loop game. Jejak di memori (checker) sudah tersedia sejak _trace.
+    async def _simpan_trace(self, code, trace):
         try:
-            PersistenceService(code).record_trace(trace)
+            await asyncio.to_thread(PersistenceService(code).record_trace, trace)
         except PersistenceError:
             pass
 

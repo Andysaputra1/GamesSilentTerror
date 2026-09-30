@@ -74,4 +74,4 @@ VALUES
   ('komentar', 'Saran atau komentar untuk permainan ini (opsional)', 'text', 1, 6,
    NULL, NULL, FALSE, 60);
 
-INSERT INTO schema_migrations(version) VALUES ('V7__survey_and_npc');
+INSERT IGNORE INTO schema_migrations(version) VALUES ('V7__survey_and_npc');

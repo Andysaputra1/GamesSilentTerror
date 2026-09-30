@@ -24,6 +24,7 @@ from services.password_service import verify_password
 from services.persistence_service import PersistenceService, PersistenceError
 from services.ai_runtime_service import ai_runtime, save_panel_configuration
 from services.checker_service import checker_service
+from services.npc_brain.runtime import brain_runtime
 from services.activity_service import activity
 from services.room_service import room_service
 from controller.middleware.auth_limits import limit_auth
@@ -235,6 +236,8 @@ def set_config(body: Configuration, token=Depends(require_panel)):
         raise HTTPException(503, "Konfigurasi gagal disimpan.") from error
     except ValueError as error:
         raise HTTPException(400, str(error)) from error
+    # Key OpenRouter dan link LLM juga dipakai rantai penulis kalimat NPC: bangun ulang dan cek di latar.
+    brain_runtime.segarkan_penulis()
     return config_view()
 
 
@@ -322,6 +325,7 @@ def rooms(after_id: int = Query(0, ge=0), token=Depends(require_panel)):
 
 
 # Gabungkan jejak tersimpan dan jejak aktif; cursor menjaga urutan halaman.
+# Daftar tanpa `penjelasan` (bisa ~10 KB per jejak); detail diambil lewat endpoint jejak tunggal.
 @router.get("/api/panel/checker/{code}")
 def checker(
     code: str, before: str | None = Query(None, max_length=100), token=Depends(require_panel)
@@ -333,7 +337,8 @@ def checker(
     rows = transaction(
         lambda db: db.execute(
             text("""
-        SELECT id,trace,CONCAT(DATE_FORMAT(created_at,'%Y-%m-%d %H:%i:%s'), '|', id) AS trace_cursor
+        SELECT id,JSON_REMOVE(trace,'$.penjelasan') AS trace,
+        CONCAT(DATE_FORMAT(created_at,'%Y-%m-%d %H:%i:%s'), '|', id) AS trace_cursor
         FROM checker_traces WHERE room_code=:code
         AND CONCAT(DATE_FORMAT(created_at,'%Y-%m-%d %H:%i:%s'), '|', id) < :before
         ORDER BY created_at DESC,id DESC LIMIT 101
@@ -350,12 +355,34 @@ def checker(
     live = checker_service.list(code) if before is None else []
     merged = {item["id"]: item for item in archived}
     merged.update({item["id"]: item for item in live})
+    traces = sorted(merged.values(), key=lambda item: item["created_at"], reverse=True)
     return {
-        "traces": sorted(merged.values(), key=lambda item: item["created_at"], reverse=True),
+        "traces": traces,
         "events": activity.list(code) if before is None else [],
+        # Ringkasan room hanya di halaman pertama: status, komposisi role, metode/persona bot.
+        "room": checker_service.ringkasan_room(code, traces) if before is None else None,
         "has_more": len(rows) > 100,
         "next_before": rows[min(len(rows), 100) - 1]["trace_cursor"] if rows else None,
     }
+
+
+# Satu jejak lengkap beserta penjelasan keputusan bot (parameter, penalaran metode, NLG).
+@router.get("/api/panel/checker/{code}/jejak/{trace_id}")
+def checker_trace(code: str, trace_id: str, token=Depends(require_panel)):
+    if len(code) > 36 or len(trace_id) != 32 or any(c not in "0123456789abcdef" for c in trace_id):
+        raise HTTPException(422, "Kode room atau ID jejak tidak valid.")
+    live = checker_service.cari(code, trace_id)
+    if live is not None:
+        return live
+    stored = transaction(
+        lambda db: db.execute(
+            text("SELECT trace FROM checker_traces WHERE id=:id AND room_code=:code"),
+            {"id": trace_id, "code": code},
+        ).scalar()
+    )
+    if stored is None:
+        raise HTTPException(404, "Jejak tidak ditemukan.")
+    return json.loads(stored) if isinstance(stored, str) else stored
 
 
 # Bangun kondisi SQL berparameter; rentang tanggal WIB dikonversi ke UTC.
