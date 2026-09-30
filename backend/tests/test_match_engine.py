@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 from controller.api.rooms import router
 from controller.middleware.auth import require_authenticated_user
 from realtime.socket_handlers import SocketGameController
-from services.match_engine import Match
+from services.match_engine import KOMPOSISI_PERAN, Match
 from services.room_service import RoomService
 
 
@@ -59,9 +59,23 @@ class EngineTests(unittest.TestCase):
         for count in range(4, 11):
             game = Match([str(i) for i in range(count)], [])
             roles = [p.role for p in game.players.values()]
-            for role in ["hitman", "spy", "stalker"]:
-                self.assertEqual(roles.count(role), 1)
-            self.assertEqual(roles.count("civilian"), count - 3)
+            hitman, spy, stalker = KOMPOSISI_PERAN[count]
+            self.assertEqual(
+                (roles.count("hitman"), roles.count("spy"), roles.count("stalker")),
+                (hitman, spy, stalker),
+            )
+            self.assertEqual(roles.count("civilian"), count - hitman - spy - stalker)
+            self.assertGreaterEqual(roles.count("civilian"), 1)
+            # Komposisi publik sama untuk semua viewer; siapa pemegang role tetap rahasia.
+            for viewer in game.players:
+                self.assertEqual(
+                    game.snapshot(viewer)["composition"],
+                    {role: roles.count(role) for role in ("hitman", "spy", "stalker", "civilian")},
+                )
+        # Jumlah Hitman, Spy, dan Stalker tidak pernah menyusut saat pemain bertambah.
+        for count in range(4, 10):
+            smaller, larger = KOMPOSISI_PERAN[count], KOMPOSISI_PERAN[count + 1]
+            self.assertTrue(all(a <= b for a, b in zip(smaller, larger)), count)
         for humans in [[], ["a"] * 4, list("abcdefghijk")]:
             with self.assertRaises(ValueError):
                 Match(humans, [])
@@ -231,6 +245,206 @@ class EngineTests(unittest.TestCase):
                 game.tick(game.deadline)
             self.assertIsNotNone(game.winner, f"seed={seed}")
             self.assertTrue({"day", "night", "tribunal"} <= phases)
+
+
+class SyndicateTests(unittest.TestCase):
+    # FIXTURE: 10 pemain (3 Hitman, 2 Spy, 1 Stalker, 4 Civilian); nama = role agar skenario mudah dibaca.
+    NAMES = ["hitman", "hitman2", "hitman3", "spy", "spy2", "stalker"] + [
+        "civilian",
+        "civilian2",
+        "civilian3",
+        "civilian4",
+    ]
+
+    def setUp(self, bots=False):
+        self.game = Match(
+            [] if bots else self.NAMES, self.NAMES if bots else [], now=0, rng=random.Random(3)
+        )
+        for name, player in self.game.players.items():
+            player.role = name.rstrip("234")
+        self.game.npc_decisions = set()
+
+    def night(self):
+        self.game.phase = "night"
+        self.game.actions.clear()
+
+    def test_one_hostage_per_night_follows_most_chosen_target(self):
+        self.night()
+        self.game.act("hitman", "hostage", "civilian")
+        self.game.act("hitman2", "hostage", "civilian2")
+        self.game.act("hitman3", "hostage", "civilian2")
+        self.game.resolve_night()
+        self.assertTrue(self.game.players["civilian2"].hostage)
+        self.assertFalse(self.game.players["civilian"].hostage)
+
+    def test_hostage_tie_keeps_earliest_choice_and_any_spy_guard_blocks_it(self):
+        self.night()
+        self.game.act("hitman2", "hostage", "civilian3")
+        self.game.act("hitman", "hostage", "civilian")
+        self.game.resolve_night()
+        self.assertTrue(self.game.players["civilian3"].hostage)
+        self.assertFalse(self.game.players["civilian"].hostage)
+        self.game.round = 2
+        self.night()
+        self.game.act("hitman", "hostage", "civilian4")
+        self.game.act("spy2", "guard", "civilian4")
+        self.game.resolve_night()
+        self.assertFalse(self.game.players["civilian4"].hostage)
+
+    def test_syndicate_cannot_hostage_or_gag_allies_but_may_vote_them(self):
+        for phase, ability in (("day", "gag"), ("night", "hostage")):
+            self.game.phase = phase
+            with self.assertRaisesRegex(ValueError, "rekan Syndicate"):
+                self.game.act("hitman", ability, "hitman2")
+        self.game.phase = "tribunal"
+        self.game.vote("hitman", "hitman2")
+        self.assertEqual(self.game.votes["hitman"], "hitman2")
+
+    def test_gag_order_is_shared_by_the_syndicate(self):
+        self.game.act("hitman", "gag", "civilian")
+        with self.assertRaises(ValueError):
+            self.game.act("hitman2", "gag", "spy")
+        ally = self.game.snapshot("hitman2")["me"]
+        self.assertEqual((ally["can_act"], ally["next_gag"]), (False, 3))
+        # Warga tidak boleh tahu dari snapshot bahwa Gag sudah dipakai.
+        self.assertEqual(self.game.snapshot("spy")["me"]["next_gag"], 1)
+        self.game.round = 2
+        with self.assertRaises(ValueError):
+            self.game.act("hitman3", "gag", "spy")
+        self.game.round = 3
+        self.game.act("hitman3", "gag", "spy")
+        self.assertTrue(self.game.players["spy"].gagged)
+
+    def test_allies_and_their_hostage_choices_are_private_to_the_syndicate(self):
+        self.night()
+        self.game.act("hitman", "hostage", "stalker")
+        me = self.game.snapshot("hitman2")["me"]
+        self.assertEqual(me["allies"], ["hitman", "hitman3"])
+        self.assertEqual(me["ally_actions"], [{"name": "hitman", "target": "stalker"}])
+        self.assertEqual(self.game.snapshot("hitman")["me"]["ally_actions"], [])
+        for viewer in ("spy", "stalker", "civilian"):
+            snapshot = self.game.snapshot(viewer)
+            self.assertEqual((snapshot["me"]["allies"], snapshot["me"]["ally_actions"]), ([], []))
+            self.assertNotIn("hitman", " ".join(snapshot["events"]))
+        self.game.players["hitman3"].alive = False
+        self.game.phase = "day"
+        me = self.game.snapshot("hitman")["me"]
+        self.assertEqual((me["allies"], me["ally_actions"]), (["hitman2", "hitman3"], []))
+
+    def test_hitman_count_is_public_and_announced_after_each_execution(self):
+        def remaining():
+            counts = {self.game.snapshot(name)["hitman_remaining"] for name in self.game.players}
+            self.assertEqual(len(counts), 1)  # sama untuk semua viewer, termasuk Hitman
+            return counts.pop()
+
+        self.assertEqual(remaining(), 3)
+        self.night()
+        self.game.act("hitman", "hostage", "civilian")
+        self.game.resolve_night()  # Hostage tidak mengubah hitungan: hanya eksekusi yang mengubahnya.
+        self.assertEqual(remaining(), 3)
+        for executed, expected in (("civilian2", 3), ("hitman2", 2)):
+            self.game.phase = "tribunal"
+            self.game.votes = {"spy": executed}
+            self.game.resolve_votes()
+            self.assertEqual(
+                self.game.events[-1],
+                f"Tribunal mengeksekusi {executed}. Hitman tersisa: {expected}. "
+                "Role tetap dirahasiakan sampai permainan selesai.",
+            )
+            for phase in ("day", "night", "tribunal"):
+                self.game.phase = phase
+                self.assertEqual(remaining(), expected)
+            # Role korban tetap rahasia; roster lawan tetap nama dan status hidup saja.
+            view = self.game.snapshot("spy")
+            self.assertTrue(all(set(p) == {"name", "alive"} for p in view["players"]))
+
+    def test_hitman_count_is_available_during_preparation(self):
+        game = Match([], self.NAMES, now=0, rng=random.Random(3), preparing=True)
+        for name, player in game.players.items():
+            player.role = name.rstrip("234")
+        view = game.snapshot("civilian")
+        self.assertEqual((view["phase"], view["hitman_remaining"]), ("preparing", 3))
+
+    def test_single_hitman_room_does_not_announce_hitman_count(self):
+        game = Match(["hitman", "spy", "stalker", "civilian", "civilian2", "civilian3"], [], now=0)
+        for name, player in game.players.items():
+            player.role = name if name in {"hitman", "spy", "stalker"} else "civilian"
+        self.assertIsNone(game.snapshot("spy")["hitman_remaining"])
+        game.phase = "tribunal"
+        game.vote("spy", "civilian")
+        game.resolve_votes()
+        self.assertEqual(
+            game.events[-1],
+            "Tribunal mengeksekusi civilian. Role tetap dirahasiakan sampai permainan selesai.",
+        )
+        self.assertIsNone(game.snapshot("hitman")["hitman_remaining"])
+
+    def test_last_hitman_execution_does_not_promise_secret_roles(self):
+        self.game.players["hitman2"].alive = False
+        self.game.players["hitman3"].alive = False
+        self.game.phase = "tribunal"
+        self.game.votes = {"spy": "hitman"}
+        self.game.resolve_votes()
+        # Permainan langsung selesai dan semua role dibuka, jadi tidak ada kalimat "dirahasiakan".
+        self.assertEqual(self.game.events[-2], "Tribunal mengeksekusi hitman. Hitman tersisa: 0.")
+        self.assertEqual(self.game.winner, "civilians")
+
+    def test_game_continues_until_every_hitman_is_executed(self):
+        self.game.phase = "tribunal"
+        self.game.vote("spy", "hitman")
+        self.game.tick(self.game.deadline)
+        self.assertIsNone(self.game.winner)
+        self.game.players["hitman2"].alive = False
+        self.game.players["hitman3"].alive = False
+        self.game.check_winner()
+        self.assertEqual(self.game.winner_reason, "hitman_executed")
+        self.assertIn("Semua Hitman dieksekusi", self.game.events[-1])
+        for name, player in self.game.players.items():
+            expected = "lost" if player.role == "hitman" else "won"
+            self.assertEqual(self.game.result(name)["outcome"], expected)
+
+    def test_syndicate_wins_when_free_citizens_no_longer_outnumber_living_hitmen(self):
+        for name in ("spy", "spy2", "stalker"):
+            self.game.players[name].hostage = True
+        self.game.check_winner()
+        self.assertIsNone(self.game.winner)  # Empat warga bebas masih melampaui tiga Hitman.
+        self.game.players["hitman3"].alive = False
+        self.game.players["civilian4"].alive = False
+        self.game.check_winner()
+        self.assertIsNone(self.game.winner)  # Tiga warga bebas melawan dua Hitman hidup.
+        self.game.players["civilian3"].hostage = True
+        self.game.check_winner()
+        self.assertEqual((self.game.winner, self.game.winner_reason), ("hitman", "vote_control"))
+        self.assertEqual(self.game.result("hitman")["civilians_voters"], 2)
+
+    def test_rule_bots_follow_ally_hostage_target_and_never_target_allies(self):
+        for seed in range(20):
+            self.setUp(bots=True)
+            self.game.rng = random.Random(seed)
+            self.night()
+            self.game.npc_decisions.add((1, "night", "hitman"))
+            self.game.act("hitman", "hostage", "civilian2")
+            self.game.run_bots()
+            chosen = {
+                self.game.actions[name]["target"] for name in ("hitman", "hitman2", "hitman3")
+            }
+            self.assertEqual(chosen, {"civilian2"}, seed)
+            self.game.phase = "day"
+            self.game.bot_day_done = False
+            self.game.run_bots()
+            gagged = [name for name, p in self.game.players.items() if p.gagged]
+            self.assertEqual(len(gagged), 1)
+            self.assertNotIn(self.game.players[gagged[0]].role, {"hitman"})
+
+    def test_rule_bots_finish_every_room_size(self):
+        for count in range(4, 11):
+            for seed in range(10):
+                game = Match([], self.NAMES[:count], now=0, quick=True, rng=random.Random(seed))
+                for _ in range(300):
+                    if game.winner:
+                        break
+                    game.tick(game.deadline)
+                self.assertIsNotNone(game.winner, (count, seed))
 
 
 class RoomGameTests(unittest.TestCase):

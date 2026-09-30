@@ -98,6 +98,24 @@ class GameLifecycleTests(unittest.TestCase):
             self.assertEqual(response.status_code, 200)
         self.assertEqual(self.rooms.rooms, {})
 
+    def hitmen(self):
+        return [name for name, player in self.match.players.items() if player.role == "hitman"]
+
+    # Dimulai saat Tribunal: setiap Tribunal mengeksekusi satu Hitman sampai semuanya tertangkap.
+    def execute_every_hitman(self):
+        hitmen = self.hitmen()
+        for index, hitman in enumerate(hitmen):
+            self.assertEqual(self.state()["phase"], "tribunal")
+            for name, player in self.match.players.items():
+                if player.alive and name != hitman:
+                    self.play(name, hitman)
+            view = self.advance()
+            if index < len(hitmen) - 1:
+                # Masih ada Hitman hidup: permainan berlanjut ke ronde berikutnya.
+                self.assertIsNone(view["winner"])
+                self.advance()
+                self.advance()
+
     def test_all_room_sizes_continue_past_old_limits_until_a_team_wins(self):
         for count in range(4, 11):
             with self.subTest(count=count):
@@ -111,18 +129,13 @@ class GameLifecycleTests(unittest.TestCase):
                 self.assertEqual((self.state()["round"], self.state()["phase"]), (26, "day"))
                 self.advance()
                 self.advance()
-                hitman = next(p.name for p in self.match.players.values() if p.role == "hitman")
-                for name in self.match.players:
-                    if name != hitman:
-                        self.play(name, hitman)
-                self.advance()
+                self.execute_every_hitman()
                 self.check_result_and_leave("civilians")
 
-    def test_civilian_victory_finishes_on_first_tribunal(self):
+    def test_civilian_victory_after_every_hitman_is_executed(self):
         for count in range(4, 11):
             with self.subTest(count=count):
                 self.create_match(count)
-                hitman = next(p.name for p in self.match.players.values() if p.role == "hitman")
                 # Persetujuan semua manusia memajukan fase melalui endpoint yang dipakai UI.
                 for name in self.match.players:
                     view = self.state(name)
@@ -134,29 +147,30 @@ class GameLifecycleTests(unittest.TestCase):
                     self.assertEqual(response.status_code, 200)
                 self.assertEqual(self.state()["phase"], "night")
                 self.advance()
-                for name in self.match.players:
-                    if name != hitman:
-                        self.play(name, hitman)
-                self.advance()
-                self.assertEqual(self.state()["round"], 1)
+                self.execute_every_hitman()
+                # Satu Hitman per Tribunal: jumlah ronde = jumlah Hitman.
+                self.assertEqual(self.state()["round"], len(self.hitmen()))
                 self.check_result_and_leave("civilians")
 
-    def test_hitman_victory_finishes_at_night_when_only_one_free_citizen_remains(self):
+    def test_hitman_victory_finishes_at_night_when_free_citizens_match_hitmen(self):
         for count in range(4, 11):
             with self.subTest(count=count):
                 self.create_match(count)
-                hitman = next(p.name for p in self.match.players.values() if p.role == "hitman")
-                targets = [name for name in self.match.players if name != hitman]
-                for index, target in enumerate(targets[:-1]):
+                hitmen = self.hitmen()
+                targets = [name for name in self.match.players if name not in hitmen]
+                # Syndicate menang saat warga bebas tinggal sebanyak Hitman yang hidup.
+                nights = len(targets) - len(hitmen)
+                for index, target in enumerate(targets[:nights]):
                     self.assertEqual(self.advance()["phase"], "night")
-                    self.play(hitman, target, "hostage")
+                    for hitman in hitmen:
+                        self.play(hitman, target, "hostage")
                     view = self.advance()
-                    if index == len(targets) - 2:
+                    if index == nights - 1:
                         self.assertEqual(view["phase"], "finished")
                     else:
                         self.assertEqual(view["phase"], "tribunal")
                         self.assertIsNone(view["winner"])
                         self.advance()
-                self.assertEqual(self.state()["result"]["civilians_voters"], 1)
-                self.assertEqual(self.state()["round"], count - 2)
+                self.assertEqual(self.state()["result"]["civilians_voters"], len(hitmen))
+                self.assertEqual(self.state()["round"], nights)
                 self.check_result_and_leave("hitman")

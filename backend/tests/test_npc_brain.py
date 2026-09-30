@@ -144,7 +144,8 @@ class BrainRuntimeTests(unittest.TestCase):
         return match, catatan
 
     def test_multi_bot_games_are_legal_and_chats_are_safe(self):
-        for seed, jumlah in [(1, 6), (2, 8), (3, 5)]:
+        # 10 bot: komposisi terbesar memakai lebih dari satu Hitman (Syndicate) dan dua Spy.
+        for seed, jumlah in [(1, 6), (2, 8), (3, 5), (4, 10)]:
             match, catatan = self.main_game(seed, jumlah)
             self.assertEqual(catatan["ilegal"], 0, f"seed {seed}")
             self.assertEqual(catatan["langgar"], 0, f"seed {seed}")
@@ -293,6 +294,12 @@ class ExportFreshnessTests(unittest.TestCase):
             b["modul"]: b["sidik"] for b in json.loads((TUJUAN / "SUMBER.json").read_text())
         }
         self.assertEqual(set(tercatat), {"otak_fuzzy", "otak_utility", "otak_bt", "nlg"})
+        # Kepala tiap modul harus cocok dengan SUMBER.json: ekspor parsial atau edit manual ketahuan
+        # walau notebook skripsi tidak tersedia di mesin ini.
+        for modul, sidik in tercatat.items():
+            kepala = (TUJUAN / f"{modul}.py").read_text(encoding="utf-8")[:600]
+            self.assertIn(f"Sidik  : {sidik}", kepala,
+                          f"{modul}.py tidak sama dengan SUMBER.json: ekspor ulang semua modul")  # fmt: skip
         if not Path(DEFAULT_NOTEBOOK_DIR, "npc_fuzzy.ipynb").is_file():
             self.skipTest("Notebook skripsi tidak tersedia di mesin ini.")
         self.assertEqual(sidik_notebook(DEFAULT_NOTEBOOK_DIR), tercatat,

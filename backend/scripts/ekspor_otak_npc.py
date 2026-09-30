@@ -16,6 +16,7 @@ import argparse
 import ast
 import hashlib
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -40,7 +41,7 @@ BAGIAN_NLG = {
     "## Templat Bervariasi",
     "## Pengaman 1: Pemeriksa Aturan",
     "## Pengaman 2: Validasi Ulang dengan IndoBERT",
-    "## Penulis Kalimat: Claude",
+    "## Penulis Kalimat: Rantai LLM",
     "## Pipeline `tulis_pesan`",
 }
 
@@ -71,6 +72,21 @@ def display(*args, **kwargs):
     return None
 
 '''
+
+# Baris "Dibuat" berubah setiap ekspor; diabaikan saat membandingkan isi supaya modul yang logikanya
+# sama tidak ditulis ulang (tidak ada perubahan git semu).
+BARIS_WAKTU = re.compile(r"^Dibuat : .*$", re.MULTILINE)
+
+
+# Tulis berkas hanya jika isinya (tanpa baris waktu) berubah. Selalu LF apa pun OS-nya (Prettier/Black
+# memakai LF); pembacaan teks menyamakan CRLF hasil checkout Git sehingga perbandingan tetap adil.
+def tulis_bila_berubah(path: Path, isi: str) -> bool:
+    if path.is_file():
+        lama = path.read_text(encoding="utf-8")
+        if BARIS_WAKTU.sub("", lama) == BARIS_WAKTU.sub("", isi):
+            return False
+    path.write_text(isi, encoding="utf-8", newline="\n")
+    return True
 
 
 # Import yang aman untuk backend; modul tampilan notebook dibuang.
@@ -176,8 +192,7 @@ def ekspor(nama_modul: str, path_notebook: Path, pilih_sel) -> dict:
     )
     compile(isi, nama_modul, "exec")  # gagal cepat jika hasil ekspor tidak valid
     TUJUAN.mkdir(parents=True, exist_ok=True)
-    # newline="\n": Windows tidak mengubah akhir baris jadi CRLF (Prettier/Black memakai LF).
-    (TUJUAN / f"{nama_modul}.py").write_text(isi, encoding="utf-8", newline="\n")
+    tulis_bila_berubah(TUJUAN / f"{nama_modul}.py", isi)
     return {"modul": nama_modul, "notebook": path_notebook.name, "sel": len(sel), "blok": len(bagian),
             "sidik": sidik}  # fmt: skip
 
@@ -189,14 +204,11 @@ def main():
     folder = args.notebook_dir.resolve()
     ringkasan = [ekspor(m, folder / f, _sel_npc) for m, f in NOTEBOOK_NPC.items()]
     ringkasan.append(ekspor("nlg", folder / NOTEBOOK_NLG, _sel_nlg))
-    (TUJUAN / "__init__.py").write_text(
+    tulis_bila_berubah(
+        TUJUAN / "__init__.py",
         '"""Modul otak NPC hasil ekspor notebook; lihat scripts/ekspor_otak_npc.py."""\n',
-        encoding="utf-8",
-        newline="\n",
     )
-    (TUJUAN / "SUMBER.json").write_text(
-        json.dumps(ringkasan, indent=2) + "\n", encoding="utf-8", newline="\n"
-    )
+    tulis_bila_berubah(TUJUAN / "SUMBER.json", json.dumps(ringkasan, indent=2) + "\n")
     for baris in ringkasan:
         print(f"{baris['modul']:14s} <- {baris['notebook']:26s} {baris['sel']:3d} sel, "
               f"{baris['blok']:4d} blok, sidik {baris['sidik']}")  # fmt: skip

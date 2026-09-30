@@ -20,7 +20,6 @@ class Participant:
     alive: bool = True
     hostage: bool = False
     gagged: bool = False
-    next_gag: int = 1
     next_peek: int = 1
     last_guard: str | None = None
     last_guard_round: int = 0
@@ -30,6 +29,20 @@ class Participant:
 # Layar persiapan: minimal cukup untuk membaca panduan, maksimal agar model yang gagal dimuat tidak menahan room.
 PREPARATION_MIN_SECONDS = 8
 PREPARATION_MAX_SECONDS = 90
+
+# Komposisi role per jumlah peserta: (hitman, spy, stalker); sisanya civilian.
+# Dipilih lewat simulasi keseimbangan semua kursi bot metode campuran, dengan pengumuman jumlah Hitman tersisa
+# (hitman_remaining); data dan alasannya ada di GAME_CONCEPT.md, bagian Ruangan dan role.
+KOMPOSISI_PERAN = {
+    4: (1, 1, 1),
+    5: (1, 1, 1),
+    6: (1, 1, 1),
+    7: (1, 1, 1),
+    8: (2, 2, 1),
+    9: (2, 2, 1),
+    10: (2, 2, 1),
+}
+NIGHT_ABILITY = {"hitman": "hostage", "spy": "guard", "stalker": "peek"}
 
 
 # Durasi mengikuti roster awal (manusia + NPC), bukan jumlah warga bebas yang bersifat rahasia.
@@ -44,14 +57,16 @@ def phase_durations(count, quick=False):
 
 
 class Match:
-    # CONSTRUCTOR: acak role di server; tepat satu Hitman, Spy, dan Stalker.
+    # CONSTRUCTOR: acak role di server sesuai KOMPOSISI_PERAN (Hitman dan Spy bisa lebih dari satu).
     # preparing=True menahan ronde 1 di layar persiapan sampai AI siap (lihat begin/mark_ai_ready).
     def __init__(self, humans, bots, *, quick=False, now=None, rng=None, preparing=False):
         names = list(humans) + list(bots)
         if not 4 <= len(names) <= 10 or len(set(names)) != len(names):
             raise ValueError("Permainan membutuhkan 4–10 identitas berbeda.")
         self.rng = rng or random.SystemRandom()
-        roles = ["hitman", "spy", "stalker"] + ["civilian"] * (len(names) - 3)
+        hitman, spy, stalker = KOMPOSISI_PERAN[len(names)]
+        roles = ["hitman"] * hitman + ["spy"] * spy + ["stalker"] * stalker
+        roles += ["civilian"] * (len(names) - len(roles))
         self.rng.shuffle(roles)
         self.players = {
             name: Participant(name, role, name in bots) for name, role in zip(names, roles)
@@ -69,6 +84,8 @@ class Match:
         self.deadline = now + self.durations["day"]
         self.actions = {}
         self.votes = {}
+        # Gag Order milik Syndicate: satu Gag per siang untuk seluruh tim, cooldown satu ronde penuh.
+        self.next_gag = 1
         self.skip_consents = set()
         self.ready_consents = set()
         self.preparation = None
@@ -173,20 +190,30 @@ class Match:
             raise ValueError("Target tidak valid.")
         return target
 
+    # Rekan Syndicate: Hitman lain dalam pertandingan (hidup atau sudah dieksekusi).
+    def allies(self, name):
+        if self.players[name].role != "hitman":
+            return []
+        return [p.name for p in self.players.values() if p.role == "hitman" and p.name != name]
+
     # AKSI PRIVAT: pilihan malam disimpan, belum diresolusikan sebelum deadline.
     def act(self, name, ability, target_name):
         player = self.actor(name)
         if ability == "gag":
-            if self.phase != "day" or player.role != "hitman" or self.round < player.next_gag:
+            if self.phase != "day" or player.role != "hitman" or self.round < self.next_gag:
                 raise ValueError("Gag Order belum tersedia.")
             target = self.target(player, target_name)
+            if target.role == "hitman":
+                raise ValueError("Tidak bisa menarget rekan Syndicate.")
             target.gagged = True
-            player.next_gag = self.round + 2
+            self.next_gag = self.round + 2
             return
-        expected = {"hitman": "hostage", "spy": "guard", "stalker": "peek"}.get(player.role)
+        expected = NIGHT_ABILITY.get(player.role)
         if expected is None or self.phase != "night" or ability != expected or name in self.actions:
             raise ValueError("Aksi malam tidak tersedia atau sudah dikunci.")
-        self.target(player, target_name, allow_self=ability == "guard")
+        target = self.target(player, target_name, allow_self=ability == "guard")
+        if ability == "hostage" and target.role == "hitman":
+            raise ValueError("Tidak bisa menarget rekan Syndicate.")
         if (
             ability == "guard"
             and player.last_guard == target_name
@@ -205,6 +232,16 @@ class Match:
         self.target(player, target_name)
         self.votes[name] = target_name
 
+    # Satu korban per malam untuk Syndicate: pilihan terbanyak, seri → yang dipilih paling awal.
+    def syndicate_target(self):
+        choices = [
+            action["target"] for action in self.actions.values() if action["ability"] == "hostage"
+        ]
+        if not choices:
+            return None
+        counts = Counter(choices)
+        return next(target for target in choices if counts[target] == max(counts.values()))
+
     # RESOLUSI MALAM: semua pilihan dibaca bersama, Guard diprioritaskan terhadap Hostage.
     def resolve_night(self):
         guards = set()
@@ -220,9 +257,9 @@ class Match:
                     {"round": self.round, "name": target, "role": self.players[target].role}
                 )
                 player.next_peek = self.round + 2
-        for action in self.actions.values():
-            if action["ability"] == "hostage" and action["target"] not in guards:
-                self.players[action["target"]].hostage = True
+        target = self.syndicate_target()
+        if target is not None and target not in guards:
+            self.players[target].hostage = True
         # Rekap identik untuk semua hasil, termasuk kegagalan atau target yang sudah Hostage.
         self.events.append(
             "Malam selesai. Semua aksi telah diselesaikan; identitas dan target tidak diumumkan."
@@ -239,9 +276,12 @@ class Match:
         )
         if len(leaders) == 1:
             self.players[leaders[0]].alive = False
-            self.events.append(
-                f"Tribunal mengeksekusi {leaders[0]}. Role tetap dirahasiakan sampai permainan selesai."
-            )
+            remaining = self.hitman_remaining()
+            count = "" if remaining is None else f" Hitman tersisa: {remaining}."
+            # Eksekusi Hitman terakhir langsung mengakhiri permainan dan membuka semua role.
+            terakhir = not any(p.alive for p in self.players.values() if p.role == "hitman")
+            rahasia = "" if terakhir else " Role tetap dirahasiakan sampai permainan selesai."
+            self.events.append(f"Tribunal mengeksekusi {leaders[0]}.{count}{rahasia}")
         else:
             self.events.append("Tribunal berakhir tanpa eksekusi: suara seri atau tidak ada suara.")
         self.check_winner()
@@ -259,21 +299,24 @@ class Match:
         }[winner]
         self.events.append(f"{label} {explanation}")
 
-    # GDD: warga menang dengan eksekusi Hitman; Hitman menang ketika suara warga bebas tidak melampaui satu.
+    # Warga menang jika semua Hitman dieksekusi; Syndicate menang ketika warga bebas tidak lagi
+    # lebih banyak dari Hitman yang hidup (suara warga tidak bisa lagi mengalahkan suara Hitman).
     def check_winner(self):
         if self.winner:
             return
-        hitman = next(player for player in self.players.values() if player.role == "hitman")
+        hitmen = [p for p in self.players.values() if p.role == "hitman"]
+        alive_hitmen = sum(p.alive for p in hitmen)
         survivors = [p for p in self.players.values() if p.role != "hitman" and p.alive]
-        if not hitman.alive:
-            self.finish("civilians", "hitman_executed", "Hitman dieksekusi oleh Tribunal.")
+        if not alive_hitmen:
+            executed = "Semua Hitman" if len(hitmen) > 1 else "Hitman"
+            self.finish("civilians", "hitman_executed", f"{executed} dieksekusi oleh Tribunal.")
         elif not survivors:
             self.finish("hitman", "no_civilians_alive", "Tidak ada warga yang masih hidup.")
         elif all(p.hostage for p in survivors):
             self.finish(
                 "hitman", "all_survivors_hostage", "Semua warga yang masih hidup telah disandera."
             )
-        elif sum(not p.hostage for p in survivors) <= 1:
+        elif sum(not p.hostage for p in survivors) <= alive_hitmen:
             self.finish(
                 "hitman",
                 "vote_control",
@@ -315,6 +358,13 @@ class Match:
                 if other.alive and other.name != player.name
             ]
             self.rng.shuffle(targets)
+            if player.role == "hitman":
+                # Syndicate: rekan tidak pernah ditarget, dan Hostage mengikuti target rekan bila ada.
+                allies = set(self.allies(player.name))
+                targets = [name for name in targets if name not in allies]
+                leader = self.syndicate_target() if self.phase == "night" else None
+                if leader in targets:
+                    targets = [leader] + [name for name in targets if name != leader]
             if self.phase == "tribunal":
                 # Stalker hanya memakai intel hasil Peek miliknya sendiri.
                 known = [
@@ -328,13 +378,7 @@ class Match:
                     if self.phase == "tribunal":
                         self.vote(player.name, target)
                     else:
-                        ability = (
-                            "gag"
-                            if self.phase == "day"
-                            else {"hitman": "hostage", "spy": "guard", "stalker": "peek"}.get(
-                                player.role
-                            )
-                        )
+                        ability = "gag" if self.phase == "day" else NIGHT_ABILITY.get(player.role)
                         self.act(player.name, ability, target)
                     break
                 except ValueError:
@@ -416,21 +460,29 @@ class Match:
             "bots": sum(p.bot for p in self.players.values()),
         }
 
+    # Jumlah tiap role sejak awal pertandingan; publik untuk semua pemain (siapa pemegangnya tetap rahasia).
+    def composition(self):
+        counts = Counter(p.role for p in self.players.values())
+        return {role: counts[role] for role in ("hitman", "spy", "stalker", "civilian")}
+
+    # Room dengan ≥ 2 Hitman mengumumkan Hitman yang masih hidup (hanya berubah saat eksekusi Tribunal).
+    # Room 1 Hitman: None, karena warga sudah tahu dari game yang selesai atau berlanjut.
+    def hitman_remaining(self):
+        hitmen = [p for p in self.players.values() if p.role == "hitman"]
+        return sum(p.alive for p in hitmen) if len(hitmen) >= 2 else None
+
     # SNAPSHOT PRIVAT: roster hanya mengandung alive; status diam orang lain tidak pernah dikirim.
     def snapshot(self, viewer):
         player = self.players[viewer]
-        ability = (
-            "gag"
-            if self.phase == "day" and player.role == "hitman"
-            else (
-                {"hitman": "hostage", "spy": "guard", "stalker": "peek"}.get(player.role)
-                if self.phase == "night"
-                else None
-            )
-        )
+        hitman = player.role == "hitman"
+        ability = None
+        if self.phase == "day" and hitman:
+            ability = "gag"
+        elif self.phase == "night":
+            ability = NIGHT_ABILITY.get(player.role)
         can_act = bool(ability and player.alive and not self.winner)
         if ability == "gag":
-            can_act &= self.round >= player.next_gag
+            can_act &= self.round >= self.next_gag
         elif ability:
             can_act &= viewer not in self.actions and (
                 ability != "peek" or self.round >= player.next_peek
@@ -466,6 +518,8 @@ class Match:
             "events": list(self.events),
             "result": self.result(viewer),
             "preparation": self.preparation_view(viewer) if self.phase == "preparing" else None,
+            "composition": self.composition(),
+            "hitman_remaining": self.hitman_remaining(),
             "players": [
                 {
                     "name": p.name,
@@ -491,8 +545,20 @@ class Match:
                 "ability": ability,
                 "can_act": bool(can_act),
                 "action": self.actions.get(viewer) if self.phase == "night" else None,
-                "next_gag": player.next_gag,
+                # Cooldown Gag bersama hanya untuk Syndicate; warga tidak boleh tahu kapan Gag dipakai.
+                "next_gag": self.next_gag if hitman else 1,
                 "next_peek": player.next_peek,
+                "allies": self.allies(viewer),
+                # Pilihan Hostage rekan malam ini agar Syndicate bisa sepakat satu target.
+                "ally_actions": (
+                    [
+                        {"name": name, "target": action["target"]}
+                        for name, action in self.actions.items()
+                        if name != viewer and action["ability"] == "hostage"
+                    ]
+                    if hitman and self.phase == "night"
+                    else []
+                ),
                 "last_guard": (
                     player.last_guard if player.last_guard_round == self.round - 1 else None
                 ),

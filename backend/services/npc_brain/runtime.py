@@ -18,14 +18,20 @@ import logging
 import random
 import re
 import threading
+import time
 import warnings
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
+from urllib.parse import urlsplit
 
-from config.settings import BACKEND_DIR, PROJECT_DIR, settings
+from config.settings import (
+    BACKEND_DIR, JALUR_PENULIS_NPC, POLA_MODEL_OPENROUTER, PROJECT_DIR, settings,
+)  # fmt: skip
+from services.ai_runtime_service import ai_runtime
 from services.match_engine import phase_durations
+from services.npc_brain.penjelasan import jelaskan
 
 logger = logging.getLogger("shadow_heist.npc_brain")
 
@@ -35,7 +41,10 @@ warnings.filterwarnings("ignore", category=DeprecationWarning, module=r"skfuzzy(
 METODE_MODUL = {"fuzzy": "otak_fuzzy", "utility": "otak_utility", "bt": "otak_bt"}
 URUTAN_CAMPURAN = ("fuzzy", "utility", "bt")
 METODE_VALID = {"campuran", "fuzzy", "utility", "bt", "llm"}
+# "claude" = nilai lama penulis, diperlakukan seperti otomatis.
 PENULIS_VALID = {"otomatis", "claude", "templat"}
+# Jalur rantai penulis: claude_bedrock, claude_api, openrouter, tautan (link LLM sendiri).
+JALUR_PENULIS = JALUR_PENULIS_NPC
 
 # Label SVM lama → intent NLU baru; hanya dipakai bila IndoBERT tidak tersedia.
 INTENT_SVM = {
@@ -138,10 +147,25 @@ class KonfigurasiNPC:
     metode: str = "campuran"
     penulis: str = "otomatis"
     validasi: bool = True
+    # Prioritas rantai penulis; jalur yang tidak tercantum dinonaktifkan.
+    urutan_penulis: list = field(default_factory=lambda: list(JALUR_PENULIS))
+    model_openrouter: str = ""  # kosong = model OpenRouter dari notebook
+
+
+# Nilai SecretStr tanpa spasi; None jika tidak diatur.
+def _rahasia(nilai):
+    return (nilai.get_secret_value().strip() or None) if nilai else None
+
+
+# Pemuatan otak yang gagal dicoba ulang paling cepat setelah jeda ini (detik).
+JEDA_MUAT_ULANG_DETIK = 60
 
 
 # Folder model pertama yang ada: pengaturan eksplisit, artifacts backend, lalu folder skripsi.
 def folder_model(nilai, jenis) -> Path | None:
+    if nilai and not Path(nilai).is_dir():
+        # Salah ketik path di .env tidak boleh lolos diam-diam ke model lain atau NLU cadangan.
+        logger.warning("Folder model %s dari pengaturan tidak ditemukan: %s", jenis, nilai)
     nama_artifact, relatif = FOLDER_MODEL[jenis]
     kandidat = [
         nilai,
@@ -158,11 +182,21 @@ class BrainRuntime:
         self.nlg = None
         self.nlu = None
         self.penulis = None
+        self.keterangan_penulis = {}  # jalur → alasan tidak masuk rantai (mis. key belum diisi)
         self.konfigurasi = KonfigurasiNPC(
-            settings.npc_method, settings.npc_writer, settings.npc_validate_nlg
+            settings.npc_method,
+            "otomatis" if settings.npc_writer == "claude" else settings.npc_writer,
+            settings.npc_validate_nlg,
+            settings.npc_writer_order.split(",") if settings.npc_writer_order else [],
+            settings.npc_openrouter_model,
         )
         self.status = {"siap": False, "gagal": False, "detail": "Belum dimuat.", "progres": 0.0,
-                       "nlu": None, "penulis": None}  # fmt: skip
+                       "nlu": None, "sedang_cek_penulis": False}  # fmt: skip
+        self._kunci_cek = threading.Lock()  # satu cek rantai penulis pada satu waktu
+        # Cek yang sedang berjalan atau antre; selama > 0 panel menampilkan "Sedang dicek…".
+        self._cek_tertunda = 0
+        # Host link LLM dan asalnya (panel/.env) untuk ditampilkan di panel.
+        self.alamat_tautan = None
         self.pertandingan: dict[str, dict[str, OtakBot]] = {}
         self._thread = None
         self.eksekutor_keputusan = ThreadPoolExecutor(1, thread_name_prefix="otak-npc")
@@ -172,13 +206,23 @@ class BrainRuntime:
         with self.lock:
             self.status.update(nilai)
 
+    _gagal_pada = None  # waktu (monotonic) pemuatan terakhir gagal; None = belum pernah gagal
+
     # STARTUP: muat modul otak, NLU, dan penulis di thread latar agar server langsung melayani request.
     def mulai_memuat(self, analysis=None):
         with self.lock:
             # Sudah dimuat (termasuk lewat muat_sekarang) atau sedang dimuat: jangan memuat ulang,
             # karena pemuatan ulang di latar mengganti NLU dan modul yang sedang dipakai bot.
-            if self._thread is not None or self.status["siap"]:
+            if self.status["siap"] or (self._thread is not None and self._thread.is_alive()):
                 return
+            # Pemuatan yang gagal dicoba lagi (mis. saat pertandingan berikutnya disiapkan), paling
+            # cepat setelah jeda agar kegagalan permanen tidak memuat ulang di setiap persiapan.
+            if (
+                self._gagal_pada is not None
+                and time.monotonic() - self._gagal_pada < JEDA_MUAT_ULANG_DETIK
+            ):
+                return
+            self.status.update(gagal=False, detail="Memuat otak NPC…", progres=0.0)
             self._thread = threading.Thread(
                 target=self._muat, args=(analysis,), daemon=True, name="muat-otak-npc"
             )
@@ -197,16 +241,14 @@ class BrainRuntime:
             self._set(detail="Memuat NLU IndoBERT (intent dan target)…", progres=0.35)
             self.nlu = nlu if nlu is not None else self._buat_nlu(analysis)
             self._set(detail="Menyiapkan penulis kalimat…", progres=0.85)
-            self.penulis = self._buat_penulis()
-            self._set(
-                siap=True, gagal=False, progres=1.0, detail="AI siap.", nlu=self.nlu.sumber,
-                penulis=getattr(self.penulis, "jalur", None) or "templat",
-            )  # fmt: skip
-            logger.info(
-                "Otak NPC siap: NLU=%s, penulis=%s", self.nlu.sumber, self.status["penulis"]
-            )
+            # Rantai dibangun sekarang dan dicek di latar: permainan tidak menunggu jaringan, dan jalur
+            # yang belum selesai dicek tetap boleh dicoba (kegagalannya ditangani rantai).
+            self.segarkan_penulis()
+            self._set(siap=True, gagal=False, progres=1.0, detail="AI siap.", nlu=self.nlu.sumber)
+            logger.info("Otak NPC siap: NLU=%s", self.nlu.sumber)
         except Exception as error:
             logger.exception("Otak NPC gagal dimuat.")
+            self._gagal_pada = time.monotonic()
             self._set(
                 siap=False, gagal=True, galat=type(error).__name__,
                 detail="Otak NPC gagal dimuat; bot memakai aksi cadangan engine.",
@@ -226,52 +268,160 @@ class BrainRuntime:
             logger.warning("Folder IndoBERT tidak ditemukan; memakai NLU cadangan (SVM + nama).")
         return NLUBersama(NLUCadangan(analysis), "cadangan")
 
-    # Penulis Claude hanya jika konfigurasi mengizinkan dan key tersedia; kegagalan → templat.
+    # RANTAI PENULIS sesuai urutan panel. Key Claude dari environment server; key OpenRouter dan link LLM
+    # (Docker/tunnel) dari Konfigurasi AI panel. Jalur tanpa key dilewati; semua gagal → templat.
     def _buat_penulis(self):
+        self.keterangan_penulis = {}
         if self.konfigurasi.penulis == "templat":
             return None
+        config = ai_runtime.current()
+        link = (config.ollama_base_url or "").strip() or None
+        # Host dan asal link ditampilkan di panel: link bawaan .env (mis. localhost) mudah dikenali.
+        self.alamat_tautan = link and {
+            "host": urlsplit(link).netloc,
+            "sumber": "panel" if ai_runtime.diatur_panel("ollama_base_url") else ".env",
+        }
+        kunci = {
+            "claude_bedrock": _rahasia(settings.amazon_api_key),
+            "claude_api": _rahasia(settings.anthropic_api_key),
+            "openrouter": config.openrouter_api_key_value,
+            "tautan": link,
+        }
+        model = {
+            "openrouter": self.konfigurasi.model_openrouter or None,
+            "tautan": config.ollama_model,
+        }
         try:
-            if settings.anthropic_api_key:
-                return self.nlg.PenulisClaude(
-                    "claude_api", settings.anthropic_api_key.get_secret_value().strip()
-                )
-            if settings.amazon_api_key:
-                self.nlg.REGION_BEDROCK = settings.npc_bedrock_region
-                return self.nlg.PenulisClaude(
-                    "claude_bedrock", settings.amazon_api_key.get_secret_value().strip()
-                )
+            rantai, self.keterangan_penulis = self.nlg.buat_rantai(
+                self.konfigurasi.urutan_penulis, kunci, model,
+                region=settings.npc_bedrock_region, token_tautan=_rahasia(config.ollama_tunnel_token),
+            )  # fmt: skip
         except Exception:
-            logger.exception("Penulis Claude gagal disiapkan; memakai templat.")
-        return None
+            logger.exception("Rantai penulis gagal disiapkan; memakai templat.")
+            return None
+        return rantai
 
-    # PANEL: ubah metode/penulis/validasi saat server berjalan (berlaku untuk pertandingan berikutnya).
-    def atur(self, metode=None, penulis=None, validasi=None):
+    # Bangun ulang rantai (key/link/urutan terbaru) lalu cek semua jalurnya. latar=False dipakai tombol
+    # "Cek ulang" di panel agar hasilnya langsung terlihat; selain itu cek berjalan di thread latar.
+    def segarkan_penulis(self, latar=True):
         with self.lock:
-            if metode is not None:
-                if metode not in METODE_VALID:
-                    raise ValueError("Metode NPC tidak dikenal.")
-                self.konfigurasi.metode = metode
-            if validasi is not None:
-                self.konfigurasi.validasi = bool(validasi)
+            if self.nlg is None:
+                return self.ringkasan()
+            lama, self.penulis = self.penulis, self._buat_penulis()
+            penulis = self.penulis
             if penulis is not None:
-                if penulis not in PENULIS_VALID:
-                    raise ValueError("Penulis kalimat tidak dikenal.")
-                self.konfigurasi.penulis = penulis
-                if self.nlg is not None:
-                    self.penulis = self._buat_penulis()
-                    self.status["penulis"] = getattr(self.penulis, "jalur", None) or "templat"
-            return self.ringkasan()
+                # Dinaikkan sebelum thread cek mulai agar ringkasan langsung "sedang dicek".
+                self._cek_tertunda += 1
+                self.status["sedang_cek_penulis"] = True
+        if lama is not None:
+            # Koneksi rantai lama dilepas setelah kalimat yang mungkin sedang ditulis selesai.
+            penutup = threading.Timer(2 * self.nlg.BATAS_WAKTU_DETIK, lama.tutup)
+            penutup.daemon = True
+            penutup.start()
+        if penulis is not None:
+            if latar:
+                threading.Thread(
+                    target=self._cek_penulis, args=(penulis,), daemon=True, name="cek-penulis"
+                ).start()
+            else:
+                self._cek_penulis(penulis)
+        return self.ringkasan()
+
+    # Claude dan OpenRouter: satu pesan pendek (key, izin model, saldo); link: daftar model.
+    # Hanya status yang dicatat, tanpa key. Penghitung dinaikkan pemanggil (segarkan_penulis).
+    def _cek_penulis(self, penulis):
+        try:
+            with self._kunci_cek:
+                hasil = penulis.cek()
+                logger.info("Cek penulis: %s", "; ".join(f"{j}={h}" for j, _, h in hasil))
+        except Exception:
+            logger.exception("Cek rantai penulis gagal.")
+        finally:
+            with self.lock:
+                self._cek_tertunda -= 1
+                self.status["sedang_cek_penulis"] = self._cek_tertunda > 0
+
+    # PANEL: ubah metode/penulis/validasi/rantai saat server berjalan. Metode berlaku untuk pertandingan
+    # berikutnya; rantai penulis langsung dipakai kalimat berikutnya. Semua nilai divalidasi dulu (atomik).
+    def atur(
+        self, metode=None, penulis=None, validasi=None, urutan_penulis=None, model_openrouter=None
+    ):
+        if metode is not None and metode not in METODE_VALID:
+            raise ValueError("Metode NPC tidak dikenal.")
+        if penulis is not None and penulis not in PENULIS_VALID:
+            raise ValueError("Penulis kalimat tidak dikenal.")
+        if urutan_penulis is not None:
+            urutan_penulis = list(urutan_penulis)
+            if not set(urutan_penulis) <= set(JALUR_PENULIS) or len(set(urutan_penulis)) != len(
+                urutan_penulis
+            ):
+                raise ValueError("Urutan penulis berisi jalur yang tidak dikenal atau ganda.")
+        if model_openrouter is not None:
+            model_openrouter = model_openrouter.strip()
+            if model_openrouter and not POLA_MODEL_OPENROUTER.fullmatch(model_openrouter):
+                raise ValueError("Model OpenRouter harus berbentuk penyedia/model.")
+        with self.lock:
+            k = self.konfigurasi
+            sebelum = (k.penulis, list(k.urutan_penulis), k.model_openrouter)
+            if metode is not None:
+                k.metode = metode
+            if validasi is not None:
+                k.validasi = bool(validasi)
+            if penulis is not None:
+                k.penulis = "otomatis" if penulis == "claude" else penulis
+            if urutan_penulis is not None:
+                k.urutan_penulis = urutan_penulis
+            if model_openrouter is not None:
+                k.model_openrouter = model_openrouter
+            rantai_berubah = sebelum != (k.penulis, list(k.urutan_penulis), k.model_openrouter)
+        if rantai_berubah:
+            self.segarkan_penulis()
+        return self.ringkasan()
 
     def ringkasan(self):
         with self.lock:
+            penulis = self.penulis if self.konfigurasi.penulis != "templat" else None
+            # Jalur yang menulis kalimat berikutnya: yang pertama siap (tidak ditolak dan tidak istirahat).
+            berikut = penulis.terdepan() if penulis else None
             return {
-                **{k: v for k, v in self.status.items()},
+                **self.status,
                 "metode": self.konfigurasi.metode,
                 "penulis_diminta": self.konfigurasi.penulis,
                 "validasi": self.konfigurasi.validasi,
-                "penulis_aktif": bool(self.penulis and getattr(self.penulis, "aktif", False)),
+                "penulis_aktif": berikut is not None,
+                "penulis": berikut.jalur if berikut else "templat",
+                "model_penulis": berikut.model if berikut else None,
+                "urutan_penulis": list(self.konfigurasi.urutan_penulis),
+                "model_openrouter": self.konfigurasi.model_openrouter,
+                "rantai_penulis": self._status_rantai(penulis, berikut),
                 "pertandingan_aktif": len(self.pertandingan),
             }
+
+    # Status tiap jalur untuk panel: jalur aktif sesuai prioritas, lalu yang dinonaktifkan. Tanpa nilai key.
+    def _status_rantai(self, penulis, berikut):
+        anggota = {p.jalur: p for p in (penulis.daftar if penulis else [])}
+        urutan = self.konfigurasi.urutan_penulis
+        baris = []
+        for jalur in urutan + [j for j in JALUR_PENULIS if j not in urutan]:
+            p = anggota.get(jalur)
+            if self.konfigurasi.penulis == "templat" or jalur not in urutan:
+                keadaan, status = "nonaktif", "mode templat" if jalur in urutan else "dinonaktifkan"
+            elif p is None:
+                keadaan, status = "tidak_ada", self.keterangan_penulis.get(jalur, "belum dimuat")
+            elif not p.aktif:
+                keadaan, status = "ditolak", p.status
+            elif not p.siap():
+                keadaan, status = "istirahat", p.status
+            else:
+                keadaan, status = ("dipakai" if p is berikut else "siap"), p.status
+            # Penghitung panggilan/token berlaku sejak rantai terakhir dibangun (token cek ikut dihitung).
+            baris.append({
+                "jalur": jalur, "keadaan": keadaan, "status": status,
+                "model": p.model if p else None, "panggilan": p.panggilan if p else 0,
+                "token_masuk": p.token_masuk if p else 0, "token_keluar": p.token_keluar if p else 0,
+                "alamat": self.alamat_tautan if jalur == "tautan" else None,
+            })  # fmt: skip
+        return baris
 
     # Metode per bot: satu metode untuk semua, atau campuran bergiliran (urutan diacak per pertandingan).
     def _bagi_metode(self, match_id, bots):
@@ -314,10 +464,14 @@ class BrainRuntime:
                 del self.pertandingan[match_id]
 
     # KEPUTUSAN (thread otak): sinkron snapshot → anotasi NLU → putuskan() metode bot.
+    # Penjelasan panel checker dihitung di thread ini juga (ingatan bot hanya diubah thread ini), hanya
+    # untuk langkah yang bisa menjadi jejak: ada vote/aksi atau rencana chat. Langkah diam tidak dicatat.
     def langkah(self, bot: OtakBot, snapshot, sekarang):
         modul = self.modul[bot.metode]
         view = bot.ingatan.sinkron_snapshot(snapshot, sekarang, self.nlu)
         hasil = modul.putuskan(bot.ingatan, view)
+        if hasil["nlg"] is not None or hasil["npc_decision"]["action"] != "wait":
+            hasil["penjelasan"] = jelaskan(bot, modul, view, hasil)
         chat = sorted(bot.ingatan.chat, key=lambda c: c["waktu"])[-8:]
         konteks = {
             "roster": [p["nama"] for p in view["pemain"]],
@@ -330,9 +484,11 @@ class BrainRuntime:
         return view, hasil, konteks
 
     # NLG (thread penulis): rencana → kalimat, dengan pengaman aturan dan validasi IndoBERT.
-    def tulis(self, bot: OtakBot, payload, konteks):
+    # pakai_llm=False: hanya templat, dipakai sebagai cadangan cepat saat penulis LLM melewati batas waktu.
+    def tulis(self, bot: OtakBot, payload, konteks, pakai_llm=True):
         with self.lock:
-            penulis = self.penulis if self.konfigurasi.penulis != "templat" else None
+            pakai = pakai_llm and self.konfigurasi.penulis != "templat"
+            penulis = self.penulis if pakai else None
             nlu = self.nlu if self.konfigurasi.validasi else None
         # Hindari kalimat sendiri yang lalu dan chat terbaru di room (bot lain tidak dikembari).
         hindari = tuple(bot.riwayat[-12:]) + tuple(c["teks"] for c in konteks["chat_terbaru"])
@@ -349,6 +505,8 @@ class BrainRuntime:
     def tutup(self):
         self.eksekutor_keputusan.shutdown(wait=False, cancel_futures=True)
         self.eksekutor_nlg.shutdown(wait=False, cancel_futures=True)
+        if self.penulis is not None:
+            self.penulis.tutup()
 
 
 brain_runtime = BrainRuntime()
