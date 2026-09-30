@@ -69,7 +69,7 @@ backend/artifacts/indobert/target/   ← models/target_classifier/target_classif
 
 Folder target harus memuat `pair_builder.json` dan `ambang_target.json` hasil `nlu_target.ipynb`. Pada mesin pengembang yang menyimpan repo skripsi di `a_skripsi/training/prethesis`, backend juga menemukan model di sana secara otomatis. Tanpa model, bot tetap bermain dengan NLU cadangan (SVM + nama yang disebut) yang kualitasnya lebih rendah; status NLU terlihat di panel menu **Otak NPC**.
 
-Pengaturan di `.env` (lihat `.env.example`): `NPC_METHOD` (`campuran`, `fuzzy`, `utility`, `bt`, atau `llm` untuk mode lama), `NPC_WRITER` (`otomatis`, `claude`, `templat`), dan opsional `ANTHROPIC_API_KEY` atau `AMAZON_API_KEY` (Bedrock) untuk penulis kalimat Claude. Tanpa key, bot memakai templat bervariasi yang tetap divalidasi IndoBERT. Metode dan penulis juga bisa diubah dari panel.
+Pengaturan di `.env` (lihat `.env.example`): `NPC_METHOD` (`campuran`, `fuzzy`, `utility`, `bt`, atau `llm` untuk mode lama), `NPC_WRITER` (`otomatis` atau `templat`), `NPC_WRITER_ORDER` (prioritas rantai penulis: `claude_bedrock`, `claude_api`, `openrouter`, `tautan`), `NPC_OPENROUTER_MODEL`, dan opsional `AMAZON_API_KEY` (Bedrock) atau `ANTHROPIC_API_KEY`. Key OpenRouter dan link LLM sendiri (Docker/tunnel) diambil dari Konfigurasi AI panel. Jalur yang ditolak dilewati otomatis; tanpa jalur yang hidup, bot memakai templat bervariasi yang tetap divalidasi IndoBERT. Metode, urutan rantai, dan model OpenRouter juga bisa diubah dari panel Otak NPC (tombol **Cek ulang penulis** memeriksa semua jalur).
 
 Setelah mengubah logika bot di notebook, jalankan ulang notebook sampai skenario/pengujiannya lulus, lalu ekspor ulang:
 
@@ -80,7 +80,9 @@ python scripts/ekspor_otak_npc.py --notebook-dir ../../training/prethesis/ai_2_d
 
 Tes `test_npc_brain` gagal bila hasil ekspor sudah tidak sama dengan notebook.
 
-**Migrasi database V7** (`backend/migrations/V7__survey_and_npc.sql`; salinan Azure `deployment/mysql/004_survey_and_npc.sql`) menambah tabel survei dan `match_bots`. Terapkan manual pada database lama.
+**Migrasi database V7** (`backend/migrations/V7__survey_and_npc.sql`; salinan Azure `deployment/mysql/004_survey_and_npc.sql`) menambah tabel survei dan `match_bots`. Terapkan manual pada database lama; skripnya aman dijalankan ulang (`IF NOT EXISTS` dan `INSERT IGNORE`).
+
+CSV jawaban survei (panel → Survei) memakai UTF-8 dengan BOM dan menyimpan jawaban persis seperti diketik pemain, sama seperti CSV riwayat chat. Saat membuka di spreadsheet, impor kolom teks sebagai teks agar jawaban yang diawali `=`, `+`, `-`, atau `@` tidak dievaluasi sebagai formula.
 
 ## Menjalankan aplikasi
 
@@ -352,6 +354,8 @@ Endpoint checker publik lama `GET /api/rooms/{code}/checker` sudah ditutup (HTTP
 Trace/prompt hanya tersedia lewat `/panel` dengan sesi administrator. Data ini dapat
 berisi role dan intel privat NPC, sehingga administrator harus dipisahkan dari peserta
 eksperimen. Trace menunjukkan input/output aplikasi, bukan chain-of-thought internal model.
+Jejak otak bot memuat `penjelasan` (role bot, kecurigaan, penalaran metode); hanya endpoint
+panel yang mengembalikannya, sedangkan daftar trace development `/api/admin/...` membuangnya.
 Silence fuzzy masih konstan 20%, bukan pengukuran aktivitas pemain.
 
 Compose ini untuk development lokal, bukan deployment publik siap pakai. Ganti kredensial default dan akun demo sebelum deployment; batasi akses port database/phpMyAdmin, serta siapkan HTTPS dan pengamanan deployment. Jangan commit `.env`, API key, file upload pengguna, atau artifact privat. Folder referensi desain `communicationfolder/` juga diabaikan Git.

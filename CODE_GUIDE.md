@@ -61,6 +61,11 @@ file saja tidak berarti route tersebut dibuka pada aplikasi utama.
    diarahkan ke login. Kegagalan jaringan ditampilkan agar dapat dicoba ulang.
 7. **Panel:** sesi administrator terpisah dari pemain. Panel membaca arsip dan
    menyimpan konfigurasi AI; nilai API key tidak dikirim kembali ke browser.
+   Checker per room menampilkan penjelasan setiap langkah bot yang dibuat
+   `services/npc_brain/penjelasan.py` di `BrainRuntime.langkah` (identitas, parameter,
+   penalaran fuzzy/utility/BT, keputusan) dan dilengkapi hasil engine/NLG di
+   `NPCService._trace`. Daftar jejak hanya membawa `ringkas`; penjelasan lengkap
+   diambil per jejak lewat `GET /api/panel/checker/{code}/jejak/{id}`.
 
 ## Profil dan manajemen akun
 

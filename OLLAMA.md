@@ -48,6 +48,23 @@ database masih diperlukan: opsi `-v` ikut menghapus named volume proyek.
   sebagian RAM/CPU, sehingga kecepatan perlu diuji sesuai kapasitas mesin.
 
 Ollama menyediakan inference, bukan pipeline training/fine-tuning.
+
+## Link LLM untuk penulis kalimat NPC
+
+Rantai penulis kalimat NPC (panel **Otak NPC**, jalur "LLM sendiri lewat link") memakai URL
+tunnel yang sama dengan menu Konfigurasi AI:
+
+1. Jalankan Ollama (lihat di atas) dan pastikan modelnya sudah diunduh.
+2. Buka tunnel HTTPS ke port host, misalnya
+   `cloudflared tunnel --url http://localhost:11435 --http-host-header localhost:11434`.
+   Jika link menjawab 403, header host inilah yang biasanya kurang (Ollama menolak host asing).
+3. Masukkan URL tunnel di panel → Konfigurasi AI (simpan), lalu klik **Cek ulang penulis** di
+   menu Otak NPC. Atur prioritas jalur ini di daftar rantai (▲▼) bila ingin dipakai lebih dulu.
+
+Backend mengenali Ollama (`/api/tags`, `/api/chat`) maupun server kompatibel OpenAI
+(`/v1/models`, `/v1/chat/completions`). Jika model yang dipilih tidak ada di link, dipakai model
+sekeluarga (mis. `qwen3:8b` untuk `qwen3:14b`) atau model pertama yang tersedia; panel
+menampilkan model yang benar-benar dipakai. Bearer token tunnel memakai `OLLAMA_TUNNEL_TOKEN`.
 ## Memilih provider chat backend
 
 Isi file .env di root:

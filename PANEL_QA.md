@@ -9,6 +9,22 @@
 - Request bersamaan memakai konteks diagnostik terpisah. Respons UI dari sesi lama diabaikan. Hasil tes sebelumnya dibersihkan setelah konfigurasi berubah.
 - Respons validasi endpoint panel/user tidak mengembalikan input password atau konteks input. Logout gagal tidak dinyatakan berhasil.
 
+## Checker room: penjelasan keputusan bot (30 September 2026)
+
+Menu **Checker** sekarang menjawab "bot ini siapa, membaca apa, menalar bagaimana, lalu memutuskan apa":
+
+- **Ringkasan room**: status (Live/Selesai/Lobby/Arsip), ronde dan fase, komposisi role, jumlah manusia, lalu tabel bot (role, metode, persona, status, keputusan terakhir). Klik nama bot untuk memfilter linimasa; filter juga ada di pilihan **Tampilkan**.
+- **Linimasa jejak**: setiap jejak otak menampilkan bot, metode, role, ringkasan keputusan (chat/vote/aksi), ronde/fase, dan tanda bila ditolak engine atau chat ditunda lantai bicara. Jejak lain (chat manusia, mode LLM) memakai laporan pipeline lama.
+- **Kartu keputusan** bertab:
+  - **Keputusan**: rencana chat/vote/aksi, yang diterapkan ke engine, kalimat akhir, ringkasan penalaran, dan alasan.
+  - **Parameter**: 5 tersangka teratas beserta fitur bukti dan nilai antara metode, siapa yang menuduh/membela, tabel khusus role (ancaman bagi Hitman, kebutuhan Guard bagi Spy), konteks permainan, dan pengetahuan pasti bot.
+  - **Penalaran**: Fuzzy (derajat keanggotaan rendah/sedang/tinggi, aturan yang menyala dan kekuatannya, keluaran centroid, ambang, hierarki kecurigaan), Utility AI (pertimbangan, bobot, utilitas per kandidat, komponen noisy-OR), atau Behavior Tree (jalur syarat/aksi yang dievaluasi dengan status ✓/✗, bendera merah dan poin).
+  - **NLG**: sumber kalimat (LLM/templat/cadangan), jalur penulis LLM, persona, hasil validasi aturan dan IndoBERT (intent/target terbaca), pelanggaran, dan percobaan.
+  - **Teknis**: laporan dan JSON lengkap jejak.
+- **Legenda** "Arti parameter dan cara membaca tiap metode" menjelaskan setiap kolom; judul kolom bergaris titik punya keterangan saat disorot.
+
+Data penjelasan dibuat `services/npc_brain/penjelasan.py` di thread keputusan (`BrainRuntime.langkah`) dari hasil `putuskan()` notebook, jadi angka yang tampil adalah angka yang benar-benar dipakai bot. Ukurannya dibatasi ≤ 12 KB per jejak (rata-rata 3,6–5 KB pada simulasi 6–10 bot); bagian yang gagal dibuat diganti catatan tanpa mengganggu permainan. Daftar jejak (`GET /api/panel/checker/{code}`) hanya membawa `ringkas` dan ringkasan room; penjelasan lengkap diambil saat jejak dibuka (`GET /api/panel/checker/{code}/jejak/{id}`) dan disimpan di cache browser, sehingga auto-refresh 5 detik tetap ringan. Penjelasan memuat role bot, sehingga hanya endpoint panel yang mengembalikannya; daftar jejak development `/api/admin/rooms/{code}/traces` membuangnya.
+
 ## Menjalankan tes dari panel
 
 Login `/panel`, buka **Konfigurasi AI**, simpan provider yang dipilih, lalu gunakan **Uji skenario game**. Pilih diskusi, Tribunal, atau malam; masukkan teks; tekan **Jalankan pengujian**.
