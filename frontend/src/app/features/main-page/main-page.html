@@ -1,78 +1,164 @@
-<main class="operation-shell">
-  <div class="operation-content">
-    <header class="operation-header">
-      <a class="operation-brand" routerLink="/main"><span>♧</span> SILENT TERROR</a>
+<main class="home-desk">
+  <div class="home-desk__content">
+    <header class="home-header">
+      <a class="home-brand" routerLink="/main" aria-label="Silent Terror, halaman utama">
+        <span>Silent <i aria-hidden="true">◆</i> Terror</span>
+        <small>PRIVATE CASE FILES</small>
+      </a>
       <app-profile-menu [username]="username" (profileChanged)="username = $event.username" />
     </header>
-    <section class="table-menu" aria-label="Menu permainan">
-      <article class="start-card">
-        <p class="operation-label">TAKE YOUR SEAT</p>
-        <h1>Siapa yang<br />tiba-tiba diam?</h1>
-        <p>
-          Hitman bersembunyi di antara warga. Amati percakapan, pertanyakan alibi, dan jaga
-          identitasmu.
+
+    <section class="home-hero" aria-labelledby="mission-title">
+      <img
+        class="home-decoration home-decoration--map"
+        src="/assets/decorations/maps/world-map-open-scroll.png"
+        alt=""
+        aria-hidden="true"
+        loading="lazy"
+        decoding="async"
+      />
+      <img
+        class="home-decoration home-decoration--books"
+        src="/assets/decorations/objects/detective-book-stack.png"
+        alt=""
+        aria-hidden="true"
+        loading="lazy"
+        decoding="async"
+      />
+
+      <article class="mission-file">
+        <p class="case-label">CASE FILE / 001</p>
+        <p class="mission-greeting">SELAMAT DATANG, {{ username }}</p>
+        <h1 id="mission-title">Temukan Hitman sebelum meja kehabisan suara.</h1>
+        <p class="mission-copy">
+          Di antara 4–10 peserta, satu Hitman menyembunyikan identitasnya. Baca alibi, lindungi
+          warga, dan bawa tersangka ke Tribunal.
         </p>
-        <button class="operation-primary" routerLink="/lobby">ENTER TRIBUNAL <span>↗</span></button>
-        <small>Buat ruangan atau gabung bersama teman.</small>
+
+        <dl class="mission-facts" aria-label="Ringkasan permainan">
+          <div>
+            <dt>PARTICIPANTS</dt>
+            <dd>4–10 pemain</dd>
+          </div>
+          <div>
+            <dt>OBJECTIVE</dt>
+            <dd>Temukan Hitman</dd>
+          </div>
+          <div>
+            <dt>THE RULE</dt>
+            <dd>Diam bukan bukti</dd>
+          </div>
+        </dl>
+
+        <div class="mission-actions">
+          <a class="home-primary" routerLink="/lobby"
+            ><span>MASUK LOBBY</span><b aria-hidden="true">↗</b></a
+          >
+          <a class="home-secondary" href="#field-guide"
+            >Lihat cara bermain <span aria-hidden="true">↓</span></a
+          >
+        </div>
+        <small class="mission-footnote">Buat ruangan baru atau gabung dengan kode teman.</small>
       </article>
-      <article class="character-card">
-        <p class="operation-label">MEET THE ROLES</p>
-        <h2>SPY</h2>
-        <img src="characters/spy.svg" alt="Karakter Spy berkacamata hitam dan berbaju biru" />
-        <b>PROTECT THE CIVILIANS.</b>
-        <p>☾ GUARD</p>
-      </article>
-      <article class="dossier rules-card">
-        <div class="dossier-top"><span>ZERO ECONOMY</span><span>RULES / 01</span></div>
-        <h2>Silent<br />Terror</h2>
-        <p class="operation-copy">
-          Tidak ada uang, item, atau tebusan. Hanya percakapan, kecurigaan, dan warga yang perlahan
-          kehilangan suara.
+
+      <aside class="suspect-deck" aria-label="Tiga kartu role permainan">
+        <div class="suspect-deck__heading">
+          <span>THE SUSPECT DECK</span>
+          <b>IDENTITAS DISEMBUNYIKAN</b>
+        </div>
+        <div class="role-deck" aria-hidden="true">
+          @for (card of roleDeck; track card.id) {
+            <div class="role-deck__card role-deck__card--{{ card.id }}">
+              <app-role-reveal-card [role]="card.id" [skinId]="card.skinId" />
+            </div>
+          }
+        </div>
+        <p class="suspect-deck__caption">
+          Role dibagikan acak ketika host memulai permainan. Tidak ada yang tahu siapa yang bermain
+          untuk kubu mana.
         </p>
-        <ol>
-          <li><b>DAY</b><span>Diskusi. Waspadai Gag Order.</span></li>
-          <li><b>NIGHT</b><span>Hostage, Guard, dan Peek.</span></li>
-          <li><b>TRIBUNAL</b><span>Voting menentukan eksekusi.</span></li>
-        </ol>
-        <p class="rules-note">
-          Hostage kehilangan chat dan hak voting, bukan mati. Sistem tidak pernah mengumumkan
-          targetnya: diam bisa berarti disandera, dibungkam, atau sengaja tidak membalas.
-        </p>
-        <p class="rules-note">
-          <b>Kubu warga menang</b> jika Hitman dieksekusi. <b>Hitman menang</b> ketika warga hidup
-          yang masih punya hak voting tersisa paling banyak satu. Gag hanya membatasi chat. Tidak
-          ada batas ronde; permainan berlanjut sampai salah satu kubu menang.
-        </p>
-      </article>
+      </aside>
     </section>
-    <section class="field-notes" aria-label="Role permainan">
-      <article>
-        <span>HITMAN / PENYUSUP</span>
-        <h2>Hostage & Gag Order</h2>
-        <p>Sandera satu korban saat malam. Bungkam satu pemain saat siang; cooldown satu ronde.</p>
-      </article>
-      <article>
-        <span>SPY / PELINDUNG</span>
-        <h2>Guard</h2>
-        <p>
-          Lindungi satu warga dari Hostage. Tidak boleh mengawal target sama dua malam
-          berturut-turut.
-        </p>
-      </article>
-      <article>
-        <span>STALKER / INTEL</span>
-        <h2>Peek</h2>
-        <p>Intip identitas asli satu pemain saat malam. Bisa digunakan sekali setiap dua ronde.</p>
-      </article>
-      <article>
-        <span>CIVILIAN / WARGA</span>
-        <h2>Observe</h2>
-        <p>Tanpa skill malam. Baca chat, uji alibi, dan gunakan hak voting dengan hati-hati.</p>
-      </article>
+
+    <section class="game-brief" aria-labelledby="moves-title">
+      <header class="section-heading">
+        <p class="case-label">THE THREE MOVES</p>
+        <h2 id="moves-title">Satu meja. Tiga fase. Tidak ada tempat aman.</h2>
+      </header>
+      <ol class="phase-list">
+        <li>
+          <span>01</span>
+          <div>
+            <b>SIANG</b>
+            <p>Diskusikan alibi dan cari kejanggalan. Hitman dapat memakai Gag Order.</p>
+          </div>
+        </li>
+        <li>
+          <span>02</span>
+          <div>
+            <b>MALAM</b>
+            <p>Aksi berlangsung secara rahasia: Hostage, Guard, dan Peek.</p>
+          </div>
+        </li>
+        <li>
+          <span>03</span>
+          <div>
+            <b>TRIBUNAL</b>
+            <p>Pemain yang masih bersuara memilih tersangka untuk dieksekusi.</p>
+          </div>
+        </li>
+      </ol>
+      <p class="game-brief__note">
+        Tidak ada batas ronde. Permainan berlanjut sampai salah satu kubu menang.
+      </p>
     </section>
-    <footer class="operation-footer">
-      <span>DIAM BISA BERARTI APA SAJA.</span
-      ><span>4–10 peserta · Kemenangan ditentukan oleh kubu · Pilihan 6 / 8 / 12 ronde.</span>
+
+    <section id="field-guide" class="field-guide" aria-labelledby="roles-title">
+      <header class="section-heading section-heading--center">
+        <p class="case-label">KNOWN ROLES</p>
+        <h2 id="roles-title">Setiap orang punya rahasia.</h2>
+        <p>
+          Skill memberi petunjuk, bukan kepastian. Perhatikan siapa yang bicara—dan siapa yang
+          memilih diam.
+        </p>
+      </header>
+
+      <div class="role-notes">
+        <article class="role-note role-note--hitman">
+          <span>01 / SYNDICATE</span>
+          <h3>Hitman</h3>
+          <p>Sandera satu pemain pada malam hari. Gag Order membungkam chat pada siang hari.</p>
+        </article>
+        <article class="role-note role-note--spy">
+          <span>02 / WARGA</span>
+          <h3>Spy</h3>
+          <p>Guard satu pemain, termasuk diri sendiri, untuk mencegah Hostage malam itu.</p>
+        </article>
+        <article class="role-note role-note--stalker">
+          <span>03 / WARGA</span>
+          <h3>Stalker</h3>
+          <p>Peek role asli satu pemain secara privat. Skill tersedia sekali setiap dua ronde.</p>
+        </article>
+        <article class="role-note role-note--civilian">
+          <span>04 / WARGA</span>
+          <h3>Civilian</h3>
+          <p>
+            Tanpa aksi malam. Amati percakapan, uji alibi, lalu gunakan suaramu dengan hati-hati.
+          </p>
+        </article>
+      </div>
+
+      <aside class="silence-note">
+        <b>DIAM BUKAN BUKTI.</b>
+        <p>
+          Hostage tetap hidup tetapi kehilangan chat dan voting. Target aksi malam tidak diumumkan.
+        </p>
+      </aside>
+    </section>
+
+    <footer class="home-footer">
+      <span>SILENT TERROR · SOCIAL DEDUCTION PARTY GAME</span>
+      <a routerLink="/lobby">SIAP MEMBUKA KASUS? <b aria-hidden="true">↗</b></a>
     </footer>
   </div>
 </main>
