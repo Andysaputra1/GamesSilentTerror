@@ -1,0 +1,42 @@
+.card-container {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1080 / 1350;
+}
+
+/* All layers stack with position absolute */
+.card-frame,
+.portrait-window,
+.skin-img,
+.prop-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Card frame renders at full size */
+.card-frame {
+  z-index: 1;
+}
+
+/* Portrait window is inset ~15% from edges to frame the skin+prop */
+.portrait-window {
+  z-index: 2;
+  top: 15%;
+  left: 15%;
+  width: 70%;
+  height: 70%;
+}
+
+/* Skin fills the portrait window */
+.skin-img {
+  object-fit: contain;
+}
+
+/* Prop overlays skin at same position */
+.prop-overlay {
+  z-index: 3;
+  object-fit: contain;
+}
