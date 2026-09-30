@@ -8,12 +8,14 @@ from unittest.mock import AsyncMock, Mock, patch
 from services.npc_service import NPCDecision, NPCService, npc_context
 from services.npc_service import request_decision
 from config.settings import Settings
+from services.npc_brain.runtime import BrainRuntime
 from services.persistence_service import PersistenceError
 from services.room_service import RoomService
 
 
 class NPCTests(unittest.IsolatedAsyncioTestCase):
     # Enam peserta dan role tetap membuat aturan serta batas informasi dapat diperiksa deterministik.
+    # File ini menguji mode pembanding "llm"; otak notebook diuji di test_npc_brain.py.
     def setUp(self):
         self.rooms = RoomService()
         self.room = self.rooms.create("human")
@@ -25,8 +27,12 @@ class NPCTests(unittest.IsolatedAsyncioTestCase):
         self.match.players["NOX"].role = "hitman"
         self.match.players["ECHO"].role = "spy"
         self.match.players["VEIL"].role = "stalker"
+        self.runtime = BrainRuntime()
+        self.runtime.konfigurasi.metode = "llm"
+        self.runtime.siapkan_pertandingan(self.match, self.room.code)
+        self.match.begin()
         self.sio = Mock(emit=AsyncMock())
-        self.service = NPCService(self.sio)
+        self.service = NPCService(self.sio, runtime=self.runtime)
         self.rooms_patch = patch("services.npc_service.room_service", self.rooms)
         self.rooms_patch.start()
         self.persistence_patch = patch("services.npc_service.PersistenceService")
@@ -34,6 +40,7 @@ class NPCTests(unittest.IsolatedAsyncioTestCase):
 
     async def asyncTearDown(self):
         await self.service.close()
+        self.runtime.tutup()
         self.persistence_patch.stop()
         self.rooms_patch.stop()
 
@@ -77,7 +84,7 @@ class NPCTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_npc_chat_uses_authorized_broadcast_when_configured(self):
         broadcast = AsyncMock()
-        self.service = NPCService(self.sio, broadcast=broadcast)
+        self.service = NPCService(self.sio, broadcast=broadcast, runtime=self.runtime)
         await self.turn("NOX", NPCDecision(message="Siapa yang punya alibi?"))
         broadcast.assert_awaited_once_with(
             "receive_chat", self.match.messages[0], to=self.room.code

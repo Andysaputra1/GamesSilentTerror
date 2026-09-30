@@ -2,6 +2,9 @@ FROM python:3.11-slim
 WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 COPY requirements.txt ./requirements.txt
+# PyTorch versi CPU untuk IndoBERT (VM tanpa GPU): wheel bawaan PyPI membawa CUDA berukuran beberapa GB.
+# Versinya sama dengan requirements.txt agar langkah berikutnya tidak menggantinya.
+RUN pip install --no-cache-dir torch==2.14.0 --index-url https://download.pytorch.org/whl/cpu
 RUN pip install --no-cache-dir -r requirements.txt && useradd --create-home --uid 10001 appuser
 COPY --chown=appuser:appuser . .
 USER appuser

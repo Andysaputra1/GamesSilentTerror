@@ -1,0 +1,30 @@
+[
+  {
+    "modul": "otak_fuzzy",
+    "notebook": "npc_fuzzy.ipynb",
+    "sel": 20,
+    "blok": 148,
+    "sidik": "bcff2ceedcd61f63"
+  },
+  {
+    "modul": "otak_utility",
+    "notebook": "npc_utility_ai.ipynb",
+    "sel": 18,
+    "blok": 134,
+    "sidik": "f39fd68d636e3d45"
+  },
+  {
+    "modul": "otak_bt",
+    "notebook": "npc_behavior_tree.ipynb",
+    "sel": 20,
+    "blok": 160,
+    "sidik": "139b214926038e34"
+  },
+  {
+    "modul": "nlg",
+    "notebook": "npc_nlg.ipynb",
+    "sel": 11,
+    "blok": 96,
+    "sidik": "e63d135d7cda8f8a"
+  }
+]

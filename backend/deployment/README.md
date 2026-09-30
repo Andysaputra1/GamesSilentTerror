@@ -78,7 +78,7 @@ Untuk melihat arsip, buka `/panel` pada origin backend melalui HTTPS dan login
 sebagai administrator. `/history` dan `/admin` mengarah ke panel baru.
 Semua API panel memakai sesi administrator terpisah dari akun pemain.
 
-Database baru menjalankan 001_schema.sql, 002_chat_history.sql, dan 003_admin_panel.sql otomatis.
+Database baru menjalankan 001_schema.sql sampai 005_skin_preference.sql otomatis.
 Database/volume lama: backup dulu, hentikan backend sementara, lalu jalankan
 `backend/migrations/V5__chat_history.sql` **sekali saja** pada database shadow_heist.
 Contoh dari root repository di VM untuk service MySQL Azure:
@@ -99,6 +99,16 @@ transaksi yang dapat dibatalkan bersama INSERT penanda migrasi.
 Pesan lama tetap ada dan ditandai `legacy`; identitas bot/ronde lama tidak direka ulang.
 Balasan AI lama tetap tersimpan di ai_analyses dan belum dimasukkan ke tabel percakapan,
 karena kode lama tidak mencatat apakah respons benar-benar dipublikasikan.
+
+## Survei, NPC, dan avatar
+
+Database/volume Azure yang sudah ada tidak menjalankan file init baru secara otomatis.
+Backup dulu, lalu periksa `schema_migrations`. Jika `V7__survey_and_npc` belum ada,
+jalankan `SOURCE /docker-entrypoint-initdb.d/004_survey_and_npc.sql;`. Jika
+`V7__add_skin_preference` belum ada atau `SHOW COLUMNS FROM user_accounts LIKE 'skin_id';`
+tidak mengembalikan kolom, jalankan
+`SOURCE /docker-entrypoint-initdb.d/005_skin_preference.sql;` sekali sebelum backend
+versi avatar diaktifkan. Jangan menghapus volume untuk menjalankan migrasi.
 
 `schema_migrations` menyimpan versi struktur yang sudah diterapkan dan waktunya.
 Saat ini project memakai SQL manual, belum ada migration runner otomatis; tabel ini
@@ -146,7 +156,9 @@ Lokal: Qwen3 `qwen3:14b`, masukkan URL dasar tunnel HTTPS di panel. Endpoint har
 meneruskan POST /api/chat ke Ollama dan model harus sudah diunduh pada mesin lokal.
 Jika tunnel menggunakan Bearer auth, set OLLAMA_TUNNEL_TOKEN pada backend.
 Konfigurasi provider/URL tersimpan di MySQL dan dimuat ulang saat startup.
-Tidak ada fallback otomatis ke provider lain. Tombol Cek AI mengirim prompt pendek
+Tidak ada fallback otomatis ke provider lain untuk mode chat LLM lama. Rantai penulis kalimat
+otak NPC (menu Otak NPC) berbeda: jalurnya dicoba sesuai prioritas panel dan jalur yang ditolak
+dilewati; key OpenRouter dan URL tunnel di menu ini ikut dipakai rantai tersebut. Tombol Cek AI mengirim prompt pendek
 untuk benar-benar menguji jawaban; mode API memakai saldo OpenRouter.
 
 Riwayat menampilkan semua pesan chat yang tercatat, pemain dan bot. Download

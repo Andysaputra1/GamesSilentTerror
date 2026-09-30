@@ -54,6 +54,18 @@ services:
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://127.0.0.1:11434}
       OLLAMA_TUNNEL_TOKEN: ${OLLAMA_TUNNEL_TOKEN:-}
       INTENT_MODEL_PATH: /models/intent_classifier.pkl
+      # Otak NPC (lihat .env.example). Nilai bawaan wajib diisi karena variabel kosong mengalahkan
+      # default backend (mis. urutan rantai kosong mematikan semua jalur LLM).
+      NPC_METHOD: ${NPC_METHOD:-campuran}
+      NPC_WRITER: ${NPC_WRITER:-otomatis}
+      NPC_WRITER_ORDER: ${NPC_WRITER_ORDER:-claude_bedrock,claude_api,openrouter,tautan}
+      NPC_OPENROUTER_MODEL: ${NPC_OPENROUTER_MODEL:-}
+      NPC_VALIDATE_NLG: ${NPC_VALIDATE_NLG:-true}
+      NPC_NLU_DEVICE: ${NPC_NLU_DEVICE:-cpu}
+      NPC_STEP_SECONDS: ${NPC_STEP_SECONDS:-3}
+      NPC_BEDROCK_REGION: ${NPC_BEDROCK_REGION:-us-east-1}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      AMAZON_API_KEY: ${AMAZON_API_KEY:-}
       DATABASE_POOL_SIZE: '5'
       DATABASE_MAX_OVERFLOW: '5'
       SQL_ECHO: 'false'

@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { of, throwError } from 'rxjs';
 import { RoomService } from '../../core/room.service';
@@ -12,6 +12,7 @@ describe('Lobby', () => {
   // INSTANCE TES: component adalah class halaman; fixture membungkus komponen untuk pengujian.
   let component: Lobby;
   let fixture: ComponentFixture<Lobby>;
+  const member = (name: string) => ({ name, skin_id: 'dexter' });
 
   // SETUP CALLBACK: siapkan lingkungan/instance baru sebelum setiap skenario tes.
   beforeEach(async () => {
@@ -44,7 +45,7 @@ describe('Lobby', () => {
     component.room = {
       code: 'ABC123',
       owner: component.username,
-      members: [component.username],
+      members: [member(component.username)],
       bots: ['NOX', 'ECHO', 'VEIL'],
       bot_enabled: true,
       phase: 'lobby',
@@ -63,7 +64,7 @@ describe('Lobby', () => {
       of({
         code: 'ABC123',
         owner: 'alice',
-        members: ['alice'],
+        members: [member('alice')],
         bots: [],
         bot_enabled: false,
         phase: 'lobby',
@@ -91,7 +92,7 @@ describe('Lobby', () => {
       of({
         code: 'ABC123',
         owner: 'alice',
-        members: ['alice'],
+        members: [member('alice')],
         bots: [],
         bot_enabled: false,
         phase: 'lobby',
@@ -120,7 +121,7 @@ describe('Lobby', () => {
     const room = {
       code: 'ABC123',
       owner: 'alice',
-      members: ['alice'],
+      members: [member('alice')],
       bots: [],
       bot_enabled: false,
       phase: 'lobby',
@@ -149,5 +150,42 @@ describe('Lobby', () => {
     component.restoreRoom();
     expect(component.room).toBeNull();
     expect(sessionStorage.length).toBe(0);
+  });
+
+  // Anggota non-host otomatis ikut ke layar persiapan saat polling melihat pertandingan dimulai.
+  it('enters the preparation screen when the host starts the match', () => {
+    const room = {
+      code: 'ABC123',
+      owner: 'alice',
+      members: [member('alice'), member('bob')],
+      bots: ['NOX'],
+      bot_enabled: true,
+      phase: 'lobby',
+    };
+    component.room = room;
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+    vi.spyOn(TestBed.inject(RoomService), 'request').mockReturnValue(
+      of({ ...room, phase: 'preparing' }),
+    );
+    (component as unknown as { load: (m: string, p: string) => void }).load('GET', '/ABC123');
+    expect(navigate).toHaveBeenCalledWith('/game');
+    expect(sessionStorage.getItem('shadow_heist_game_entry')).toBe('allowed');
+  });
+
+  // Tab di latar bisa melewatkan layar persiapan: polling berikutnya sudah melihat siang.
+  it('still enters the game when polling skips the short preparation phase', () => {
+    const room = {
+      code: 'ABC123',
+      owner: 'alice',
+      members: [member('alice'), member('bob')],
+      bots: [],
+      bot_enabled: false,
+      phase: 'lobby',
+    };
+    component.room = room;
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+    vi.spyOn(TestBed.inject(RoomService), 'request').mockReturnValue(of({ ...room, phase: 'day' }));
+    (component as unknown as { load: (m: string, p: string) => void }).load('GET', '/ABC123');
+    expect(navigate).toHaveBeenCalledWith('/game');
   });
 });

@@ -23,3 +23,5 @@ SQL; database teman yang sudah berisi data perlu menerapkannya sendiri tanpa
 menghapus volume.
 
 `V4__account_identities.sql` menambah tabel email/Google subject, dengan constraint unik dan foreign key akun. Akun demo lama tetap bisa login username tanpa identitas tambahan. Jalankan pada database lama sebelum memakai registrasi atau login email/Google; tabel/akun lama tidak dihapus.
+
+`V7__survey_and_npc.sql` menambah `survey_questions` (pertanyaan, jenis jawaban, skala, dan arti skala yang diatur dari panel), `survey_responses` (satu kiriman per akun per pertandingan, dengan salinan pertanyaan), dan `match_bots` (metode/persona tiap bot). Enam pertanyaan awal diisi dengan `INSERT IGNORE`. Salinan untuk Azure: `deployment/mysql/004_survey_and_npc.sql`.

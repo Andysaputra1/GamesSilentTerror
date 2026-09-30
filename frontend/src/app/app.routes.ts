@@ -3,7 +3,6 @@ import { Routes } from '@angular/router';
 import { MainPage } from './features/main-page/main-page';
 import { Auth } from './features/auth/auth';
 import { Lobby } from './features/lobby/lobby';
-import { Game } from './features/game/game';
 import { PanelRedirect } from './features/panel/panel-redirect';
 import { DebugCards } from './features/debug-cards/debug-cards';
 import { authGuard } from './core/auth.guard';
@@ -17,7 +16,12 @@ export const routes: Routes = [
   { path: 'login', component: Auth, canActivate: [activeMatchGuard, loginRedirectGuard] },
   { path: 'main', component: MainPage, canActivate: [authGuard, activeMatchGuard] },
   { path: 'lobby', component: Lobby, canActivate: [authGuard, activeMatchGuard] },
-  { path: 'game', component: Game, canActivate: [authGuard, activeMatchGuard] },
+  // Layar game (aset dan gaya terbesar) dimuat saat dibutuhkan agar login/lobby tetap ringan.
+  {
+    path: 'game',
+    loadComponent: () => import('./features/game/game').then((module) => module.Game),
+    canActivate: [authGuard, activeMatchGuard],
+  },
   // TEMPORARY DEBUG ROUTE — DELETE AFTER VISUAL APPROVAL
   { path: 'debug/cards', component: DebugCards },
   { path: '**', redirectTo: '/login' },

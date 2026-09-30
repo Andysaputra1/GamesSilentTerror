@@ -40,10 +40,13 @@ class MatchSimulationTests(unittest.TestCase):
                             ability = me["ability"] if me["can_act"] else None
                             if not ability and not me["can_vote"]:
                                 continue
+                            # Hostage/Gag tidak boleh ke rekan Syndicate; vote ke rekan tetap boleh.
+                            allies = set(me["allies"]) if ability in {"hostage", "gag"} else set()
                             targets = [
                                 p.name
                                 for p in game.players.values()
                                 if p.alive
+                                and p.name not in allies
                                 and (p.name != name or ability == "guard")
                                 and not (ability == "guard" and p.name == me["last_guard"])
                             ]
@@ -56,16 +59,17 @@ class MatchSimulationTests(unittest.TestCase):
                         game.tick(game.deadline)
                     self.assertEqual(game.phase, "finished")
                     self.assertIn(game.winner, {"civilians", "hitman"})
-                    hitman = next(p for p in game.players.values() if p.role == "hitman")
+                    hitmen = [p for p in game.players.values() if p.role == "hitman"]
+                    alive_hitmen = sum(p.alive for p in hitmen)
                     free_citizens = sum(
                         p.alive and not p.hostage and p.role != "hitman"
                         for p in game.players.values()
                     )
                     if game.winner == "civilians":
-                        self.assertFalse(hitman.alive)
+                        self.assertEqual(alive_hitmen, 0)
                     elif game.winner == "hitman":
-                        self.assertTrue(hitman.alive)
-                        self.assertLessEqual(free_citizens, 1)
-                    result = game.result(hitman.name)
+                        self.assertGreater(alive_hitmen, 0)
+                        self.assertLessEqual(free_citizens, alive_hitmen)
+                    result = game.result(hitmen[0].name)
                     game.tick(game.deadline + 10000)
-                    self.assertEqual(game.result(hitman.name), result)
+                    self.assertEqual(game.result(hitmen[0].name), result)

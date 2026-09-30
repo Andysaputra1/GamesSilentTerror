@@ -32,6 +32,10 @@ class SkipOption(BaseModel):
     phase: Literal["day"]
 
 
+class ReadyOption(BaseModel):
+    match_id: str = Field(min_length=1, max_length=40)
+
+
 class PlayOption(BaseModel):
     match_id: str = Field(max_length=40)
     round_number: int = Field(ge=1)
@@ -72,6 +76,12 @@ def skip(code: str, body: SkipOption, user=Depends(require_authenticated_user)):
 # START: otorisasi host dan jumlah peserta dilakukan di RoomService.
 def start(code: str, body: StartOption, user=Depends(require_authenticated_user)):
     return game_result(lambda: room_service.start(code, user.username, body.quick))
+
+
+@router.post("/{code}/ready")
+# SIAP: manusia menandai sudah membaca panduan; ronde 1 tetap menunggu AI siap.
+def ready(code: str, body: ReadyOption, user=Depends(require_authenticated_user)):
+    return game_result(lambda: room_service.ready(code, user.username, match_id=body.match_id))
 
 
 @router.get("/{code}/game")

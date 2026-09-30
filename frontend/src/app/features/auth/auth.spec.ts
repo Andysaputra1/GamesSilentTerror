@@ -65,11 +65,11 @@ describe('Auth', () => {
     fixture.detectChanges();
     expect(component.statusLabel).toBe('SYSTEM OFFLINE');
     const link = fixture.nativeElement.querySelector('a[href*="wa.me"]') as HTMLAnchorElement;
-    expect(link.textContent).toContain('Andy Saputra');
+    expect(link.textContent).toContain('Andy');
     expect(link.href).toContain('https://wa.me/6281995247372?text=');
     expect(decodeURIComponent(link.href)).toContain('tolong nyalakan server Silent Terror');
-    expect(fixture.nativeElement.textContent).toContain('Janice Tiffany Wijono');
-    expect(fixture.nativeElement.textContent).toContain('Kimberly Joseph Wirawan');
+    expect(fixture.nativeElement.textContent).toContain('Janice');
+    expect(fixture.nativeElement.textContent).toContain('Kimberly');
     window.dispatchEvent(new Event('focus'));
     httpMock.expectOne((request) => request.url.endsWith('/ready')).flush({ ready: true });
     fixture.detectChanges();

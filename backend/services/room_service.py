@@ -181,10 +181,29 @@ class RoomService:
             if any(self.active(name) for name in room.members):
                 raise ValueError("Ada anggota yang masih mengikuti pertandingan lain.")
             room.members_skin = self._fetch_skin_ids(room.members)
-            room.match = Match(room.members, self.bot_names(room),
-                             skin_map=room.members_skin, quick=quick)
+            # Ronde 1 ditahan di layar persiapan sampai otak bot siap (NPCService.prepare).
+            room.match = Match(
+                room.members,
+                self.bot_names(room),
+                skin_map=room.members_skin,
+                quick=quick,
+                preparing=True,
+            )
             room.match.ai_controlled = True
             return self.snapshot(room)
+
+    # SIAP: manusia boleh mempercepat layar persiapan setelah membaca panduan; AI tetap harus siap.
+    @traced
+    def ready(self, code, username, *, match_id):
+        with self.lock:
+            room = self.get(code, username)
+            match = room.match
+            if not match or match.id != match_id:
+                raise ValueError("Pertandingan sudah berganti. Perbarui halaman.")
+            match.tick()
+            if match.phase == "preparing":
+                match.ready_consent(username)
+            return self.state(code, username)
 
     # PEMULIHAN: cari pertandingan akun dari server, bukan mengandalkan sessionStorage tab.
     def current(self, username):
@@ -270,6 +289,12 @@ class RoomService:
                 raise ValueError(
                     "Tidak dapat keluar dari pertandingan aktif. Kamu bisa menyambung kembali setelah menutup tab."
                 )
+            if room.match:
+                # Survei akhir tetap bisa dikirim setelah keluar (room mungkin segera dibersihkan).
+                # Impor lambat: survey_service mengimpor modul ini.
+                from services.survey_service import survey_service
+
+                survey_service.ingat_pertandingan(room)
             room.members.remove(username)
             room.members_skin.pop(username, None)
             if not room.members:

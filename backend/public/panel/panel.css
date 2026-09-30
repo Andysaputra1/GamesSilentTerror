@@ -473,3 +473,70 @@ dialog form button { width: 100%; }
 #notice:not(:empty) { position: fixed; bottom: 20px; right: 24px; z-index: 20; max-width: min(480px,calc(100vw - 48px)); padding: 16px 20px; margin: 0; background: #203328; border: 1px solid #597b4c; border-radius: 10px; color: #e1f4d8; box-shadow: 0 15px 45px #0006; font-size: 13px; }
 @media (max-width: 1000px) { .ai-layout { grid-template-columns: 1fr; }.config-panel { border-right: 0; padding-right: 0; border-bottom: 1px solid #293546; padding-bottom: 24px; }.metric-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
 @media (max-width: 680px) { .card .form-grid { grid-template-columns: 1fr; }#menu-users td:last-child { width: 100%; }.toolbar label { min-width: 100%; }.toolbar .check { min-width: 100%; }nav { display: grid; grid-template-columns: 1fr 1fr; }.metric strong { font-size: 15px; } }
+/* OTAK NPC: daftar status dua kolom. */
+.status-list { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 10px 18px; margin: 0; }
+.status-list dt { color: #9aacbf; font-size: 12px; }
+.status-list dd { margin: 0; overflow-wrap: anywhere; }
+/* OTAK NPC: rantai penulis (prioritas, jalur aktif, status cek terakhir). */
+.chain-box { border: 1px solid #293546; border-radius: 10px; padding: 12px 16px 2px; margin: 0 0 20px; min-width: 0; }
+.chain-box legend { padding: 0 6px; font-size: 12px; color: #c9d8e9; }
+.chain-box.muted { opacity: .55; }
+.chain-list { list-style: none; margin: 12px 0 18px; padding: 0; display: grid; gap: 8px; }
+.chain-item { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px 12px; align-items: center; padding: 10px 12px; background: #0e1724; border: 1px solid #293546; border-radius: 9px; }
+.chain-item.off .chain-text { opacity: .55; }
+.chain-item input[type='checkbox'] { width: 16px; height: 16px; margin: 0; padding: 0; }
+.chain-text { min-width: 0; }
+.chain-text strong { display: block; font-size: 13px; color: #e6effa; }
+.chain-text small { display: block; margin-top: 2px; overflow-wrap: anywhere; }
+.chain-move { display: flex; gap: 4px; }
+.chain-move button { padding: 5px 9px; font-size: 11px; }
+.chain-state { grid-column: 2 / -1; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
+.chain-state small { overflow-wrap: anywhere; }
+.chip { display: inline-block; padding: 2px 8px; border: 1px solid currentColor; border-radius: 20px; font-size: 10px; font-weight: 650; letter-spacing: .4px; text-transform: uppercase; }
+.status-muted { color: #9aacbf !important; }
+#menu-survey td button { margin: 2px 0; }
+#menu-survey h3 { margin-top: 28px; }
+/* CHECKER ROOM: ringkasan room, linimasa per bot, dan kartu penjelasan keputusan otak. */
+.room-summary { display: grid; gap: 12px; margin: 0 0 16px; padding: 16px 18px; background: #0e1724; border: 1px solid #293546; border-radius: 10px; min-width: 0; }
+.room-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.room-head strong { font-size: 15px; }
+.room-meta { color: #9aacbf; font-size: 12px; }
+.room-composition { display: flex; flex-wrap: wrap; gap: 6px; }
+.room-count { padding: 4px 10px; border: 1px solid #334055; border-radius: 20px; font-size: 12px; background: #131a24; }
+.room-summary .table-scroll { margin: 0; }
+.room-summary table { min-width: 640px; } /* layar sempit: tabel bot digulir, baris tidak meninggi */
+.room-bot { background: transparent; color: #baf578; border: 0; padding: 0; font-weight: 650; text-decoration: underline; text-underline-offset: 3px; }
+.room-legend { margin: 0 0 12px; }
+.room-legend .status-list { margin-bottom: 10px; }
+.trace-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 6px; }
+.decision-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin: 2px 0 12px; }
+.decision-head strong { font-size: 17px; }
+.decision-tabs { display: flex; flex-wrap: wrap; gap: 6px; padding-bottom: 10px; margin-bottom: 14px; border-bottom: 1px solid #293546; }
+.decision-tab { background: transparent; color: #97a8bd; border: 1px solid #293546; padding: 8px 12px; font-size: 12px; }
+.decision-tab[aria-selected='true'] { background: #202e24; color: #baf578; border-color: #3d5a33; }
+.decision-panel { min-width: 0; }
+.decision-block { border: 1px solid #293546; border-radius: 9px; padding: 12px 14px; margin: 0 0 12px; background: #0e1724; min-width: 0; }
+.decision-block h4 { margin-top: 0; }
+.decision-result { margin: 4px 0 10px; color: #dce4ef; font-weight: 600; line-height: 1.6; }
+.decision-list { margin: 6px 0 12px; padding-left: 20px; font-size: 13px; line-height: 1.6; }
+.decision-kv { margin-bottom: 12px; }
+.decision-table { margin: 6px 0 12px; }
+.decision-table table { font-size: 12px; }
+.decision-table th { padding: 8px 10px; text-transform: none; letter-spacing: 0; font-size: 11px; }
+.decision-table th[title] { text-decoration: underline dotted; text-underline-offset: 3px; cursor: help; }
+.decision-table td { padding: 7px 10px; white-space: normal; line-height: 1.5; }
+/* Kata pendek (nama, rendah/sedang/tinggi) tidak dipotong; tabel lebar digulir di dalam kotaknya. */
+.decision-table th, .decision-table td { overflow-wrap: break-word; word-break: normal; }
+.decision-table td:last-child { min-width: 0; }
+.fuzzy-system { border-top: 1px dashed #334055; padding-top: 10px; margin-top: 10px; }
+.fuzzy-input { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin: 6px 0; font-size: 12px; }
+.fuzzy-name { min-width: 170px; font-weight: 600; }
+.fuzzy-degree { display: inline-flex; align-items: center; gap: 6px; color: #9aacbf; }
+.fuzzy-degree meter { width: 64px; height: 8px; }
+.bt-path ol { margin: 6px 0 10px; padding-left: 22px; font-size: 12px; line-height: 1.8; }
+.bt-icon { display: inline-block; width: 18px; font-weight: 700; }
+.bt-sukses .bt-icon { color: #baf578; }
+.bt-gagal { color: #8d9eb2; }
+.bt-gagal .bt-icon { color: #ffb5b5; }
+.bt-berjalan .bt-icon { color: #f6d79c; }
+@media (max-width: 700px) { .room-summary { padding: 12px; } .fuzzy-name { min-width: 100%; } .decision-tab { flex: 1 1 auto; } }

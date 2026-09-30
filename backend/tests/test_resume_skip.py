@@ -75,6 +75,7 @@ class ActiveRoomTests(unittest.TestCase):
         self.rooms.set_bot(self.room.code, "alice", True)
         self.other = self.rooms.create("carol")
         self.rooms.start(self.room.code, "alice")
+        self.room.match.begin()  # lewati layar persiapan; alur persiapan diuji di test_match_engine
 
     def test_lookup_and_no_second_room(self):
         active = self.rooms.active("alice")
