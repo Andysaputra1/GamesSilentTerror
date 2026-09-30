@@ -27,6 +27,11 @@ class Participant:
     intel: list[dict] = field(default_factory=list)
 
 
+# Layar persiapan: minimal cukup untuk membaca panduan, maksimal agar model yang gagal dimuat tidak menahan room.
+PREPARATION_MIN_SECONDS = 8
+PREPARATION_MAX_SECONDS = 90
+
+
 # Durasi mengikuti roster awal (manusia + NPC), bukan jumlah warga bebas yang bersifat rahasia.
 def phase_durations(count, quick=False):
     if quick:
@@ -40,7 +45,8 @@ def phase_durations(count, quick=False):
 
 class Match:
     # CONSTRUCTOR: acak role di server; tepat satu Hitman, Spy, dan Stalker.
-    def __init__(self, humans, bots, *, quick=False, now=None, rng=None):
+    # preparing=True menahan ronde 1 di layar persiapan sampai AI siap (lihat begin/mark_ai_ready).
+    def __init__(self, humans, bots, *, quick=False, now=None, rng=None, preparing=False):
         names = list(humans) + list(bots)
         if not 4 <= len(names) <= 10 or len(set(names)) != len(names):
             raise ValueError("Permainan membutuhkan 4–10 identitas berbeda.")
@@ -59,17 +65,80 @@ class Match:
         self.ai_grace_phase = None
         self.phase = "day"
         self.durations = phase_durations(len(names), quick)
-        self.deadline = (time.time() if now is None else now) + self.durations["day"]
+        now = time.time() if now is None else now
+        self.deadline = now + self.durations["day"]
         self.actions = {}
         self.votes = {}
         self.skip_consents = set()
+        self.ready_consents = set()
+        self.preparation = None
         self.events = ["Permainan dimulai. Diskusikan alibi tanpa membocorkan identitasmu."]
+        if preparing:
+            # Fase persiapan tidak menjalankan timer ronde; deadline = batas tunggu maksimal AI.
+            self.phase = "preparing"
+            self.deadline = now + PREPARATION_MAX_SECONDS
+            self.preparation = {
+                "ready": not bots,
+                "detail": "Tidak ada bot di ruangan." if not bots else "Menyiapkan AI bot…",
+                "progress": 1.0 if not bots else 0.0,
+                "min_until": now + PREPARATION_MIN_SECONDS,
+                "ready_at": now if not bots else None,
+            }
+            self.events = ["Menyiapkan pertandingan. Baca panduan singkat sambil menunggu AI siap."]
         self.messages = []
         self.winner = None
         self.winner_reason = None
         self.bot_day_done = False
         self.bot_night_done = False
         self.bot_vote_done = False
+
+    # PERSIAPAN: progres pemuatan AI ditampilkan di layar persiapan semua pemain.
+    def update_preparation(self, *, detail=None, progress=None):
+        if self.phase != "preparing":
+            return
+        if detail is not None:
+            self.preparation["detail"] = detail
+        if progress is not None:
+            self.preparation["progress"] = max(0.0, min(1.0, float(progress)))
+
+    # PERSIAPAN: AI siap; ronde 1 dimulai setelah waktu baca minimal atau semua manusia menekan Siap.
+    def mark_ai_ready(self, now=None, detail="AI siap."):
+        if self.phase != "preparing":
+            return
+        now = time.time() if now is None else now
+        self.preparation.update(ready=True, detail=detail, progress=1.0, ready_at=now)
+        self.try_begin(now)
+
+    # PERSIAPAN: persetujuan "Siap" hanya dari manusia; tidak berarti AI boleh dilewati.
+    def ready_consent(self, name, now=None):
+        player = self.players.get(name)
+        if self.phase != "preparing" or not player or player.bot:
+            raise ValueError("Tombol siap hanya tersedia untuk pemain manusia saat persiapan.")
+        self.ready_consents.add(name)
+        self.try_begin(time.time() if now is None else now)
+
+    # Mulai jika AI siap dan (waktu baca minimal lewat atau semua manusia sudah siap).
+    def try_begin(self, now=None):
+        if self.phase != "preparing" or not self.preparation["ready"]:
+            return False
+        now = time.time() if now is None else now
+        humans = {p.name for p in self.players.values() if not p.bot}
+        if now >= self.preparation["min_until"] or (humans and humans <= self.ready_consents):
+            self.begin(now)
+            return True
+        return False
+
+    # Ronde 1 benar-benar dimulai: timer siang baru berjalan dari titik ini.
+    def begin(self, now=None, event=None):
+        if self.phase != "preparing":
+            return
+        now = time.time() if now is None else now
+        self.phase = "day"
+        self.deadline = now + self.durations["day"]
+        self.ready_consents.clear()
+        self.events.append(
+            event or "Permainan dimulai. Diskusikan alibi tanpa membocorkan identitasmu."
+        )
 
     def reserve_ai_reply(self, now=None):
         """At most one bounded extension per phase; manual skip still takes precedence."""
@@ -288,6 +357,13 @@ class Match:
     # TIMER SERVER: maju satu fase saat deadline; tetap berjalan walaupun semua tab ditutup.
     def tick(self, now=None):
         now = time.time() if now is None else now
+        if self.phase == "preparing":
+            # Batas tunggu habis: mulai dengan cadangan bawaan daripada menahan pemain selamanya.
+            if now >= self.deadline:
+                self.begin(now, "AI belum siap penuh; permainan dimulai dengan bot cadangan.")
+            else:
+                self.try_begin(now)
+            return
         # Scheduler LLM mendapat waktu memilih; fallback aturan hanya mengisi pilihan yang kosong di deadline.
         if self.phase != "finished" and now >= self.deadline:
             self.run_bots()
@@ -322,6 +398,23 @@ class Match:
         self.messages.append(record)
         self.messages = self.messages[-100:]
         return record
+
+    # Data layar persiapan: progres AI, hitung mundur mulai, dan jumlah manusia yang sudah siap.
+    def preparation_view(self, viewer):
+        now = time.time()
+        prep = self.preparation
+        starts_at = max(prep["min_until"], prep["ready_at"]) if prep["ready"] else None
+        return {
+            "ready": prep["ready"],
+            "detail": prep["detail"],
+            "progress": round(prep["progress"], 2),
+            "starts_in": max(0, ceil(starts_at - now)) if starts_at else None,
+            "max_wait": max(0, ceil(self.deadline - now)),
+            "agreed": len(self.ready_consents),
+            "required": sum(not p.bot for p in self.players.values()),
+            "consented": viewer in self.ready_consents,
+            "bots": sum(p.bot for p in self.players.values()),
+        }
 
     # SNAPSHOT PRIVAT: roster hanya mengandung alive; status diam orang lain tidak pernah dikirim.
     def snapshot(self, viewer):
@@ -372,6 +465,7 @@ class Match:
             "winner": self.winner,
             "events": list(self.events),
             "result": self.result(viewer),
+            "preparation": self.preparation_view(viewer) if self.phase == "preparing" else None,
             "players": [
                 {
                     "name": p.name,

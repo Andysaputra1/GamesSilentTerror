@@ -398,6 +398,7 @@ class SocketGameTests(unittest.IsolatedAsyncioTestCase):
         room = rooms.create("alice")
         rooms.set_bot(room.code, "alice", True)
         rooms.start(room.code, "alice")
+        room.match.begin()  # lewati layar persiapan
         room.match.ai_controlled = False  # Uji jalur balasan legacy, bukan scheduler NPC.
         sio = Mock(emit=AsyncMock(), enter_room=AsyncMock())
         analysis = Mock()

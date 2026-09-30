@@ -28,6 +28,8 @@ ENV/
 env/
 .ipynb_checkpoints/
 *.pkl
+# Model IndoBERT (~440 MB per model) disalin manual; jangan masuk Git.
+backend/artifacts/indobert/
 !.gitkeep
 
 .env

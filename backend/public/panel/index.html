@@ -47,8 +47,156 @@
           <button data-menu="ai" aria-current="page"><span>01</span> Konfigurasi AI</button
           ><button data-menu="checker"><span>02</span> Checker</button
           ><button data-menu="history"><span>03</span> Riwayat chat</button>
-          <button data-menu="users"><span>04</span> Manajemen user</button>
+          <button data-menu="users"><span>04</span> Manajemen user</button
+          ><button data-menu="npc"><span>05</span> Otak NPC</button
+          ><button data-menu="survey"><span>06</span> Survei</button>
         </nav>
+        <section id="menu-npc" class="card" hidden>
+          <div class="section-head">
+            <div>
+              <span class="eyebrow">NPC BRAIN</span>
+              <h2>Otak NPC</h2>
+              <p>
+                Metode penalaran bot (hasil notebook skripsi), penulis kalimat, dan status NLU
+                IndoBERT.
+              </p>
+            </div>
+            <button id="refresh-npc" class="secondary">Refresh</button>
+          </div>
+          <div class="ai-layout">
+            <section class="config-panel" aria-label="Pengaturan otak NPC">
+              <h3>01 / Metode dan penulis</h3>
+              <form id="npc-form">
+                <label>Metode penalaran<select id="npc-method"></select></label>
+                <label>Penulis kalimat<select id="npc-writer"></select></label>
+                <label class="check"
+                  ><input id="npc-validate" type="checkbox" checked /> Validasi ulang kalimat bot
+                  dengan IndoBERT</label
+                >
+                <p class="hint">
+                  Berlaku untuk pertandingan yang dimulai setelah disimpan. Key Claude
+                  (ANTHROPIC_API_KEY atau AMAZON_API_KEY) dibaca dari environment server dan tidak
+                  pernah ditampilkan.
+                </p>
+                <button id="save-npc">Simpan otak NPC</button>
+              </form>
+            </section>
+            <section class="probe-panel" aria-label="Status otak NPC">
+              <h3>02 / Status</h3>
+              <dl id="npc-status" class="status-list"></dl>
+            </section>
+          </div>
+        </section>
+        <section id="menu-survey" class="card" hidden>
+          <div class="section-head">
+            <div>
+              <span class="eyebrow">PLAYER FEEDBACK</span>
+              <h2>Survei akhir pertandingan</h2>
+              <p>
+                Atur pertanyaan, jenis jawaban, skala, dan arti nilai terkecil/terbesar. Pertanyaan
+                tidak dihapus agar jawaban lama tetap utuh; nonaktifkan bila tidak dipakai.
+              </p>
+            </div>
+            <button id="download-survey">&darr; Download jawaban (CSV)</button>
+          </div>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Urutan</th>
+                  <th>Pertanyaan</th>
+                  <th>Jenis / skala</th>
+                  <th>Arti skala</th>
+                  <th>Status</th>
+                  <th>Hasil</th>
+                  <th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="survey-rows"></tbody>
+            </table>
+          </div>
+          <details id="survey-editor-box" class="create-user">
+            <summary id="survey-editor-title">+ Tambah pertanyaan</summary>
+            <form id="survey-form" class="form-grid">
+              <input id="survey-id" type="hidden" />
+              <label
+                >Kode<input
+                  id="survey-code"
+                  required
+                  minlength="2"
+                  maxlength="40"
+                  pattern="[a-z0-9_]+"
+                  autocomplete="off"
+              /></label>
+              <label
+                >Urutan<input id="survey-position" type="number" min="-1000" max="1000" value="0"
+              /></label>
+              <label class="full-width"
+                >Pertanyaan<input id="survey-prompt" required minlength="3" maxlength="300"
+              /></label>
+              <label
+                >Jenis jawaban<select id="survey-kind">
+                  <option value="stars">Bintang</option>
+                  <option value="scale">Skala angka</option>
+                  <option value="choice">Pilihan ganda</option>
+                  <option value="text">Teks bebas</option>
+                </select></label
+              >
+              <label
+                >Nilai terkecil<input id="survey-min" type="number" min="0" max="10" value="1"
+              /></label>
+              <label
+                >Nilai terbesar<input id="survey-max" type="number" min="1" max="10" value="6"
+              /></label>
+              <label
+                >Arti nilai terkecil<input
+                  id="survey-label-min"
+                  maxlength="80"
+                  placeholder="mis. Sangat membosankan"
+              /></label>
+              <label
+                >Arti nilai terbesar<input
+                  id="survey-label-max"
+                  maxlength="80"
+                  placeholder="mis. Sangat seru"
+              /></label>
+              <label class="full-width"
+                >Pilihan (satu per baris, khusus pilihan ganda)<textarea
+                  id="survey-options"
+                  rows="3"
+                ></textarea>
+              </label>
+              <label class="check"
+                ><input id="survey-required" type="checkbox" checked /> Wajib dijawab</label
+              >
+              <label class="check"
+                ><input id="survey-active" type="checkbox" checked /> Aktif</label
+              >
+              <div class="form-actions full-width">
+                <button id="save-survey">Simpan pertanyaan</button
+                ><button id="cancel-survey" type="button" class="secondary">Batal</button>
+              </div>
+            </form>
+          </details>
+          <h3>Rata-rata per metode bot</h3>
+          <p class="hint">
+            Jawaban dari pertandingan yang memuat bot dengan metode tersebut. Pertandingan campuran
+            dihitung pada setiap metode yang ikut bermain.
+          </p>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Pertanyaan</th>
+                  <th>Metode</th>
+                  <th>Jawaban</th>
+                  <th>Rata-rata</th>
+                </tr>
+              </thead>
+              <tbody id="survey-method-rows"></tbody>
+            </table>
+          </div>
+        </section>
         <section id="menu-ai" class="card">
           <div class="section-head">
             <div>

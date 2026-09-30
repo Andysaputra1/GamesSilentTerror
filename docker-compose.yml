@@ -78,6 +78,13 @@ services:
       OPENAI_MAX_OUTPUT_TOKENS: '${OPENAI_MAX_OUTPUT_TOKENS:-320}'
       AUTH_SESSION_HOURS: '${AUTH_SESSION_HOURS:-24}'
       CORS_ORIGINS: '${CORS_ORIGINS:-http://localhost:4200,http://127.0.0.1:4200}'
+      # Otak NPC: model IndoBERT dibaca dari backend/artifacts/indobert/{intent,target}.
+      NPC_METHOD: '${NPC_METHOD:-campuran}'
+      NPC_WRITER: '${NPC_WRITER:-otomatis}'
+      NPC_VALIDATE_NLG: '${NPC_VALIDATE_NLG:-true}'
+      NPC_NLU_DEVICE: '${NPC_NLU_DEVICE:-cpu}'
+      ANTHROPIC_API_KEY: '${ANTHROPIC_API_KEY:-}'
+      AMAZON_API_KEY: '${AMAZON_API_KEY:-}'
       MYSQL_HOST: mysql
       MYSQL_PORT: '3306'
       MYSQL_DATABASE: shadow_heist

@@ -68,6 +68,10 @@ function clearSession() {
   $('probe-result').replaceChildren();
   $('ai-status').textContent = 'Belum diperiksa.';
   $('probe-progress').textContent = '';
+  $('npc-status').replaceChildren();
+  $('survey-rows').replaceChildren();
+  $('survey-method-rows').replaceChildren();
+  resetSurveyForm();
   historyVersion++;
   traces = [];
 }
@@ -395,11 +399,176 @@ async function selectMenu(name) {
     if (b.dataset.menu === name) b.setAttribute('aria-current', 'page');
     else b.removeAttribute('aria-current');
   }
-  for (const id of ['ai', 'checker', 'history', 'users']) $('menu-' + id).hidden = id !== name;
+  for (const id of ['ai', 'checker', 'history', 'users', 'npc', 'survey'])
+    $('menu-' + id).hidden = id !== name;
   if (name === 'checker' || name === 'history') await loadRooms();
   if (name === 'checker') await checker();
   if (name === 'history') await history();
   if (name === 'users') await loadUsers();
+  if (name === 'npc') await loadNpc();
+  if (name === 'survey') await loadSurvey();
+}
+
+// OTAK NPC: isi pilihan dari server agar panel tidak perlu tahu daftar metode.
+function fillSelect(select, options, value) {
+  select.replaceChildren(
+    ...Object.entries(options).map(([key, label]) => {
+      const option = node('option', label);
+      option.value = key;
+      return option;
+    }),
+  );
+  select.value = value;
+}
+// Tampilkan status pemuatan otak, sumber NLU, dan penulis kalimat yang benar-benar aktif.
+function showNpc(data) {
+  const status = data.status;
+  fillSelect($('npc-method'), data.pilihan.metode, status.metode);
+  fillSelect($('npc-writer'), data.pilihan.penulis, status.penulis_diminta);
+  $('npc-validate').checked = status.validasi;
+  const nlu = {
+    indobert: 'IndoBERT (intent + target)',
+    cadangan: 'Cadangan: SVM + nama yang disebut (IndoBERT tidak ditemukan)',
+  };
+  const rows = [
+    ['Status', status.siap ? 'Siap' : status.gagal ? 'Gagal dimuat' : 'Memuat…'],
+    ['Keterangan', status.detail],
+    ['NLU', nlu[status.nlu] ?? '—'],
+    ['Penulis aktif', status.penulis_aktif ? status.penulis : 'Templat bervariasi (tanpa LLM)'],
+    ['Pertandingan dengan otak aktif', String(status.pertandingan_aktif)],
+  ];
+  $('npc-status').replaceChildren(
+    ...rows.flatMap(([label, value]) => [node('dt', label), node('dd', value || '—')]),
+  );
+}
+async function loadNpc() {
+  const epoch = generation;
+  const data = await request('/api/panel/npc');
+  if (!token || epoch !== generation) return;
+  showNpc(data);
+}
+
+// SURVEI: pertanyaan, jenis, skala, dan arti skala sepenuhnya diatur dari panel.
+const KIND_LABEL = {
+  stars: 'Bintang',
+  scale: 'Skala angka',
+  choice: 'Pilihan ganda',
+  text: 'Teks bebas',
+};
+function surveyScale(question) {
+  if (question.kind === 'stars' || question.kind === 'scale')
+    return `${KIND_LABEL[question.kind]} ${question.scale_min}–${question.scale_max}`;
+  if (question.kind === 'choice') return `${KIND_LABEL.choice}: ${question.options.join(' / ')}`;
+  return KIND_LABEL.text;
+}
+async function loadSurvey() {
+  const epoch = generation;
+  const data = await request('/api/panel/survey/summary');
+  if (!token || epoch !== generation) return;
+  const distribution = {};
+  for (const row of data.distribution) (distribution[row.question_id] ??= []).push(row);
+  const texts = Object.fromEntries(data.text_answers.map((row) => [row.question_id, row.n]));
+  $('survey-rows').replaceChildren(
+    ...data.questions.map((question) => {
+      const rows = distribution[question.id] ?? [];
+      const total = rows.reduce((sum, row) => sum + row.n, 0);
+      const mean = total
+        ? rows.reduce((sum, row) => sum + row.n * row.value_number, 0) / total
+        : null;
+      const result =
+        question.kind === 'text' || question.kind === 'choice'
+          ? `${texts[question.id] ?? 0} jawaban`
+          : total
+            ? `${total} jawaban · rata-rata ${mean.toFixed(2)}`
+            : 'Belum ada';
+      const meaning =
+        question.label_min || question.label_max
+          ? `${question.scale_min} = ${question.label_min ?? '—'} · ${question.scale_max} = ${question.label_max ?? '—'}`
+          : '—';
+      const edit = node('button', 'Edit', 'secondary');
+      edit.type = 'button';
+      edit.onclick = () => editSurvey(question);
+      const toggle = node('button', question.active ? 'Nonaktifkan' : 'Aktifkan', 'secondary');
+      toggle.type = 'button';
+      toggle.onclick = handle(() =>
+        saveSurvey({ ...question, active: !question.active }, question.id),
+      );
+      const actions = node('td');
+      actions.append(edit, ' ', toggle);
+      const tr = document.createElement('tr');
+      tr.append(
+        node('td', String(question.position)),
+        node('td', question.prompt + (question.required ? '' : ' (opsional)')),
+        node('td', surveyScale(question)),
+        node('td', meaning),
+        node('td', question.active ? 'Aktif' : 'Nonaktif'),
+        node('td', result),
+        actions,
+      );
+      return tr;
+    }),
+  );
+  const prompts = Object.fromEntries(data.questions.map((q) => [q.id, q.prompt]));
+  $('survey-method-rows').replaceChildren(
+    ...data.per_method.map((row) => {
+      const tr = document.createElement('tr');
+      tr.append(
+        node('td', prompts[row.question_id] ?? String(row.question_id)),
+        node('td', row.method),
+        node('td', String(row.n)),
+        node('td', row.rata == null ? '—' : row.rata.toFixed(2)),
+      );
+      return tr;
+    }),
+  );
+}
+// Isi form dari data pertanyaan untuk diedit.
+function editSurvey(question) {
+  $('survey-id').value = String(question.id);
+  $('survey-code').value = question.code;
+  $('survey-position').value = String(question.position);
+  $('survey-prompt').value = question.prompt;
+  $('survey-kind').value = question.kind;
+  $('survey-min').value = String(question.scale_min);
+  $('survey-max').value = String(question.scale_max);
+  $('survey-label-min').value = question.label_min ?? '';
+  $('survey-label-max').value = question.label_max ?? '';
+  $('survey-options').value = question.options.join('\n');
+  $('survey-required').checked = question.required;
+  $('survey-active').checked = question.active;
+  $('survey-editor-title').textContent = 'Edit pertanyaan: ' + question.code;
+  $('survey-editor-box').open = true;
+}
+function resetSurveyForm() {
+  $('survey-form').reset();
+  $('survey-id').value = '';
+  $('survey-editor-title').textContent = '+ Tambah pertanyaan';
+  $('survey-editor-box').open = false;
+}
+function surveyPayload() {
+  return {
+    code: $('survey-code').value.trim().toLowerCase(),
+    prompt: $('survey-prompt').value.trim(),
+    kind: $('survey-kind').value,
+    scale_min: Number($('survey-min').value),
+    scale_max: Number($('survey-max').value),
+    label_min: $('survey-label-min').value.trim() || null,
+    label_max: $('survey-label-max').value.trim() || null,
+    options: $('survey-options')
+      .value.split('\n')
+      .map((item) => item.trim())
+      .filter(Boolean),
+    required: $('survey-required').checked,
+    active: $('survey-active').checked,
+    position: Number($('survey-position').value) || 0,
+  };
+}
+async function saveSurvey(body, id) {
+  if (id) await request(`/api/panel/survey/questions/${id}`, body, 'PUT');
+  else await request('/api/panel/survey/questions', body, 'POST');
+  notice('Pertanyaan survei tersimpan. Pemain melihat versi terbaru di pertandingan berikutnya.');
+  resetSurveyForm();
+  await loadSurvey();
 }
 
 // Muat daftar akun tanpa rahasia; versi request mencegah hasil filter lama menimpa pencarian baru.
@@ -708,6 +877,58 @@ $('download').onclick = handle(async () => {
     notice('CSV sesuai filter tanggal, ruangan, dan pengirim berhasil diunduh.');
   } finally {
     $('download').disabled = false;
+  }
+});
+$('npc-form').onsubmit = handle(async () => {
+  $('save-npc').disabled = true;
+  try {
+    const data = await request(
+      '/api/panel/npc',
+      {
+        metode: $('npc-method').value,
+        penulis: $('npc-writer').value,
+        validasi: $('npc-validate').checked,
+      },
+      'PUT',
+    );
+    showNpc(data);
+    notice('Otak NPC tersimpan. Berlaku untuk pertandingan yang dimulai berikutnya.');
+  } finally {
+    $('save-npc').disabled = false;
+  }
+});
+$('refresh-npc').onclick = handle(loadNpc);
+$('survey-form').onsubmit = handle(async () => {
+  $('save-survey').disabled = true;
+  try {
+    await saveSurvey(surveyPayload(), Number($('survey-id').value) || null);
+  } finally {
+    $('save-survey').disabled = false;
+  }
+});
+$('cancel-survey').onclick = resetSurveyForm;
+$('download-survey').onclick = handle(async () => {
+  $('download-survey').disabled = true;
+  try {
+    const response = await fetch('/api/panel/survey/responses.csv', {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: 'no-store',
+    });
+    if (!response.ok) {
+      if (response.status === 401) clearSession();
+      throw new Error('Download gagal. Periksa login dan migrasi V7.');
+    }
+    const url = URL.createObjectURL(await response.blob()),
+      a = document.createElement('a');
+    a.href = url;
+    a.download = 'survei-silent-terror.csv';
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    notice('Jawaban survei berhasil diunduh.');
+  } finally {
+    $('download-survey').disabled = false;
   }
 });
 $('logout').onclick = handle(async () => {

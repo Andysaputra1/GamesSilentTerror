@@ -24,6 +24,8 @@ from realtime.socket_handlers import register_socket_handlers
 from services.analysis_service import analysis_service
 from services.persistence_service import persistence_service
 from services.npc_service import NPCService
+from services.npc_brain.runtime import brain_runtime
+from services.npc_config_service import load_npc_configuration
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("shadow_heist")
@@ -45,8 +47,15 @@ async def lifespan(_: FastAPI):
             load_panel_configuration()
         except PersistenceError:
             logger.error("Konfigurasi panel belum tersedia; jalankan migrasi V6.")
+        try:
+            load_npc_configuration()
+        except PersistenceError:
+            logger.warning("Konfigurasi NPC panel belum tersimpan; memakai nilai .env.")
     else:
         logger.error("Koneksi awal MySQL gagal.")
+
+    # Otak NPC (IndoBERT + fuzzy/utility/BT + NLG) dimuat di latar agar server langsung melayani.
+    brain_runtime.mulai_memuat(analysis_service)
 
     # Timer server tidak bergantung pada tab pemain atau kecepatan respons LLM.
     async def game_clock():
@@ -63,6 +72,7 @@ async def lifespan(_: FastAPI):
         with suppress(asyncio.CancelledError):
             await clock
         await npc_service.close()
+        brain_runtime.tutup()
         engine.dispose()
 
 
@@ -73,7 +83,7 @@ app.include_router(api_router)
 # The former Node real-time server is hosted alongside FastAPI on port 8000.
 sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins=settings.allowed_origins)
 socket_controller = register_socket_handlers(sio, analysis_service, persistence_service)
-npc_service = NPCService(sio, broadcast=socket_controller.emit_room)
+npc_service = NPCService(sio, broadcast=socket_controller.emit_room, analysis=analysis_service)
 
 # Uvicorn targets this object so FastAPI and Socket.IO share one backend port.
 asgi_app = socketio.ASGIApp(sio, other_asgi_app=app)

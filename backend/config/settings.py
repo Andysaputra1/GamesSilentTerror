@@ -76,6 +76,32 @@ class Settings(MySQLSettings):
     openai_reasoning_effort: Literal["minimal", "low", "medium", "high"] = "minimal"
     intent_model_path: Path = BACKEND_DIR / "artifacts" / "svm" / "intent_classifier.pkl"
 
+    # OTAK NPC (hasil ekspor notebook skripsi): metode penalaran, penulis kalimat, dan lokasi IndoBERT.
+    # campuran = bot dalam satu room dibagi bergiliran ke fuzzy, utility, dan behavior tree.
+    npc_method: Literal["campuran", "fuzzy", "utility", "bt", "llm"] = "campuran"
+    # otomatis = Claude jika ada key, selain itu templat; templat = tanpa LLM sama sekali.
+    npc_writer: Literal["otomatis", "claude", "templat"] = "otomatis"
+    npc_validate_nlg: bool = True
+    npc_intent_model_dir: Path | None = None
+    npc_target_model_dir: Path | None = None
+    npc_nlu_device: Literal["cpu", "cuda"] = "cpu"
+    npc_step_seconds: float = Field(default=3.0, ge=1.0, le=30.0)
+    anthropic_api_key: SecretStr | None = None
+    # Bedrock API key (bearer) untuk Claude di Amazon Bedrock; nama AMAZON_API_KEY mengikuti proyek skripsi.
+    amazon_api_key: SecretStr | None = Field(
+        default=None, validation_alias=AliasChoices("AMAZON_API_KEY", "AWS_BEARER_TOKEN_BEDROCK")
+    )
+    npc_bedrock_region: str = "us-east-1"
+
+    @field_validator(
+        "npc_intent_model_dir", "npc_target_model_dir", "anthropic_api_key", "amazon_api_key",
+        mode="before",
+    )  # fmt: skip
+    @classmethod
+    # VALIDATOR: nilai kosong di .env berarti "tidak diatur", bukan folder kerja atau key kosong.
+    def empty_as_none(cls, value: object) -> object:
+        return None if isinstance(value, str) and not value.strip() else value
+
     auth_session_hours: int = Field(default=24, ge=1, le=24 * 30)
 
     default_room_code: str = "local-lobby"

@@ -17,3 +17,8 @@ python-socketio
 google-auth[requests]>=2.40,<3
 email-validator>=2,<3
 cryptography>=46,<51
+# Otak NPC hasil notebook skripsi (lihat services/npc_brain).
+pandas
+torch
+transformers==4.46.3
+anthropic

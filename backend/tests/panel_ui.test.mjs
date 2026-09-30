@@ -134,3 +134,85 @@ test('user editor uses selected account, clears secrets, and separates destructi
   assert.equal(w.document.querySelector('#user-new-password').value, '');
   assert.equal(w.document.querySelector('#user-rows .danger').textContent, 'Hapus akun');
 });
+
+test('NPC brain menu shows server status and saves the selected method', async (t) => {
+  const status = {
+    siap: true,
+    gagal: false,
+    detail: 'AI siap.',
+    nlu: 'indobert',
+    penulis: 'templat',
+    metode: 'campuran',
+    penulis_diminta: 'otomatis',
+    validasi: true,
+    penulis_aktif: false,
+    pertandingan_aktif: 2,
+  };
+  const pilihan = {
+    metode: { campuran: 'Campuran', fuzzy: 'Fuzzy', utility: 'Utility', bt: 'BT', llm: 'LLM' },
+    penulis: { otomatis: 'Otomatis', claude: 'Claude', templat: 'Templat' },
+  };
+  let saved;
+  const w = setup(t, (path, options) => {
+    if (path !== '/api/panel/npc') return undefined;
+    if (options.method === 'PUT') {
+      saved = JSON.parse(options.body);
+      return response({ status: { ...status, metode: saved.metode }, pilihan });
+    }
+    return response({ status, pilihan });
+  });
+  await login(w);
+  await w.document.querySelector('[data-menu=npc]').onclick({ preventDefault() {} });
+  assert.match(w.document.querySelector('#npc-status').textContent, /IndoBERT/);
+  assert.equal(w.document.querySelector('#npc-method').value, 'campuran');
+  w.document.querySelector('#npc-method').value = 'bt';
+  await w.document.querySelector('#npc-form').onsubmit({ preventDefault() {} });
+  assert.deepEqual(saved, { metode: 'bt', penulis: 'otomatis', validasi: true });
+  assert.equal(w.document.querySelector('#npc-method').value, 'bt');
+});
+
+test('survey menu renders questions as text and edits scale meaning from the panel', async (t) => {
+  const question = {
+    id: 3,
+    code: 'seru',
+    prompt: '<b>Seberapa seru?</b>',
+    kind: 'stars',
+    scale_min: 1,
+    scale_max: 6,
+    label_min: 'Bosan',
+    label_max: 'Seru',
+    options: [],
+    required: true,
+    active: true,
+    position: 10,
+  };
+  let saved;
+  const w = setup(t, (path, options) => {
+    if (path === '/api/panel/survey/summary')
+      return response({
+        questions: [question],
+        distribution: [{ question_id: 3, value_number: 5, n: 2 }],
+        per_method: [{ question_id: 3, method: 'fuzzy', n: 2, rata: 5 }],
+        text_answers: [],
+      });
+    if (path === '/api/panel/survey/questions/3' && options.method === 'PUT') {
+      saved = JSON.parse(options.body);
+      return response({ id: 3, ...saved });
+    }
+    return undefined;
+  });
+  await login(w);
+  await w.document.querySelector('[data-menu=survey]').onclick({ preventDefault() {} });
+  const rows = w.document.querySelector('#survey-rows');
+  assert.equal(rows.querySelector('b'), null);
+  assert.match(rows.textContent, /1 = Bosan · 6 = Seru/);
+  assert.match(rows.textContent, /rata-rata 5.00/);
+  assert.match(w.document.querySelector('#survey-method-rows').textContent, /fuzzy/);
+  rows.querySelector('button').click();
+  assert.equal(w.document.querySelector('#survey-editor-box').open, true);
+  w.document.querySelector('#survey-label-max').value = 'Seru sekali';
+  await w.document.querySelector('#survey-form').onsubmit({ preventDefault() {} });
+  assert.equal(saved.label_max, 'Seru sekali');
+  assert.equal(saved.kind, 'stars');
+  assert.equal(w.document.querySelector('#survey-editor-box').open, false);
+});

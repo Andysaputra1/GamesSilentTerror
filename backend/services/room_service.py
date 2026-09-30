@@ -150,9 +150,23 @@ class RoomService:
                 )
             if any(self.active(name) for name in room.members):
                 raise ValueError("Ada anggota yang masih mengikuti pertandingan lain.")
-            room.match = Match(room.members, self.bot_names(room), quick=quick)
+            # Ronde 1 ditahan di layar persiapan sampai otak bot siap (NPCService.prepare).
+            room.match = Match(room.members, self.bot_names(room), quick=quick, preparing=True)
             room.match.ai_controlled = True
             return self.snapshot(room)
+
+    # SIAP: manusia boleh mempercepat layar persiapan setelah membaca panduan; AI tetap harus siap.
+    @traced
+    def ready(self, code, username, *, match_id):
+        with self.lock:
+            room = self.get(code, username)
+            match = room.match
+            if not match or match.id != match_id:
+                raise ValueError("Pertandingan sudah berganti. Perbarui halaman.")
+            match.tick()
+            if match.phase == "preparing":
+                match.ready_consent(username)
+            return self.state(code, username)
 
     # PEMULIHAN: cari pertandingan akun dari server, bukan mengandalkan sessionStorage tab.
     def current(self, username):

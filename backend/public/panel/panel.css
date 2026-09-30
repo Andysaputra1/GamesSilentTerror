@@ -473,3 +473,9 @@ dialog form button { width: 100%; }
 #notice:not(:empty) { position: fixed; bottom: 20px; right: 24px; z-index: 20; max-width: min(480px,calc(100vw - 48px)); padding: 16px 20px; margin: 0; background: #203328; border: 1px solid #597b4c; border-radius: 10px; color: #e1f4d8; box-shadow: 0 15px 45px #0006; font-size: 13px; }
 @media (max-width: 1000px) { .ai-layout { grid-template-columns: 1fr; }.config-panel { border-right: 0; padding-right: 0; border-bottom: 1px solid #293546; padding-bottom: 24px; }.metric-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
 @media (max-width: 680px) { .card .form-grid { grid-template-columns: 1fr; }#menu-users td:last-child { width: 100%; }.toolbar label { min-width: 100%; }.toolbar .check { min-width: 100%; }nav { display: grid; grid-template-columns: 1fr 1fr; }.metric strong { font-size: 15px; } }
+/* OTAK NPC: daftar status dua kolom. */
+.status-list { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 10px 18px; margin: 0; }
+.status-list dt { color: #9aacbf; font-size: 12px; }
+.status-list dd { margin: 0; overflow-wrap: anywhere; }
+#menu-survey td button { margin: 2px 0; }
+#menu-survey h3 { margin-top: 28px; }
