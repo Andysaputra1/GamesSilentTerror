@@ -170,4 +170,21 @@ describe('Lobby', () => {
     expect(navigate).toHaveBeenCalledWith('/game');
     expect(sessionStorage.getItem('shadow_heist_game_entry')).toBe('allowed');
   });
+
+  // Tab di latar bisa melewatkan layar persiapan: polling berikutnya sudah melihat siang.
+  it('still enters the game when polling skips the short preparation phase', () => {
+    const room = {
+      code: 'ABC123',
+      owner: 'alice',
+      members: ['alice', 'bob'],
+      bots: [],
+      bot_enabled: false,
+      phase: 'lobby',
+    };
+    component.room = room;
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+    vi.spyOn(TestBed.inject(RoomService), 'request').mockReturnValue(of({ ...room, phase: 'day' }));
+    (component as unknown as { load: (m: string, p: string) => void }).load('GET', '/ABC123');
+    expect(navigate).toHaveBeenCalledWith('/game');
+  });
 });

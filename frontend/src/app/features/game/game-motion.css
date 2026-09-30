@@ -261,6 +261,14 @@
   .players {
     --gap: 12px;
   }
+  /* Komposisi di meja HP: tanpa ikon agar tetap satu baris. */
+  .felt-composition i {
+    display: none;
+  }
+  .felt-composition .comp-chip {
+    padding: 0.05em 0.5em;
+    font-size: 13px;
+  }
   .hud-side .round-button {
     display: none;
   }

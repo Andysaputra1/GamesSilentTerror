@@ -409,9 +409,13 @@ textarea:focus-visible {
   font-size: 13px;
   line-height: 1.45;
 }
-.objective {
+.objective,
+.allies {
   font-family: var(--font-hand);
   font-size: 15px !important;
+}
+.allies {
+  color: #8f1f18;
 }
 .private-status {
   width: 100%;

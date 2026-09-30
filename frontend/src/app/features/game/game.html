@@ -32,6 +32,32 @@
     }
   </ng-template>
 
+  <!-- Komposisi role room dari server (dipakai di persiapan dan di tepi atas meja). -->
+  <ng-template #compositionChips let-extra>
+    <p class="composition {{ extra }}">
+      <span class="sr-only">Komposisi room: </span>
+      @for (item of composition; track item.role) {
+        @let sisa = hitmanLeft(item, extra);
+        <span
+          class="comp-chip"
+          [attr.data-role]="item.role"
+          [class.reduced]="sisa !== null && sisa < item.count"
+          [attr.title]="sisa === null ? null : 'Hitman tersisa ' + sisa + ' dari ' + item.count"
+          ><i aria-hidden="true">{{ roleIcons[item.role] }}</i>
+          @if (sisa === null) {
+            <b>{{ item.count }}</b> {{ roleNames[item.role] }}
+          } @else {
+            <!-- "1/2" dibaca pembaca layar sebagai pecahan; teks sr-only memberi arti yang jelas. -->
+            <span aria-hidden="true"
+              ><b>{{ sisa }}/{{ item.count }}</b> {{ roleNames[item.role] }}</span
+            >
+            <span class="sr-only">Hitman tersisa {{ sisa }} dari {{ item.count }}</span>
+          }
+        </span>
+      }
+    </p>
+  </ng-template>
+
   @if (transition; as t) {
     <div class="phase-transition" [attr.data-phase]="t.phase" role="status" aria-live="polite">
       <div class="transition-card">
@@ -61,10 +87,14 @@
               <p class="hand">Berkas kasus rahasia</p>
               <h2 id="splash-title">Sebelum lampu dimatikan…</h2>
               <p>
-                Satu Hitman bersembunyi di antara kalian. Baca panduan singkat ini sambil menunggu
+                {{ threatLine }} Baca panduan singkat ini sambil menunggu
                 {{ state.preparation?.bots ? state.preparation?.bots + ' bot AI' : 'semua pemain' }}
                 siap.
               </p>
+              @if (composition.length) {
+                <ng-container *ngTemplateOutlet="compositionChips; context: { $implicit: '' }" />
+                <p class="composition-note hand">Jumlah Hitman dan Spy mengikuti jumlah pemain.</p>
+              }
             </header>
             <div class="guide-grid">
               @for (item of guide; track item.title) {
@@ -84,6 +114,11 @@
                   <b>{{ roleNames[state.me.role] || state.me.role }}</b> —
                   {{ roleHelp[state.me.role] }}
                 </p>
+                @if (allies.length) {
+                  <p class="role-note allies">
+                    Rekan Syndicate: <b>{{ allies.join(', ') }}</b>
+                  </p>
+                }
               } @else {
                 <p class="role-note hand">
                   Role hanya untukmu. Jangan sampai terlihat pemain lain!
@@ -202,6 +237,11 @@
             @if (revealRole && !state.winner) {
               <p class="objective"><b>Tujuan kubumu:</b> {{ objective }}</p>
               <p class="role-help">{{ roleHelp[state.me.role] }}</p>
+              @if (allies.length) {
+                <p class="allies">
+                  Rekan Syndicate: <b>{{ allies.join(', ') }}</b>
+                </p>
+              }
             }
             <p class="private-status">{{ privateStatus }}</p>
           </div>
@@ -233,7 +273,12 @@
 
         <!-- TENGAH: papan tersangka dan baki aksi. -->
         <section class="table-panel" aria-label="Meja pemain">
-          <div class="table-felt" #felt>
+          <div class="table-felt" #felt [class.has-composition]="composition.length > 0">
+            @if (composition.length) {
+              <ng-container
+                *ngTemplateOutlet="compositionChips; context: { $implicit: 'felt-composition' }"
+              />
+            }
             <div class="players" [style.--cols]="tableColumns" [style.--rows]="tableRows">
               @for (player of state.players; track player.name) {
                 <div
@@ -269,6 +314,13 @@
                         class="role-tag"
                         >{{ (roleNames[player.role] || player.role).toUpperCase() }}</strong
                       >
+                    } @else if (isAlly(player.name)) {
+                      <!-- Hanya Hitman menerima daftar rekan dari server; pemain lain tidak pernah melihatnya. -->
+                      <span class="ally-tag"
+                        >◆ Rekan<span class="sr-only">
+                          Syndicate, tidak bisa jadi target Hostage atau Gag</span
+                        ></span
+                      >
                     }
                     @if (!player.alive) {
                       <span class="stamp stamp-dead">Dieksekusi</span>
@@ -277,6 +329,14 @@
                     }
                     @if (target === player.name) {
                       <span class="stamp stamp-target">Target</span>
+                    }
+                    @if (allyPicks(player.name).length) {
+                      <!-- Label pendek agar tidak terpotong di kartu kecil; rincian untuk pembaca layar. -->
+                      <span class="ally-pick"
+                        >◆ Incaran<span class="sr-only">
+                          Hostage pilihan rekan: {{ allyPicks(player.name).join(', ') }}</span
+                        ></span
+                      >
                     }
                   </button>
                   @if (state.phase === 'tribunal' && leadingTarget === player.name) {
@@ -326,11 +386,30 @@
                     🔒 Suaramu terkunci: <b>{{ state.me.vote }}</b>
                   </p>
                 }
+                @if (allyPlan.length) {
+                  <p class="ally-plan">
+                    <span aria-hidden="true">◆</span> Pilihan rekan:
+                    @for (ally of allyPlan; track ally.name) {
+                      <span class="ally-choice"
+                        ><b>{{ ally.name }}</b> → {{ ally.target || 'belum memilih' }}</span
+                      >
+                    }
+                  </p>
+                  @if (state.me.action && allyTarget && state.me.action.target !== allyTarget) {
+                    <p class="hint">
+                      Pilihanmu berbeda dengan rekan. Syndicate memakai target terbanyak; seri →
+                      pilihan yang masuk lebih dulu.
+                    </p>
+                  }
+                }
                 @if (state.me.role === 'stalker') {
                   <p class="hint">Peek tersedia mulai ronde {{ state.me.next_peek }}.</p>
                 }
                 @if (state.me.role === 'hitman') {
-                  <p class="hint">Gag tersedia mulai ronde {{ state.me.next_gag }}.</p>
+                  <p class="hint">
+                    Gag Order{{ allies.length ? ' (dipakai bersama rekan)' : '' }} tersedia mulai
+                    ronde {{ state.me.next_gag }}.
+                  </p>
                 }
                 @if (notice) {
                   <p class="notice" role="status">{{ notice }}</p>
@@ -347,6 +426,15 @@
                     ⚖ Kunci vote: {{ target || 'pilih pemain' }}
                   </button>
                 } @else if (state.me.can_act) {
+                  @if (allyTarget && target !== allyTarget && canTarget(allyTarget)) {
+                    <button
+                      type="button"
+                      class="wood-button plank ally-match"
+                      (click)="target = allyTarget"
+                    >
+                      ◆ Samakan dengan rekan: {{ allyTarget }}
+                    </button>
+                  }
                   <button
                     type="button"
                     class="wood-button green"
@@ -684,18 +772,46 @@
                   </article>
                 }
               </div>
-              <p><b>Kubu warga (Spy, Stalker, Civilian):</b> menang jika Hitman dieksekusi.</p>
               <p>
-                <b>Hitman:</b> menang ketika warga hidup yang masih memiliki hak voting tersisa
-                paling banyak satu.
+                <b>Komposisi:</b>
+                {{ compositionLabel ? 'room ini berisi ' + compositionLabel + '.' : '' }}
+                Jumlah Hitman dan Spy mengikuti jumlah pemain.
+                @if (hitmanRemaining !== null) {
+                  Karena Hitman lebih dari satu, jumlah Hitman yang tersisa diumumkan setelah setiap
+                  eksekusi; role korban tetap rahasia sampai akhir.
+                }
               </p>
+              <p>
+                <b>Kubu warga (Spy, Stalker, Civilian):</b> menang jika semua Hitman dieksekusi.
+              </p>
+              <p>
+                <b>Hitman (Syndicate):</b> menang ketika warga hidup yang masih memiliki hak voting
+                tidak lebih banyak dari Hitman yang masih hidup.
+                @if (multiHitman) {
+                  Para Hitman saling mengenal dan tidak bisa menyandera atau membungkam rekan
+                  sendiri.
+                }
+              </p>
+              @if (multiHitman) {
+                <p>
+                  Syndicate hanya menyandera satu pemain per malam: target terbanyak dari pilihan
+                  para Hitman; jika seri, pilihan yang masuk lebih dulu. Gag Order dipakai bersama:
+                  satu kali per siang, lalu jeda satu ronde penuh. Setiap Spy menjaga satu pemain.
+                </p>
+              } @else {
+                <p>
+                  Hitman menyandera satu pemain per malam dan bisa memakai Gag Order satu kali per
+                  siang, lalu jeda satu ronde penuh. Spy menjaga satu pemain.
+                </p>
+              }
               <p>
                 Hostage tetap hidup dan masih bisa memakai skill malam, tetapi kehilangan chat dan
                 voting permanen. Gag hanya membatasi chat sampai akhir ronde; hak voting tetap ada.
               </p>
               <p>
-                Voting seri atau tanpa suara tidak mengeksekusi siapa pun. Ronde berikutnya dimulai
-                jika belum ada pemenang. Tidak ada batas ronde atau hasil seri pertandingan.
+                Voting seri atau tanpa suara tidak mengeksekusi siapa pun, dan role pemain yang
+                dieksekusi tetap rahasia sampai permainan selesai. Ronde berikutnya dimulai jika
+                belum ada pemenang. Tidak ada batas ronde atau hasil seri pertandingan.
               </p>
             </div>
           </section>

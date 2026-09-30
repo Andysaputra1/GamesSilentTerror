@@ -521,4 +521,231 @@ describe('Game', () => {
     expect(component.surveyState).toBe('done');
     expect(component.surveyError).toBe('');
   });
+
+  function render(): HTMLElement {
+    fixture.componentRef.changeDetectorRef.markForCheck();
+    fixture.detectChanges();
+    return fixture.nativeElement;
+  }
+
+  // KOMPOSISI: jumlah role dari server tampil di persiapan dan di meja; tanpa data, tidak ada chip.
+  it('shows the room composition from the server on the splash and the table', () => {
+    const state = snapshot();
+    state.game.phase = 'preparing';
+    state.game.preparation = {
+      ready: true,
+      detail: 'AI siap.',
+      progress: 1,
+      starts_in: 5,
+      max_wait: 80,
+      agreed: 0,
+      required: 1,
+      consented: false,
+      bots: 7,
+    };
+    component.game = state.game;
+    expect(render().querySelector('.composition')).toBeNull();
+    expect(component.threatLine).toBe('Hitman bersembunyi di antara kalian.');
+
+    state.game.composition = { hitman: 2, spy: 1, stalker: 1, civilian: 4 };
+    const splash = render().querySelector('.splash') as HTMLElement;
+    expect(splash.querySelectorAll('.comp-chip').length).toBe(4);
+    expect(component.compositionLabel).toBe('2 Hitman · 1 Spy · 1 Stalker · 4 Civilian');
+    expect(splash.textContent).toContain('2 Hitman bersembunyi di antara kalian');
+    expect(splash.textContent).toContain('Jumlah Hitman dan Spy mengikuti jumlah pemain');
+
+    state.game.phase = 'day';
+    state.game.me.role = 'spy';
+    const felt = render().querySelector('.table-felt') as HTMLElement;
+    expect(felt.classList).toContain('has-composition');
+    expect(felt.querySelector('.felt-composition')?.textContent).toContain('Hitman');
+    expect(component.objective).toContain('semua 2 Hitman');
+    const hitmanChip = () =>
+      render().querySelector('.felt-composition [data-role="hitman"]') as HTMLElement;
+    expect(hitmanChip().textContent?.trim()).toMatch(/^\S*\s*2\s+Hitman$/); // belum diumumkan
+
+    // Room multi-Hitman: server mengumumkan Hitman tersisa → chip meja "tersisa/total", merah bila berkurang.
+    state.game.hitman_remaining = 2;
+    expect(hitmanChip().textContent).toContain('2/2');
+    expect(hitmanChip().classList).not.toContain('reduced');
+    state.game.hitman_remaining = 1;
+    expect(hitmanChip().textContent).toContain('1/2');
+    expect(hitmanChip().classList).toContain('reduced');
+    expect(hitmanChip().title).toBe('Hitman tersisa 1 dari 2');
+    // Pembaca layar mendengar kalimat utuh, bukan pecahan "1/2".
+    expect(hitmanChip().querySelector('.sr-only')?.textContent).toBe('Hitman tersisa 1 dari 2');
+    expect(hitmanChip().querySelector('[aria-hidden="true"] b')?.textContent).toBe('1/2');
+    expect(render().querySelector('.splash')).toBeNull();
+  });
+
+  // REKAN: hanya Hitman yang melihat rekan; rekan tidak bisa jadi target Hostage/Gag, tetapi boleh di-vote.
+  it('shows Syndicate allies only to a Hitman and keeps them out of Hostage and Gag targets', () => {
+    const game = snapshot().game;
+    game.players = ['alice', 'NOX', 'bob'].map((name) => ({ name, alive: true }));
+    game.me.allies = ['NOX'];
+    component.game = game;
+    component.revealRole = true;
+    let cards = render().querySelectorAll('.player-card');
+    expect(component.canTarget('NOX')).toBe(false);
+    expect(component.canTarget('bob')).toBe(true);
+    expect(cards[1].querySelector('.ally-tag')?.textContent).toContain('Rekan');
+    expect((cards[1].querySelector('button') as HTMLButtonElement).disabled).toBe(true);
+    expect((cards[2].querySelector('button') as HTMLButtonElement).disabled).toBe(false);
+    expect(cards[2].querySelector('.ally-tag')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.private-card .allies')?.textContent).toContain(
+      'NOX',
+    );
+    expect(fixture.nativeElement.querySelector('.action-panel').textContent).toContain(
+      'dipakai bersama rekan',
+    );
+
+    game.phase = 'tribunal';
+    game.me = { ...game.me, ability: null, can_act: false, can_vote: true };
+    cards = render().querySelectorAll('.player-card');
+    expect(component.canTarget('NOX')).toBe(true);
+    expect((cards[1].querySelector('button') as HTMLButtonElement).disabled).toBe(false);
+
+    // Role lain tidak pernah menampilkan rekan, walaupun data salah ikut terkirim.
+    game.me.role = 'civilian';
+    expect(component.allies).toEqual([]);
+    expect(render().querySelector('.ally-tag')).toBeNull();
+  });
+
+  // MALAM: pilihan Hostage rekan terlihat, dan target terbanyak (seri → pilihan pertama) bisa disamakan.
+  it('lists ally Hostage choices at night and offers to match them', () => {
+    const game = snapshot().game;
+    game.phase = 'night';
+    game.players = ['alice', 'NOX', 'VEIL', 'bob', 'eka'].map((name) => ({ name, alive: true }));
+    game.me = {
+      ...game.me,
+      ability: 'hostage',
+      can_act: true,
+      allies: ['NOX', 'VEIL'],
+      ally_actions: [{ name: 'VEIL', target: 'bob' }],
+    };
+    component.game = game;
+    const page = render();
+    expect(component.allyPlan).toEqual([
+      { name: 'NOX', target: null },
+      { name: 'VEIL', target: 'bob' },
+    ]);
+    expect(component.allyTarget).toBe('bob');
+    const panel = page.querySelector('.action-panel') as HTMLElement;
+    expect(panel.textContent).toContain('belum memilih');
+    expect(panel.textContent).toContain('Syndicate hanya menyandera satu orang');
+    expect(page.querySelectorAll('.player-card')[3].querySelector('.ally-pick')).not.toBeNull();
+    (panel.querySelector('.ally-match') as HTMLButtonElement).click();
+    expect(component.target).toBe('bob');
+    expect(render().querySelector('.ally-match')).toBeNull();
+
+    game.me.ally_actions = [
+      { name: 'VEIL', target: 'eka' },
+      { name: 'NOX', target: 'bob' },
+    ];
+    expect(component.allyTarget).toBe('eka');
+  });
+
+  // ATURAN BARU: semua Hitman harus dieksekusi; Hitman menang saat warga bebas ≤ Hitman hidup.
+  it('explains the multi-Hitman win conditions in the rules and the result', () => {
+    const game = snapshot().game;
+    game.composition = { hitman: 2, spy: 2, stalker: 1, civilian: 5 };
+    component.game = game;
+    component.showRules = true;
+    const rules = (render().querySelector('.rules-modal') as HTMLElement).textContent ?? '';
+    expect(rules).toContain('2 Hitman · 2 Spy · 1 Stalker · 5 Civilian');
+    expect(rules).toContain('menang jika semua Hitman dieksekusi');
+    expect(rules).toContain('tidak lebih banyak dari Hitman yang masih hidup');
+    expect(rules).not.toContain('Hitman yang tersisa diumumkan');
+    game.hitman_remaining = 2;
+    const announced = (render().querySelector('.rules-modal') as HTMLElement).textContent ?? '';
+    expect(announced).toContain('jumlah Hitman yang tersisa diumumkan setelah setiap eksekusi');
+
+    game.phase = 'finished';
+    game.winner = 'civilians';
+    game.me.role = 'spy';
+    game.players = [
+      { name: 'alice', alive: true, role: 'spy' },
+      { name: 'NOX', alive: false, role: 'hitman' },
+      { name: 'VEIL', alive: false, role: 'hitman' },
+    ];
+    game.result = {
+      reason: 'hitman_executed',
+      team: 'civilians',
+      outcome: 'won',
+      civilians_alive: 1,
+      civilians_hostage: 0,
+      civilians_eliminated: 0,
+    };
+    expect(component.resultExplanation).toContain('Semua Hitman telah dieksekusi');
+
+    // Syndicate menang walau satu Hitman sudah dieksekusi (keadaan yang mungkin di engine).
+    game.winner = 'hitman';
+    game.players = [
+      { name: 'alice', alive: true, role: 'spy' },
+      { name: 'NOX', alive: true, role: 'hitman' },
+      { name: 'VEIL', alive: false, role: 'hitman' },
+    ];
+    game.result = {
+      reason: 'vote_control',
+      team: 'civilians',
+      outcome: 'lost',
+      civilians_alive: 1,
+      civilians_hostage: 0,
+      civilians_eliminated: 0,
+    };
+    expect(component.winners.map((player) => player.name)).toEqual(['NOX', 'VEIL']);
+    expect(component.congratsTitle).toBe('Selamat untuk Syndicate!');
+    expect(component.resultExplanation).toContain('tidak lebih banyak dari Hitman');
+    expect(render().querySelectorAll('.lineup li').length).toBe(2);
+  });
+
+  // Room satu Hitman: teks Syndicate (Hostage/Gag bersama, "para Hitman") tidak ditampilkan.
+  it('keeps single-Hitman wording in rooms with one Hitman', () => {
+    const game = snapshot().game;
+    game.composition = { hitman: 1, spy: 1, stalker: 1, civilian: 2 };
+    game.me.role = 'hitman';
+    component.game = game;
+    component.showRules = true;
+    const rules = (render().querySelector('.rules-modal') as HTMLElement).textContent ?? '';
+    expect(rules).not.toContain('Syndicate hanya menyandera');
+    expect(rules).not.toContain('dipakai bersama');
+    expect(rules).toContain('Hitman menyandera satu pemain per malam');
+    expect(component.guide.map((item) => item.text).join(' ')).not.toMatch(/Para Hitman|bersama/);
+    expect(component.roleHelp['hitman']).not.toContain('Syndicate');
+    expect(component.roleHelp['spy']).not.toContain('Spy lain');
+
+    game.composition = { hitman: 2, spy: 2, stalker: 1, civilian: 3 };
+    expect(component.guide.find((item) => item.title === 'Malam')?.text).toContain('Para Hitman');
+    expect(component.roleHelp['hitman']).toContain('Syndicate');
+    expect(component.roleHelp['spy']).toContain('Spy lain');
+  });
+
+  // Malam Hitman: rekan yang sudah mati tidak masuk rencana; beda pilihan dengan rekan diberi tahu.
+  it('lists only living allies and warns when the Hitman picks a different target', () => {
+    const game = snapshot().game;
+    game.phase = 'night';
+    game.composition = { hitman: 2, spy: 2, stalker: 1, civilian: 3 };
+    game.me.role = 'hitman';
+    game.me.ability = 'hostage';
+    game.me.can_act = true;
+    game.me.allies = ['NOX', 'VEIL'];
+    game.players = [
+      { name: 'alice', alive: true },
+      { name: 'NOX', alive: true },
+      { name: 'VEIL', alive: false },
+      { name: 'eka', alive: true },
+      { name: 'bob', alive: true },
+    ];
+    game.me.ally_actions = [{ name: 'NOX', target: 'eka' }];
+    component.game = game;
+    expect(component.allyPlan).toEqual([{ name: 'NOX', target: 'eka' }]);
+    expect(render().textContent).not.toContain('Pilihanmu berbeda dengan rekan');
+    // Setelah pilihan sendiri dikunci ke target lain, Hitman diberi tahu aturan target terbanyak.
+    game.me.can_act = false;
+    game.me.action = { ability: 'hostage', target: 'bob' };
+    expect(render().textContent).toContain('Pilihanmu berbeda dengan rekan');
+    const pick = render().querySelector('.ally-pick') as HTMLElement;
+    expect(pick.textContent).toContain('◆ Incaran');
+    expect(pick.querySelector('.sr-only')?.textContent).toContain('Hostage pilihan rekan: NOX');
+  });
 });

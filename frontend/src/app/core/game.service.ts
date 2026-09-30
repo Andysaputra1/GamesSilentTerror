@@ -21,6 +21,13 @@ export interface Preparation {
   consented: boolean;
   bots: number;
 }
+// Komposisi role room (publik); jumlah Hitman dan Spy mengikuti jumlah pemain dan ditentukan backend.
+export interface RoleComposition {
+  hitman: number;
+  spy: number;
+  stalker: number;
+  civilian: number;
+}
 export interface MatchView {
   id: string;
   phase: 'preparing' | 'day' | 'night' | 'tribunal' | 'finished';
@@ -28,6 +35,10 @@ export interface MatchView {
   deadline: number;
   server_time: number;
   winner: 'hitman' | 'civilians' | null;
+  // Opsional: backend lama belum mengirimnya.
+  composition?: RoleComposition | null;
+  // Room dengan ≥ 2 Hitman: jumlah Hitman yang masih hidup, diumumkan setelah setiap eksekusi.
+  hitman_remaining?: number | null;
   preparation?: Preparation | null;
   result?: {
     reason: 'hitman_executed' | 'all_survivors_hostage' | 'no_civilians_alive' | 'vote_control';
@@ -56,10 +67,14 @@ export interface MatchView {
     ability: string | null;
     can_act: boolean;
     action: { ability: string; target: string } | null;
+    // Cooldown Gag bersama Syndicate (sama untuk semua Hitman).
     next_gag: number;
     next_peek: number;
     last_guard: string | null;
     intel: { round: number; name: string; role: string }[];
+    // Hanya untuk Hitman: rekan Syndicate dan pilihan Hostage mereka malam ini; selain itu kosong.
+    allies?: string[];
+    ally_actions?: { name: string; target: string }[];
   };
 }
 export interface GameSnapshot {

@@ -209,7 +209,8 @@ export class Lobby implements OnInit, OnDestroy {
       )
       .subscribe({
         next: (room) => {
-          const justStarted = this.room?.phase === 'lobby' && room.phase === 'preparing';
+          // Tab di latar bisa melewatkan layar persiapan yang singkat: fase apa pun selain lobby berarti mulai.
+          const justStarted = this.room?.phase === 'lobby' && room.phase !== 'lobby';
           this.room = room;
           this.error = '';
           sessionStorage.setItem('shadow_heist_room', room.code);

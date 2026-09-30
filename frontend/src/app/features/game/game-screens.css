@@ -199,6 +199,86 @@
 .role-note.hand {
   font-size: 16px;
 }
+.role-note.allies {
+  color: #ffc2b3;
+}
+
+/* ---------- Komposisi role room (chip dari server) ---------- */
+.composition {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin: 0;
+}
+.comp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  padding: 0.1em 0.65em;
+  border: 1px solid rgb(139 90 43 / 0.45);
+  border-radius: 999px;
+  background: #fffaf0;
+  color: var(--ink);
+  font: 15px/1.35 var(--font-hand);
+  white-space: nowrap;
+  box-shadow: 0 2px 0 rgb(139 90 43 / 0.18);
+}
+.comp-chip i {
+  font-style: normal;
+}
+.comp-chip b {
+  font: 800 0.95em/1 var(--font-display);
+}
+.comp-chip[data-role='hitman'] {
+  border-color: rgb(179 38 30 / 0.55);
+  color: #8f1f18;
+}
+/* Room multi-Hitman: chip Hitman di meja diisi merah setelah ada Hitman yang tereksekusi
+   (lebih spesifik dari aturan chip Hitman biasa agar tidak bergantung urutan). */
+.comp-chip[data-role='hitman'].reduced {
+  border-color: #8f1f18;
+  background: #8f1f18;
+  color: #fff3e6;
+}
+
+/* ---------- Penanda Syndicate di kartu pemain (hanya ada di layar Hitman) ----------
+   Dipindah ke sini dari game-table.css karena budget 12 kB per stylesheet komponen. */
+.ally-tag,
+.ally-pick {
+  position: absolute;
+  z-index: 3;
+  padding: 0.1em 0.4em;
+  border-radius: 0.3em;
+  font: 800 max(9px, 0.58em) / 1.3 var(--font-display);
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.ally-tag {
+  top: 0.55em;
+  left: 0.5em;
+  background: rgb(43 23 12 / 0.72);
+  color: #ffc2b3;
+}
+/* Incaran Hostage rekan malam ini: pojok kanan atas, nama pemain di bawah potret tetap terbaca. */
+.ally-pick {
+  top: 0.55em;
+  right: 0.5em;
+  max-width: calc(100% - 1em);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: rgb(107 42 28 / 0.9);
+  color: #ffe3d6;
+}
+.briefing-head .composition {
+  justify-content: flex-start;
+  margin-top: 10px;
+}
+.briefing-head .composition-note {
+  margin-top: 4px;
+  font-size: 15px;
+}
 .splash-status {
   display: flex;
   flex-direction: column;

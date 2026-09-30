@@ -21,6 +21,7 @@ import {
   GameMessage,
   GameService,
   MatchView,
+  RoleComposition,
   SurveyQuestion,
   SurveyStatus,
 } from '../../core/game.service';
@@ -99,6 +100,13 @@ export class Game implements OnInit, OnDestroy {
     guard: 'Jaga',
     peek: 'Intip',
   };
+  // Ikon chip komposisi room (akhiran U+FE0F memaksa tampilan emoji berwarna, bukan simbol teks).
+  readonly roleIcons: Record<string, string> = {
+    hitman: '🗡️',
+    spy: '🛡️',
+    stalker: '👁️',
+    civilian: '👤',
+  };
   // Overlay pergantian fase (meredup saat malam, terang saat pagi).
   transition: { phase: string; title: string; subtitle: string } | null = null;
   // Survei akhir: pertanyaan, jawaban lokal, dan status pengiriman.
@@ -135,48 +143,68 @@ export class Game implements OnInit, OnDestroy {
     },
     finished: { title: 'Permainan selesai', subtitle: 'Identitas semua pemain dibuka.' },
   };
-  // Panduan singkat di layar persiapan sebelum ronde 1.
-  readonly guide = [
-    {
-      icon: '🎭',
-      title: 'Tujuan',
-      text: 'Warga (Civilian, Spy, Stalker) menang jika Hitman dieksekusi. Hitman menang jika warga yang masih bebas bersuara tinggal satu.',
-    },
-    {
-      icon: '☀',
-      title: 'Siang',
-      text: 'Diskusi bebas. Tanyakan alibi, tuduh dengan alasan, dan bela pemain yang kamu percaya. Hitman bisa membungkam satu pemain (Gag).',
-    },
-    {
-      icon: '☾',
-      title: 'Malam',
-      text: 'Layar meredup dan chat dikunci. Hitman menyandera satu pemain, Spy menjaga satu pemain, Stalker mengintip role seseorang.',
-    },
-    {
-      icon: '⚖',
-      title: 'Tribunal',
-      text: 'Pemain yang masih punya suara memilih tersangka. Suara terbanyak tunggal dieksekusi; seri berarti tidak ada eksekusi.',
-    },
-    {
-      icon: '◆',
-      title: 'Bot AI',
-      text: 'Sebagian kursi diisi bot. Mereka membaca chat, menimbang bukti, dan bisa berbohong jika menjadi Hitman. Perlakukan seperti pemain lain.',
-    },
-    {
-      icon: '💡',
-      title: 'Tips',
-      text: 'Diam bukan bukti. Perhatikan siapa yang mendorong vote ke pemain yang ternyata bukan Hitman.',
-    },
-  ];
-  readonly roleHelp: Record<string, string> = {
-    hitman:
-      'Malam: Hostage satu warga. Siang: Gag Order, lalu lewati satu ronde sebelum memakai lagi.',
-    spy: 'Malam: Guard satu pemain (boleh diri sendiri). Jangan pilih target sama dua malam berturut-turut.',
-    stalker:
-      'Malam: Peek identitas satu pemain, sekali setiap dua ronde. Hasil hanya terlihat olehmu.',
-    civilian:
-      'Amati percakapan, uji alibi, dan pilih tersangka saat Tribunal. Tidak punya skill malam.',
-  };
+  // Room dengan lebih dari satu Hitman memakai aturan Syndicate (Hostage dan Gag bersama).
+  get multiHitman(): boolean {
+    return this.hitmanCount > 1;
+  }
+
+  // Panduan singkat di layar persiapan sebelum ronde 1 (juga dipakai modal aturan).
+  get guide(): { icon: string; title: string; text: string }[] {
+    const banyak = this.multiHitman;
+    return [
+      {
+        icon: '🎭',
+        title: 'Tujuan',
+        text: 'Warga (Civilian, Spy, Stalker) menang jika semua Hitman dieksekusi. Hitman menang jika warga yang masih bebas bersuara tidak lebih banyak dari Hitman yang masih hidup. Jumlah Hitman dan Spy mengikuti jumlah pemain.',
+      },
+      {
+        icon: '☀',
+        title: 'Siang',
+        text: banyak
+          ? 'Diskusi bebas. Tanyakan alibi, tuduh dengan alasan, dan bela pemain yang kamu percaya. Hitman bisa membungkam satu pemain (Gag Order, dipakai bersama seluruh Hitman).'
+          : 'Diskusi bebas. Tanyakan alibi, tuduh dengan alasan, dan bela pemain yang kamu percaya. Hitman bisa membungkam satu pemain (Gag).',
+      },
+      {
+        icon: '☾',
+        title: 'Malam',
+        text: banyak
+          ? 'Layar meredup dan chat dikunci. Para Hitman menyandera satu pemain (pilihan terbanyak mereka), setiap Spy menjaga satu pemain, Stalker mengintip role seseorang.'
+          : 'Layar meredup dan chat dikunci. Hitman menyandera satu pemain, Spy menjaga satu pemain, Stalker mengintip role seseorang.',
+      },
+      {
+        icon: '⚖',
+        title: 'Tribunal',
+        text: 'Pemain yang masih punya suara memilih tersangka. Suara terbanyak tunggal dieksekusi; seri berarti tidak ada eksekusi.',
+      },
+      {
+        icon: '◆',
+        title: 'Bot AI',
+        text: 'Sebagian kursi diisi bot. Mereka membaca chat, menimbang bukti, dan bisa berbohong jika menjadi Hitman. Perlakukan seperti pemain lain.',
+      },
+      {
+        icon: '💡',
+        title: 'Tips',
+        text: banyak
+          ? 'Diam bukan bukti. Para Hitman saling mengenal: perhatikan siapa yang kompak saling membela atau mendorong vote bersama.'
+          : 'Diam bukan bukti. Perhatikan siapa yang mendorong vote ke pemain yang ternyata bukan Hitman.',
+      },
+    ];
+  }
+
+  get roleHelp(): Record<string, string> {
+    return {
+      hitman: this.multiHitman
+        ? 'Malam: pilih satu warga untuk disandera; Syndicate hanya menyandera satu orang per malam (pilihan terbanyak para Hitman). Siang: Gag Order dipakai bersama, lalu jeda satu ronde.'
+        : 'Malam: Hostage satu warga. Siang: Gag Order, lalu lewati satu ronde sebelum memakai lagi.',
+      spy:
+        'Malam: Guard satu pemain (boleh diri sendiri). Jangan pilih target sama dua malam berturut-turut.' +
+        ((this.game?.composition?.spy ?? 1) > 1 ? ' Spy lain berjaga sendiri-sendiri.' : ''),
+      stalker:
+        'Malam: Peek identitas satu pemain, sekali setiap dua ronde. Hasil hanya terlihat olehmu.',
+      civilian:
+        'Amati percakapan, uji alibi, dan pilih tersangka saat Tribunal. Tidak punya skill malam.',
+    };
+  }
   readonly phaseNames: Record<string, string> = {
     preparing: 'Persiapan',
     day: 'Siang / diskusi',
@@ -187,9 +215,98 @@ export class Game implements OnInit, OnDestroy {
 
   // Tampilkan tujuan kubu pemain berdasarkan role privat dari server.
   get objective(): string {
-    return this.game?.me.role === 'hitman'
-      ? 'Kurangi warga hidup yang masih punya suara hingga tersisa paling banyak satu. Hindari eksekusi Tribunal.'
-      : 'Temukan dan eksekusi Hitman lewat Tribunal. Spy, Stalker, dan Civilian menang sebagai satu kubu.';
+    if (this.game?.me.role === 'hitman')
+      return `${this.allies.length ? 'Bersama rekan Syndicate, kurangi' : 'Kurangi'} warga hidup yang masih punya suara sampai tidak lebih banyak dari Hitman yang masih hidup. Hindari eksekusi Tribunal.`;
+    const hitmen = this.hitmanCount > 1 ? `semua ${this.hitmanCount} Hitman` : 'Hitman';
+    return `Temukan dan eksekusi ${hitmen} lewat Tribunal. Spy, Stalker, dan Civilian menang sebagai satu kubu.`;
+  }
+
+  // KOMPOSISI: jumlah tiap role di room (publik, dari server); urutan chip mengikuti ROLES.
+  get composition(): { role: string; count: number }[] {
+    const counts = this.game?.composition;
+    if (!counts) return [];
+    return ROLES.map((role) => ({
+      role,
+      count: counts[role as keyof RoleComposition] ?? 0,
+    })).filter((item) => item.count > 0);
+  }
+
+  get compositionLabel(): string {
+    return this.composition
+      .map((item) => `${item.count} ${this.roleNames[item.role] ?? item.role}`)
+      .join(' · ');
+  }
+
+  // Jumlah Hitman: dari komposisi server, atau dari role yang dibuka setelah pertandingan selesai.
+  get hitmanCount(): number {
+    const game = this.game;
+    if (!game) return 0;
+    return (
+      game.composition?.hitman ?? game.players.filter((player) => player.role === 'hitman').length
+    );
+  }
+
+  // Hitman yang masih hidup (publik, hanya room dengan ≥ 2 Hitman); null bila server tidak mengumumkan.
+  get hitmanRemaining(): number | null {
+    const remaining = this.game?.hitman_remaining;
+    return typeof remaining === 'number' ? remaining : null;
+  }
+
+  // Chip Hitman di tepi meja menampilkan "tersisa/total"; chip lain dan layar persiapan: null.
+  hitmanLeft(item: { role: string }, place: string): number | null {
+    return item.role === 'hitman' && place === 'felt-composition' ? this.hitmanRemaining : null;
+  }
+
+  // Kalimat pembuka layar persiapan.
+  get threatLine(): string {
+    if (this.hitmanCount > 1)
+      return `${this.hitmanCount} Hitman bersembunyi di antara kalian dan saling mengenal.`;
+    return this.hitmanCount === 1
+      ? 'Satu Hitman bersembunyi di antara kalian.'
+      : 'Hitman bersembunyi di antara kalian.';
+  }
+
+  // REKAN SYNDICATE: server hanya mengirim daftar ini kepada Hitman; role lain selalu kosong.
+  get allies(): string[] {
+    return this.game?.me.role === 'hitman' ? (this.game.me.allies ?? []) : [];
+  }
+
+  isAlly(name: string): boolean {
+    return this.allies.includes(name);
+  }
+
+  // Pilihan Hostage rekan yang masih hidup malam ini (null = belum memilih).
+  get allyPlan(): { name: string; target: string | null }[] {
+    const game = this.game;
+    if (!game || game.phase !== 'night') return [];
+    const actions = game.me.ally_actions ?? [];
+    return this.allies
+      .filter((name) => game.players.some((player) => player.name === name && player.alive))
+      .map((name) => ({
+        name,
+        target: actions.find((action) => action.name === name)?.target ?? null,
+      }));
+  }
+
+  // Target terbanyak dari pilihan rekan; seri → pilihan yang masuk lebih dulu (sama dengan engine).
+  get allyTarget(): string {
+    const game = this.game;
+    if (!game || game.phase !== 'night') return '';
+    const counts = new Map<string, number>();
+    for (const action of game.me.ally_actions ?? [])
+      counts.set(action.target, (counts.get(action.target) ?? 0) + 1);
+    let best = '';
+    for (const [target, count] of counts) if (count > (counts.get(best) ?? 0)) best = target;
+    return best;
+  }
+
+  // Rekan yang memilih pemain ini sebagai target Hostage malam ini (penanda di kartu meja).
+  allyPicks(name: string): string[] {
+    const game = this.game;
+    if (!game || game.phase !== 'night') return [];
+    return (game.me.ally_actions ?? [])
+      .filter((action) => action.target === name)
+      .map((action) => action.name);
   }
 
   // Terjemahkan pemenang tim menjadi hasil pribadi.
@@ -203,15 +320,15 @@ export class Game implements OnInit, OnDestroy {
 
   // Jelaskan alasan kemenangan server, dengan fallback untuk backend versi lama.
   get resultExplanation(): string {
+    const hitmen = this.hitmanCount > 1 ? 'Semua Hitman' : 'Hitman';
     const explanations: Record<string, string> = {
       vote_control:
-        'Warga hidup yang masih punya hak voting tersisa paling banyak satu. Suara warga tidak lagi melampaui suara Hitman.',
-      hitman_executed:
-        'Hitman telah dieksekusi. Semua anggota kubu warga menang, termasuk yang menjadi Hostage atau sudah dieksekusi.',
+        'Warga hidup yang masih punya hak voting tidak lebih banyak dari Hitman yang masih hidup. Suara warga tidak lagi bisa mengalahkan suara Hitman.',
+      hitman_executed: `${hitmen} telah dieksekusi. Semua anggota kubu warga menang, termasuk yang menjadi Hostage atau sudah dieksekusi.`,
       all_survivors_hostage:
         'Semua anggota kubu warga yang masih hidup telah menjadi Hostage. Hitman menguasai meja.',
       no_civilians_alive:
-        'Seluruh anggota kubu warga telah dieksekusi. Hitman menjadi satu-satunya pemain yang masih hidup.',
+        'Seluruh anggota kubu warga telah dieksekusi. Hanya Hitman yang masih hidup.',
     };
     if (this.game?.result) return explanations[this.game.result.reason] ?? '';
     // Kompatibel selama frontend dan backend diperbarui pada waktu berbeda.
@@ -232,9 +349,11 @@ export class Game implements OnInit, OnDestroy {
   get congratsTitle(): string {
     if (!this.game?.winner) return '';
     if (this.outcomeLabel === 'KAMU MENANG') return 'Selamat, kamu menang!';
-    return this.game.winner === 'hitman'
-      ? 'Selamat untuk Hitman yang lolos!'
-      : 'Selamat untuk kubu warga!';
+    if (this.game.winner === 'civilians') return 'Selamat untuk kubu warga!';
+    // Syndicate bisa menang walau salah satu Hitman sudah dieksekusi, jadi tidak disebut "lolos".
+    return this.winners.length > 1
+      ? 'Selamat untuk Syndicate!'
+      : 'Selamat untuk Hitman yang lolos!';
   }
 
   // Label singkat pemenang: role, penanda bot, dan penanda akun sendiri.
@@ -309,6 +428,10 @@ export class Game implements OnInit, OnDestroy {
     if (!state) return '';
     if (state.me.can_vote)
       return 'Pilih tersangka di meja, lalu kunci suaramu. Suara terbanyak tunggal dieksekusi; seri berarti tidak ada eksekusi.';
+    if (state.me.can_act && this.allies.length && state.me.ability === 'hostage')
+      return 'Pilih satu warga di meja. Syndicate hanya menyandera satu orang: target terbanyak dari pilihan para Hitman; seri → pilihan yang masuk lebih dulu.';
+    if (state.me.can_act && this.allies.length && state.me.ability === 'gag')
+      return 'Pilih pemain yang dibungkam. Gag Order dipakai bersama rekan: satu kali per siang, lalu jeda satu ronde penuh.';
     if (state.me.can_act)
       return 'Pilih target di meja. Pilihan tidak dapat diubah setelah dikunci.';
     if (state.phase === 'night')
@@ -742,10 +865,13 @@ export class Game implements OnInit, OnDestroy {
 
   // TARGET: bantuan UX saja; semua aturan juga diperiksa engine.
   canTarget(name: string): boolean {
-    if (!this.game) return false;
-    if (this.game.me.ability === 'guard' && this.game.me.can_act)
-      return name !== this.game.me.last_guard;
-    return name !== this.game.me.name;
+    const me = this.game?.me;
+    if (!me) return false;
+    // Rekan Syndicate tidak bisa disandera atau dibungkam; vote ke rekan tetap boleh.
+    if (me.can_act && (me.ability === 'hostage' || me.ability === 'gag') && this.isAlly(name))
+      return false;
+    if (me.ability === 'guard' && me.can_act) return name !== me.last_guard;
+    return name !== me.name;
   }
 
   // CHAT: hanya echo server ditampilkan supaya pesan yang ditolak tidak tampak terkirim.
