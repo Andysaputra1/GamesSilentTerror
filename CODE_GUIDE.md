@@ -23,6 +23,7 @@ permintaan pengguna.
 | `backend/module/` | Koneksi database, klien AI, helper upload, dan CLI akun |
 | `backend/public/panel/` | Halaman administrasi yang disajikan backend |
 | `backend/scripts/` | Penyiapan environment deployment dan kredensial panel |
+| `backend/services/npc_brain/` | Runtime otak NPC; `generated/` adalah ekspor notebook (jangan diedit manual) |
 | `backend/tests/` | Unit/integration test serta skrip smoke test manual |
 
 Daftar router di `controller_main.py` adalah acuan endpoint aktif. Modul admin,
@@ -46,9 +47,15 @@ file saja tidak berarti route tersebut dibuka pada aplikasi utama.
    Aturan kemenangan dijelaskan lebih lengkap di `GAME_CONCEPT.md`.
 5. **Chat dan AI:** handler socket memeriksa sesi/hak chat, menganalisis intent dan
    fuzzy, lalu menyimpan dan menyiarkan pesan. Pada pertandingan, `NPCService`
-   mengambil giliran mandiri dari timer: konteks privat per NPC -> model terpilih
-   -> JSON tervalidasi -> aksi/vote engine serta chat. Fase diperiksa ulang setelah
-   model merespons. Jalur balasan reaktif lama hanya untuk lobby/kompatibilitas.
+   mengambil langkah mandiri dari timer untuk setiap bot: snapshot privat ->
+   `services/npc_brain` (IndoBERT -> fuzzy/utility/behavior tree hasil ekspor
+   notebook -> NLG tervalidasi) -> aksi/vote engine serta chat. Fase diperiksa ulang
+   sebelum keputusan diterapkan. Vote/aksi langsung diterapkan; chat bot melewati
+   "lantai bicara" (`NPCService._ambil_lantai`): satu bot menyusun/mengetik per
+   pertandingan, dan rencana yang lebih tua dari chat bot lain dibatalkan lalu
+   diputuskan ulang. Mode `NPC_METHOD=llm` mempertahankan jalur lama
+   (satu prompt LLM). Jalur balasan reaktif lama hanya untuk lobby/kompatibilitas.
+   Setelah Mulai, `Match` berada di fase `preparing` sampai otak bot siap.
 6. **Logout:** `ProfileMenu` → `SessionService` → endpoint logout. Setelah token
    dicabut atau sudah tidak berlaku, data sesi browser dibersihkan dan pengguna
    diarahkan ke login. Kegagalan jaringan ditampilkan agar dapat dicoba ulang.

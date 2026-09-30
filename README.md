@@ -58,6 +58,30 @@ File `.pkl` sengaja diabaikan Git dan **tidak tersedia hanya dengan clone reposi
 
 Tanpa model SVM, pesan pemain masih bisa diteruskan dan scheduler NPC pertandingan tetap dapat memanggil LLM. Analisis intent dan balasan reaktif NOX di lobby lama memerlukan SVM. Ini berlaku untuk mode Ollama maupun API. Lihat [panduan artifact SVM](backend/artifacts/svm/README.md).
 
+### 4. Siapkan otak NPC (IndoBERT + fuzzy/utility/behavior tree + NLG)
+
+Bot memakai logika notebook skripsi (`training/prethesis/ai_2_dataset_baru`): NLU IndoBERT, penalaran Fuzzy/Utility AI/Behavior Tree, dan NLG. Kode logikanya sudah ada di `backend/services/npc_brain/generated/` (hasil ekspor, jangan diedit manual). Yang perlu disalin hanyalah dua folder model IndoBERT (±440 MB masing-masing, diabaikan Git):
+
+```text
+backend/artifacts/indobert/intent/   ← models/notebook_standalone/intent_classifier_transformer
+backend/artifacts/indobert/target/   ← models/target_classifier/target_classifier_transformer
+```
+
+Folder target harus memuat `pair_builder.json` dan `ambang_target.json` hasil `nlu_target.ipynb`. Pada mesin pengembang yang menyimpan repo skripsi di `a_skripsi/training/prethesis`, backend juga menemukan model di sana secara otomatis. Tanpa model, bot tetap bermain dengan NLU cadangan (SVM + nama yang disebut) yang kualitasnya lebih rendah; status NLU terlihat di panel menu **Otak NPC**.
+
+Pengaturan di `.env` (lihat `.env.example`): `NPC_METHOD` (`campuran`, `fuzzy`, `utility`, `bt`, atau `llm` untuk mode lama), `NPC_WRITER` (`otomatis`, `claude`, `templat`), dan opsional `ANTHROPIC_API_KEY` atau `AMAZON_API_KEY` (Bedrock) untuk penulis kalimat Claude. Tanpa key, bot memakai templat bervariasi yang tetap divalidasi IndoBERT. Metode dan penulis juga bisa diubah dari panel.
+
+Setelah mengubah logika bot di notebook, jalankan ulang notebook sampai skenario/pengujiannya lulus, lalu ekspor ulang:
+
+```sh
+cd backend
+python scripts/ekspor_otak_npc.py --notebook-dir ../../training/prethesis/ai_2_dataset_baru
+```
+
+Tes `test_npc_brain` gagal bila hasil ekspor sudah tidak sama dengan notebook.
+
+**Migrasi database V7** (`backend/migrations/V7__survey_and_npc.sql`; salinan Azure `deployment/mysql/004_survey_and_npc.sql`) menambah tabel survei dan `match_bots`. Terapkan manual pada database lama.
+
 ## Menjalankan aplikasi
 
 Pilih **salah satu** mode berikut.
@@ -267,12 +291,14 @@ backend/           Python FastAPI + Socket.IO
   models/          Query SQL terparameterisasi
   module/          Konektor MySQL, klien Ollama, helper upload
   artifacts/svm/   Model intent privat, disediakan terpisah
+  artifacts/indobert/ Model IndoBERT intent + target untuk otak NPC (disalin manual)
+  services/npc_brain/ Runtime otak NPC; generated/ = ekspor notebook skripsi
   migrations/     Skema SQL dan akun development
 proxy/             Gateway Nginx
 docker-compose.yml Service development dan volume
 ```
 
-Alur chat pertandingan: **pesan → otorisasi → SVM/fuzzy → validasi ulang fase/hak chat → penyimpanan MySQL → broadcast**. Secara terpisah, timer menjalankan **NPC → konteks privat → LLM → validasi keputusan → aksi/vote/chat**. Persentase diam pada fuzzy masih nilai tetap, bukan observasi diam pemain yang sesungguhnya.
+Alur chat pertandingan: **pesan → otorisasi → SVM/fuzzy → validasi ulang fase/hak chat → penyimpanan MySQL → broadcast**. Secara terpisah, timer menjalankan **NPC → snapshot privat → IndoBERT → fuzzy/utility/behavior tree → NLG tervalidasi → aksi/vote/chat** (mode `llm` lama tetap tersedia). Persentase diam pada fuzzy masih nilai tetap, bukan observasi diam pemain yang sesungguhnya.
 
 Dengan container aplikasi sudah berjalan:
 
