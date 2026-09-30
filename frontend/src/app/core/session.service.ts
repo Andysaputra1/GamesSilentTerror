@@ -1,13 +1,18 @@
 import { HttpClient, HttpErrorResponse, HttpHeaders } from '@angular/common/http';
 import { Injectable, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { catchError, defer, finalize, of, tap, throwError, timeout } from 'rxjs';
+import { catchError, defer, finalize, map, of, tap, throwError, timeout } from 'rxjs';
 import { backendUrl } from './backend-url';
 
 export interface UserProfile {
   username: string;
-  display_name: string;
-  skin_id?: string;
+  displayName: string;
+  skinId?: string;
+}
+
+// Transform API response (snake_case) to TypeScript interface (camelCase).
+function toUserProfile(raw: { username: string; display_name: string; skin_id?: string }): UserProfile {
+  return { username: raw.username, displayName: raw.display_name, skinId: raw.skin_id };
 }
 
 @Injectable({ providedIn: 'root' })
@@ -24,7 +29,7 @@ export class SessionService {
   updateProfile(displayName: string, username?: string) {
     const token = localStorage.getItem('shadow_heist_access_token');
     return this.http
-      .post<UserProfile>(
+      .post<{ username: string; display_name: string; skin_id?: string }>(
         backendUrl() + '/api/auth/me',
         { display_name: displayName, ...(username ? { username } : {}) },
         {
@@ -33,6 +38,7 @@ export class SessionService {
       )
       .pipe(
         timeout(10_000),
+        map(toUserProfile),
         tap((profile) => {
           if (
             !token ||

@@ -148,7 +148,7 @@ export class ProfileMenu implements OnInit {
     if (!isPlatformBrowser(this.platform)) return;
     try {
       const profile = JSON.parse(localStorage.getItem('shadow_heist_user') ?? '{}');
-      this.profileName.set(typeof profile.display_name === 'string' ? profile.display_name : '');
+      this.profileName.set(typeof profile.displayName === 'string' ? profile.displayName : '');
       this.profileUsername.set(typeof profile.username === 'string' ? profile.username : '');
     } catch {
       this.profileName.set('');
@@ -164,7 +164,7 @@ export class ProfileMenu implements OnInit {
     if (this.profileUsername())
       this.profileChanged.emit({
         username: this.profileUsername(),
-        display_name: this.displayName,
+        displayName: this.displayName,
       });
   }
 
@@ -209,7 +209,7 @@ export class ProfileMenu implements OnInit {
       )
       .subscribe({
         next: (profile) => {
-          this.profileName.set(profile.display_name);
+          this.profileName.set(profile.displayName);
           this.profileUsername.set(profile.username);
           this.profileChanged.emit(profile);
           this.editing.set(false);

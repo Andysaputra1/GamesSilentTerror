@@ -117,7 +117,7 @@ describe('profile logout', () => {
   it('saves the edited display name and restores it in a new profile component', async () => {
     localStorage.setItem(
       'shadow_heist_user',
-      JSON.stringify({ username: 'alice', display_name: 'Alice' }),
+      JSON.stringify({ username: 'alice', displayName: 'Alice' }),
     );
     const fixture = TestBed.createComponent(ProfileMenu);
     fixture.componentRef.setInput('username', 'alice');
@@ -197,7 +197,7 @@ describe('profile logout', () => {
     request.flush({ username: 'alice_detective', display_name: 'Alice Detective' });
     expect(changed).toHaveBeenCalledWith({
       username: 'alice_detective',
-      display_name: 'Alice Detective',
+      displayName: 'Alice Detective',
     });
     fixture.destroy();
   });

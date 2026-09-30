@@ -31,7 +31,7 @@ import {
 import { loadGoogleIdentity } from '../../core/google-identity';
 import { profileCountdown, PROFILE_COUNTDOWN_TARGET } from '../../core/profile-countdown';
 
-// INTERFACE: bentuk respons login yang diharapkan dari API Python.
+// Transform API response (snake_case) to TypeScript interface (camelCase).
 interface LoginResponse {
   access_token: string;
   expires_at: string;
@@ -349,7 +349,11 @@ export class Auth implements OnInit {
     try {
       localStorage.setItem('shadow_heist_access_token', response.access_token);
       localStorage.setItem('shadow_heist_access_token_expires_at', response.expires_at);
-      localStorage.setItem('shadow_heist_user', JSON.stringify(response.user));
+      // Simpan dengan camelCase untuk konsistensi TypeScript.
+      localStorage.setItem(
+        'shadow_heist_user',
+        JSON.stringify({ username: response.user.username, displayName: response.user.display_name }),
+      );
       sessionStorage.removeItem('shadow_heist_game_entry');
     } catch {
       this.errorMessage = 'BROWSER MENOLAK PENYIMPANAN SESI. IZINKAN STORAGE LALU COBA LAGI.';
