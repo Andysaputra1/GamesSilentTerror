@@ -209,10 +209,12 @@ export class Lobby implements OnInit, OnDestroy {
       )
       .subscribe({
         next: (room) => {
+          const justStarted = this.room?.phase === 'lobby' && room.phase === 'preparing';
           this.room = room;
           this.error = '';
           sessionStorage.setItem('shadow_heist_room', room.code);
-          if (path.endsWith('/start')) {
+          // Host maupun anggota lain langsung masuk ke layar persiapan begitu pertandingan dimulai.
+          if (path.endsWith('/start') || justStarted) {
             this.busy = false;
             this.enterGame();
           }

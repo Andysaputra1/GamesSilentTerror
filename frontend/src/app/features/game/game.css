@@ -1,300 +1,531 @@
-/* GAME TOKENS: jarak dan lebar chat hanya berlaku pada halaman game. */
+/* ==========================================================================
+   Silent Terror — halaman game (persiapan, meja permainan, hasil, kuesioner)
+
+   Bahasa visual mengikuti halaman login: meja kayu, kertas sobek (9-slice
+   register-paper), papan kayu, tombol aset kayu/kulit, dan font Fraunces +
+   Patrick Hand. Halaman permainan selalu satu layar (100dvh) tanpa scroll;
+   yang boleh bergulir hanya isi panel (chat, catatan, kuesioner).
+   ========================================================================== */
+
+/* GAME TOKENS */
 :host {
+  --ink: #422719;
+  --ink-strong: #2b170c;
+  --cream: #fff7e5;
+  --paper: #f6ead0;
+  --wood-text: #fbeacb;
+  --line: rgb(139 90 43 / 0.45);
+  --red: #b3261e;
+  --heat-color: 196 40 28;
+  --green: #3f6b3a;
+  --gold: #e8c073;
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-hand: 'Patrick Hand', cursive;
+  --pad: clamp(10px, 1.6vw, 22px);
+  --game-gap: clamp(10px, 1.4vw, 20px);
   display: block;
-  --game-gap: 24px;
-  --chat-size: 370px;
+  height: 100dvh;
 }
+
+/* ---------- Kerangka satu layar ---------- */
 .match-shell {
-  background: #ded0b7;
-  color: #28251e;
-  min-height: 100dvh;
-  padding: clamp(16px, 3vw, 40px);
-}
-.match-shell > * { max-width: 1440px; margin-left: auto; margin-right: auto; }
-.round-flow { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
-.round-flow span { padding: 10px 16px; border: 1px solid currentColor; border-radius: 24px; font-size: 13px; }
-.round-flow .current { background: #36564b; color: #fff7e8; border-color: #36564b; font-weight: bold; }
-.rules-panel p { line-height: 1.6; max-width: 95ch; }
-.result-stats { display: flex; gap: 12px; flex-wrap: wrap; }
-.result-stats span { padding: 12px; background: #e4e9da; border-radius: 10px; }
-.result-stats b { font-size: 22px; margin-right: 6px; }
-.result .eyebrow { font-weight: bold; color: #36564b; }
-.result.is-loss .eyebrow { color: #922e2e; }
-.private-status { padding-top: 12px; border-top: 1px solid #b6a17e; }
-.match-shell.night {
-  background: #202934;
-  color: #efe9dd;
-}
-.match-header,
-.phase-strip {
+  position: relative;
+  isolation: isolate;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 20px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  height: 100dvh;
+  overflow: hidden;
+  color: var(--ink);
+  background: #4a2b18 url('/assets/backgrounds/backwood.jpg') center / cover no-repeat;
 }
-.match-header {
-  border-bottom: 2px solid currentColor;
-  padding-bottom: 20px;
+/* Malam: meja meredup perlahan; Tribunal: tepi layar memerah. Lapisan ada di belakang konten. */
+.match-shell::before,
+.match-shell::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 1.6s ease;
 }
-.match-account { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
-h1 {
-  font: 800 clamp(24px, 3vw, 38px) var(--font-title);
-  margin: 8px 0;
+.match-shell::before {
+  background: radial-gradient(ellipse 75% 65% at 50% 50%, rgb(10 16 34 / 0.55), rgb(4 7 16 / 0.9));
 }
-h2 {
-  font-size: 23px;
+.match-shell::after {
+  background: radial-gradient(ellipse 80% 75% at 50% 50%, transparent 55%, rgb(120 16 10 / 0.55));
 }
-a {
-  color: inherit;
+.match-shell.night::before,
+.match-shell.tribunal::after {
+  opacity: 1;
 }
-button,
-input {
-  font: inherit;
-  border: 1px solid #8b7c64;
-  border-radius: 10px;
-  padding: 12px 16px;
+.match-shell.night .side-panel,
+.match-shell.night .chat-panel {
+  filter: brightness(0.72) saturate(0.8);
 }
-button {
-  cursor: pointer;
-  color: #28251e;
-  background: #f6efe2;
+.side-panel,
+.chat-panel,
+.table-felt {
+  transition: filter 1.6s ease;
 }
-button:disabled {
-  cursor: not-allowed;
-}
-.primary {
-  background: #28251e;
-  color: #fff7e8;
-}
-.primary:disabled {
-  opacity: 0.5;
-}
-button:focus-visible,
-input:focus-visible,
-a:focus-visible {
-  outline: 3px solid #34768e;
-  outline-offset: 3px;
-}
-.eyebrow,
-.phase-strip {
-  font:
-    12px Consolas,
-    monospace;
-  letter-spacing: 0.08em;
-}
-.phase-strip {
-  margin: 24px 0;
-  padding: 16px;
-  border: 1px solid currentColor;
-  border-radius: 12px;
-}
-.phase-strip strong {
-  font-size: 24px;
-}
-.match-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) var(--chat-size);
-  gap: var(--game-gap);
-}
-.skip-panel {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 16px;
-  padding: 18px;
-  margin-bottom: 24px;
-  border: 1px solid currentColor;
-  border-radius: 12px;
-}
-.skip-panel p {
-  margin: 8px 0;
-}
-.skip-panel small {
-  display: block;
-  max-width: 70ch;
-  line-height: 1.5;
-}
+
+/* ---------- Bahan bersama: kertas, papan kayu, tombol ---------- */
+.paper,
+.note,
 .private-card,
 .action-panel,
-.intel,
-.result,
-details,
-.chat-panel {
-  padding: 22px;
-  background: #f5eee0;
-  color: #28251e;
-  border: 2px solid #28251e;
-  border-radius: 18px;
-  margin-bottom: 20px;
-}
-.private-card {
-  border-style: dashed;
-}
-.private-card p,
-.action-panel p,
-.result p {
-  line-height: 1.6;
-}
-.hint,
-.event {
-  font-size: 13px;
-  line-height: 1.65;
-}
-.players {
-  display: grid;
-  align-items: start;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
-  margin: 20px 0;
-}
-.player {
-  width: 100%;
-  min-width: 0;
-  display: grid;
-  justify-items: center;
-  gap: 10px;
-  overflow-wrap: anywhere;
-  border: 2px solid #28251e;
-  padding: 20px 10px;
-}
-.player-card {
+.board-bar {
+  --edge: 18px;
   position: relative;
-  min-width: 0;
+  isolation: isolate;
+  color: var(--ink);
+}
+.paper::before,
+.note::before,
+.private-card::before,
+.action-panel::before,
+.board-bar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  border: var(--edge) solid transparent;
+  border-image: url('/assets/auth/register-paper.png') 60 fill / var(--edge) stretch;
+  filter: drop-shadow(0 0.4em 0.7em rgb(20 10 5 / 0.45));
+}
+
+.wood-sign {
+  position: relative;
   display: flex;
   flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--wood-text);
+  text-align: center;
+  background: url('/assets/buttons/btn-wood.png') center / 100% 100% no-repeat;
+  filter: drop-shadow(0 0.35em 0.4em rgb(14 6 2 / 0.55));
+  text-shadow:
+    0 0.06em 0 #3a200f,
+    0 0.1em 0.14em rgb(0 0 0 / 0.4);
 }
-.vote-count {
+/* paku di kiri dan kanan papan */
+.wood-sign::before,
+.wood-sign::after {
+  content: '';
   position: absolute;
-  top: 8px;
-  right: 8px;
-  border-radius: 20px;
-  padding: 4px 8px;
-  background: #28251e;
-  color: #fffaf0;
-  font-size: 11px;
-  pointer-events: none;
+  top: 50%;
+  width: 0.55em;
+  height: 0.55em;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ecd09a 0 16%, #a3743f 46%, #4a2b14 100%);
+  box-shadow: 0 0.1em 0.12em rgb(0 0 0 / 0.5);
+  transform: translateY(-50%);
 }
-.voter-badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  padding-top: 8px;
+.wood-sign::before {
+  left: 1em;
 }
-.voter-badge {
-  font-size: 11px;
-  color: #28251e;
-  padding: 4px 7px;
-  border-radius: 6px;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.wood-sign::after {
+  right: 1em;
 }
-.voter-details {
-  padding: 8px;
-  margin: 6px 0 0;
-  border-width: 1px;
-  border-radius: 8px;
-  font-size: 12px;
-  overflow-wrap: anywhere;
+
+.wood-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4em;
+  min-height: 46px;
+  padding: 0.65em 1.5em;
+  border: 0;
+  background: url('/assets/buttons/btn-wood.png') center / 100% 100% no-repeat;
+  color: var(--cream);
+  font: 800 15px/1.15 var(--font-display);
+  letter-spacing: 0.03em;
+  text-shadow:
+    0 0.08em 0 rgb(30 14 6 / 0.75),
+    0 0.12em 0.2em rgb(0 0 0 / 0.35);
+  filter: drop-shadow(0 0.25em 0.3em rgb(20 9 3 / 0.4));
+  cursor: pointer;
+  transition:
+    transform 0.18s ease,
+    filter 0.18s ease;
 }
-.voter-details p {
-  margin: 6px 0;
+.wood-button.green {
+  background-image: url('/assets/buttons/btn-greenwood.png');
 }
-.player.chosen {
-  background: #c0d7d9;
-  outline: 3px solid #397287;
+.wood-button.red {
+  background-image: url('/assets/buttons/btn-leather.png');
 }
-.player.eliminated {
-  opacity: 0.5;
+.wood-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  filter: drop-shadow(0 0.4em 0.45em rgb(20 9 3 / 0.45));
 }
-.avatar {
+.wood-button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.wood-button:disabled {
+  opacity: 0.55;
+  filter: grayscale(0.35);
+  cursor: not-allowed;
+}
+
+.round-button {
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 2px solid var(--ink-strong);
   border-radius: 50%;
-  border: 2px solid #28251e;
-  background: #a7bec5;
-  font-weight: bold;
+  background: var(--paper);
+  color: var(--ink);
+  font: 800 18px/1 var(--font-display);
+  box-shadow: 0 3px 0 rgb(43 23 12 / 0.55);
+  cursor: pointer;
 }
-.player small {
-  font-size: 10px;
+.round-button:hover {
+  background: #fff3d6;
 }
-.chat-panel {
+
+.text-link {
+  padding: 4px 2px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: 16px var(--font-hand);
+  text-decoration: underline dashed;
+  text-underline-offset: 0.2em;
+  cursor: pointer;
+}
+
+.eyebrow {
+  margin: 0;
+  font: 700 12px/1.2 var(--font-display);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #8c3f2b;
+}
+.hand {
+  font-family: var(--font-hand);
+}
+.hint {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #6b4b2e;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 3px dashed #f6d9a4;
+  outline-offset: 3px;
+}
+
+/* ---------- HUD ---------- */
+.hud {
+  flex: none;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 10px var(--pad) 6px;
+}
+.hud-brand {
+  justify-self: start;
+  width: 210px;
+  aspect-ratio: 1335 / 436;
+  gap: 2px;
+  font-size: 14px;
+  transform: rotate(-0.8deg);
+}
+.hud-brand b {
+  font: 800 1.35em/1 var(--font-display);
+  white-space: nowrap;
+}
+.hud-brand b i {
+  margin: 0 0.25em;
+  color: var(--gold);
+  font-size: 0.45em;
+  font-style: normal;
+  vertical-align: middle;
+}
+.hud-brand small {
+  font: 1.05em/1 var(--font-hand);
+  color: #f2dbb0;
+  letter-spacing: 0.05em;
+}
+.hud-phase {
   display: flex;
   flex-direction: column;
-  max-height: 85vh;
-  min-height: 550px;
-  position: sticky;
-  top: 16px;
+  align-items: center;
+  gap: 6px;
 }
-.messages {
+.phase-sign {
+  flex-direction: row;
+  gap: 0.45em;
+  min-width: 250px;
+  padding: 0.55em 2.6em;
+  font-size: 16px;
+}
+.phase-sign b {
+  font: 800 1.2em/1 var(--font-display);
+  white-space: nowrap;
+}
+.phase-icon {
+  font-size: 1.3em;
+  line-height: 1;
+}
+.phase-sign[data-phase='night'] {
+  filter: drop-shadow(0 0 0.6em rgb(120 150 255 / 0.55)) brightness(0.85);
+}
+.phase-sign[data-phase='tribunal'] {
+  filter: drop-shadow(0 0 0.7em rgb(255 90 60 / 0.6));
+}
+.round-flow {
+  display: flex;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.round-flow li {
+  padding: 3px 10px;
+  border: 1px solid rgb(251 234 203 / 0.45);
+  border-radius: 999px;
+  background: rgb(26 12 5 / 0.45);
+  color: var(--wood-text);
+  font: 15px/1.2 var(--font-hand);
+}
+.round-flow li.current {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: var(--ink-strong);
+  font-weight: 700;
+}
+.hud-side {
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.timer {
+  position: relative;
+  width: 58px;
+  height: 58px;
+  flex: none;
+}
+.timer svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+  filter: drop-shadow(0 3px 3px rgb(0 0 0 / 0.45));
+}
+.timer-track {
+  fill: rgb(43 23 12 / 0.75);
+  stroke: rgb(251 234 203 / 0.25);
+  stroke-width: 4;
+}
+.timer-fill {
+  fill: none;
+  stroke: var(--gold);
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-dasharray: 125.66;
+  transition:
+    stroke-dashoffset 1s linear,
+    stroke 0.3s;
+}
+.timer b {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--cream);
+  font: 800 19px/1 var(--font-display);
+  font-variant-numeric: tabular-nums;
+}
+.timer.urgent .timer-fill {
+  stroke: #ff6b5a;
+}
+.timer.urgent b {
+  color: #ffd2c9;
+  animation: denyut-timer 1s ease-in-out infinite;
+}
+.profile-chip {
+  padding: 2px 8px;
+  border: 2px solid var(--ink-strong);
+  border-radius: 999px;
+  background: var(--paper);
+  box-shadow: 0 3px 0 rgb(43 23 12 / 0.55);
+}
+
+/* ---------- Grid satu layar ---------- */
+.match-grid {
   flex: 1;
-  overflow-y: auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(230px, 280px) minmax(0, 1fr) minmax(290px, 360px);
+  gap: var(--game-gap);
+  padding: 4px var(--pad) var(--pad);
+}
+.side-panel,
+.table-panel,
+.chat-panel {
+  min-width: 0;
+  min-height: 0;
+}
+
+/* KIRI */
+.side-panel {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  min-height: 100px;
-  padding: 6px 0;
+  overflow-y: auto;
+  padding: 2px 4px 4px 2px;
+  scrollbar-width: thin;
 }
-.message {
-  background: #fffaf0;
-  border: 1px solid #b6a17e;
-  padding: 14px;
-  border-radius: 12px;
-  overflow-wrap: anywhere;
-}
-.message.self {
-  background: #d4dfcf;
-}
-.message small {
-  font-weight: bold;
-}
-.message p {
-  margin: 8px 0 0;
-  white-space: pre-wrap;
-  line-height: 1.5;
-}
-.composer {
+.private-card {
+  flex: none;
   display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: 8px;
-  margin-top: 16px;
+  padding: 18px 18px 14px;
+  text-align: center;
 }
-.composer input {
-  min-width: 0;
+.private-card p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.objective {
+  font-family: var(--font-hand);
+  font-size: 15px !important;
+}
+.private-status {
   width: 100%;
-  background: #fffaf0;
+  padding-top: 8px;
+  border-top: 1px dashed var(--line);
+  color: #5b3a22;
 }
-.alert {
-  padding: 14px;
-  background: #ffebc1;
-  color: #382417;
-  border: 1px solid #9a6a32;
-  border-radius: 10px;
+.rules-open {
+  display: none;
 }
-summary {
+.note {
+  flex: none;
+  padding: 14px 16px 12px;
+}
+.note h3 {
+  margin: 0 0 6px;
+  font: 700 15px/1.2 var(--font-display);
+  color: #5b311b;
+}
+.note p {
+  margin: 4px 0;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.events {
+  flex: 1 1 auto;
+  min-height: 140px;
+  display: flex;
+  flex-direction: column;
+}
+.events-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.event {
+  padding-left: 10px;
+  border-left: 2px solid var(--line);
+  font-family: var(--font-hand);
+  font-size: 15px !important;
+}
+
+/* Kartu role: bisa dibalik; bagian depan = kartu role + karakter pemain. */
+.role-flip {
+  width: min(100%, 190px);
+  aspect-ratio: 4 / 5;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  perspective: 900px;
   cursor: pointer;
-  font-weight: bold;
 }
-@media (max-width: 950px) {
-  .match-grid {
-    grid-template-columns: 1fr;
-  }
-  .chat-panel {
-    position: static;
-    max-height: 650px;
-  }
+.role-flip:disabled {
+  cursor: default;
 }
-@media (max-width: 500px) {
-  .players {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .private-card,
-  .chat-panel,
-  .action-panel {
-    padding: 16px;
-  }
+.flip-inner {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform 0.7s cubic-bezier(0.3, 1.3, 0.5, 1);
+}
+.role-flip.open .flip-inner {
+  transform: rotateY(180deg);
+}
+.role-flip:hover:not(:disabled) .flip-inner {
+  translate: 0 -4px;
+}
+.flip-face {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  backface-visibility: hidden;
+  border-radius: 7%;
+  overflow: hidden;
+  filter: drop-shadow(0 0.5em 0.6em rgb(20 10 5 / 0.45));
+}
+.flip-back {
+  align-content: center;
+  gap: 8px;
+  background:
+    radial-gradient(circle at 50% 42%, rgb(232 192 115 / 0.35), transparent 45%),
+    repeating-linear-gradient(45deg, #3b2314 0 10px, #452a18 10px 20px);
+  border: 4px double var(--gold);
+  color: var(--gold);
+}
+.flip-back b {
+  font: 800 54px/1 var(--font-display);
+  text-shadow: 0 3px 0 #1f1008;
+}
+.flip-back small {
+  padding: 0 14px;
+  color: var(--wood-text);
+  font: 15px/1.2 var(--font-hand);
+}
+.flip-front {
+  transform: rotateY(180deg);
+}
+.card-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.card-skin {
+  position: absolute;
+  left: 50%;
+  top: 53%;
+  width: 66%;
+  transform: translate(-50%, -50%);
+}
+.role-help {
+  color: #5b3a22;
 }

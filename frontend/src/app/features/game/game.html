@@ -1,286 +1,713 @@
-<main class="match-shell" [class.night]="game?.phase === 'night'">
-  <header class="match-header">
-    <div>
-      <p class="eyebrow">SILENT TERROR / {{ code }}</p>
-      <h1>
-        {{ game?.phase === 'finished' ? 'Hasil pertandingan.' : 'Meja penyelidikan.' }}
-      </h1>
+<main
+  class="match-shell"
+  [class.night]="game?.phase === 'night'"
+  [class.tribunal]="game?.phase === 'tribunal'"
+  [class.preparing]="game?.phase === 'preparing'"
+  [class.finished]="!!game?.winner"
+>
+  <!-- Kartu role pribadi: tertutup sampai pemain membukanya sendiri (dipakai di splash dan panel kiri). -->
+  <ng-template #roleFlip let-state>
+    <button
+      type="button"
+      class="role-flip"
+      [class.open]="revealRole || !!state.winner"
+      [disabled]="!!state.winner"
+      (click)="revealRole = !revealRole"
+      [attr.aria-pressed]="revealRole"
+      [attr.aria-label]="revealRole ? 'Sembunyikan role' : 'Lihat role saya'"
+    >
+      <span class="flip-inner">
+        <span class="flip-face flip-back" aria-hidden="true">
+          <b>◆</b>
+          <small>Ketuk untuk melihat role</small>
+        </span>
+        <span class="flip-face flip-front" [attr.aria-hidden]="!(revealRole || state.winner)">
+          <img class="card-art" [src]="roleCard(state.me.role)" alt="" />
+          <img class="card-skin" [src]="skinFor(state.me.name)" alt="" />
+        </span>
+      </span>
+    </button>
+    @if (revealRole || state.winner) {
+      <p class="sr-only">Role kamu: {{ roleNames[state.me.role] || state.me.role }}</p>
+    }
+  </ng-template>
+
+  @if (transition; as t) {
+    <div class="phase-transition" [attr.data-phase]="t.phase" role="status" aria-live="polite">
+      <div class="transition-card">
+        <span class="transition-icon" aria-hidden="true">{{ phaseIcons[t.phase] }}</span>
+        <h2>{{ t.title }}</h2>
+        <p>{{ t.subtitle }}</p>
+      </div>
     </div>
-    <div class="match-account">
-      @if (game?.winner) {
-        <a routerLink="/lobby">← Kembali ke lobby</a>
-      }
-      <app-profile-menu
-        [username]="game?.me?.name || 'Pemain'"
-        [activeMatch]="!!game && !game.winner"
-      />
-    </div>
-  </header>
-  @if (error) {
-    <p class="alert" role="alert">{{ error }} <button (click)="error = ''">Tutup</button></p>
   }
+
   @if (game; as state) {
-    <div class="phase-strip">
-      <b>RONDE {{ state.round }} · {{ phaseNames[state.phase] }}</b
-      ><strong>{{ state.winner ? 'SELESAI' : seconds + 's' }}</strong
-      ><span
-        >{{ state.winner ? 'RIWAYAT DISKUSI' : connected ? 'CHAT TERHUBUNG' : 'MENYAMBUNG CHAT…' }}</span
-      >
-    </div>
-    @if (!state.winner) {
-      <nav class="round-flow" aria-label="Urutan fase">
-        <span [class.current]="state.phase === 'day'">1. Diskusi</span>
-        <span [class.current]="state.phase === 'night'">2. Aksi malam</span>
-        <span [class.current]="state.phase === 'tribunal'">3. Voting Tribunal</span>
-      </nav>
-      <details class="rules-panel">
-        <summary>Cara menang dan arti status pemain</summary>
-        <p><b>Kubu warga (Spy, Stalker, Civilian):</b> menang jika Hitman dieksekusi.</p>
-        <p>
-          <b>Hitman:</b> menang ketika warga hidup yang masih memiliki hak voting tersisa paling
-          banyak satu.
-        </p>
-        <p>
-          Hostage tetap hidup dan masih bisa memakai skill malam, tetapi kehilangan chat dan voting
-          permanen. Gag hanya membatasi chat sampai akhir ronde; hak voting tetap ada.
-        </p>
-        <p>
-          Voting seri atau tanpa suara tidak mengeksekusi siapa pun. Ronde berikutnya dimulai jika
-          belum ada pemenang. Tidak ada batas ronde atau hasil seri pertandingan.
-        </p>
-      </details>
-    }
-    @if (state.phase === 'day') {
-      <section class="skip-panel" aria-label="Persetujuan skip diskusi">
-        <div>
-          <b>Siap lanjut ke malam?</b>
-          <p>
-            {{ state.discussion_skip.agreed }} / {{ state.discussion_skip.required }} pemain manusia
-            setuju. Bot tidak dihitung.
-          </p>
-          <small
-            >Semua manusia yang masih hidup harus setuju, termasuk yang sedang dibungkam. Jika belum
-            lengkap, timer tetap berjalan.</small
-          >
-        </div>
-        <button (click)="skipDiscussion()" [disabled]="busy || !state.discussion_skip.can_consent">
-          {{ state.discussion_skip.consented ? 'Sudah setuju' : 'Setuju skip diskusi' }}
-        </button>
-      </section>
-    }
-    @if (state.winner) {
-      <section class="result" [class.is-loss]="outcomeLabel === 'KAMU KALAH'" aria-live="polite">
-        <p class="eyebrow">{{ outcomeLabel }}</p>
-        <h2>
-          {{ state.winner === 'hitman' ? 'Hitman menang.' : 'Kubu warga menang.' }}
-        </h2>
-        <p>{{ resultExplanation }}</p>
-        @if (state.result; as result) {
-          <div class="result-stats">
-            <span
-              ><b
-                >{{ result.civilians_voters ?? result.civilians_alive - result.civilians_hostage }}</b
-              >
-              warga masih punya suara</span
-            >
-            <span
-              ><b>{{ result.civilians_alive }}</b> warga hidup</span
-            >
-            <span
-              ><b>{{ result.civilians_hostage }}</b> dari warga hidup disandera</span
-            >
-            <span
-              ><b>{{ result.civilians_eliminated }}</b> warga dieksekusi</span
-            >
-          </div>
-        }
-        <p>
-          Role dan status akhir semua pemain kini dibuka. Keluar dari ruangan lewat lobby untuk
-          membuat atau bergabung ke permainan baru.
-        </p>
-      </section>
-    }
-    <div class="match-grid">
-      <section class="table-panel">
-        <div class="private-card">
-          <p class="eyebrow">{{ state.winner ? 'ROLE KAMU' : 'HANYA UNTUKMU' }}</p>
-          @if (!state.winner) {
-            <button (click)="revealRole = !revealRole">
-              {{ revealRole ? 'Sembunyikan role' : 'Lihat role saya' }}
-            </button>
-          }
-          @if (revealRole || state.winner) {
-            <h2>{{ state.me.role.toUpperCase() }}</h2>
-            @if (!state.winner) {
-              <p class="objective"><b>Tujuan kubumu:</b> {{ objective }}</p>
-              <p>{{ roleHelp[state.me.role] }}</p>
-            }
-          }
-          <p class="private-status">{{ privateStatus }}</p>
-        </div>
-        <h2>{{ state.winner ? 'Identitas dan status akhir' : 'Pemain di meja' }}</h2>
-        <p class="hint">
-          {{ state.winner ? 'Hasil mengikuti kubu, bukan siapa yang masih hidup.' : 'Diam bukan bukti. Status Hostage dan Gag pemain lain tetap rahasia.' }}
-        </p>
-        <div class="players">
-          @for (player of state.players; track player.name) {
-            <div class="player-card">
-              <button
-                class="player"
-                [class.chosen]="target === player.name"
-                [class.eliminated]="!player.alive"
-                [disabled]="
-                  !player.alive ||
-                  !(state.me.can_act || state.me.can_vote) ||
-                  !canTarget(player.name)
-                "
-                (click)="target = player.name"
-              >
-                <span class="avatar">{{ player.name.slice(0, 1) }}</span>
-                <b>{{ player.name }}</b>
-                <!-- prettier-ignore -->
-                <small>{{ state.winner && player.bot ? 'BOT' : 'PEMAIN' }}{{ player.name === state.me.name ? ' / YOU' : '' }}</small>
-                <small
-                  >{{ !player.alive ? 'DIEKSEKUSI' : state.winner && player.hostage ? 'HIDUP / HOSTAGE' : state.winner ? 'HIDUP / BEBAS' : 'DI MEJA' }}</small
-                >
-                @if (player.role) {
-                  <strong>{{ player.role.toUpperCase() }}</strong>
-                }
-              </button>
-              @if (state.phase === 'tribunal') {
-                <span
-                  class="vote-count"
-                  [attr.aria-label]="votersFor(player.name).length + ' vote untuk ' + player.name"
-                  >{{ votersFor(player.name).length }} vote</span
-                >
-                <div class="voter-badges" aria-label="Pemilih">
-                  @for (voter of votersFor(player.name).slice(0, 4); track voter) {
-                    <span
-                      class="voter-badge"
-                      [style.background]="voterColor(voter)"
-                      [title]="voter"
-                      >{{ voter }}</span
-                    >
-                  }
-                  @if (votersFor(player.name).length > 4) {
-                    <span class="voter-badge">+{{ votersFor(player.name).length - 4 }}</span>
-                  }
-                </div>
-                @if (votersFor(player.name).length) {
-                  <details class="voter-details">
-                    <summary>Lihat pemilih</summary>
-                    @for (voter of votersFor(player.name); track voter) {
-                      <p>{{ voter }}</p>
-                    }
-                  </details>
-                }
+    @if (state.phase === 'preparing') {
+      <!-- LAYAR PERSIAPAN: panduan singkat sambil menunggu otak bot siap. -->
+      <section class="splash" aria-labelledby="splash-title">
+        <header class="wood-sign splash-sign">
+          <p>Persiapan pertandingan · Ruang {{ code }}</p>
+          <h1><span>Silent</span><i aria-hidden="true">◆</i><span>Terror</span></h1>
+        </header>
+        <div class="splash-body">
+          <article class="paper briefing">
+            <img
+              class="decoration briefing-gears"
+              src="/assets/decorations/gears/gear-trio.png"
+              alt=""
+            />
+            <header class="briefing-head">
+              <p class="hand">Berkas kasus rahasia</p>
+              <h2 id="splash-title">Sebelum lampu dimatikan…</h2>
+              <p>
+                Satu Hitman bersembunyi di antara kalian. Baca panduan singkat ini sambil menunggu
+                {{ state.preparation?.bots ? state.preparation?.bots + ' bot AI' : 'semua pemain' }}
+                siap.
+              </p>
+            </header>
+            <div class="guide-grid">
+              @for (item of guide; track item.title) {
+                <article class="guide-card">
+                  <span class="guide-icon" aria-hidden="true">{{ item.icon }}</span>
+                  <h3>{{ item.title }}</h3>
+                  <p>{{ item.text }}</p>
+                </article>
               }
             </div>
-          }
+          </article>
+          <aside class="splash-side">
+            <div class="splash-role">
+              <ng-container *ngTemplateOutlet="roleFlip; context: { $implicit: state }" />
+              @if (revealRole) {
+                <p class="role-note">
+                  <b>{{ roleNames[state.me.role] || state.me.role }}</b> —
+                  {{ roleHelp[state.me.role] }}
+                </p>
+              } @else {
+                <p class="role-note hand">
+                  Role hanya untukmu. Jangan sampai terlihat pemain lain!
+                </p>
+              }
+            </div>
+            @if (state.preparation; as prep) {
+              <div class="paper splash-status" aria-live="polite">
+                <p class="splash-state">
+                  @if (prep.ready) {
+                    {{ prep.starts_in ? 'Ronde 1 dimulai dalam ' + prep.starts_in + ' detik' : 'Memulai ronde 1…' }}
+                  } @else {
+                    Menyiapkan AI… ({{ prep.max_wait }} detik lagi paling lama)
+                  }
+                </p>
+                <div
+                  class="progress"
+                  role="progressbar"
+                  aria-label="Kesiapan AI"
+                  aria-valuemin="0"
+                  aria-valuemax="100"
+                  [attr.aria-valuenow]="prep.progress * 100"
+                >
+                  <span [style.width.%]="prep.progress * 100"></span>
+                </div>
+                <small class="hand">{{ prep.detail }}</small>
+                <button
+                  type="button"
+                  class="wood-button green"
+                  (click)="readyUp()"
+                  [disabled]="busy || prep.consented"
+                >
+                  {{ prep.consented ? 'Menunggu pemain lain…' : 'Saya sudah paham, siap!' }}
+                </button>
+                <small
+                  >{{ prep.agreed }} / {{ prep.required }} pemain siap. Ronde 1 dimulai saat AI siap
+                  dan semua pemain menekan siap, atau otomatis setelah hitung mundur.</small
+                >
+              </div>
+            }
+          </aside>
         </div>
-        @if (!state.winner) {
-          <section class="action-panel">
-            <p class="eyebrow">
-              {{ state.phase === 'tribunal' ? 'TRIBUNAL / SATU SUARA FINAL' : 'AKSI RAHASIA' }}
-            </p>
-            @if (state.me.can_vote) {
-              <p>
-                Pilih tersangka dari meja. Suara terbanyak dieksekusi; seri berarti tidak ada
-                eksekusi.
-              </p>
-              <button class="primary" [disabled]="!target || busy" (click)="act(true)">
-                Kunci vote: {{ target || 'pilih pemain' }}
-              </button>
-            } @else if (state.me.can_act) {
-              <p>Pilih target. Pilihan malam tidak dapat diubah setelah dikunci.</p>
-              <button class="primary" [disabled]="!target || busy" (click)="act()">
-                {{ state.me.ability?.toUpperCase() }} → {{ target || 'pilih pemain' }}
-              </button>
-            } @else {
-              <p>
-                {{
-                  state.phase === 'night'
-                    ? 'Tunggu aksi malam diselesaikan. Skill mungkin sudah dipakai, cooldown, atau tidak tersedia untuk role/statusmu.'
-                    : 'Tidak ada aksi tersedia saat ini. Amati percakapan dan tunggu fase berikutnya.'
-                }}
-              </p>
-            }
-            @if (state.me.action) {
-              <p>Pilihan malammu terkunci: {{ state.me.action.target }}</p>
-            }
-            @if (state.phase === 'tribunal' && state.me.vote) {
-              <p>Suaramu terkunci: {{ state.me.vote }}</p>
-            }
-            @if (state.me.role === 'stalker') {
-              <p class="hint">Peek tersedia mulai ronde {{ state.me.next_peek }}.</p>
-            }
-            @if (state.me.role === 'hitman') {
-              <p class="hint">Gag tersedia mulai ronde {{ state.me.next_gag }}.</p>
-            }
-            @if (notice) {
-              <p role="status">{{ notice }}</p>
-            }
-          </section>
-        }
-        @if (state.me.intel.length) {
-          <section class="intel">
-            <h3>Intel privat / Peek</h3>
-            @for (item of state.me.intel; track $index) {
-              <p>Ronde {{ item.round }}: {{ item.name }} → {{ item.role.toUpperCase() }}</p>
-            }
-          </section>
-        }
-        <details>
-          <summary>Catatan pertandingan</summary>
-          @for (event of state.events; track $index) {
-            <p class="event">{{ event }}</p>
-          }
-        </details>
       </section>
-      <aside class="chat-panel">
-        <h2>Diskusi meja</h2>
-        <p class="hint">
-          {{
-            state.winner ? 'Pertandingan selesai. Riwayat diskusi tetap bisa dibaca.' : state.phase === 'night'
-              ? 'Malam: semua chat terkunci.'
-              : 'Baca alibi. Amati siapa yang menjawab, bukan sekadar siapa yang diam.'
-          }}
-        </p>
-        <div class="messages" aria-live="polite">
-          @for (chat of state.messages; track chat.id) {
-            <article class="message" [class.self]="chat.sender === state.me.name">
-              <small>{{ chat.sender }}</small>
-              <p>{{ chat.message }}</p>
-            </article>
-          } @empty {
-            <p class="hint">Belum ada percakapan. Mulai diskusi saat siang.</p>
+    } @else {
+      <!-- HUD: papan fase, timer, aturan, dan profil. -->
+      <header class="hud">
+        <div class="wood-sign hud-brand">
+          <b>Silent<i aria-hidden="true">◆</i>Terror</b>
+          <small>Ruang {{ code }}</small>
+        </div>
+        <div class="hud-phase">
+          <div class="wood-sign phase-sign" [attr.data-phase]="state.phase">
+            <span class="phase-icon" aria-hidden="true">{{ phaseIcons[state.phase] }}</span>
+            <b>{{
+              state.winner ? 'Permainan selesai' : 'Ronde ' + state.round + ' · ' + phaseShort[state.phase]
+            }}</b>
+          </div>
+          @if (!state.winner) {
+            <ol class="round-flow" aria-label="Urutan fase">
+              @for (step of phaseSteps; track step.key) {
+                <li [class.current]="state.phase === step.key">
+                  <span aria-hidden="true">{{ step.icon }}</span> {{ step.label }}
+                </li>
+              }
+            </ol>
           }
         </div>
-        @if (thinking) {
-          <p role="status" class="hint">
-            Bot sedang menyiapkan balasan. Timer permainan tetap berjalan.
-          </p>
-        }
-        <form class="composer" (ngSubmit)="sendMessage()">
-          <input
-            name="message"
-            aria-label="Pesan diskusi"
-            [(ngModel)]="draft"
-            maxlength="1000"
-            [disabled]="!state.me.can_chat || !connected"
-            [placeholder]="state.me.can_chat ? 'Tulis alibimu…' : 'Chat terkunci'"
-          /><button
-            class="primary"
-            aria-label="Kirim pesan"
-            [disabled]="!draft.trim() || !state.me.can_chat || !connected || thinking"
+        <div class="hud-side">
+          <div
+            class="timer"
+            [class.urgent]="timerUrgent"
+            role="timer"
+            [attr.aria-label]="state.winner ? 'Permainan selesai' : 'Sisa waktu ' + seconds + ' detik'"
           >
-            ↑
+            <svg viewBox="0 0 48 48" aria-hidden="true">
+              <circle class="timer-track" cx="24" cy="24" r="20" />
+              <circle
+                class="timer-fill"
+                cx="24"
+                cy="24"
+                r="20"
+                [style.stroke-dashoffset]="125.66 * (1 - timerFraction)"
+              />
+            </svg>
+            <b>{{ state.winner ? '★' : seconds }}</b>
+          </div>
+          <button
+            type="button"
+            class="round-button"
+            (click)="showRules = true"
+            aria-label="Cara bermain"
+          >
+            ?
           </button>
-        </form>
-      </aside>
-    </div>
+          <div class="profile-chip">
+            <app-profile-menu
+              [username]="state.me.name || 'Pemain'"
+              [activeMatch]="!state.winner"
+            />
+          </div>
+        </div>
+      </header>
+
+      @if (error) {
+        <p class="alert toast" role="alert">
+          {{ error }} <button type="button" (click)="error = ''">Tutup</button>
+        </p>
+      }
+
+      <div class="match-grid" [attr.data-tab]="mobileTab">
+        <!-- KIRI: kartu rahasia, status, intel, dan catatan pertandingan. -->
+        <aside class="side-panel" aria-label="Kartu dan catatan">
+          <div class="private-card">
+            <p class="eyebrow">{{ state.winner ? 'Role kamu' : 'Hanya untukmu' }}</p>
+            <ng-container *ngTemplateOutlet="roleFlip; context: { $implicit: state }" />
+            @if (revealRole && !state.winner) {
+              <p class="objective"><b>Tujuan kubumu:</b> {{ objective }}</p>
+              <p class="role-help">{{ roleHelp[state.me.role] }}</p>
+            }
+            <p class="private-status">{{ privateStatus }}</p>
+          </div>
+          @if (state.me.intel.length) {
+            <section class="note intel">
+              <h3>Intel privat · Peek</h3>
+              @for (item of state.me.intel; track $index) {
+                <p>
+                  Ronde {{ item.round }}: <b>{{ item.name }}</b> →
+                  {{ roleNames[item.role] || item.role }}
+                </p>
+              }
+            </section>
+          }
+          <button type="button" class="wood-button plank rules-open" (click)="showRules = true">
+            ❔ Cara bermain
+          </button>
+          <section class="note events">
+            <h3>Catatan pertandingan</h3>
+            <div class="events-list">
+              @for (event of state.events; track $index) {
+                <p class="event">{{ event }}</p>
+              } @empty {
+                <p class="event">Belum ada kejadian.</p>
+              }
+            </div>
+          </section>
+        </aside>
+
+        <!-- TENGAH: papan tersangka dan baki aksi. -->
+        <section class="table-panel" aria-label="Meja pemain">
+          <div class="table-felt" #felt>
+            <div class="players" [style.--cols]="tableColumns" [style.--rows]="tableRows">
+              @for (player of state.players; track player.name) {
+                <div
+                  class="player-card"
+                  [class.has-votes]="state.phase === 'tribunal' && votersFor(player.name).length > 0"
+                  [class.leading]="state.phase === 'tribunal' && leadingTarget === player.name"
+                  [attr.data-bump]="votersFor(player.name).length % 2"
+                  [style.--heat]="state.phase === 'tribunal' ? voteHeat(player.name) : 0"
+                  [style.--tag]="colorFor(player.name)"
+                >
+                  <button
+                    type="button"
+                    class="player"
+                    [class.chosen]="target === player.name"
+                    [class.eliminated]="!player.alive"
+                    [class.self]="player.name === state.me.name"
+                    [attr.aria-pressed]="target === player.name"
+                    [disabled]="
+                      !player.alive ||
+                      !(state.me.can_act || state.me.can_vote) ||
+                      !canTarget(player.name)
+                    "
+                    (click)="target = player.name"
+                  >
+                    <span class="portrait">
+                      <img class="skin" [src]="skinFor(player.name)" alt="" />
+                    </span>
+                    <b class="name-tag">{{ player.name }}</b>
+                    <!-- prettier-ignore -->
+                    <small class="player-sub">{{ state.winner ? (player.bot ? 'BOT' : 'PEMAIN') : '' }}{{ player.name === state.me.name ? (state.winner ? ' · ' : '') + 'KAMU' : '' }}</small>
+                    @if (player.role) {
+                      <strong
+                        class="role-tag"
+                        >{{ (roleNames[player.role] || player.role).toUpperCase() }}</strong
+                      >
+                    }
+                    @if (!player.alive) {
+                      <span class="stamp stamp-dead">Dieksekusi</span>
+                    } @else if (state.winner && player.hostage) {
+                      <span class="stamp stamp-hostage">Disandera</span>
+                    }
+                    @if (target === player.name) {
+                      <span class="stamp stamp-target">Target</span>
+                    }
+                  </button>
+                  @if (state.phase === 'tribunal' && leadingTarget === player.name) {
+                    <span class="leading-ribbon" aria-hidden="true">⚖ Terancam</span>
+                  }
+                  @if (state.phase === 'tribunal') {
+                    <span
+                      class="vote-count"
+                      [attr.aria-label]="votersFor(player.name).length + ' vote untuk ' + player.name"
+                      >{{ votersFor(player.name).length }} vote</span
+                    >
+                    <div class="voter-badges" [attr.title]="votersFor(player.name).join(', ')">
+                      @for (voter of votersFor(player.name).slice(0, 4); track voter) {
+                        <span class="voter-badge" [style.--chip]="voterColor(voter)">{{
+                          voter.slice(0, 2)
+                        }}</span>
+                      }
+                      @if (votersFor(player.name).length > 4) {
+                        <span class="voter-badge more"
+                          >+{{ votersFor(player.name).length - 4 }}</span
+                        >
+                      }
+                    </div>
+                    <ul class="voter-details sr-only" [attr.aria-label]="'Pemilih ' + player.name">
+                      @for (voter of votersFor(player.name); track voter) {
+                        <li>{{ voter }}</li>
+                      }
+                    </ul>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+
+          @if (!state.winner) {
+            <section class="action-panel" [attr.data-phase]="state.phase">
+              <div class="action-copy">
+                <p class="eyebrow">{{ actionTitle }}</p>
+                <p class="action-text">{{ actionHint }}</p>
+                @if (state.me.action) {
+                  <p class="locked">
+                    🔒 Pilihan malammu terkunci: <b>{{ state.me.action.target }}</b>
+                  </p>
+                }
+                @if (state.phase === 'tribunal' && state.me.vote) {
+                  <p class="locked">
+                    🔒 Suaramu terkunci: <b>{{ state.me.vote }}</b>
+                  </p>
+                }
+                @if (state.me.role === 'stalker') {
+                  <p class="hint">Peek tersedia mulai ronde {{ state.me.next_peek }}.</p>
+                }
+                @if (state.me.role === 'hitman') {
+                  <p class="hint">Gag tersedia mulai ronde {{ state.me.next_gag }}.</p>
+                }
+                @if (notice) {
+                  <p class="notice" role="status">{{ notice }}</p>
+                }
+              </div>
+              <div class="action-buttons">
+                @if (state.me.can_vote) {
+                  <button
+                    type="button"
+                    class="wood-button red"
+                    [disabled]="!target || busy"
+                    (click)="act(true)"
+                  >
+                    ⚖ Kunci vote: {{ target || 'pilih pemain' }}
+                  </button>
+                } @else if (state.me.can_act) {
+                  <button
+                    type="button"
+                    class="wood-button green"
+                    [disabled]="!target || busy"
+                    (click)="act()"
+                  >
+                    {{ abilityNames[state.me.ability || ''] || state.me.ability }} →
+                    {{ target || 'pilih pemain' }}
+                  </button>
+                }
+                @if (state.phase === 'day') {
+                  <button
+                    type="button"
+                    class="wood-button plank skip-button"
+                    (click)="skipDiscussion()"
+                    [disabled]="busy || !state.discussion_skip.can_consent"
+                    [title]="'Semua manusia yang masih hidup harus setuju. Bot tidak dihitung.'"
+                  >
+                    {{ state.discussion_skip.consented ? 'Sudah setuju' : 'Setuju skip diskusi' }}
+                    ({{ state.discussion_skip.agreed }}/{{ state.discussion_skip.required }})
+                  </button>
+                }
+              </div>
+            </section>
+          } @else {
+            <div class="board-bar">
+              <p class="hand">Role dan status akhir semua pemain kini dibuka.</p>
+              <button type="button" class="wood-button green" (click)="showResult()">
+                🏆 Lihat hasil & kuesioner
+              </button>
+              <a class="text-link" routerLink="/lobby">← Kembali ke lobby</a>
+            </div>
+          }
+        </section>
+
+        <!-- KANAN: buku catatan diskusi. -->
+        <aside class="chat-panel paper" aria-label="Diskusi meja">
+          <header class="chat-head">
+            <h2>Diskusi meja</h2>
+            <span class="link-dot" [class.online]="connected || !!state.winner">{{
+              state.winner ? 'Riwayat' : connected ? 'Tersambung' : 'Menyambung…'
+            }}</span>
+          </header>
+          <p class="hint chat-hint">{{ chatHint }}</p>
+          <div class="messages" #messageList aria-live="polite">
+            @for (chat of state.messages; track chat.id) {
+              <article
+                class="message"
+                [class.self]="chat.sender === state.me.name"
+                [style.--tag]="colorFor(chat.sender)"
+              >
+                <small><i aria-hidden="true"></i>{{ chat.sender }}</small>
+                <p>{{ chat.message }}</p>
+              </article>
+            } @empty {
+              <p class="hint empty">Belum ada percakapan. Mulai diskusi saat siang.</p>
+            }
+            @if (thinking) {
+              <p class="typing" role="status">
+                <span aria-hidden="true"><i></i><i></i><i></i></span> Bot sedang menyiapkan balasan.
+                Timer tetap berjalan.
+              </p>
+            }
+          </div>
+          <form class="composer" (ngSubmit)="sendMessage()">
+            <input
+              name="message"
+              aria-label="Pesan diskusi"
+              [(ngModel)]="draft"
+              maxlength="1000"
+              autocomplete="off"
+              [disabled]="!state.me.can_chat || !connected"
+              [placeholder]="state.me.can_chat ? 'Tulis alibimu…' : 'Chat terkunci'"
+            /><button
+              class="send-button"
+              aria-label="Kirim pesan"
+              [disabled]="!draft.trim() || !state.me.can_chat || !connected || thinking"
+            >
+              ➤
+            </button>
+          </form>
+        </aside>
+      </div>
+
+      <!-- TAB HP: satu panel penuh per tab supaya halaman tidak perlu di-scroll. -->
+      <nav class="mobile-tabs" aria-label="Tampilan">
+        <button
+          type="button"
+          class="tab-table"
+          [class.active]="mobileTab === 'table'"
+          (click)="selectTab('table')"
+        >
+          <span aria-hidden="true">🃏</span> Meja
+        </button>
+        <button
+          type="button"
+          class="tab-chat"
+          [class.active]="mobileTab === 'chat'"
+          (click)="selectTab('chat')"
+        >
+          <span aria-hidden="true">💬</span> Chat
+          @if (unread) {
+            <span class="badge" [attr.aria-label]="unread + ' pesan baru'">{{ unread }}</span>
+          }
+        </button>
+        <button
+          type="button"
+          class="tab-info"
+          [class.active]="mobileTab === 'info'"
+          (click)="selectTab('info')"
+        >
+          <span aria-hidden="true">🂠</span> Kartu
+        </button>
+      </nav>
+
+      <!-- AKHIR: pengumuman pemenang ala Among Us, lalu kuesioner. -->
+      @if (state.winner && endView !== 'board') {
+        <div
+          class="end-stage"
+          [class.hitman-win]="state.winner === 'hitman'"
+          [class.is-loss]="outcomeLabel === 'KAMU KALAH'"
+        >
+          @if (endView === 'reveal') {
+            <section
+              class="result celebrate"
+              [class.is-loss]="outcomeLabel === 'KAMU KALAH'"
+              aria-live="polite"
+            >
+              @if (outcomeLabel === 'KAMU MENANG') {
+                <div class="confetti" aria-hidden="true">
+                  @for (piece of confetti; track $index) {
+                    <i
+                      [style.left.%]="piece.x"
+                      [style.animation-delay.s]="piece.delay"
+                      [style.background]="piece.color"
+                    ></i>
+                  }
+                </div>
+              }
+              <p class="cheer">{{ outcomeLabel === 'KAMU MENANG' ? 'Horay!' : 'Yah…' }}</p>
+              <h2 class="victory-title">{{ victoryTitle }}</h2>
+              <p class="outcome-stamp">{{ outcomeLabel }}</p>
+              <p class="congrats-title">{{ congratsTitle }}</p>
+              <ul class="winner-list lineup" aria-label="Pemenang" [style.--count]="winners.length">
+                @for (player of winners; track player.name; let index = $index) {
+                  <li [style.--i]="index" [style.--tag]="colorFor(player.name)">
+                    <img class="lineup-skin" [src]="skinFor(player.name)" alt="" />
+                    <b>{{ player.name }}</b>
+                    <small>{{ winnerLabel(player) }}</small>
+                  </li>
+                }
+              </ul>
+              <p class="reason">
+                <b>{{ state.winner === 'hitman' ? 'Hitman menang.' : 'Kubu warga menang.' }}</b>
+                {{ resultExplanation }}
+              </p>
+              @if (state.result; as result) {
+                <div class="result-stats">
+                  <span
+                    ><b>{{
+                      result.civilians_voters ?? result.civilians_alive - result.civilians_hostage
+                    }}</b>
+                    warga masih punya suara</span
+                  >
+                  <span
+                    ><b>{{ result.civilians_alive }}</b> warga hidup</span
+                  >
+                  <span
+                    ><b>{{ result.civilians_hostage }}</b> disandera</span
+                  >
+                  <span
+                    ><b>{{ result.civilians_eliminated }}</b> dieksekusi</span
+                  >
+                </div>
+              }
+              <div class="end-actions">
+                @if (surveyState !== 'done') {
+                  <button type="button" class="wood-button green" (click)="goToSurvey()">
+                    Isi kuesioner →
+                  </button>
+                } @else {
+                  <p class="survey-thanks">Terima kasih! Kuesionermu sudah tersimpan.</p>
+                }
+                <button type="button" class="wood-button plank" (click)="showBoard()">
+                  Lihat meja & role
+                </button>
+                <a class="text-link" routerLink="/lobby">← Kembali ke lobby</a>
+              </div>
+            </section>
+          } @else {
+            <section class="survey paper" aria-labelledby="survey-title">
+              <header class="survey-head">
+                <p class="hand">Kuesioner singkat · untuk penelitian</p>
+                <h2 id="survey-title">Bagaimana pertandingan tadi?</h2>
+              </header>
+              <div class="survey-body">
+                @switch (surveyState) {
+                  @case ('loading') {
+                    <p class="hint">Memuat pertanyaan…</p>
+                  }
+                  @case ('unavailable') {
+                    <p class="hint">{{ surveyError }}</p>
+                  }
+                  @case ('done') {
+                    <div class="survey-done">
+                      <span aria-hidden="true">✉</span>
+                      <p class="survey-thanks">
+                        Terima kasih! Jawabanmu sudah tersimpan untuk penelitian.
+                      </p>
+                    </div>
+                  }
+                  @default {
+                    <form (ngSubmit)="submitSurvey()">
+                      @for (
+                        question of survey?.questions ?? [];
+                        track question.id;
+                        let n = $index
+                      ) {
+                        <fieldset class="survey-question">
+                          <legend>
+                            <span class="q-number">{{ n + 1 }}</span> {{ question.prompt }}
+                            @if (!question.required) {
+                              <small>(opsional)</small>
+                            }
+                          </legend>
+                          @if (question.kind === 'stars' || question.kind === 'scale') {
+                            <div
+                              class="scale"
+                              [class.stars]="question.kind === 'stars'"
+                              role="radiogroup"
+                              [attr.aria-label]="question.prompt"
+                            >
+                              @for (value of scaleValues(question); track value) {
+                                <button
+                                  type="button"
+                                  role="radio"
+                                  [class.selected]="isSelected(question, value)"
+                                  [attr.aria-checked]="surveyAnswers[question.id]?.value === value"
+                                  [attr.aria-label]="value + ' dari ' + question.scale_max"
+                                  (click)="setAnswer(question, value)"
+                                >
+                                  {{ question.kind === 'stars' ? '★' : value }}
+                                </button>
+                              }
+                            </div>
+                            @if (question.label_min || question.label_max) {
+                              <p class="scale-labels">
+                                <span>{{ question.scale_min }} = {{ question.label_min }}</span>
+                                <span>{{ question.scale_max }} = {{ question.label_max }}</span>
+                              </p>
+                            }
+                          } @else if (question.kind === 'choice') {
+                            <div class="choices">
+                              @for (option of question.options; track option) {
+                                <label>
+                                  <input
+                                    type="radio"
+                                    [name]="'q' + question.id"
+                                    [value]="option"
+                                    [checked]="surveyAnswers[question.id]?.text === option"
+                                    (change)="setText(question, option)"
+                                  />
+                                  <span>{{ option }}</span>
+                                </label>
+                              }
+                            </div>
+                          } @else {
+                            <textarea
+                              [name]="'q' + question.id"
+                              maxlength="1000"
+                              rows="3"
+                              placeholder="Tulis jawabanmu di sini…"
+                              [attr.aria-label]="question.prompt"
+                              [ngModel]="surveyAnswers[question.id]?.text ?? ''"
+                              (ngModelChange)="setText(question, $event)"
+                            ></textarea>
+                            <small class="counter"
+                              >{{ surveyAnswers[question.id]?.text?.length ?? 0 }} / 1000</small
+                            >
+                          }
+                        </fieldset>
+                      }
+                      @if (surveyError) {
+                        <p class="alert" role="alert">{{ surveyError }}</p>
+                      }
+                      <button
+                        class="wood-button green submit-survey"
+                        [disabled]="!surveyComplete || surveyState === 'sending'"
+                      >
+                        {{ surveyState === 'sending' ? 'Mengirim…' : 'Kirim kuesioner' }}
+                      </button>
+                    </form>
+                  }
+                }
+              </div>
+              <footer class="survey-foot">
+                <button type="button" class="text-link" (click)="showResult()">← Pengumuman</button>
+                <button type="button" class="text-link" (click)="showBoard()">Lihat meja</button>
+                <a class="text-link" routerLink="/lobby">Kembali ke lobby</a>
+              </footer>
+            </section>
+          }
+        </div>
+      }
+
+      <!-- ATURAN: dibuka dari tombol "?" di HUD. -->
+      @if (showRules) {
+        <div class="modal-backdrop" (click)="showRules = false">
+          <section
+            class="rules-modal paper"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="rules-title"
+            (click)="$event.stopPropagation()"
+            (keydown.escape)="showRules = false"
+          >
+            <header class="rules-head">
+              <h2 id="rules-title">Cara bermain</h2>
+              <button
+                type="button"
+                class="round-button"
+                (click)="showRules = false"
+                aria-label="Tutup"
+              >
+                ✕
+              </button>
+            </header>
+            <div class="rules-body">
+              <div class="guide-grid compact">
+                @for (item of guide; track item.title) {
+                  <article class="guide-card">
+                    <span class="guide-icon" aria-hidden="true">{{ item.icon }}</span>
+                    <h3>{{ item.title }}</h3>
+                    <p>{{ item.text }}</p>
+                  </article>
+                }
+              </div>
+              <p><b>Kubu warga (Spy, Stalker, Civilian):</b> menang jika Hitman dieksekusi.</p>
+              <p>
+                <b>Hitman:</b> menang ketika warga hidup yang masih memiliki hak voting tersisa
+                paling banyak satu.
+              </p>
+              <p>
+                Hostage tetap hidup dan masih bisa memakai skill malam, tetapi kehilangan chat dan
+                voting permanen. Gag hanya membatasi chat sampai akhir ronde; hak voting tetap ada.
+              </p>
+              <p>
+                Voting seri atau tanpa suara tidak mengeksekusi siapa pun. Ronde berikutnya dimulai
+                jika belum ada pemenang. Tidak ada batas ronde atau hasil seri pertandingan.
+              </p>
+            </div>
+          </section>
+        </div>
+      }
+    }
   } @else {
-    <p class="loading">Memuat pertandingan dari server…</p>
-    <button (click)="refresh()" [disabled]="busy">Coba lagi</button>
+    <div class="loading-card paper">
+      <p class="loading">Memuat pertandingan dari server…</p>
+      <button type="button" class="wood-button green" (click)="refresh()" [disabled]="busy">
+        Coba lagi
+      </button>
+    </div>
   }
 </main>

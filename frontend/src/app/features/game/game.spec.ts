@@ -217,7 +217,128 @@ describe('Game', () => {
     expect(target.querySelector('.vote-count')?.textContent).toContain('5 vote');
     expect(target.querySelectorAll('.voter-badge').length).toBe(5);
     expect(target.querySelector('.voter-badges')?.textContent).toContain('+1');
-    expect(target.querySelectorAll('.voter-details p').length).toBe(5);
+    expect(target.querySelectorAll('.voter-details li').length).toBe(5);
+    expect(target.querySelector('.voter-badges')?.getAttribute('title')).toBe('a, b, c, d, e');
+  });
+
+  // VOTE: bingkai makin merah seiring suara; suara terbanyak tunggal ditandai "terancam".
+  it('heats up voted players and marks only a unique leader', () => {
+    const game = snapshot().game;
+    game.phase = 'tribunal';
+    game.players = ['a', 'b', 'c', 'd', 'e', 'f'].map((name) => ({
+      name,
+      bot: false,
+      alive: true,
+    }));
+    game.tribunal_votes = [
+      { target: 'e', voters: ['a'] },
+      { target: 'f', voters: ['b', 'c'] },
+    ];
+    component.game = game;
+    // 6 pemain hidup: mayoritas 4 suara = panas penuh.
+    expect(component.voteHeat('e')).toBeCloseTo(0.25);
+    expect(component.voteHeat('f')).toBeCloseTo(0.5);
+    expect(component.voteHeat('a')).toBe(0);
+    expect(component.leadingTarget).toBe('f');
+    game.tribunal_votes.push({ target: 'a', voters: ['d', 'e'] });
+    expect(component.leadingTarget).toBe('');
+    game.tribunal_votes[1].voters.push('a', 'd', 'e');
+    expect(component.voteHeat('f')).toBe(1);
+    fixture.componentRef.changeDetectorRef.markForCheck();
+    fixture.detectChanges();
+    const leading = fixture.nativeElement.querySelector('.player-card.leading');
+    expect(leading?.textContent).toContain('f');
+    expect(leading?.textContent).toContain('Terancam');
+  });
+
+  // KARAKTER: ditentukan urutan kursi, tidak pernah dari role (tidak membocorkan rahasia).
+  it('assigns avatars and colors by seat order, never by role', () => {
+    const game = snapshot().game;
+    component.game = game;
+    const before = [
+      component.skinFor('alice'),
+      component.skinFor('NOX'),
+      component.colorFor('NOX'),
+    ];
+    game.players = game.players.map((player, index) => ({
+      ...player,
+      role: index ? 'hitman' : 'civilian',
+    }));
+    expect([
+      component.skinFor('alice'),
+      component.skinFor('NOX'),
+      component.colorFor('NOX'),
+    ]).toEqual(before);
+    expect(component.skinFor('alice')).not.toBe(component.skinFor('NOX'));
+    expect(component.roleCard('spy')).toBe('/assets/cards/card_spy.png');
+    expect(component.roleCard('unknown')).toBe('/assets/cards/card_blank.png');
+  });
+
+  // TIMER: sisa waktu dibandingkan durasi fase dari room snapshot.
+  it('computes the timer ring from the room phase durations', () => {
+    const state = snapshot();
+    state.room.match_durations = { day: 120, night: 30, tribunal: 45 };
+    vi.spyOn(TestBed.inject(GameService), 'request').mockReturnValue(of(state));
+    component.code = 'ABC123';
+    component.refresh();
+    expect(component.seconds).toBe(20);
+    expect(component.timerFraction).toBeCloseTo(20 / 120);
+    expect(component.timerUrgent).toBe(false);
+  });
+
+  // TAB HP: pesan baru saat tab lain aktif ditandai, dan dihapus saat tab chat dibuka.
+  it('counts unread chat on other mobile tabs and clears it when chat opens', () => {
+    const state = snapshot();
+    const request = vi.spyOn(TestBed.inject(GameService), 'request').mockReturnValue(of(state));
+    component.code = 'ABC123';
+    component.refresh();
+    expect(component.unread).toBe(0);
+    const next = snapshot();
+    next.game.messages = [
+      { id: 'm1', sender: 'NOX', message: 'Halo' },
+      { id: 'm2', sender: 'NOX', message: 'Ada yang curiga?' },
+    ];
+    request.mockReturnValue(of(next));
+    component.refresh();
+    expect(component.unread).toBe(2);
+    component.selectTab('chat');
+    expect(component.unread).toBe(0);
+    expect(component.mobileTab).toBe('chat');
+  });
+
+  // AKHIR: pengumuman pemenang → kuesioner → meja akhir, tanpa baki aksi.
+  it('walks from the winner announcement to the survey and the final board', () => {
+    const state = snapshot();
+    state.game.phase = 'finished';
+    state.game.winner = 'hitman';
+    state.game.players = [
+      { name: 'alice', bot: false, alive: true, role: 'hitman' },
+      { name: 'NOX', bot: true, alive: false, role: 'civilian' },
+    ];
+    const api = TestBed.inject(GameService);
+    vi.spyOn(api, 'request').mockReturnValue(of(state));
+    vi.spyOn(api, 'survey').mockReturnValue(
+      of({ match_id: 'match-1', submitted: false, questions: [] }),
+    );
+    component.code = 'ABC123';
+    component.refresh();
+    fixture.componentRef.changeDetectorRef.markForCheck();
+    fixture.detectChanges();
+    const stage = fixture.nativeElement.querySelector('.end-stage');
+    expect(stage.textContent).toContain('Hitman menang!');
+    expect(stage.textContent).toContain('KAMU MENANG');
+    expect(stage.querySelectorAll('.lineup li').length).toBe(1);
+    component.goToSurvey();
+    fixture.componentRef.changeDetectorRef.markForCheck();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.survey')).not.toBeNull();
+    component.showBoard();
+    fixture.componentRef.changeDetectorRef.markForCheck();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.end-stage')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.board-bar')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('.action-panel')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.players').textContent).toContain('BOT');
   });
 
   it('does not clear draft when chat is disconnected or locked', () => {
@@ -274,5 +395,130 @@ describe('Game', () => {
     component.game.me.hostage = true;
     component.game.winner = 'hitman';
     expect(component.outcomeLabel).toBe('KAMU KALAH');
+  });
+
+  // PERSIAPAN: layar panduan tampil sebelum ronde 1; tombol siap mengirim token pertandingan.
+  it('shows the preparation screen and sends ready with the match token', () => {
+    const state = snapshot();
+    state.game.phase = 'preparing';
+    state.game.preparation = {
+      ready: false,
+      detail: 'Memuat NLU IndoBERT…',
+      progress: 0.4,
+      starts_in: null,
+      max_wait: 80,
+      agreed: 0,
+      required: 1,
+      consented: false,
+      bots: 1,
+    };
+    const request = vi.spyOn(TestBed.inject(GameService), 'request').mockReturnValue(of(state));
+    component.code = 'ABC123';
+    component.refresh();
+    fixture.componentRef.changeDetectorRef.markForCheck();
+    fixture.detectChanges();
+    const splash = fixture.nativeElement.querySelector('.splash');
+    expect(splash.textContent).toContain('Memuat NLU IndoBERT');
+    expect(fixture.nativeElement.querySelector('.match-grid')).toBeNull();
+    component.readyUp();
+    expect(request).toHaveBeenLastCalledWith('ABC123', { match_id: 'match-1' }, 'ready');
+  });
+
+  // TRANSISI: overlay muncul saat fase berganti, tidak saat halaman pertama kali dimuat.
+  it('shows the night transition only when the phase changes', () => {
+    const state = snapshot();
+    const request = vi.spyOn(TestBed.inject(GameService), 'request').mockReturnValue(of(state));
+    component.code = 'ABC123';
+    component.refresh();
+    expect(component.transition).toBeNull();
+    request.mockReturnValue(of({ ...state, game: { ...state.game, phase: 'night' } }));
+    component.refresh();
+    expect(component.transition?.phase).toBe('night');
+    expect(component.transition?.title).toContain('Malam');
+  });
+
+  // HASIL: ucapan selamat dan daftar pemenang dari role yang dibuka setelah selesai.
+  it('congratulates the winning team', () => {
+    component.game = snapshot().game;
+    component.game.winner = 'civilians';
+    component.game.me.role = 'spy';
+    component.game.players = [
+      { name: 'alice', alive: true, role: 'spy', bot: false },
+      { name: 'NOX', alive: false, role: 'hitman', bot: true },
+    ];
+    expect(component.congratsTitle).toBe('Selamat, kamu menang!');
+    expect(component.winners.map((player) => player.name)).toEqual(['alice']);
+    component.game.me.role = 'hitman';
+    expect(component.congratsTitle).toBe('Selamat untuk kubu warga!');
+  });
+
+  // SURVEI: pertanyaan dari backend, wajib diisi sebelum kirim, dan dikirim sekali.
+  it('loads the survey once after the match and submits required answers', () => {
+    const state = snapshot();
+    state.game.winner = 'civilians';
+    state.game.phase = 'finished';
+    const api = TestBed.inject(GameService);
+    vi.spyOn(api, 'request').mockReturnValue(of(state));
+    const survey = vi.spyOn(api, 'survey').mockReturnValue(
+      of({
+        match_id: 'match-1',
+        submitted: false,
+        questions: [
+          {
+            id: 1,
+            code: 'seru',
+            prompt: 'Seberapa seru?',
+            kind: 'stars',
+            scale_min: 1,
+            scale_max: 6,
+            label_min: 'Bosan',
+            label_max: 'Seru',
+            options: [],
+            required: true,
+          },
+          {
+            id: 2,
+            code: 'komentar',
+            prompt: 'Komentar',
+            kind: 'text',
+            scale_min: 1,
+            scale_max: 6,
+            label_min: null,
+            label_max: null,
+            options: [],
+            required: false,
+          },
+        ],
+      }),
+    );
+    const submit = vi
+      .spyOn(api, 'submitSurvey')
+      .mockReturnValue(of({ submitted: true, answers: 1 }));
+    component.code = 'ABC123';
+    component.refresh();
+    component.refresh();
+    expect(survey).toHaveBeenCalledTimes(1);
+    expect(component.surveyState).toBe('ready');
+    expect(component.surveyComplete).toBe(false);
+    const [stars] = component.survey!.questions;
+    component.setAnswer(stars, 5);
+    expect(component.isSelected(stars, 4)).toBe(true);
+    expect(component.isSelected(stars, 6)).toBe(false);
+    expect(component.surveyComplete).toBe(true);
+    component.submitSurvey();
+    expect(submit).toHaveBeenCalledWith('ABC123', 'match-1', [{ question_id: 1, value: 5 }]);
+    expect(component.surveyState).toBe('done');
+  });
+
+  it('treats an already submitted survey as done', () => {
+    component.code = 'ABC123';
+    component.survey = { match_id: 'match-1', submitted: false, questions: [] };
+    component.surveyState = 'ready';
+    vi.spyOn(TestBed.inject(GameService), 'submitSurvey').mockReturnValue(
+      throwError(() => ({ status: 409, error: { detail: 'Sudah dikirim.' } })),
+    );
+    component.submitSurvey();
+    expect(component.surveyState).toBe('done');
+    expect(component.surveyError).toBe('');
   });
 });

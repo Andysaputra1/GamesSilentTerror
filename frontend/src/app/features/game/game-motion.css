@@ -1,0 +1,341 @@
+/* Animasi dan aturan responsif (dimuat terakhir agar menimpa aturan dasar). */
+/* ---------- Animasi ---------- */
+@keyframes transisi-fase {
+  0% {
+    opacity: 0;
+  }
+  25%,
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes kartu-transisi {
+  0% {
+    transform: translateY(14px) scale(0.94) rotate(-2deg);
+  }
+  30%,
+  100% {
+    transform: none;
+  }
+}
+@keyframes cap {
+  0% {
+    opacity: 0;
+    transform: scale(2.2);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes muncul {
+  0% {
+    transform: scale(0) rotate(-40deg);
+  }
+  70% {
+    transform: scale(1.25) rotate(8deg);
+  }
+  100% {
+    transform: scale(1) rotate(0);
+  }
+}
+@keyframes guncang-a {
+  0%,
+  100% {
+    transform: none;
+  }
+  30% {
+    transform: scale(1.05) rotate(-2deg);
+  }
+  60% {
+    transform: scale(0.98) rotate(1.5deg);
+  }
+}
+@keyframes guncang-b {
+  0%,
+  100% {
+    transform: none;
+  }
+  30% {
+    transform: scale(1.05) rotate(2deg);
+  }
+  60% {
+    transform: scale(0.98) rotate(-1.5deg);
+  }
+}
+@keyframes panas {
+  from {
+    opacity: 0.45;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes denyut-timer {
+  50% {
+    transform: scale(1.18);
+  }
+}
+@keyframes masuk {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@keyframes titik {
+  50% {
+    opacity: 0.25;
+    transform: translateY(-3px);
+  }
+}
+@keyframes panggung {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes zoom {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes lompat {
+  0% {
+    opacity: 0;
+    transform: translateY(20px) scale(0.6);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes naik {
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+}
+@keyframes konfeti {
+  0% {
+    opacity: 1;
+    transform: translateY(0) rotate(0deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(100vh) rotate(620deg);
+  }
+}
+
+/* ==========================================================================
+   Responsif
+   ========================================================================== */
+
+/* Tablet: meja + chat; kartu rahasia dibuka lewat tab. */
+@media (max-width: 1099px) {
+  .match-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 330px);
+  }
+  .side-panel {
+    display: none;
+  }
+  .match-grid[data-tab='info'] .side-panel {
+    display: flex;
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .match-grid[data-tab='info'] .table-panel {
+    display: none;
+  }
+  .mobile-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    padding: 6px 10px calc(6px + env(safe-area-inset-bottom));
+    background: rgb(30 16 8 / 0.88);
+  }
+  .mobile-tabs .tab-chat {
+    display: none;
+  }
+  .mobile-tabs button {
+    position: relative;
+    min-height: 42px;
+    border: 1px solid rgb(251 234 203 / 0.35);
+    border-radius: 10px;
+    background: transparent;
+    color: var(--wood-text);
+    font: 17px var(--font-hand);
+    cursor: pointer;
+  }
+  .mobile-tabs button.active {
+    background: var(--paper);
+    color: var(--ink);
+    border-color: var(--paper);
+  }
+  .badge {
+    position: absolute;
+    top: -6px;
+    right: 10px;
+    min-width: 20px;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: var(--red);
+    color: #fff;
+    font: 800 12px/18px var(--font-display);
+  }
+  .hud-brand {
+    width: 170px;
+    font-size: 12px;
+  }
+  .phase-sign {
+    min-width: 0;
+    font-size: 14px;
+  }
+  .guide-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* HP: satu panel per tab; kartu meja 2–3 kolom tanpa scroll. */
+@media (max-width: 759px) {
+  .hud {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 8px 10px 4px;
+  }
+  .hud-brand,
+  .round-flow {
+    display: none;
+  }
+  .hud-phase {
+    justify-self: start;
+  }
+  .phase-sign {
+    max-width: 100%;
+    padding: 0.45em 1.7em;
+    font-size: 12px;
+  }
+  .phase-sign b {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .timer {
+    width: 48px;
+    height: 48px;
+  }
+  .timer b {
+    font-size: 16px;
+  }
+  .round-button {
+    width: 36px;
+    height: 36px;
+  }
+  .match-grid {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 4px 10px 8px;
+  }
+  .side-panel,
+  .table-panel,
+  .chat-panel {
+    display: none;
+  }
+  .match-grid[data-tab='table'] .table-panel,
+  .match-grid[data-tab='chat'] .chat-panel,
+  .match-grid[data-tab='info'] .side-panel {
+    display: flex;
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .mobile-tabs {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .mobile-tabs .tab-chat {
+    display: block;
+  }
+  .players {
+    --gap: 12px;
+  }
+  .hud-side .round-button {
+    display: none;
+  }
+  .rules-open {
+    display: inline-flex;
+    flex: none;
+    align-self: center;
+  }
+  .hud-phase {
+    min-width: 0;
+  }
+  .table-felt {
+    padding: 12px;
+    border-width: 7px;
+  }
+  .action-panel {
+    padding: 12px 16px;
+  }
+  .action-buttons,
+  .action-buttons .wood-button {
+    width: 100%;
+  }
+  .splash-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .splash-side {
+    order: -1;
+  }
+  .guide-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .briefing,
+  .survey,
+  .rules-modal {
+    padding: 24px 22px 16px;
+  }
+  .toast {
+    top: 64px;
+  }
+}
+
+/* Gerak minimal: tanpa animasi, informasi tetap tersedia. */
+@media (prefers-reduced-motion: reduce) {
+  .match-shell::before,
+  .match-shell::after,
+  .side-panel,
+  .chat-panel,
+  .table-felt,
+  .progress span,
+  .flip-inner,
+  .player,
+  .timer-fill {
+    transition: none;
+  }
+  .phase-transition,
+  .transition-card,
+  .stamp-target,
+  .voter-badge,
+  .player-card .player,
+  .player-card.leading::after,
+  .timer.urgent b,
+  .message,
+  .typing i,
+  .end-stage,
+  .cheer,
+  .victory-title,
+  .outcome-stamp,
+  .lineup li,
+  .survey {
+    animation: none !important;
+  }
+  .phase-transition {
+    opacity: 1;
+  }
+  .confetti {
+    display: none;
+  }
+}

@@ -16,6 +16,10 @@ Mulai dari **src/styles.css**, bagian DESIGN TOKENS:
 | --color-gold / --color-paper | Aksen emas dan panel krem |
 | --radius-panel | Lengkungan sudut panel |
 
+Font Fraunces (judul) dan Patrick Hand (tulisan tangan) disimpan sendiri di
+`public/assets/fonts` (lisensi OFL di folder yang sama) dan didaftarkan lewat `@font-face`
+di awal **src/styles.css**, sehingga tampil tanpa internet atau layanan pihak ketiga.
+
 Setiap halaman memiliki HTML dan CSS terpisah di src/app/features/.
 Khusus auth sekarang memakai `auth.html` dan `auth.scss` dari desain Kimberly:
 meja kayu, kertas register, dan binder login. Asetnya di `public/assets/`.
@@ -25,12 +29,18 @@ file `auth_kim.*` atau CSS lama karena sudah digantikan.
 Tidak ada style inline di template Main atau Lobby.
 CSS diformat multiline; bagian responsive ada di bawah file.
 
-Di **game/game.css**, bagian GAME TOKENS menyediakan `--chat-size` untuk lebar
-chat dan `--game-gap` untuk jarak kolom. Padding halaman ada di `.match-shell`,
-padding panel ada di selector `.private-card, .action-panel, ...`. Warna malam
-di `.match-shell.night`; pergantian warna langsung agar teks tidak kehilangan kontras.
-Aturan breakpoint 950px menempatkan chat di bawah meja; 500px membuat kartu pemain
-dua kolom. Perubahan file game ini tidak memengaruhi login/main page. Pada Main, 900px
+Halaman **game** memakai bahasa visual login (meja kayu, kertas 9-slice
+`register-paper.png`, papan `btn-wood.png`, tombol kayu/kulit, font Fraunces dan
+Patrick Hand) dan selalu satu layar (100dvh) tanpa scroll halaman; hanya isi panel
+yang bergulir. Gayanya dibagi lima berkas karena batas 12 kB per stylesheet komponen:
+`game.css` (token `--pad`/`--game-gap`, kertas, papan, tombol, HUD, panel kiri, kartu role),
+`game-table.css` (papan tersangka, kartu pemain, efek vote, baki aksi, chat, tab HP),
+`game-screens.css` (transisi fase, layar persiapan `.splash`), `game-end.css` (pengumuman
+pemenang `.end-stage`, kuesioner `.survey`, modal aturan), dan `game-motion.css` (animasi,
+responsif, `prefers-reduced-motion`). Panas vote diatur `--heat` (0–1) per kartu; jumlah kolom
+meja dipilih `Game.tableColumns` dari ukuran papan. Karakter dan warna label pemain mengikuti
+urutan kursi, bukan role. Breakpoint 1099px: meja + chat dengan tab Meja/Kartu; 759px: satu panel
+per tab (Meja/Chat/Kartu). Perubahan file game ini tidak memengaruhi login/main page. Pada Main, 900px
 mengubah menu tiga kartu menjadi satu kolom dan 760px menumpuk kartu role.
 Lobby menjadi satu kolom pada 760px. Sesuaikan angka tersebut jika perlu.
 

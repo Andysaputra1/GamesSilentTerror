@@ -1,0 +1,236 @@
+/* Layar khusus: transisi fase, persiapan, pengumuman pemenang, kuesioner, aturan. */
+/* ---------- Transisi fase ---------- */
+.phase-transition {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  pointer-events: none;
+  animation: transisi-fase 2.6s ease forwards;
+}
+.phase-transition[data-phase='night'] {
+  background: radial-gradient(circle at 50% 45%, rgb(32 41 52 / 0.72), rgb(8 11 16 / 0.97) 70%);
+}
+.phase-transition[data-phase='day'] {
+  background: radial-gradient(circle at 50% 40%, rgb(255 236 190 / 0.85), rgb(74 43 24 / 0.9) 75%);
+}
+.phase-transition[data-phase='tribunal'] {
+  background: radial-gradient(circle at 50% 45%, rgb(122 46 38 / 0.8), rgb(40 18 15 / 0.96) 70%);
+}
+.phase-transition[data-phase='finished'] {
+  background: radial-gradient(circle at 50% 45%, rgb(227 180 72 / 0.85), rgb(40 25 12 / 0.95) 75%);
+}
+.transition-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: min(560px, 90vw);
+  padding: 34px 70px 30px;
+  color: var(--wood-text);
+  text-align: center;
+  background: url('/assets/buttons/btn-wood.png') center / 100% 100% no-repeat;
+  filter: drop-shadow(0 1em 1.2em rgb(0 0 0 / 0.55));
+  text-shadow: 0 0.06em 0 #3a200f;
+  animation: kartu-transisi 2.6s ease forwards;
+}
+.transition-card h2 {
+  margin: 6px 0 4px;
+  font: 800 clamp(30px, 5vw, 50px) var(--font-display);
+}
+.transition-card p {
+  margin: 0;
+  font: 18px/1.3 var(--font-hand);
+  color: #f2dbb0;
+}
+.transition-icon {
+  display: block;
+  font-size: clamp(38px, 6vw, 58px);
+  line-height: 1;
+}
+
+/* ---------- Layar persiapan ---------- */
+.splash {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(10px, 2vh, 20px);
+  overflow-y: auto;
+  padding: clamp(12px, 2.5vh, 26px) var(--pad);
+}
+.splash-sign {
+  flex: none;
+  width: min(92vw, 400px);
+  aspect-ratio: 1335 / 436;
+  gap: 4px;
+  font-size: 15px;
+  transform: rotate(-0.7deg);
+}
+.splash-sign p {
+  margin: 0;
+  color: #f2dbb0;
+  font: 1em/1 var(--font-hand);
+  letter-spacing: 0.05em;
+}
+.splash-sign h1 {
+  display: flex;
+  align-items: center;
+  gap: 0.3em;
+  margin: 0;
+  font: 800 2.2em/1 var(--font-display);
+}
+.splash-sign h1 i {
+  color: var(--gold);
+  font-size: 0.35em;
+  font-style: normal;
+}
+.splash-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(250px, 300px);
+  gap: clamp(14px, 2vw, 28px);
+  width: min(1180px, 100%);
+}
+.briefing {
+  --edge: 24px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 30px 34px 26px;
+}
+.briefing-gears {
+  position: absolute;
+  top: -18px;
+  right: 18px;
+  width: 78px;
+  rotate: -6deg;
+  pointer-events: none;
+}
+.briefing-head p {
+  margin: 0;
+  line-height: 1.5;
+}
+.briefing-head .hand {
+  color: #7f5a37;
+  font-size: 17px;
+}
+.briefing-head h2 {
+  margin: 2px 0 6px;
+  font: 800 clamp(26px, 3.4vw, 38px)/1.05 var(--font-display);
+  color: #5b311b;
+}
+.guide-grid {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: minmax(min-content, 1fr);
+  gap: 16px 14px;
+  margin-top: 18px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.guide-card {
+  position: relative;
+  padding: 14px 14px 12px;
+  border: 1px solid rgb(139 90 43 / 0.35);
+  border-radius: 6px;
+  background: #fffaf0;
+  box-shadow: 0 3px 0 rgb(139 90 43 / 0.18);
+  rotate: -0.6deg;
+}
+.guide-card:nth-child(even) {
+  rotate: 0.7deg;
+}
+/* selotip di atas catatan */
+.guide-card::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  width: 54px;
+  height: 16px;
+  background: rgb(232 192 115 / 0.65);
+  translate: -50% 0;
+  rotate: -3deg;
+}
+.guide-icon {
+  font-size: 26px;
+}
+.guide-card h3 {
+  margin: 4px 0 6px;
+  font: 700 18px/1.2 var(--font-display);
+  color: #5b311b;
+}
+.guide-card p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+}
+.splash-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  min-height: 0;
+}
+.splash-role {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+.splash-role .role-flip {
+  width: min(100%, 200px);
+}
+.role-note {
+  margin: 0;
+  color: var(--wood-text);
+  font-size: 14px;
+  line-height: 1.45;
+  text-align: center;
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.6);
+}
+.role-note.hand {
+  font-size: 16px;
+}
+.splash-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 20px 20px 16px;
+  text-align: center;
+}
+.splash-status small {
+  font-size: 12px;
+  line-height: 1.45;
+}
+.splash-status .hand {
+  font-size: 15px;
+}
+.splash-state {
+  margin: 0;
+  font: 800 17px/1.25 var(--font-display);
+  color: #5b311b;
+}
+.progress {
+  width: 100%;
+  height: 12px;
+  overflow: hidden;
+  border: 1.5px solid rgb(139 90 43 / 0.55);
+  border-radius: 12px;
+  background: rgb(255 255 255 / 0.5);
+}
+.progress span {
+  display: block;
+  height: 100%;
+  background: repeating-linear-gradient(-45deg, #4f7f35 0 10px, #5f9443 10px 20px);
+  transition: width 0.6s ease;
+}

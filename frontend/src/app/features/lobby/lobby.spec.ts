@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { of, throwError } from 'rxjs';
 import { RoomService } from '../../core/room.service';
@@ -149,5 +149,25 @@ describe('Lobby', () => {
     component.restoreRoom();
     expect(component.room).toBeNull();
     expect(sessionStorage.length).toBe(0);
+  });
+
+  // Anggota non-host otomatis ikut ke layar persiapan saat polling melihat pertandingan dimulai.
+  it('enters the preparation screen when the host starts the match', () => {
+    const room = {
+      code: 'ABC123',
+      owner: 'alice',
+      members: ['alice', 'bob'],
+      bots: ['NOX'],
+      bot_enabled: true,
+      phase: 'lobby',
+    };
+    component.room = room;
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+    vi.spyOn(TestBed.inject(RoomService), 'request').mockReturnValue(
+      of({ ...room, phase: 'preparing' }),
+    );
+    (component as unknown as { load: (m: string, p: string) => void }).load('GET', '/ABC123');
+    expect(navigate).toHaveBeenCalledWith('/game');
+    expect(sessionStorage.getItem('shadow_heist_game_entry')).toBe('allowed');
   });
 });
