@@ -1,4 +1,4 @@
-"""Layar persiapan: ronde 1 menunggu AI siap, waktu baca minimal, atau semua manusia menekan Siap."""
+"""Layar persiapan: ronde 1 menunggu AI siap dan minimal sepuluh detik."""
 
 import unittest
 
@@ -33,12 +33,15 @@ class PreparationTests(unittest.TestCase):
         self.assertEqual(self.match.deadline, PREPARATION_MIN_SECONDS + self.match.durations["day"])
         self.assertIsNone(self.match.snapshot("alice")["preparation"])
 
-    def test_all_humans_ready_skip_the_wait_but_never_skip_the_ai(self):
+    def test_all_humans_ready_cannot_skip_ten_seconds_or_ai(self):
         self.match.ready_consent("alice", now=1.0)
         self.match.ready_consent("bob", now=1.0)
         self.assertEqual(self.match.phase, "preparing")  # AI belum siap
         self.assertTrue(self.match.snapshot("bob")["preparation"]["consented"])
         self.match.mark_ai_ready(now=3.0)
+        self.match.tick(9.999)
+        self.assertEqual(self.match.phase, "preparing")
+        self.match.tick(10.0)
         self.assertEqual(self.match.phase, "day")
         with self.assertRaises(ValueError):
             self.match.ready_consent("alice")  # hanya saat persiapan
@@ -57,7 +60,15 @@ class PreparationTests(unittest.TestCase):
         self.assertTrue(match.snapshot("a")["preparation"]["ready"])
         for name in "abcd":
             match.ready_consent(name, now=0.5)
+        match.tick(9.999)
+        self.assertEqual(match.phase, "preparing")
+        match.tick(10.0)
         self.assertEqual(match.phase, "day")
+
+    def test_ai_ready_after_minimum_starts_without_an_extra_wait(self):
+        self.match.mark_ai_ready(now=12.0)
+        self.assertEqual(self.match.phase, "day")
+        self.assertEqual(self.match.deadline, 12.0 + self.match.durations["day"])
 
     def test_progress_is_clamped_and_only_while_preparing(self):
         self.match.update_preparation(detail="Memuat IndoBERT…", progress=4)

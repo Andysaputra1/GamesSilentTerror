@@ -71,7 +71,12 @@
   @if (game; as state) {
     @if (state.phase === 'preparing') {
       <!-- LAYAR PERSIAPAN: panduan singkat sambil menunggu otak bot siap. -->
-      <section class="splash" aria-labelledby="splash-title">
+      <section
+        class="splash"
+        aria-labelledby="splash-title"
+        animate.enter="splash-enter"
+        animate.leave="splash-leave"
+      >
         <header class="wood-sign splash-sign">
           <p>Persiapan pertandingan · Ruang {{ code }}</p>
           <h1><span>Silent</span><i aria-hidden="true">◆</i><span>Terror</span></h1>
@@ -151,11 +156,12 @@
                   (click)="readyUp()"
                   [disabled]="busy || prep.consented"
                 >
-                  {{ prep.consented ? 'Menunggu pemain lain…' : 'Saya sudah paham, siap!' }}
+                  {{ prep.consented ? 'Menunggu pertandingan dimulai…' : 'Saya sudah paham, siap!' }}
                 </button>
                 <small
-                  >{{ prep.agreed }} / {{ prep.required }} pemain siap. Ronde 1 dimulai saat AI siap
-                  dan semua pemain menekan siap, atau otomatis setelah hitung mundur.</small
+                  >{{ prep.agreed }} / {{ prep.required }} pemain siap. Layar persiapan berlangsung
+                  minimal 10 detik. Ronde 1 dimulai otomatis setelah hitung mundur dan AI
+                  siap.</small
                 >
               </div>
             }
@@ -164,7 +170,7 @@
       </section>
     } @else {
       <!-- HUD: papan fase, timer, aturan, dan profil. -->
-      <header class="hud">
+      <header class="hud" animate.enter="game-enter">
         <div class="wood-sign hud-brand">
           <b>Silent<i aria-hidden="true">◆</i>Terror</b>
           <small>Ruang {{ code }}</small>
@@ -228,7 +234,7 @@
         </p>
       }
 
-      <div class="match-grid" [attr.data-tab]="mobileTab">
+      <div class="match-grid" [attr.data-tab]="mobileTab" animate.enter="game-enter">
         <!-- KIRI: kartu rahasia, status, intel, dan catatan pertandingan. -->
         <aside class="side-panel" aria-label="Kartu dan catatan">
           <div class="private-card">
@@ -520,7 +526,7 @@
       </div>
 
       <!-- TAB HP: satu panel penuh per tab supaya halaman tidak perlu di-scroll. -->
-      <nav class="mobile-tabs" aria-label="Tampilan">
+      <nav class="mobile-tabs" aria-label="Tampilan" animate.enter="game-enter">
         <button
           type="button"
           class="tab-table"

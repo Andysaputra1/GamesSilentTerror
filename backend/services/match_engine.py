@@ -27,7 +27,7 @@ class Participant:
 
 
 # Layar persiapan: minimal cukup untuk membaca panduan, maksimal agar model yang gagal dimuat tidak menahan room.
-PREPARATION_MIN_SECONDS = 8
+PREPARATION_MIN_SECONDS = 10
 PREPARATION_MAX_SECONDS = 90
 
 # Komposisi role per jumlah peserta: (hitman, spy, stalker); sisanya civilian.
@@ -118,7 +118,7 @@ class Match:
         if progress is not None:
             self.preparation["progress"] = max(0.0, min(1.0, float(progress)))
 
-    # PERSIAPAN: AI siap; ronde 1 dimulai setelah waktu baca minimal atau semua manusia menekan Siap.
+    # PERSIAPAN: AI siap; ronde 1 tetap menunggu waktu baca minimal.
     def mark_ai_ready(self, now=None, detail="AI siap."):
         if self.phase != "preparing":
             return
@@ -134,13 +134,12 @@ class Match:
         self.ready_consents.add(name)
         self.try_begin(time.time() if now is None else now)
 
-    # Mulai jika AI siap dan (waktu baca minimal lewat atau semua manusia sudah siap).
+    # Mulai jika AI siap dan waktu baca minimal lewat; tombol Siap tidak melewati minimum.
     def try_begin(self, now=None):
         if self.phase != "preparing" or not self.preparation["ready"]:
             return False
         now = time.time() if now is None else now
-        humans = {p.name for p in self.players.values() if not p.bot}
-        if now >= self.preparation["min_until"] or (humans and humans <= self.ready_consents):
+        if now >= self.preparation["min_until"]:
             self.begin(now)
             return True
         return False

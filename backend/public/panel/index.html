@@ -74,7 +74,9 @@
                   <p class="hint">
                     Jalur dicoba dari atas. Jalur yang ditolak (key salah, kredit habis, model tidak
                     ada) dilewati sampai dicek ulang; yang gagal sementara diistirahatkan. Templat
-                    selalu menjadi cadangan terakhir.
+                    selalu menjadi cadangan terakhir. Tes koneksi mengirim pesan singkat ke setiap
+                    jalur aktif dan dapat memakai token API. Hasil menunjukkan kondisi saat diuji;
+                    jalur yang dinonaktifkan tidak diuji.
                   </p>
                   <ol id="npc-chain" class="chain-list"></ol>
                   <label
@@ -99,7 +101,7 @@
                 <div class="form-actions">
                   <button id="save-npc">Simpan otak NPC</button
                   ><button id="check-writers" type="button" class="secondary">
-                    Cek ulang penulis
+                    Tes koneksi semua prioritas
                   </button>
                 </div>
               </form>

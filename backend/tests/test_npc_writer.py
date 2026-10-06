@@ -215,12 +215,29 @@ class WriterCheckTests(unittest.TestCase):
         self.assertEqual((baris["claude_bedrock"]["keadaan"], baris["claude_bedrock"]["status"]),
                          ("ditolak", "key ditolak (401)"))  # fmt: skip
         self.assertEqual(baris["openrouter"]["keadaan"], "dipakai")
+        self.assertEqual(baris["openrouter"]["hasil_cek"]["keadaan"], "berhasil")
+        self.assertGreater(baris["openrouter"]["hasil_cek"]["waktu"], 0)
+        self.assertGreaterEqual(baris["openrouter"]["hasil_cek"]["durasi_ms"], 0)
         self.assertEqual(baris["tautan"]["keadaan"], "istirahat")
+        self.assertEqual(baris["tautan"]["hasil_cek"]["keadaan"], "gagal")
         self.assertEqual(baris["tautan"]["alamat"], {"host": "llm-uji.example", "sumber": "panel"})
         self.assertEqual(baris["claude_api"]["status"], "key belum diisi")
         teks = "\n".join(log.output) + json.dumps(status, ensure_ascii=False)
         for rahasia in RAHASIA.values():
             self.assertNotIn(rahasia, teks)
+
+    def test_link_check_requires_an_actual_reply(self):
+        self.lepas.set()
+        nlg = self.runtime.nlg
+        with (
+            patch.object(nlg.PenulisTautan, "_cek", return_value="ok"),
+            patch.object(nlg.PenulisTautan, "tulis", return_value=("", "ok")) as hit,
+        ):
+            status = self.runtime.segarkan_penulis(latar=False)
+        hit.assert_called_once_with("Jawab singkat.", "Balas: ok")
+        link = next(b for b in status["rantai_penulis"] if b["jalur"] == "tautan")
+        self.assertEqual(link["hasil_cek"]["keadaan"], "gagal")
+        self.assertEqual(link["hasil_cek"]["detail"], "jawaban pengujian kosong")
 
 
 class NpcConfigStoreTests(unittest.TestCase):
@@ -317,12 +334,12 @@ class PanelWriterApiTests(unittest.TestCase):
         )
         self.assertEqual(bad.status_code, 422)
 
-    def test_check_endpoint_rebuilds_and_checks_synchronously(self):
+    def test_check_endpoint_rebuilds_and_checks_in_background(self):
         with patch("controller.api.panel_npc.brain_runtime") as runtime:
             runtime.segarkan_penulis.return_value = {"penulis": "openrouter"}
             response = self.client.post("/api/panel/npc/cek-penulis")
         self.assertEqual(response.status_code, 200)
-        runtime.segarkan_penulis.assert_called_once_with(latar=False)
+        runtime.segarkan_penulis.assert_called_once_with(latar=True)
         self.assertIn("jalur_penulis", response.json()["pilihan"])
 
     def test_saving_ai_link_refreshes_writer_chain(self):

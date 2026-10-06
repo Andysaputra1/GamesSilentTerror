@@ -39,7 +39,7 @@ class GameLifecycleTests(unittest.TestCase):
         response = self.client.post(self.base + "/start", json={"quick": True})
         self.assertEqual(response.status_code, 200)
         self.match = self.rooms.rooms[code].match
-        # Layar persiapan: tanpa bot AI langsung siap; ronde 1 mulai setelah semua manusia menekan Siap.
+        # Tanpa bot AI langsung siap; semua manusia tetap menunggu waktu baca minimal.
         self.assertEqual(self.state()["phase"], "preparing")
         for index in range(count):
             response = self.client.post(
@@ -48,6 +48,9 @@ class GameLifecycleTests(unittest.TestCase):
                 headers={"x-user": f"player{index}"},
             )
             self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.state()["phase"], "preparing")
+        self.now = self.match.preparation["min_until"]
+        self.rooms.tick_all()
         self.assertEqual(self.state()["phase"], "day")
         self.assertNotIn("max_rounds", self.state())
 

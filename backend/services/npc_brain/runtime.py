@@ -301,8 +301,8 @@ class BrainRuntime:
             return None
         return rantai
 
-    # Bangun ulang rantai (key/link/urutan terbaru) lalu cek semua jalurnya. latar=False dipakai tombol
-    # "Cek ulang" di panel agar hasilnya langsung terlihat; selain itu cek berjalan di thread latar.
+    # Bangun ulang rantai (key/link/urutan terbaru) lalu cek semua jalurnya di latar.
+    # latar=False tersedia untuk pemanggil sinkron; panel membaca progres lewat polling.
     def segarkan_penulis(self, latar=True):
         with self.lock:
             if self.nlg is None:
@@ -327,12 +327,27 @@ class BrainRuntime:
                 self._cek_penulis(penulis)
         return self.ringkasan()
 
-    # Claude dan OpenRouter: satu pesan pendek (key, izin model, saldo); link: daftar model.
+    # Hit provider langsung; link juga diuji menghasilkan jawaban setelah penemuan model.
     # Hanya status yang dicatat, tanpa key. Penghitung dinaikkan pemanggil (segarkan_penulis).
     def _cek_penulis(self, penulis):
         try:
             with self._kunci_cek:
-                hasil = penulis.cek()
+                hasil = []
+                for p in penulis.daftar:
+                    mulai = time.monotonic()
+                    p.hasil_cek = {"keadaan": "memeriksa"}
+                    status = p.cek()
+                    if status == "ok" and p.jalur == "tautan":
+                        teks, status = p.tulis("Jawab singkat.", "Balas: ok")
+                        if status == "ok" and not (teks or "").strip():
+                            status = p.gagal("jawaban pengujian kosong")[1]
+                    p.hasil_cek = {
+                        "keadaan": "berhasil" if status == "ok" else "gagal",
+                        "waktu": time.time(),
+                        "durasi_ms": round((time.monotonic() - mulai) * 1000),
+                        "detail": status,
+                    }
+                    hasil.append((p.jalur, p.model, status))
                 logger.info("Cek penulis: %s", "; ".join(f"{j}={h}" for j, _, h in hasil))
         except Exception:
             logger.exception("Cek rantai penulis gagal.")
@@ -420,6 +435,7 @@ class BrainRuntime:
                 "model": p.model if p else None, "panggilan": p.panggilan if p else 0,
                 "token_masuk": p.token_masuk if p else 0, "token_keluar": p.token_keluar if p else 0,
                 "alamat": self.alamat_tautan if jalur == "tautan" else None,
+                "hasil_cek": getattr(p, "hasil_cek", None),
             })  # fmt: skip
         return baris
 
