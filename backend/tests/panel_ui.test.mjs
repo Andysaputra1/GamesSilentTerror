@@ -152,6 +152,7 @@ test('NPC brain menu shows the writer chain, reorders it, and saves method and p
       panggilan: 3,
       token_masuk: 900,
       token_keluar: 60,
+      hasil_cek: { keadaan: 'berhasil', waktu: 1800000000, durasi_ms: 1250, detail: 'ok' },
     },
     {
       jalur: 'tautan',
@@ -235,6 +236,7 @@ test('NPC brain menu shows the writer chain, reorders it, and saves method and p
   );
   assert.match(rows()[0].textContent, /Ditolak.*key ditolak \(401\)/);
   assert.match(rows()[1].textContent, /3 panggilan · token 900\/60 sejak cek terakhir/);
+  assert.match(rows()[1].textContent, /Hit berhasil.*Cek terakhir:.*1\.25 detik/);
   assert.match(rows()[2].textContent, /qwen3:14b · llm-uji\.trycloudflare\.com \(panel\)/);
   assert.match(rows()[2].textContent, /Istirahat.*tidak terhubung/);
   assert.equal(doc.querySelector('#npc-chain b'), null); // data server dirender sebagai teks
@@ -275,7 +277,12 @@ test('NPC brain menu shows the writer chain, reorders it, and saves method and p
   assert.equal(doc.querySelector('#npc-method').value, 'bt');
   await doc.querySelector('#check-writers').onclick({ preventDefault() {} });
   assert.equal(checked, 1);
+  assert.equal(doc.querySelector('#check-writers').disabled, true);
+  status.sedang_cek_penulis = false;
+  refreshes.splice(0).forEach((refresh) => refresh());
+  await settle();
   assert.equal(doc.querySelector('#check-writers').disabled, false);
+  assert.equal(doc.querySelector('#check-writers').textContent, 'Tes koneksi semua prioritas');
 });
 
 test('survey menu renders questions as text and edits scale meaning from the panel', async (t) => {

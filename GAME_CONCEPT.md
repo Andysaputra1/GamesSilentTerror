@@ -82,7 +82,7 @@ Label NPC tidak ditampilkan di roster pertandingan aktif. Lobby masih menampilka
 
 ## Persiapan pertandingan
 
-Setelah host menekan Mulai, semua peserta masuk ke **layar persiapan** berisi panduan singkat (tujuan, siang, malam, Tribunal, bot AI, tips) dan progres pemuatan AI. Ronde 1 **belum berjalan** selama persiapan. Ronde 1 dimulai ketika otak bot siap **dan** (waktu baca minimal 8 detik lewat **atau** semua manusia menekan "Siap"). Jika AI gagal atau belum siap dalam 90 detik, permainan tetap dimulai dengan aksi cadangan engine. Room tanpa bot langsung siap; pemain tetap bisa membaca panduan atau menekan Siap.
+Setelah host menekan Mulai, semua peserta masuk ke **layar persiapan** berisi panduan singkat (tujuan, siang, malam, Tribunal, bot AI, tips) dan progres pemuatan AI. Ronde 1 **belum berjalan** selama persiapan. Ronde 1 dimulai ketika otak bot siap **dan** waktu baca minimal 10 detik lewat. Tombol "Siap" mencatat kesiapan pemain tetapi tidak melewati waktu minimum. Jika AI gagal atau belum siap dalam 90 detik, permainan tetap dimulai dengan aksi cadangan engine. Room tanpa bot langsung siap, tetapi tetap menunggu waktu minimum. Splash memudar keluar dan meja permainan masuk secara halus; pengaturan reduced motion menonaktifkan animasi tersebut.
 
 ## NPC: otak dari notebook skripsi
 

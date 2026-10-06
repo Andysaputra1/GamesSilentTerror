@@ -1033,7 +1033,36 @@ function renderChain() {
         'status-pending',
       ];
       const state = node('div', undefined, 'chain-state');
-      state.append(node('span', stateLabel, `chip ${stateClass}`));
+      const check = last.hasil_cek;
+      const unverified =
+        !check && ['dipakai', 'siap'].includes(last.keadaan) && last.status === 'belum dicek';
+      state.append(
+        node(
+          'span',
+          unverified ? 'Belum dicek' : stateLabel,
+          `chip ${unverified ? 'status-pending' : stateClass}`,
+        ),
+      );
+      if (check) {
+        const checking = check.keadaan === 'memeriksa';
+        const success = check.keadaan === 'berhasil';
+        state.append(
+          node(
+            'span',
+            checking ? 'Sedang dicek…' : success ? 'Hit berhasil' : 'Hit gagal',
+            `chip ${checking ? 'status-pending' : success ? 'status-good' : 'status-bad'}`,
+          ),
+        );
+        if (!checking) {
+          state.append(
+            node(
+              'small',
+              `Cek terakhir: ${new Date(check.waktu * 1000).toLocaleString('id-ID')} · ${(check.durasi_ms / 1000).toFixed(2)} detik`,
+            ),
+          );
+          if (!success && check.detail) state.append(node('small', check.detail));
+        }
+      }
       if (last.status) state.append(node('small', last.status));
       if (last.panggilan || last.token_masuk)
         state.append(
@@ -1060,6 +1089,10 @@ function scheduleNpcRefresh(status) {
 // form=false (refresh otomatis, hasil cek) hanya memperbarui status; isi form dan urutan rantai lokal tetap.
 function showNpc(data, { form = true } = {}) {
   const status = data.status;
+  $('check-writers').disabled = !!status.sedang_cek_penulis;
+  $('check-writers').textContent = status.sedang_cek_penulis
+    ? 'Sedang menguji prioritas…'
+    : 'Tes koneksi semua prioritas';
   npcPaths = data.pilihan.jalur_penulis ?? {};
   const chain = status.rantai_penulis ?? [];
   npcChainStatus = Object.fromEntries(chain.map((row) => [row.jalur, row]));
@@ -1568,7 +1601,7 @@ for (const id of ['npc-method', 'npc-writer', 'npc-validate', 'npc-openrouter-mo
       npcDirty = true;
       if (id === 'npc-writer') renderChain();
     });
-// Cek ulang semua jalur dengan key/link terbaru (Claude dan OpenRouter: satu pesan pendek; link: daftar model).
+// Hit semua jalur aktif dengan konfigurasi tersimpan; hasil dimuat lewat polling.
 // Cek memakai konfigurasi tersimpan, jadi editan harus disimpan dulu.
 $('check-writers').onclick = handle(async () => {
   if (npcDirty) {
@@ -1578,9 +1611,10 @@ $('check-writers').onclick = handle(async () => {
   $('check-writers').disabled = true;
   try {
     showNpc(await request('/api/panel/npc/cek-penulis', {}, 'POST'), { form: false });
-    notice('Rantai penulis sudah dicek. Lihat status tiap jalur.');
-  } finally {
+    notice('Pengecekan dimulai. Status tiap prioritas diperbarui otomatis.');
+  } catch (error) {
     $('check-writers').disabled = false;
+    throw error;
   }
 });
 $('survey-form').onsubmit = handle(async () => {

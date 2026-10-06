@@ -74,7 +74,6 @@ def npc_update(body: NPCConfig, token=Depends(require_panel)):
 
 
 @router.post("/api/panel/npc/cek-penulis", dependencies=[Depends(limit_auth)])
-# PANEL: bangun ulang rantai dengan key/link terbaru lalu cek semua jalur sekarang. Claude: pesan 8 token;
-# OpenRouter: key/model (gratis) + satu pesan pendek untuk memastikan saldo; link LLM: daftar model (gratis).
+# PANEL: hit semua jalur aktif di latar; status per jalur dibaca lewat GET agar tidak timeout.
 def npc_check_writers(token=Depends(require_panel)):
-    return {"status": brain_runtime.segarkan_penulis(latar=False), "pilihan": PILIHAN}
+    return {"status": brain_runtime.segarkan_penulis(latar=True), "pilihan": PILIHAN}
