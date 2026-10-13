@@ -12,6 +12,7 @@ describe('Game', () => {
   // INSTANCE TES: component adalah class halaman; fixture membungkus komponen untuk pengujian.
   let component: Game;
   let fixture: ComponentFixture<Game>;
+  const member = (name: string) => ({ name, skin_id: 'dexter' });
 
   // SETUP CALLBACK: siapkan lingkungan/instance baru sebelum setiap skenario tes.
   beforeEach(async () => {
@@ -37,7 +38,7 @@ describe('Game', () => {
       room: {
         code: 'ABC123',
         owner: 'alice',
-        members: ['alice'],
+        members: [member('alice')],
         bots: ['NOX'],
         bot_enabled: true,
         phase: 'day',

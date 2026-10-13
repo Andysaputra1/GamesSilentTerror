@@ -103,7 +103,7 @@
   justify-content: center;
   color: var(--wood-text);
   text-align: center;
-  background: url('/assets/buttons/btn-wood.png') center / 100% 100% no-repeat;
+  background: url('/assets/buttons/btn-wood.png') center / contain no-repeat;
   filter: drop-shadow(0 0.35em 0.4em rgb(14 6 2 / 0.55));
   text-shadow:
     0 0.06em 0 #3a200f,
@@ -134,6 +134,8 @@
   align-items: center;
   justify-content: center;
   gap: 0.4em;
+  min-inline-size: 0;
+  max-inline-size: 100%;
   min-height: 46px;
   padding: 0.65em 1.5em;
   border: 0;
@@ -141,6 +143,8 @@
   color: var(--cream);
   font: 800 15px/1.15 var(--font-display);
   letter-spacing: 0.03em;
+  text-align: center;
+  overflow-wrap: anywhere;
   text-shadow:
     0 0.08em 0 rgb(30 14 6 / 0.75),
     0 0.12em 0.2em rgb(0 0 0 / 0.35);
@@ -272,15 +276,24 @@ textarea:focus-visible {
   gap: 6px;
 }
 .phase-sign {
+  box-sizing: border-box;
   flex-direction: row;
   gap: 0.45em;
-  min-width: 250px;
-  padding: 0.55em 2.6em;
+  width: clamp(250px, 18vw, 360px);
+  max-width: 100%;
+  min-width: 0;
+  padding: 0.62em clamp(2.3em, 12%, 3.1em);
+  background-image: url('/assets/buttons/btn-leather.png');
+  background-size: 100% 100%;
   font-size: 16px;
 }
 .phase-sign b {
+  min-width: 0;
+  max-width: 100%;
   font: 800 1.2em/1 var(--font-display);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .phase-icon {
   font-size: 1.3em;

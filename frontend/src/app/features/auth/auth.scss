@@ -123,7 +123,7 @@
   padding: 0 2.4em;
   font-size: var(--em);
   text-align: center;
-  background: url('/assets/buttons/btn-wood.png') center / 100% 100% no-repeat;
+  background: url('/assets/buttons/btn-wood.png') center / contain no-repeat;
   filter: drop-shadow(0 .5em .55em rgba(14, 6, 2, .55));
   transform: rotate(-.7deg);
 
@@ -234,7 +234,7 @@
     inset: 0;
     z-index: -1;
     pointer-events: none;
-    background: url('/assets/auth/login-binder.png') center / 100% 100% no-repeat;
+    background: url('/assets/auth/login-binder.png') center / contain no-repeat;
     filter: drop-shadow(.5em .75em 1.1em rgba(15, 8, 4, .5));
   }
 }
@@ -382,7 +382,7 @@
   padding: 0;
   border: 0;
   outline: 0;
-  background: center / 100% 100% no-repeat;
+  background: center / contain no-repeat;
   color: var(--cream);
   font: 800 1.2em / 1 'Fraunces', Georgia, serif;
   font-variation-settings: 'SOFT' 100;
@@ -473,8 +473,8 @@
 
 .register-sheet {
   .decoration--gears {
-    top: 2em;
-    right: 2em;
+    top: 1.5em;
+    right: 1.5em;
     width: 6em;
     transform: rotate(-5deg);
   }
@@ -644,14 +644,14 @@
   &:disabled { font-size: .85em; letter-spacing: .02em; }
 }
 
-/* Widget resmi tetap terlihat dan dipusatkan setelah Google siap. */
 .google-provider {
   display: flex;
   justify-content: center;
-  max-width: 100%;
-
-  &:empty { display: none; }
+  width: 100%;
+  min-height: 44px;
 }
+
+.google-provider:empty { display: none; }
 
 .google-access .form-alert { align-self: stretch; }
 .unavailable-note { font-size: .85em; color: #7a5230; }

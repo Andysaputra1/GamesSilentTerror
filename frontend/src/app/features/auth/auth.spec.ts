@@ -36,6 +36,11 @@ describe('Auth', () => {
     httpMock = TestBed.inject(HttpTestingController);
     fixture.detectChanges();
     readiness = httpMock.expectOne((request) => request.url === 'http://localhost:8000/ready');
+    // Tombol resmi Google disiapkan otomatis setelah view tersedia. Client ID
+    // kosong menjaga test lain tidak mencoba memuat SDK Google sungguhan.
+    await Promise.resolve();
+    httpMock.expectOne('http://localhost:8000/api/auth/google/config').flush({ client_id: '' });
+    await fixture.whenStable();
   });
 
   // CLEANUP CALLBACK: pastikan tidak ada request HTTP mock yang belum ditangani setelah tes.
@@ -43,6 +48,7 @@ describe('Auth', () => {
     fixture.destroy();
     httpMock.verify();
     vi.useRealTimers();
+    delete (window as Window & { google?: unknown }).google;
   });
 
   // Status awal tidak mengklaim online sebelum backend menjawab readiness.
@@ -65,11 +71,11 @@ describe('Auth', () => {
     fixture.detectChanges();
     expect(component.statusLabel).toBe('SYSTEM OFFLINE');
     const link = fixture.nativeElement.querySelector('a[href*="wa.me"]') as HTMLAnchorElement;
-    expect(link.textContent).toContain('Andy Saputra');
+    expect(link.textContent).toContain('Andy');
     expect(link.href).toContain('https://wa.me/6281995247372?text=');
     expect(decodeURIComponent(link.href)).toContain('tolong nyalakan server Silent Terror');
-    expect(fixture.nativeElement.textContent).toContain('Janice Tiffany Wijono');
-    expect(fixture.nativeElement.textContent).toContain('Kimberly Joseph Wirawan');
+    expect(fixture.nativeElement.textContent).toContain('Janice');
+    expect(fixture.nativeElement.textContent).toContain('Kimberly');
     window.dispatchEvent(new Event('focus'));
     httpMock.expectOne((request) => request.url.endsWith('/ready')).flush({ ready: true });
     fixture.detectChanges();
@@ -130,6 +136,40 @@ describe('Auth', () => {
     await pending;
     expect(component.googleError).toContain('belum diaktifkan');
     expect(component.googleLoading).toBe(false);
+  });
+
+  it('renders one compact official Google icon automatically, ready for a single click', async () => {
+    const initialize = vi.fn();
+    const renderButton = vi.fn();
+    const googleWindow = window as Window & { google?: unknown };
+    googleWindow.google = {
+      accounts: { id: { initialize, renderButton } },
+    };
+
+    const pending = component.prepareGoogle();
+    httpMock
+      .expectOne('http://localhost:8000/api/auth/google/config')
+      .flush({ client_id: 'google-client-id' });
+    await Promise.resolve();
+    httpMock.expectOne('http://localhost:8000/api/auth/google/challenge').flush({ nonce: 'nonce' });
+    await pending;
+
+    expect(initialize).toHaveBeenCalledWith(
+      expect.objectContaining({
+        client_id: 'google-client-id',
+        nonce: 'nonce',
+      }),
+    );
+    expect(renderButton).toHaveBeenCalledWith(
+      expect.any(HTMLElement),
+      expect.objectContaining({
+        theme: 'outline',
+        type: 'icon',
+        shape: 'circle',
+      }),
+    );
+    expect(component.googleReady).toBe(true);
+    expect(fixture.nativeElement.querySelector('.google-provider')).toBeTruthy();
   });
 
   // TES: simulasikan HTTP 401 untuk memastikan form tidak macet setelah password salah.

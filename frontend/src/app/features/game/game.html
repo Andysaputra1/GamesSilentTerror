@@ -152,11 +152,11 @@
                 <small class="hand">{{ prep.detail }}</small>
                 <button
                   type="button"
-                  class="wood-button green"
+                  class="wood-button green splash-ready"
                   (click)="readyUp()"
                   [disabled]="busy || prep.consented"
                 >
-                  {{ prep.consented ? 'Menunggu pertandingan dimulai…' : 'Saya sudah paham, siap!' }}
+                  <span>{{ prep.consented ? 'Menunggu pertandingan dimulai…' : 'Saya sudah paham, siap!' }}</span>
                 </button>
                 <small
                   >{{ prep.agreed }} / {{ prep.required }} pemain siap. Layar persiapan berlangsung
@@ -219,6 +219,7 @@
           >
             ?
           </button>
+          <app-fullscreen-control />
           <div class="profile-chip">
             <app-profile-menu
               [username]="state.me.name || 'Pemain'"
@@ -562,6 +563,7 @@
           class="end-stage"
           [class.hitman-win]="state.winner === 'hitman'"
           [class.is-loss]="outcomeLabel === 'KAMU KALAH'"
+          [class.survey-stage]="endView === 'survey'"
         >
           @if (endView === 'reveal') {
             <section
@@ -631,7 +633,7 @@
               </div>
             </section>
           } @else {
-            <section class="survey paper" aria-labelledby="survey-title">
+            <section class="survey" aria-labelledby="survey-title">
               <header class="survey-head">
                 <p class="hand">Kuesioner singkat · untuk penelitian</p>
                 <h2 id="survey-title">Bagaimana pertandingan tadi?</h2>

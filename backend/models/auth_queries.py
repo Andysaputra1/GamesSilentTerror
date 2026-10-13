@@ -21,6 +21,14 @@ def update_username(database: Session, user_id: int, username: str):
     )
 
 
+# QUERY UPDATE: ubah skin preference pengguna berdasarkan ID akun.
+def update_skin(database: Session, user_id: int, skin_id: str):
+    database.execute(
+        text("UPDATE user_accounts SET skin_id = :skin_id WHERE id = :user_id"),
+        {"skin_id": skin_id, "user_id": user_id},
+    )
+
+
 # QUERY INSERT: akun baru saja; constraint unik mencegah menimpa akun yang sudah ada.
 def create_account(database: Session, *, username: str, display_name: str, password_hash: str):
     return database.execute(
@@ -60,7 +68,7 @@ def create_session(database: Session, *, user_id: int, token_hash: str, expires_
 # QUERY JOIN: cari akun aktif dengan sesi yang cocok dan belum kedaluwarsa.
 def account_for_token(database: Session, token_hash: str, now: datetime):
     sql = text("""
-        SELECT u.id, u.username, u.display_name
+        SELECT u.id, u.username, u.display_name, u.skin_id
         FROM user_accounts u JOIN auth_sessions s ON s.user_id = u.id
         WHERE s.token_hash = :token_hash AND s.expires_at > :now AND u.is_active = 1
     """)

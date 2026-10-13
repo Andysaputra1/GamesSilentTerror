@@ -1,0 +1,77 @@
+<main class="debug-shell">
+  <header class="debug-header">
+    <h1>Card Preview Debug</h1>
+    <p>Temporary route for visual calibration — to be deleted after approval</p>
+  </header>
+
+  <section class="debug-section">
+    <h2>Player Avatar (all skins)</h2>
+    <div class="avatar-grid">
+      @for (skin of skins; track skin) {
+        <div class="avatar-item">
+          <app-player-avatar [skinId]="skin" size="medium" />
+          <span class="avatar-label">{{ skin }}</span>
+        </div>
+      }
+    </div>
+  </section>
+
+  <section class="debug-section">
+    <h2>Player Avatar (sizes)</h2>
+    <div class="avatar-sizes">
+      <div class="avatar-item">
+        <app-player-avatar skinId="dexter" size="small" />
+        <span class="avatar-label">small</span>
+      </div>
+      <div class="avatar-item">
+        <app-player-avatar skinId="dexter" size="medium" />
+        <span class="avatar-label">medium</span>
+      </div>
+      <div class="avatar-item">
+        <app-player-avatar skinId="dexter" size="large" />
+        <span class="avatar-label">large</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="debug-section">
+    <h2>Role Reveal Card (all roles)</h2>
+    <p>Portrait window calibration test — compare skin position vs card frame</p>
+    <div class="card-grid">
+      @for (role of roles; track role) {
+        <div class="card-item">
+          <app-role-reveal-card skinId="dexter" [role]="role" />
+          <span class="card-label">{{ role }}</span>
+        </div>
+      }
+    </div>
+  </section>
+
+  <section class="debug-section">
+    <h2>Role Reveal Card (skin variations for spy)</h2>
+    <p>Test each skin with spy role + spy-shades prop</p>
+    <div class="card-grid">
+      @for (skin of skins; track skin) {
+        <div class="card-item">
+          <app-role-reveal-card [skinId]="skin" role="spy" />
+          <span class="card-label">{{ skin }}</span>
+        </div>
+      }
+    </div>
+  </section>
+
+  <section class="debug-section">
+    <h2>Role Reveal Card (undefined skinId fallback)</h2>
+    <p>Tests that undefined skinId falls back to 'dexter'</p>
+    <div class="card-grid">
+      <div class="card-item">
+        <app-role-reveal-card [skinId]="undefined" role="hitman" />
+        <span class="card-label">undefined → dexter</span>
+      </div>
+      <div class="card-item">
+        <app-role-reveal-card role="stalker" />
+        <span class="card-label">no input → dexter</span>
+      </div>
+    </div>
+  </section>
+</main>

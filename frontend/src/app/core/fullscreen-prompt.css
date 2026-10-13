@@ -1,86 +1,62 @@
 :host {
-  font-family: Arial, sans-serif;
+  display: block;
+  font-family: var(--font-hand, Arial, sans-serif);
 }
 
-.fullscreen-prompt {
-  position: fixed;
-  z-index: 1000;
-  bottom: max(20px, env(safe-area-inset-bottom));
-  left: 50%;
-  transform: translateX(-50%);
-  box-sizing: border-box;
-  width: min(680px, calc(100% - 32px));
+.fullscreen-control {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 24px;
-  padding: 18px 22px;
-  border: 1px solid #b68a49;
-  border-radius: 12px;
-  color: #f7ead3;
-  background: #241b15;
-  box-shadow: 0 12px 40px #0008;
+  gap: 6px;
 }
-
-h2 {
-  margin: 0 0 6px;
-  font-size: 16px;
-  line-height: 1.4;
-}
-
-p {
-  margin: 0;
-  color: #d9c8ac;
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-.fullscreen-error {
-  margin-top: 8px;
-  color: #ffc4a6;
-}
-
-.fullscreen-actions {
-  display: flex;
-  flex-shrink: 0;
-  gap: 8px;
-}
-
-button {
-  min-height: 44px;
-  padding: 10px 14px;
-  border: 1px solid #b68a49;
-  border-radius: 6px;
-  font: inherit;
-  font-size: 13px;
+.fullscreen-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 40px;
+  padding: 7px 10px;
+  border: 2px solid var(--ink-strong, #2b170c);
+  border-radius: 999px;
+  background: var(--paper, #f6ead0);
+  color: var(--ink, #422719);
+  box-shadow: 0 3px 0 rgb(43 23 12 / 0.55);
+  font: 16px/1 var(--font-hand, Arial, sans-serif);
   cursor: pointer;
 }
-
-button:focus-visible {
-  outline: 2px solid #fff;
-  outline-offset: 3px;
+.fullscreen-toggle span[aria-hidden='true'] {
+  font: 20px/1 Arial, sans-serif;
 }
-
-button:disabled {
+.fullscreen-toggle:disabled {
   opacity: 0.65;
   cursor: wait;
 }
-
-.fullscreen-enter {
-  color: #241b15;
-  background: #e8c073;
-  font-weight: 700;
+.fullscreen-toggle:focus-visible {
+  outline: 3px dashed var(--gold, #e8c073);
+  outline-offset: 3px;
 }
-
-.fullscreen-later {
-  color: #f7ead3;
-  background: transparent;
+.fullscreen-error {
+  position: absolute;
+  top: calc(100% + 7px);
+  right: 0;
+  z-index: 3;
+  width: max-content;
+  max-width: 220px;
+  padding: 6px 8px;
+  border-radius: 7px;
+  background: #4a1710;
+  color: #fff0e6;
+  font: 12px/1.25 var(--font-hand, Arial, sans-serif);
+  text-align: right;
 }
 
 @media (max-width: 600px) {
-  .fullscreen-prompt {
-    align-items: stretch;
-    flex-direction: column;
-    gap: 14px;
-    padding: 16px;
+  .fullscreen-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
   }
 }

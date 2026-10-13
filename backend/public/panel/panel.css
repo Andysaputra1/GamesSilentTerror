@@ -540,3 +540,98 @@ dialog form button { width: 100%; }
 .bt-gagal .bt-icon { color: #ffb5b5; }
 .bt-berjalan .bt-icon { color: #f6d79c; }
 @media (max-width: 700px) { .room-summary { padding: 12px; } .fuzzy-name { min-width: 100%; } .decision-tab { flex: 1 1 auto; } }
+
+/* --------------------------------------------------------------------------
+   Viewport workspace
+   The administrator console can contain unbounded traces, tables, and forms.
+   Keep the application chrome still and let only the active menu card scroll.
+   -------------------------------------------------------------------------- */
+html,
+body {
+  min-height: 100%;
+}
+body {
+  display: grid;
+  grid-template-rows: 78px minmax(0, 1fr) auto;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+body > header {
+  height: 78px;
+}
+body > main {
+  width: min(100%, 1440px);
+  min-height: 0;
+  height: 100%;
+  margin: 0 auto;
+  padding: clamp(16px, 2.4vw, 32px) clamp(16px, 2.4vw, 28px);
+  overflow: hidden;
+}
+#login-view:not([hidden]) {
+  max-height: 100%;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+#workspace:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+#workspace .page-title,
+#workspace nav {
+  flex: none;
+}
+#workspace .card:not([hidden]) {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+body > footer {
+  min-height: 38px;
+  padding: 10px 6vw;
+}
+@media (max-height: 700px) {
+  body {
+    grid-template-rows: 64px minmax(0, 1fr);
+  }
+  body > header {
+    height: 64px;
+  }
+  body > footer {
+    display: none;
+  }
+  #workspace .page-title {
+    margin-bottom: 12px;
+  }
+  #workspace nav {
+    margin-bottom: 12px;
+  }
+}
+@media (max-width: 700px) {
+  body {
+    grid-template-rows: 68px minmax(0, 1fr);
+  }
+  body > header {
+    height: 68px;
+    padding: 0 16px;
+  }
+  body > footer {
+    display: none;
+  }
+  body > main {
+    padding: 16px;
+  }
+  #workspace .page-title {
+    margin-bottom: 12px;
+  }
+  #workspace nav {
+    margin-bottom: 12px;
+  }
+  #workspace .card:not([hidden]) {
+    padding: 18px;
+  }
+}

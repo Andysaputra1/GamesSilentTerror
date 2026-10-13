@@ -4,10 +4,13 @@ import {
   ChangeDetectorRef,
   Component,
   DestroyRef,
+  ElementRef,
+  HostListener,
   Inject,
   OnDestroy,
   OnInit,
   PLATFORM_ID,
+  ViewChild,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
@@ -22,7 +25,7 @@ import { ProfileMenu } from '../../core/profile-menu';
   selector: 'app-lobby',
   imports: [RouterLink, FormsModule, ProfileMenu],
   templateUrl: './lobby.html',
-  styleUrl: './lobby.css',
+  styleUrls: ['./lobby.css'],
 })
 // CLASS KOMPONEN: mengatur buat/gabung ruangan, roster, pilihan bot, dan masuk chat.
 export class Lobby implements OnInit, OnDestroy {
@@ -35,6 +38,14 @@ export class Lobby implements OnInit, OnDestroy {
   copied = false;
   quick = false;
   capacity = 6;
+  entryMode: 'create' | 'join' = 'create';
+  activePanel: 'room' | 'players' | 'help' = 'room';
+  helpOpen = false;
+
+  // Fokus kembali ke tombol yang membuka Case File setelah overlay ditutup.
+  private helpReturnFocus?: HTMLElement;
+  @ViewChild('helpClose') private helpClose?: ElementRef<HTMLButtonElement>;
+  @ViewChild('helpDialog') private helpDialog?: ElementRef<HTMLElement>;
 
   // Pratinjau memakai durasi dari server; fallback hanya untuk backend lama sebelum deployment.
   get durations() {
@@ -83,6 +94,64 @@ export class Lobby implements OnInit, OnDestroy {
   // LIFECYCLE METHOD: hentikan polling saat komponen dilepas agar tidak berjalan di belakang.
   ngOnDestroy(): void {
     if (this.timer) clearInterval(this.timer);
+  }
+
+  // Navigasi panel hanya dipakai pada tablet/mobile; desktop tetap memperlihatkan dua panel utama.
+  selectPanel(panel: 'room' | 'players' | 'help'): void {
+    this.activePanel = panel;
+  }
+
+  // Segmen create/join menjaga kedua alur masuk tersedia tanpa membuat panel menjadi panjang.
+  selectEntryMode(mode: 'create' | 'join'): void {
+    this.entryMode = mode;
+    this.error = '';
+  }
+
+  // Case File adalah overlay agar aturan lengkap tidak mengambil tinggi waiting room.
+  openHelp(event?: Event): void {
+    this.helpReturnFocus =
+      event?.currentTarget instanceof HTMLElement ? event.currentTarget : undefined;
+    this.helpOpen = true;
+    queueMicrotask(() => this.helpClose?.nativeElement.focus());
+  }
+
+  closeHelp(): void {
+    if (!this.helpOpen) return;
+    this.helpOpen = false;
+    queueMicrotask(() => this.helpReturnFocus?.focus());
+  }
+
+  @HostListener('document:keydown.escape')
+  closeHelpOnEscape(): void {
+    this.closeHelp();
+  }
+
+  // Case File bersifat modal: Tab dan Shift+Tab tetap berputar di dalam dialog.
+  @HostListener('document:keydown', ['$event'])
+  keepHelpFocus(event: KeyboardEvent): void {
+    if (event.key !== 'Tab' || !this.helpOpen || !this.helpDialog) return;
+    const focusable = Array.from(
+      this.helpDialog.nativeElement.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ),
+    );
+    if (!focusable.length) {
+      event.preventDefault();
+      return;
+    }
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    const active = document.activeElement;
+    if (event.shiftKey && active === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (
+      !event.shiftKey &&
+      (active === last || !this.helpDialog.nativeElement.contains(active))
+    ) {
+      event.preventDefault();
+      first.focus();
+    }
   }
 
   // METHOD EVENT TOMBOL: minta backend membuat ruangan dan kode baru.

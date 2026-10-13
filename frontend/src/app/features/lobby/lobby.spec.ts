@@ -12,6 +12,7 @@ describe('Lobby', () => {
   // INSTANCE TES: component adalah class halaman; fixture membungkus komponen untuk pengujian.
   let component: Lobby;
   let fixture: ComponentFixture<Lobby>;
+  const member = (name: string) => ({ name, skin_id: 'dexter' });
 
   // SETUP CALLBACK: siapkan lingkungan/instance baru sebelum setiap skenario tes.
   beforeEach(async () => {
@@ -36,15 +37,24 @@ describe('Lobby', () => {
     expect(component).toBeTruthy();
   });
 
-  it('offers four players, enables start at four, and previews roster timing', () => {
-    const options = [...fixture.nativeElement.querySelectorAll('#room-capacity option')].map(
-      (o: any) => o.textContent,
-    );
-    expect(options).toContain('4 pemain');
+  it('renders the binder room page and opens rules in a dismissible case file', () => {
+    expect(fixture.nativeElement.querySelector('.room-binder')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('.room-code-block')).toBeNull();
+
+    fixture.nativeElement.querySelector('.room-guide-trigger').click();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[role="dialog"]')).toBeTruthy();
+
+    fixture.nativeElement.querySelector('[aria-label="Tutup panduan"]').click();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[role="dialog"]')).toBeNull();
+  });
+
+  it('enables start at four players and previews roster timing', () => {
     component.room = {
       code: 'ABC123',
       owner: component.username,
-      members: [component.username],
+      members: [member(component.username)],
       bots: ['NOX', 'ECHO', 'VEIL'],
       bot_enabled: true,
       phase: 'lobby',
@@ -52,18 +62,20 @@ describe('Lobby', () => {
     };
     fixture.componentRef.changeDetectorRef.markForCheck();
     fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('.start-game-btn').disabled).toBe(false);
+    expect(fixture.nativeElement.querySelector('.room-primary').disabled).toBe(false);
+    expect(fixture.nativeElement.querySelector('.room-roster')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('.room-controls')).toBeTruthy();
     expect(component.durations).toEqual({ day: 80, night: 20, tribunal: 30 });
     component.quick = true;
     expect(component.durations).toEqual({ day: 14, night: 10, tribunal: 10 });
   });
 
-  it('creates a room with selected capacity and no round limit option', () => {
+  it('keeps the API create path available for the selected capacity', () => {
     const request = vi.spyOn(TestBed.inject(RoomService), 'request').mockReturnValue(
       of({
         code: 'ABC123',
         owner: 'alice',
-        members: ['alice'],
+        members: [member('alice')],
         bots: [],
         bot_enabled: false,
         phase: 'lobby',
@@ -75,28 +87,22 @@ describe('Lobby', () => {
     expect(request).toHaveBeenCalledWith('POST', '', { capacity: 10 });
     fixture.componentRef.changeDetectorRef.markForCheck();
     fixture.detectChanges();
-    expect(fixture.nativeElement.textContent).toContain('10 PEMAIN');
-    expect(fixture.nativeElement.textContent).toContain('Tanpa batas ronde');
-    expect(fixture.nativeElement.querySelector('#room-rounds')).toBeNull();
+    expect(fixture.nativeElement.textContent).toContain('1 / 10');
+    expect(fixture.nativeElement.querySelector('.room-code-block')).toBeTruthy();
   });
 
-  it('keeps typed room code and submits the normalized code', () => {
-    const input = fixture.nativeElement.querySelector('#room-code') as HTMLInputElement;
-    input.value = 'abc123';
-    input.dispatchEvent(new Event('input'));
-    fixture.detectChanges();
-    expect(component.joinCode).toBe('abc123');
-    expect(input.value).toBe('abc123');
+  it('normalizes a room code before submitting the legacy join action', () => {
     const request = vi.spyOn(TestBed.inject(RoomService), 'request').mockReturnValue(
       of({
         code: 'ABC123',
         owner: 'alice',
-        members: ['alice'],
+        members: [member('alice')],
         bots: [],
         bot_enabled: false,
         phase: 'lobby',
       }),
     );
+    component.joinCode = 'abc123';
     component.joinRoom();
     expect(request).toHaveBeenCalledWith('POST', '/join', { code: 'ABC123' });
     expect(component.busy).toBe(false);
@@ -120,7 +126,7 @@ describe('Lobby', () => {
     const room = {
       code: 'ABC123',
       owner: 'alice',
-      members: ['alice'],
+      members: [member('alice')],
       bots: [],
       bot_enabled: false,
       phase: 'lobby',
@@ -135,7 +141,9 @@ describe('Lobby', () => {
     expect(sessionStorage.getItem('shadow_heist_room')).toBe('ABC123');
     fixture.componentRef.changeDetectorRef.markForCheck();
     fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('#room-code')).toBeNull();
+    fixture.componentRef.changeDetectorRef.markForCheck();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.room-code-block')).toBeTruthy();
   });
 
   it('clears stale room and game pointers when the server no longer has a room', () => {
@@ -156,7 +164,7 @@ describe('Lobby', () => {
     const room = {
       code: 'ABC123',
       owner: 'alice',
-      members: ['alice', 'bob'],
+      members: [member('alice'), member('bob')],
       bots: ['NOX'],
       bot_enabled: true,
       phase: 'lobby',
@@ -176,7 +184,7 @@ describe('Lobby', () => {
     const room = {
       code: 'ABC123',
       owner: 'alice',
-      members: ['alice', 'bob'],
+      members: [member('alice'), member('bob')],
       bots: [],
       bot_enabled: false,
       phase: 'lobby',

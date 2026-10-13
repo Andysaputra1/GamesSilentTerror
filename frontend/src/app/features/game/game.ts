@@ -28,6 +28,7 @@ import {
 import { gameEntryStorageKey } from '../../core/flow.guard';
 import { ProfileMenu } from '../../core/profile-menu';
 import { PhaseDurations } from '../../core/room.service';
+import { FullscreenPrompt } from '../../core/fullscreen-prompt';
 
 // Karakter meja dan warna label pemain: berdasarkan urutan kursi, bukan role atau status rahasia.
 const SKINS = ['arthur', 'jenny', 'dexter', 'eloise', 'kiera', 'sadie'];
@@ -48,7 +49,7 @@ const ROLES = ['hitman', 'spy', 'stalker', 'civilian'];
 // KOMPONEN: render snapshot privat server; tidak mengacak role atau memutuskan hasil aksi di browser.
 @Component({
   selector: 'app-game',
-  imports: [FormsModule, RouterLink, ProfileMenu, NgTemplateOutlet],
+  imports: [FormsModule, RouterLink, ProfileMenu, FullscreenPrompt, NgTemplateOutlet],
   templateUrl: './game.html',
   styleUrls: [
     './game.css',

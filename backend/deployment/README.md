@@ -78,7 +78,7 @@ Untuk melihat arsip, buka `/panel` pada origin backend melalui HTTPS dan login
 sebagai administrator. `/history` dan `/admin` mengarah ke panel baru.
 Semua API panel memakai sesi administrator terpisah dari akun pemain.
 
-Database baru menjalankan 001_schema.sql, 002_chat_history.sql, dan 003_admin_panel.sql otomatis.
+Database baru menjalankan 001_schema.sql sampai 005_skin_preference.sql otomatis.
 Database/volume lama: backup dulu, hentikan backend sementara, lalu jalankan
 `backend/migrations/V5__chat_history.sql` **sekali saja** pada database shadow_heist.
 Contoh dari root repository di VM untuk service MySQL Azure:
@@ -99,6 +99,16 @@ transaksi yang dapat dibatalkan bersama INSERT penanda migrasi.
 Pesan lama tetap ada dan ditandai `legacy`; identitas bot/ronde lama tidak direka ulang.
 Balasan AI lama tetap tersimpan di ai_analyses dan belum dimasukkan ke tabel percakapan,
 karena kode lama tidak mencatat apakah respons benar-benar dipublikasikan.
+
+## Survei, NPC, dan avatar
+
+Database/volume Azure yang sudah ada tidak menjalankan file init baru secara otomatis.
+Backup dulu, lalu periksa `schema_migrations`. Jika `V7__survey_and_npc` belum ada,
+jalankan `SOURCE /docker-entrypoint-initdb.d/004_survey_and_npc.sql;`. Jika
+`V7__add_skin_preference` belum ada atau `SHOW COLUMNS FROM user_accounts LIKE 'skin_id';`
+tidak mengembalikan kolom, jalankan
+`SOURCE /docker-entrypoint-initdb.d/005_skin_preference.sql;` sekali sebelum backend
+versi avatar diaktifkan. Jangan menghapus volume untuk menjalankan migrasi.
 
 `schema_migrations` menyimpan versi struktur yang sudah diterapkan dan waktunya.
 Saat ini project memakai SQL manual, belum ada migration runner otomatis; tabel ini
