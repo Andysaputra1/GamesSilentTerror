@@ -4,13 +4,12 @@ import { isPlatformBrowser } from '@angular/common';
 import { catchError, exhaustMap, filter, fromEvent, merge, of, Subscription, timer } from 'rxjs';
 import { ActiveMatchService } from './core/active-match.service';
 import { SessionService } from './core/session.service';
-import { FullscreenPrompt } from './core/fullscreen-prompt';
 
 // DECORATOR: hubungkan komponen dengan selector HTML, template, dan fitur router.
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, FullscreenPrompt],
+  imports: [RouterOutlet],
   templateUrl: './app.html',
 })
 // CLASS KOMPONEN: wadah utama halaman; router-outlet di app.html menampilkan route aktif.

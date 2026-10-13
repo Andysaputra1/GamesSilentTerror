@@ -339,6 +339,86 @@
   }
 }
 
+/* Layar laptop pendek / tablet landscape: pertahankan action dan HUD tanpa
+   mengecilkan touch target. Konten variabel tetap memakai scroll panel lokal. */
+@media (max-height: 760px) and (min-width: 760px) {
+  .hud {
+    padding-top: 5px;
+    padding-bottom: 3px;
+  }
+  .hud-brand {
+    width: 174px;
+    font-size: 12px;
+  }
+  .phase-sign {
+    min-width: 210px;
+    padding: 0.4em 2em;
+    font-size: 14px;
+  }
+  .round-flow li {
+    padding: 2px 8px;
+    font-size: 13px;
+  }
+  .match-grid {
+    gap: 8px;
+    padding-top: 2px;
+  }
+  .private-card {
+    gap: 5px;
+    padding: 10px 14px;
+  }
+  .role-flip {
+    width: min(100%, 145px);
+  }
+  .note {
+    padding: 10px 12px;
+  }
+  .splash {
+    gap: 8px;
+    padding-top: 8px;
+  }
+  .splash-sign {
+    width: min(72vw, 320px);
+    font-size: 12px;
+  }
+  .briefing {
+    padding: 20px 24px 18px;
+  }
+  .briefing-head h2 {
+    font-size: clamp(23px, 3vw, 31px);
+  }
+  .guide-grid {
+    gap: 10px;
+    margin-top: 10px;
+  }
+  .guide-card {
+    padding: 10px 12px 9px;
+  }
+  .guide-card p {
+    font-size: 12px;
+  }
+  .splash-role .role-flip {
+    width: min(100%, 155px);
+  }
+  .splash-status {
+    gap: 5px;
+    padding: 13px 16px 11px;
+  }
+}
+
+@media (max-height: 620px) and (min-width: 760px) {
+  .round-flow,
+  .hud-brand small {
+    display: none;
+  }
+  .match-grid {
+    padding-bottom: 7px;
+  }
+  .splash-sign {
+    display: none;
+  }
+}
+
 /* Gerak minimal: tanpa animasi, informasi tetap tersedia. */
 @media (prefers-reduced-motion: reduce) {
   .match-shell::before,

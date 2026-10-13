@@ -1,4 +1,4 @@
-// ADAPTER GIS: muat library resmi hanya saat pengguna memilih login Google.
+// ADAPTER GIS: muat library resmi untuk tombol Sign in with Google.
 export interface GoogleIdentity {
   initialize(options: {
     client_id: string;
@@ -6,7 +6,17 @@ export interface GoogleIdentity {
     auto_select: boolean;
     callback: (result: { credential: string }) => void;
   }): void;
-  renderButton(element: HTMLElement, options: { theme: string; size: string; type: string }): void;
+  renderButton(
+    element: HTMLElement,
+    options: {
+      theme: string;
+      size: string;
+      type: string;
+      text?: string;
+      shape?: string;
+      width?: number;
+    },
+  ): void;
 }
 type GoogleWindow = Window & { google?: { accounts: { id: GoogleIdentity } } };
 

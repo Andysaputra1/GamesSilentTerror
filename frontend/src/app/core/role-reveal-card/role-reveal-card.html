@@ -1,15 +1,19 @@
 <div class="card-container">
   <!-- Layer 1: Card frame (always render) -->
-  <img [src]="frameUrl()" alt="Role Card" class="card-frame" />
+  <img [src]="frameUrl" alt="Role Card" class="card-frame" />
 
   <!-- Layer 2: Portrait window containing skin + prop -->
-  <div class="portrait-window">
+  <div
+    class="portrait-window"
+    [class.portrait-window--skin-fading-out]="skinTransition === 'out'"
+    [class.portrait-window--skin-fading-in]="skinTransition === 'in'"
+  >
     <!-- Skin image -->
-    <img [src]="skinUrl()" alt="Avatar" class="skin-img" />
+    <img [src]="skinUrl" alt="Avatar" class="skin-img" />
 
     <!-- Prop overlay (only render if role has a prop) -->
-    @if (propUrl()) {
-      <img [src]="propUrl()!" alt="Role Prop" class="prop-overlay" />
+    @if (propUrl) {
+      <img [src]="propUrl!" alt="Role Prop" class="prop-overlay" />
     }
   </div>
 </div>

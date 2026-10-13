@@ -2,15 +2,16 @@ import { backendUrl } from '../../core/backend-url';
 import { isPlatformBrowser } from '@angular/common';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import {
+  AfterViewInit,
   ChangeDetectorRef,
   Component,
   DestroyRef,
+  ElementRef,
   Inject,
   PLATFORM_ID,
-  ElementRef,
-  ViewChild,
   OnInit,
   signal,
+  ViewChild,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
@@ -46,7 +47,7 @@ interface LoginResponse {
   styleUrl: './auth.scss',
 })
 // CLASS KOMPONEN: mengatur perilaku halaman login, bukan memeriksa password di database.
-export class Auth implements OnInit {
+export class Auth implements OnInit, AfterViewInit {
   readonly countdown = signal(['--', '--', '--', '--', '--']);
   readonly countdownEnded = signal(false);
   readonly countdownLabels = ['BULAN', 'HARI', 'JAM', 'MENIT', 'DETIK'];
@@ -141,9 +142,17 @@ export class Auth implements OnInit {
     return backendUrl();
   }
 
-  // GIS memverifikasi identitas di Google; backend memverifikasi token + nonce lagi.
+  // Siapkan satu tombol resmi Google yang langsung bisa diklik. Button flow
+  // tidak boleh dipicu secara programatik oleh tombol custom, jadi tombol
+  // resmi dirender otomatis sejak halaman login selesai dimuat.
   async prepareGoogle(): Promise<void> {
-    if (!isPlatformBrowser(this.platformId) || this.googleLoading || this.isSubmitting) return;
+    if (
+      !isPlatformBrowser(this.platformId) ||
+      this.googleLoading ||
+      this.googleReady ||
+      this.isSubmitting
+    )
+      return;
     this.googleError = '';
     this.googleLoading = true;
     try {
@@ -174,11 +183,16 @@ export class Auth implements OnInit {
         auto_select: false,
         callback: (result) => this.submitGoogle(result.credential, challenge.nonce),
       });
-      // Icon resmi Google tidak memaksa binder kecil menjadi lebih lebar.
-      identity.renderButton(this.googleButton.nativeElement, {
+      const target = this.googleButton?.nativeElement;
+      if (!target) throw new Error('Tombol Google belum siap. Muat ulang halaman lalu coba lagi.');
+      target.replaceChildren();
+      // Pakai varian icon resmi Google agar aksinya tetap langsung tersedia,
+      // tetapi visualnya tidak mengambil alih desain buku pada halaman ini.
+      identity.renderButton(target, {
         theme: 'outline',
         size: 'large',
         type: 'icon',
+        shape: 'circle',
       });
       this.googleReady = true;
     } catch (error) {
@@ -198,6 +212,7 @@ export class Auth implements OnInit {
   private submitGoogle(credential: string, nonce: string): void {
     if (this.destroyRef.destroyed || this.isSubmitting) return;
     this.isSubmitting = true;
+    let retryButton = false;
     this.http
       .post<LoginResponse>(this.backendUrl + '/api/auth/google', { credential, nonce })
       .pipe(
@@ -208,11 +223,13 @@ export class Auth implements OnInit {
           this.googleReady = false;
           this.googleButton?.nativeElement.replaceChildren();
           this.changeDetector.markForCheck();
+          if (retryButton && !this.destroyRef.destroyed) void this.prepareGoogle();
         }),
       )
       .subscribe({
         next: (response) => this.completeLogin(response),
         error: (error: unknown) => {
+          retryButton = true;
           this.googleError =
             error instanceof HttpErrorResponse && error.status === 409
               ? 'Email sudah terdaftar. Gunakan metode login awal.'
@@ -271,6 +288,14 @@ export class Auth implements OnInit {
         this.backendStatus = ready ? 'online' : 'offline';
         this.changeDetector.markForCheck();
       });
+  }
+
+  ngAfterViewInit(): void {
+    // Jalankan setelah siklus render selesai agar spinner/button tidak memicu
+    // perubahan state di tengah pemeriksaan Angular.
+    queueMicrotask(() => {
+      if (!this.destroyRef.destroyed) void this.prepareGoogle();
+    });
   }
 
   // Status koneksi hanya mengikuti respons readiness, bukan hasil validasi akun pengguna.

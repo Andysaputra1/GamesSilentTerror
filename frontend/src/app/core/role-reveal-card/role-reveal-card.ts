@@ -1,4 +1,4 @@
-import { Component, Input, computed } from '@angular/core';
+import { Component, Input } from '@angular/core';
 
 @Component({
   selector: 'app-role-reveal-card',
@@ -12,6 +12,9 @@ export class RoleRevealCard {
   /** Role determines which card frame and prop to display. */
   @Input() role: string = 'civilian';
 
+  /** Parent controls the portrait-only fade when the deck skin changes. */
+  @Input() skinTransition: 'idle' | 'out' | 'in' = 'idle';
+
   /** Mapping from role to prop asset filename (without extension). */
   private readonly roleToProp: Record<string, string | null> = {
     'spy': 'spy-shades',
@@ -24,17 +27,17 @@ export class RoleRevealCard {
     return this.skinId || 'dexter';
   }
 
-  readonly skinUrl = computed(() =>
-    `/assets/characters/skin_${this.getSafeSkinId()}.png`
-  );
+  get skinUrl(): string {
+    return `/assets/characters/skin_${this.getSafeSkinId()}.png`;
+  }
 
-  readonly frameUrl = computed(() =>
-    `/assets/cards/card_${this.role}.png`
-  );
+  get frameUrl(): string {
+    return `/assets/cards/card_${this.role}.png`;
+  }
 
   /** Returns prop URL if the role has one, null otherwise. */
-  readonly propUrl = computed(() => {
+  get propUrl(): string | null {
     const prop = this.roleToProp[this.role];
     return prop ? `/assets/props/${prop}.png` : null;
-  });
+  }
 }

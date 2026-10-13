@@ -1,4 +1,4 @@
-<main class="home-desk">
+<main class="home-desk" [class.home-desk--case-open]="caseFileOpen">
   <div class="home-desk__content">
     <header class="home-header">
       <a class="home-brand" routerLink="/main" aria-label="Silent Terror, halaman utama">
@@ -8,158 +8,289 @@
       <app-profile-menu [username]="username" (profileChanged)="username = $event.username" />
     </header>
 
-    <section class="home-hero" aria-labelledby="mission-title">
-      <img
-        class="home-decoration home-decoration--map"
-        src="/assets/decorations/maps/world-map-open-scroll.png"
-        alt=""
-        aria-hidden="true"
-        loading="lazy"
-        decoding="async"
-      />
-      <img
-        class="home-decoration home-decoration--books"
-        src="/assets/decorations/objects/detective-book-stack.png"
-        alt=""
-        aria-hidden="true"
-        loading="lazy"
-        decoding="async"
-      />
+    <section class="home-hero" aria-label="Main content">
+      <section class="binder-section" aria-label="Create or join room">
+        <div class="binder-content">
+          <!-- Left page: full-page role-card carousel -->
+          <div class="binder-page binder-page--left">
+            <aside class="suspect-deck" aria-label="Empat kartu role permainan">
+              <button
+                class="skin-cycle"
+                type="button"
+                [attr.aria-label]="'Ganti skin karakter. Skin saat ini ' + activeSkin.label"
+                [attr.title]="'Ganti skin: ' + activeSkin.label"
+                [disabled]="skinTransitionState !== 'idle'"
+                (click)="cycleRoleDeckSkin()"
+              >
+                <img class="skin-cycle__icon" src="/assets/decorations/icons/hanger.png" alt="" aria-hidden="true" />
+              </button>
+              <div class="suspect-deck__heading">
+                <span>ROLE DECK</span>
+              </div>
+              <div class="role-deck-carousel">
+                <button
+                  class="role-deck__control role-deck__control--previous"
+                  type="button"
+                  aria-label="Tampilkan kartu sebelumnya"
+                  (click)="shuffleRoleDeck('previous')"
+                >
+                  <span aria-hidden="true">‹</span>
+                </button>
 
-      <article class="mission-file">
-        <p class="case-label">CASE FILE / 001</p>
-        <p class="mission-greeting">SELAMAT DATANG, {{ username }}</p>
-        <h1 id="mission-title">Temukan semua Hitman sebelum meja kehabisan suara.</h1>
-        <p class="mission-copy">
-          Di antara 4–10 peserta, para Hitman menyembunyikan identitasnya. Baca alibi, lindungi
-          warga, dan bawa semua tersangka ke Tribunal.
-        </p>
+                <div class="role-deck" aria-hidden="true">
+                  @for (card of roleDeck; track card.id; let index = $index) {
+                    <div
+                      class="role-deck__card"
+                      [class.role-deck__card--front]="index === 0"
+                      [class.role-deck__card--middle]="index === 1"
+                      [class.role-deck__card--back]="index === 2"
+                      [class.role-deck__card--hidden]="index > 2"
+                    >
+                      <app-role-reveal-card
+                        [role]="card.id"
+                        [skinId]="activeSkin.id"
+                        [skinTransition]="skinTransitionState"
+                      />
+                    </div>
+                  }
+                </div>
 
-        <dl class="mission-facts" aria-label="Ringkasan permainan">
-          <div>
-            <dt>PARTICIPANTS</dt>
-            <dd>4–10 pemain</dd>
+                <button
+                  class="role-deck__control role-deck__control--next"
+                  type="button"
+                  aria-label="Tampilkan kartu berikutnya"
+                  (click)="shuffleRoleDeck('next')"
+                >
+                  <span aria-hidden="true">›</span>
+                </button>
+              </div>
+              <p class="role-deck__description">
+                <b>{{ activeRole.label }}.</b> {{ activeRole.description }}
+              </p>
+              <p class="role-deck__status" aria-live="polite">{{ deckAnnouncement }}</p>
+            </aside>
           </div>
-          <div>
-            <dt>OBJECTIVE</dt>
-            <dd>Bongkar Syndicate</dd>
-          </div>
-          <div>
-            <dt>THE RULE</dt>
-            <dd>Diam bukan bukti</dd>
-          </div>
-        </dl>
 
-        <div class="mission-actions">
-          <a class="home-primary" routerLink="/lobby"
-            ><span>MASUK LOBBY</span><b aria-hidden="true">↗</b></a
-          >
-          <a class="home-secondary" href="#field-guide"
-            >Lihat cara bermain <span aria-hidden="true">↓</span></a
-          >
+          <!-- Right page: Create/Join UI -->
+          <div class="binder-page binder-page--right">
+            @if (createSetupOpen) {
+              <button class="capacity-back" type="button" (click)="cancelCreateSetup()" [disabled]="busy">
+                ← BACK
+              </button>
+              <section class="capacity-picker" aria-labelledby="capacity-picker-title">
+                <p class="binder-kicker">NEW ROOM</p>
+                <h2 id="capacity-picker-title" class="binder-title">
+                  <span>How many players</span>
+                  <span>at your table?</span>
+                </h2>
+                <div class="capacity-slider">
+                  <output for="room-capacity-slider">
+                    <span class="capacity-slider__value">{{ capacity }}</span>
+                    <span class="capacity-slider__label">PLAYERS</span>
+                  </output>
+                  <input
+                    id="room-capacity-slider"
+                    type="range"
+                    min="4"
+                    max="10"
+                    step="1"
+                    name="capacity"
+                    [(ngModel)]="capacity"
+                    [disabled]="busy"
+                    aria-label="Jumlah pemain"
+                  />
+                  <div class="capacity-ticks" aria-hidden="true">
+                    @for (count of capacities; track count) { <span>{{ count }}</span> }
+                  </div>
+                </div>
+                <button class="leather-button" type="button" (click)="onCreateRoom()" [disabled]="busy">
+                  {{ busy ? 'CREATING…' : 'CREATE ROOM' }}
+                </button>
+              </section>
+            } @else {
+              <section class="room-entry">
+                <h2 class="binder-title">
+                  <span>Create or join</span>
+                  <span>your friend's party!</span>
+                </h2>
+
+                <button class="leather-button" type="button" (click)="openCreateSetup()" [disabled]="busy">
+                  CREATE
+                </button>
+
+                <form class="join-form" (ngSubmit)="onJoinRoom()">
+                  <input
+                    type="text"
+                    [(ngModel)]="joinCode"
+                    name="joinCode"
+                    maxlength="6"
+                    placeholder="ROOM CODE"
+                    autocomplete="off"
+                    [disabled]="busy"
+                    class="join-input"
+                  />
+                  <button class="leather-button" type="submit" [disabled]="busy">
+                    {{ busy ? 'JOINING…' : 'JOIN' }}
+                  </button>
+                </form>
+              </section>
+            }
+
+            @if (error) {
+              <p class="binder-error" role="alert">{{ error }}</p>
+            }
+          </div>
         </div>
-        <small class="mission-footnote">Buat ruangan baru atau gabung dengan kode teman.</small>
-      </article>
-
-      <aside class="suspect-deck" aria-label="Tiga kartu role permainan">
-        <div class="suspect-deck__heading">
-          <span>THE SUSPECT DECK</span>
-          <b>IDENTITAS DISEMBUNYIKAN</b>
-        </div>
-        <div class="role-deck" aria-hidden="true">
-          @for (card of roleDeck; track card.id) {
-            <div class="role-deck__card role-deck__card--{{ card.id }}">
-              <app-role-reveal-card [role]="card.id" [skinId]="card.skinId" />
-            </div>
-          }
-        </div>
-        <p class="suspect-deck__caption">
-          Role dibagikan acak ketika host memulai permainan. Tidak ada yang tahu siapa yang bermain
-          untuk kubu mana.
-        </p>
-      </aside>
-    </section>
-
-    <section class="game-brief" aria-labelledby="moves-title">
-      <header class="section-heading">
-        <p class="case-label">THE THREE MOVES</p>
-        <h2 id="moves-title">Satu meja. Tiga fase. Tidak ada tempat aman.</h2>
-      </header>
-      <ol class="phase-list">
-        <li>
-          <span>01</span>
-          <div>
-            <b>SIANG</b>
-            <p>Diskusikan alibi dan cari kejanggalan. Hitman dapat memakai Gag Order.</p>
-          </div>
-        </li>
-        <li>
-          <span>02</span>
-          <div>
-            <b>MALAM</b>
-            <p>Aksi berlangsung secara rahasia: Hostage, Guard, dan Peek.</p>
-          </div>
-        </li>
-        <li>
-          <span>03</span>
-          <div>
-            <b>TRIBUNAL</b>
-            <p>Pemain yang masih bersuara memilih tersangka untuk dieksekusi.</p>
-          </div>
-        </li>
-      </ol>
-      <p class="game-brief__note">
-        Warga menang jika semua Hitman dieksekusi. Syndicate menang jika warga hidup yang masih
-        bebas bersuara tidak lebih banyak dari Hitman yang tersisa. Tidak ada batas ronde.
-      </p>
-    </section>
-
-    <section id="field-guide" class="field-guide" aria-labelledby="roles-title">
-      <header class="section-heading section-heading--center">
-        <p class="case-label">KNOWN ROLES</p>
-        <h2 id="roles-title">Setiap orang punya rahasia.</h2>
-        <p>
-          Skill memberi petunjuk, bukan kepastian. Perhatikan siapa yang bicara—dan siapa yang
-          memilih diam.
-        </p>
-      </header>
-
-      <div class="role-notes">
-        <article class="role-note role-note--hitman">
-          <span>01 / SYNDICATE</span>
-          <h3>Hitman</h3>
-          <p>Sandera satu pemain pada malam hari. Gag Order membungkam chat pada siang hari.</p>
-        </article>
-        <article class="role-note role-note--spy">
-          <span>02 / WARGA</span>
-          <h3>Spy</h3>
-          <p>Guard satu pemain, termasuk diri sendiri, untuk mencegah Hostage malam itu.</p>
-        </article>
-        <article class="role-note role-note--stalker">
-          <span>03 / WARGA</span>
-          <h3>Stalker</h3>
-          <p>Peek role asli satu pemain secara privat. Skill tersedia sekali setiap dua ronde.</p>
-        </article>
-        <article class="role-note role-note--civilian">
-          <span>04 / WARGA</span>
-          <h3>Civilian</h3>
-          <p>
-            Tanpa aksi malam. Amati percakapan, uji alibi, lalu gunakan suaramu dengan hati-hati.
-          </p>
-        </article>
-      </div>
-
-      <aside class="silence-note">
-        <b>DIAM BUKAN BUKTI.</b>
-        <p>
-          Hostage tetap hidup tetapi kehilangan chat dan voting. Target aksi malam tidak diumumkan.
-        </p>
-      </aside>
+      </section>
     </section>
 
     <footer class="home-footer">
       <span>SILENT TERROR · SOCIAL DEDUCTION PARTY GAME</span>
-      <a routerLink="/lobby">SIAP MEMBUKA KASUS? <b aria-hidden="true">↗</b></a>
+      <button type="button" (click)="openCaseFile($event)">BUKA PANDUAN <b aria-hidden="true">↗</b></button>
     </footer>
   </div>
 </main>
+
+@if (caseFileOpen) {
+  <div class="case-file-overlay" (click)="closeCaseFile()">
+    <section
+      #caseFileDialog
+      id="case-file-dialog"
+      class="case-file-dialog"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="case-file-title"
+      (click)="$event.stopPropagation()"
+      (keydown)="onDialogKeydown($event)"
+    >
+      <header class="case-file-dialog__header">
+        <div>
+          <p class="case-label">CASE FILE / 001</p>
+          <h2 id="case-file-title">Panduan meja</h2>
+        </div>
+        <button #caseFileClose class="case-file-close" type="button" (click)="closeCaseFile()">
+          <span>Tutup</span><b aria-hidden="true">×</b>
+        </button>
+      </header>
+
+      <div class="case-file-tabs" role="tablist" aria-label="Isi case file">
+        @for (tab of caseFileTabs; track tab.id; let index = $index) {
+          <button
+            class="case-file-tab"
+            type="button"
+            role="tab"
+            [id]="'case-file-tab-' + tab.id"
+            [attr.aria-controls]="'case-file-panel-' + tab.id"
+            [attr.aria-selected]="activeCaseTab === tab.id"
+            [attr.tabindex]="activeCaseTab === tab.id ? 0 : -1"
+            (click)="selectCaseTab(tab.id)"
+            (keydown)="onTabKeydown($event, index)"
+          >
+            {{ tab.label }}
+          </button>
+        }
+      </div>
+
+      <div class="case-file-dialog__body">
+        @switch (activeCaseTab) {
+          @case ('phases') {
+            <section
+              id="case-file-panel-phases"
+              class="case-file-panel"
+              role="tabpanel"
+              tabindex="0"
+              aria-labelledby="case-file-tab-phases"
+            >
+              <p class="case-file-intro">Satu meja bergerak dalam tiga fase berulang.</p>
+              <ol class="phase-list">
+                <li>
+                  <span>01</span>
+                  <div>
+                    <b>SIANG</b>
+                    <p>Diskusikan alibi dan cari kejanggalan. Hitman dapat memakai Gag Order.</p>
+                  </div>
+                </li>
+                <li>
+                  <span>02</span>
+                  <div>
+                    <b>MALAM</b>
+                    <p>Aksi berlangsung secara rahasia: Hostage, Guard, dan Peek.</p>
+                  </div>
+                </li>
+                <li>
+                  <span>03</span>
+                  <div>
+                    <b>TRIBUNAL</b>
+                    <p>Pemain yang masih bersuara memilih tersangka untuk dieksekusi.</p>
+                  </div>
+                </li>
+              </ol>
+              <p class="case-file-note">Tidak ada batas ronde. Gunakan setiap fase untuk menguji cerita yang berubah.</p>
+            </section>
+          }
+          @case ('roles') {
+            <section
+              id="case-file-panel-roles"
+              class="case-file-panel"
+              role="tabpanel"
+              tabindex="0"
+              aria-labelledby="case-file-tab-roles"
+            >
+              <p class="case-file-intro">Skill memberi petunjuk, bukan kepastian.</p>
+              <div class="role-notes">
+                <article class="role-note role-note--hitman">
+                  <span>01 / SYNDICATE</span>
+                  <h3>Hitman</h3>
+                  <p>Sandera satu pemain pada malam hari. Gag Order membungkam chat pada siang hari.</p>
+                </article>
+                <article class="role-note role-note--spy">
+                  <span>02 / WARGA</span>
+                  <h3>Spy</h3>
+                  <p>Guard satu pemain, termasuk diri sendiri, untuk mencegah Hostage malam itu.</p>
+                </article>
+                <article class="role-note role-note--stalker">
+                  <span>03 / WARGA</span>
+                  <h3>Stalker</h3>
+                  <p>Peek role asli satu pemain secara privat. Skill tersedia sekali setiap dua ronde.</p>
+                </article>
+                <article class="role-note role-note--civilian">
+                  <span>04 / WARGA</span>
+                  <h3>Civilian</h3>
+                  <p>Tanpa aksi malam. Amati percakapan, uji alibi, lalu gunakan suaramu dengan hati-hati.</p>
+                </article>
+              </div>
+              <aside class="silence-note">
+                <b>DIAM BUKAN BUKTI.</b>
+                <p>Hostage tetap hidup tetapi kehilangan chat dan voting. Target aksi malam tidak diumumkan.</p>
+              </aside>
+            </section>
+          }
+          @case ('win') {
+            <section
+              id="case-file-panel-win"
+              class="case-file-panel case-file-panel--verdict"
+              role="tabpanel"
+              tabindex="0"
+              aria-labelledby="case-file-tab-win"
+            >
+              <p class="case-file-intro">Jaga siapa yang masih punya suara, bukan hanya siapa yang masih hidup.</p>
+              <div class="verdict-grid">
+                <article class="verdict-card verdict-card--citizens">
+                  <span>WARGA MENANG</span>
+                  <h3>Semua Hitman dieksekusi.</h3>
+                  <p>Baca alibi, lindungi warga, dan gunakan Tribunal sebelum Syndicate menguasai meja.</p>
+                </article>
+                <article class="verdict-card verdict-card--syndicate">
+                  <span>SYNDICATE MENANG</span>
+                  <h3>Hitman menyamai atau melampaui warga yang masih bebas bersuara.</h3>
+                  <p>Hostage masih hidup, tetapi tidak dihitung sebagai suara bebas untuk menyelamatkan kota.</p>
+                </article>
+              </div>
+              <p class="case-file-note">Diam bisa menjadi strategi—tetapi bukan bukti.</p>
+            </section>
+          }
+        }
+      </div>
+    </section>
+  </div>
+}

@@ -1,0 +1,361 @@
+/* Help only occupies a workspace slot on the compact tab layout. */
+.help-panel {
+  display: none;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 18px;
+  padding: clamp(20px, 4vw, 32px);
+  background: var(--card-blue);
+  color: var(--card-ink);
+}
+
+.help-glance {
+  display: grid;
+  gap: 8px;
+}
+
+.help-glance p {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #607381;
+}
+
+.help-glance b {
+  min-width: 63px;
+  font-family: var(--font-title);
+  font-size: 19px;
+}
+
+.help-glance span {
+  font-size: 12px;
+}
+
+.lobby-footer {
+  flex: 0 0 auto;
+  margin-top: 0;
+  padding-top: 8px;
+  font-size: 8px;
+}
+
+.case-file-layer {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: clamp(14px, 3vw, 34px);
+  background: #1e1813a8;
+}
+
+.case-file-dialog {
+  width: min(760px, 100%);
+  max-height: calc(100dvh - clamp(28px, 6vw, 68px));
+  overflow: auto;
+  border: 3px solid var(--card-ink);
+  outline: 1px solid var(--card-ink);
+  outline-offset: -10px;
+  padding: clamp(24px, 4vw, 42px);
+  background: #f5eee1;
+  color: var(--card-ink);
+  box-shadow: 8px 9px 0 #0e0b08;
+}
+
+.case-file-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.case-file-header h2 {
+  max-width: 550px;
+  margin: 0;
+  font-family: var(--font-title);
+  font-size: clamp(28px, 4vw, 45px);
+  font-weight: 900;
+  letter-spacing: -0.05em;
+  line-height: 1;
+}
+
+.dialog-close {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  border: 2px solid var(--card-ink);
+  border-radius: 8px;
+  background: var(--card-peach);
+  color: var(--card-ink);
+  font-size: 28px;
+  line-height: 1;
+}
+
+.case-file-intro {
+  max-width: 610px;
+  margin: 17px 0 20px;
+  color: #566051;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.case-file-rules {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.case-file-rules article {
+  padding: 14px;
+  border: 2px solid var(--card-ink);
+  background: #eee5d6;
+}
+
+.case-file-rules article > span {
+  color: var(--color-gold);
+  font: 700 10px Consolas, monospace;
+}
+
+.case-file-rules h3 {
+  margin: 12px 0 6px;
+  font-family: var(--font-title);
+  font-size: 18px;
+}
+
+.case-file-rules p {
+  margin: 0;
+  color: #566051;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.case-file-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #b9af9f;
+}
+
+.case-file-footer p {
+  max-width: 420px;
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.case-file-footer .operation-primary {
+  flex: 0 0 auto;
+  padding: 11px 14px;
+  gap: 9px;
+  white-space: nowrap;
+}
+
+button:disabled {
+  opacity: 0.5;
+}
+
+@media (max-width: 920px) {
+  .lobby-titlebar {
+    align-items: center;
+  }
+
+  .lobby-tabs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    overflow: hidden;
+    flex: 0 0 auto;
+    border: 2px solid var(--card-ink);
+    border-radius: 9px;
+    background: #e7ded0;
+  }
+
+  .lobby-tabs button {
+    min-height: 39px;
+    border: 0;
+    border-right: 1px solid var(--card-ink);
+    background: transparent;
+    color: var(--card-ink);
+    font: 700 10px Consolas, monospace;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .lobby-tabs button:last-child {
+    border-right: 0;
+  }
+
+  .lobby-tabs button.is-selected {
+    background: var(--card-blue);
+  }
+
+  .lobby-tabs button span {
+    display: inline-grid;
+    place-items: center;
+    min-width: 16px;
+    height: 16px;
+    margin-left: 4px;
+    border-radius: 50%;
+    background: var(--card-ink);
+    color: var(--color-paper);
+    font-size: 8px;
+  }
+
+  .lobby-workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .lobby-panel {
+    display: none;
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .room-panel.is-active,
+  .help-panel.is-active {
+    display: flex;
+  }
+
+  .players-panel.is-active {
+    display: grid;
+  }
+
+  .help-panel.is-active {
+    min-height: 0;
+  }
+}
+
+@media (max-width: 600px) {
+  .lobby-shell {
+    padding: 10px;
+  }
+
+  .lobby-content {
+    gap: 8px;
+  }
+
+  .lobby-header {
+    min-height: 40px;
+    padding-bottom: 8px;
+  }
+
+  .operation-brand {
+    max-width: 45vw;
+    overflow: hidden;
+    font-size: 11px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .case-file-trigger {
+    display: none;
+  }
+
+  .lobby-header-actions {
+    gap: 0;
+  }
+
+  .back-link,
+  .lobby-summary {
+    display: none;
+  }
+
+  .lobby-titlebar .operation-label {
+    margin-bottom: 2px;
+    font-size: 9px;
+  }
+
+  .lobby-titlebar h1 {
+    font-size: 28px;
+  }
+
+  .room-panel,
+  .roster-card,
+  .help-panel {
+    padding: 18px;
+    outline-offset: -8px;
+  }
+
+  .panel-heading h2,
+  .help-panel h2 {
+    font-size: 28px;
+  }
+
+  .join-fields {
+    flex-direction: column;
+  }
+
+  .join-fields .operation-primary {
+    width: 100%;
+  }
+
+  .case-file-dialog {
+    padding: 22px;
+    outline-offset: -8px;
+  }
+
+  .case-file-rules {
+    grid-template-columns: 1fr;
+  }
+
+  .case-file-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .case-file-footer .operation-primary {
+    width: 100%;
+  }
+
+  .lobby-footer {
+    justify-content: center;
+    min-height: 13px;
+    padding-top: 4px;
+  }
+
+  .lobby-footer span:last-child {
+    display: none;
+  }
+}
+
+/* A compact fallback keeps controls reachable on short landscape displays without page scrolling. */
+@media (max-height: 680px) {
+  .lobby-titlebar .back-link,
+  .lobby-summary,
+  .lobby-footer span:last-child {
+    display: none;
+  }
+
+  .lobby-titlebar h1 {
+    font-size: 28px;
+  }
+
+  .room-panel,
+  .help-panel {
+    overflow-y: auto;
+  }
+
+  .panel-heading h2,
+  .help-panel h2 {
+    font-size: 25px;
+  }
+
+  .room-panel {
+    gap: 9px;
+  }
+
+  .room-code {
+    padding: 9px 0;
+  }
+
+  .bot-control p,
+  .room-runtime {
+    display: none;
+  }
+}

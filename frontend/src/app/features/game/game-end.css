@@ -26,6 +26,9 @@
     #120403 100%
   );
 }
+.end-stage.survey-stage {
+  background: #f3e7ce url('/assets/backgrounds/backpaper.jpg') center / cover no-repeat;
+}
 .result {
   display: flex;
   flex-direction: column;
@@ -74,7 +77,7 @@
 }
 .lineup {
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   align-items: flex-end;
   justify-content: center;
   gap: clamp(2px, 1.2vw, 16px);
@@ -83,7 +86,7 @@
   list-style: none;
 }
 .lineup li {
-  --size: clamp(70px, calc(64vw / var(--count, 1)), 170px);
+  --size: clamp(52px, calc(64vw / var(--count, 1)), 170px);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -174,12 +177,13 @@
 
 /* ---------- Kuesioner ---------- */
 .survey {
-  --edge: 26px;
   display: flex;
   flex-direction: column;
   width: min(760px, 100%);
   max-height: 100%;
   padding: 30px 34px 18px;
+  background: transparent;
+  color: var(--ink);
   animation: naik 0.5s ease both;
 }
 .survey-head .hand {

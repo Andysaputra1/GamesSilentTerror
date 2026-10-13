@@ -79,6 +79,7 @@ import { SessionService, UserProfile } from './session.service';
     .profile-trigger i { font-style: normal; font-size: 24px; color: #716038; }
     .profile-trigger b { max-width: 140px; overflow: hidden; text-overflow: ellipsis; font-size: 14px; }
     .profile-actions { position: absolute; right: 0; top: calc(100% + 10px); width: min(270px, 85vw);
+      max-height: min(520px, calc(100dvh - 24px)); overflow-y: auto; overscroll-behavior: contain;
       padding: 18px; border: 2px solid #493b28; border-radius: 14px; background: #fff7e5;
       color: #28251e; box-shadow: 0 10px 28px #24180d33; }
     .profile-actions p { margin: 0 0 8px; font: 11px Consolas, monospace; letter-spacing: .1em; }
@@ -101,6 +102,9 @@ import { SessionService, UserProfile } from './session.service';
     .name-actions button { padding: 8px 12px; border: 1px solid #493b28; border-radius: 7px;
       background: #f5eee0; color: #28251e; }
     .name-actions button[type=submit] { background: #344c3d; color: #fff7e5; }
+    @media (max-height: 620px) {
+      .profile-actions { top: auto; bottom: calc(100% + 10px); }
+    }
   `,
 })
 export class ProfileMenu implements OnInit {

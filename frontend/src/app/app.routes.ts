@@ -4,7 +4,6 @@ import { MainPage } from './features/main-page/main-page';
 import { Auth } from './features/auth/auth';
 import { Lobby } from './features/lobby/lobby';
 import { PanelRedirect } from './features/panel/panel-redirect';
-import { DebugCards } from './features/debug-cards/debug-cards';
 import { authGuard } from './core/auth.guard';
 import { loginRedirectGuard } from './core/flow.guard';
 import { activeMatchGuard } from './core/active-match.service';
@@ -22,7 +21,5 @@ export const routes: Routes = [
     loadComponent: () => import('./features/game/game').then((module) => module.Game),
     canActivate: [authGuard, activeMatchGuard],
   },
-  // TEMPORARY DEBUG ROUTE — DELETE AFTER VISUAL APPROVAL
-  { path: 'debug/cards', component: DebugCards },
   { path: '**', redirectTo: '/login' },
 ];
