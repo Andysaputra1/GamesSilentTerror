@@ -626,3 +626,31 @@ class SocketGameTests(unittest.IsolatedAsyncioTestCase):
             await controller.send_chat("sid", {"username": "alice", "message": "hostage"})
         self.assertFalse(any(c.args[0] == "receive_chat" for c in sio.emit.call_args_list))
         self.assertEqual(room.match.messages, [])
+
+
+class ChatOrderTests(unittest.TestCase):
+    # Chat yang terbaca bot dalam satu langkah harus tetap kronologis (audit AI 1 Okt: ID UUID mengacak urutan).
+    def test_bot_memory_keeps_chat_order_within_one_snapshot(self):
+        from services.npc_brain.generated import otak_fuzzy
+
+        class NLUTiruan:
+            ambang = 0.0
+
+            def intent(self, teks, daftar=()):
+                return "offend", 0.99
+
+            def target(self, pengirim, teks, konteks, daftar, label):
+                return [{"pemain": p, "relasi": "offend", "prob": 0.99}
+                        for p in daftar if p != pengirim and p in teks]  # fmt: skip
+
+        for _ in range(20):
+            match = Match(["Andi", "Budi", "Citra", "Dodi"], [])
+            match.add_message("Andi", "Aku curiga sama Budi")
+            match.add_message("Budi", "Justru Citra yang aneh")
+            ingatan = otak_fuzzy.Ingatan("Dodi")
+            view = ingatan.sinkron_snapshot(
+                match.snapshot("Dodi"), match.deadline - 60, NLUTiruan()
+            )
+            tabel, _ = otak_fuzzy.hitung_bukti(ingatan, view)
+            budi = tabel[tabel["pemain"] == "Budi"].iloc[0]
+            self.assertEqual(budi["pengalihan"], 0.5)  # dituduh lalu menuduh pihak ketiga

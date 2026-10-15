@@ -134,6 +134,7 @@ class Match:
             }
             self.events = ["Menyiapkan pertandingan. Baca panduan singkat sambil menunggu AI siap."]
         self.messages = []
+        self.jumlah_pesan = 0
         self.winner = None
         self.winner_reason = None
         self.bot_day_done = False
@@ -473,7 +474,14 @@ class Match:
 
     # PESAN PUBLIK: hanya dipanggil setelah pemeriksaan can_chat; ID mencegah duplikasi saat reconnect.
     def add_message(self, sender, message):
-        record = {"id": uuid4().hex, "sender": sender, "message": message}
+        # ID diawali nomor urut: otak bot mengurutkan chat dengan waktu terima lalu ID, jadi chat yang
+        # terbaca dalam satu langkah tetap kronologis (UUID murni membuat urutannya acak).
+        self.jumlah_pesan += 1
+        record = {
+            "id": f"{self.jumlah_pesan:06d}{uuid4().hex[:10]}",
+            "sender": sender,
+            "message": message,
+        }
         self.messages.append(record)
         self.messages = self.messages[-100:]
         return record
