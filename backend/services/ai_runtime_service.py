@@ -59,6 +59,7 @@ def _decode_config(stored):
     from services.persistence_service import PersistenceError
 
     override = dict(stored)
+    override.pop("api_backend", None)  # kunci lama; OpenAI langsung sudah dihapus
     encrypted = override.pop("openrouter_key_encrypted", None)
     source = override.setdefault("openrouter_key_source", "custom" if encrypted else "default")
     override["openrouter_custom_configured"] = bool(encrypted)
@@ -102,7 +103,6 @@ def save_panel_configuration(provider, endpoint, api_key=None, key_source=None):
 
     stored = {
         "ai_provider": provider,
-        "api_backend": "openrouter",
         "ollama_model": "qwen3:14b",
         "openrouter_model": "qwen/qwen3-14b",
         "ollama_base_url": endpoint,

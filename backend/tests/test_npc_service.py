@@ -154,7 +154,7 @@ class NPCTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_selected_provider_is_used_without_silent_provider_switch(self):
         for provider in ["docker", "api"]:
-            config = Settings(ai_provider=provider, api_backend="openrouter")
+            config = Settings(ai_provider=provider)
             with (
                 patch(
                     "services.npc_service.ollama_reply", AsyncMock(return_value='{"action":"wait"}')

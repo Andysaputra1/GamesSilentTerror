@@ -10,7 +10,6 @@ networkx
 scikit-learn==1.9.0
 python-dotenv
 thefuzz
-openai
 httpx
 joblib 
 python-socketio
@@ -23,4 +22,3 @@ pandas
 # pin versi yang sama di sana agar pip tidak menggantinya dengan build lain saat rilis baru.
 torch==2.14.0
 transformers==4.46.3
-anthropic

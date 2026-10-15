@@ -11,7 +11,6 @@ import time
 from time import perf_counter
 from typing import Literal
 
-from openai import AsyncOpenAI
 from pydantic import BaseModel, ConfigDict, Field
 
 from module.ollama_client import generate_reply as ollama_reply
@@ -24,7 +23,7 @@ from services.npc_brain.runtime import brain_runtime
 from services.persistence_service import PersistenceService, PersistenceError
 from services.room_service import room_service
 from services.survey_service import survey_service
-from services.ai_diagnostics import capture_exchange, record_request, record_response
+from services.ai_diagnostics import capture_exchange
 from config.settings import settings
 
 logger = logging.getLogger("shadow_heist.npc")
@@ -108,29 +107,8 @@ STATE_JSON:
 async def request_decision(prompt, config):
     if config.ai_provider == "docker":
         raw = await ollama_reply(prompt, config=config)
-    elif config.api_backend == "openrouter":
-        raw = await openrouter_reply(prompt, config=config)
     else:
-        payload = {
-            "model": config.openai_model,
-            "input": prompt,
-            "reasoning": {"effort": config.openai_reasoning_effort},
-            "max_output_tokens": config.openai_max_output_tokens,
-            "store": False,
-        }
-        record_request("https://api.openai.com/v1/responses", payload)
-        async with AsyncOpenAI(api_key=config.openai_api_key_value, timeout=20) as client:
-            response = await client.responses.create(**payload)
-            raw = response.output_text
-            record_response(
-                200,
-                {
-                    "id": response.id,
-                    "model": response.model,
-                    "output": raw,
-                    "usage": response.usage.model_dump() if response.usage else None,
-                },
-            )
+        raw = await openrouter_reply(prompt, config=config)
     return NPCDecision.model_validate_json(raw.strip())
 
 
@@ -483,11 +461,7 @@ class NPCService:
                     model=(
                         config.ollama_model
                         if config.ai_provider == "docker"
-                        else (
-                            config.openrouter_model
-                            if config.api_backend == "openrouter"
-                            else config.openai_model
-                        )
+                        else config.openrouter_model
                     ),
                 )
                 trace.setdefault("timings", {})["queue_ms"] = round(

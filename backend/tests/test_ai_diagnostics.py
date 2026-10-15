@@ -76,7 +76,6 @@ class DiagnosticsTests(unittest.IsolatedAsyncioTestCase):
         config = Settings(
             _env_file=None,
             ai_provider="api",
-            api_backend="openrouter",
             openrouter_api_key="fixture",
             openrouter_default=None,
         )

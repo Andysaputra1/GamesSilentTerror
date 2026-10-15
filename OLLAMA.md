@@ -80,7 +80,7 @@ OLLAMA_MAX_OUTPUT_TOKENS=160
 ```
 
 - `AI_PROVIDER=docker`: backend mengirim chat ke Ollama di `http://ollama:11434`.
-- `AI_PROVIDER=api`: backend memakai OpenAI dengan `OPENAI_API_KEY` dan `OPENAI_MODEL`.
+- `AI_PROVIDER=api`: backend memakai OpenRouter dengan key dari panel Konfigurasi AI atau `OPENROUTER_API_KEY`.
 - `OLLAMA_MODEL=8` memilih `qwen3:8b`; `OLLAMA_MODEL=14` memilih `qwen3:14b`.
 - Nilai lama `qwen3:8b` dan `qwen3:14b` tetap diterima; pilihan lain ditolak.
 - Tidak ada fallback otomatis dari Docker ke API berbayar.

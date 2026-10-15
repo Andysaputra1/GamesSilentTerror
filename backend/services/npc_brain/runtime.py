@@ -27,7 +27,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from config.settings import (
-    BACKEND_DIR, JALUR_PENULIS_NPC, POLA_MODEL_OPENROUTER, PROJECT_DIR, settings,
+    BACKEND_DIR, JALUR_PENULIS_LAMA, JALUR_PENULIS_NPC, POLA_MODEL_OPENROUTER, PROJECT_DIR, settings,
 )  # fmt: skip
 from services.ai_runtime_service import ai_runtime
 from services.match_engine import phase_durations
@@ -47,7 +47,7 @@ POLA_MODEL_TAUTAN = re.compile(
 )
 # "claude" = nilai lama penulis, diperlakukan seperti otomatis.
 PENULIS_VALID = {"otomatis", "claude", "templat"}
-# Jalur rantai penulis: claude_bedrock, claude_api, openrouter, tautan (link LLM sendiri).
+# Jalur rantai penulis: openrouter dan tautan (link LLM sendiri, mis. Ollama lewat tunnel).
 JALUR_PENULIS = JALUR_PENULIS_NPC
 
 # Label SVM lama → intent NLU baru; hanya dipakai bila IndoBERT tidak tersedia.
@@ -302,8 +302,6 @@ class BrainRuntime:
             "sumber": "panel" if ai_runtime.diatur_panel("ollama_base_url") else ".env",
         }
         kunci = {
-            "claude_bedrock": _rahasia(settings.amazon_api_key),
-            "claude_api": _rahasia(settings.anthropic_api_key),
             "openrouter": config.openrouter_api_key_value,
             "tautan": link,
         }
@@ -314,7 +312,7 @@ class BrainRuntime:
         try:
             rantai, self.keterangan_penulis = self.nlg.buat_rantai(
                 self.konfigurasi.urutan_penulis, kunci, model,
-                region=settings.npc_bedrock_region, token_tautan=_rahasia(config.ollama_tunnel_token),
+                token_tautan=_rahasia(config.ollama_tunnel_token),
             )  # fmt: skip
         except Exception:
             logger.exception("Rantai penulis gagal disiapkan; memakai templat.")
@@ -398,7 +396,7 @@ class BrainRuntime:
         if penulis is not None and penulis not in PENULIS_VALID:
             raise ValueError("Penulis kalimat tidak dikenal.")
         if urutan_penulis is not None:
-            urutan_penulis = list(urutan_penulis)
+            urutan_penulis = [j for j in urutan_penulis if j not in JALUR_PENULIS_LAMA]
             if not set(urutan_penulis) <= set(JALUR_PENULIS) or len(set(urutan_penulis)) != len(
                 urutan_penulis
             ):

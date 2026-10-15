@@ -28,11 +28,6 @@ PILIHAN = {
     },
     # Jalur rantai penulis: nama tampilan dan asal key/link-nya (nilai key tidak pernah dikirim).
     "jalur_penulis": {
-        "claude_bedrock": {
-            "label": "Claude · Amazon Bedrock",
-            "sumber": "AMAZON_API_KEY di server",
-        },
-        "claude_api": {"label": "Claude API · Anthropic", "sumber": "ANTHROPIC_API_KEY di server"},
         "openrouter": {"label": "OpenRouter", "sumber": "API key di menu Konfigurasi AI"},
         "tautan": {
             "label": "LLM sendiri lewat link",
@@ -47,9 +42,7 @@ class NPCConfig(BaseModel):
     penulis: Literal["otomatis", "claude", "templat"]  # "claude" = nilai lama, sama dengan otomatis
     validasi: bool = True
     # None = pertahankan urutan/model yang tersimpan (klien panel lama).
-    urutan_penulis: list[Literal["claude_bedrock", "claude_api", "openrouter", "tautan"]] | None = (
-        Field(default=None, max_length=4)
-    )
+    urutan_penulis: list[Literal["openrouter", "tautan"]] | None = Field(default=None, max_length=2)
     model_openrouter: str | None = Field(default=None, max_length=100)
     # Model di link LLM; "" = model Ollama dari Konfigurasi AI/.env.
     model_tautan: str | None = Field(default=None, max_length=100)

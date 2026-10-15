@@ -94,7 +94,7 @@ backend/artifacts/indobert/target/   ← models/target_classifier/target_classif
 
 Folder target harus memuat `pair_builder.json` dan `ambang_target.json` hasil `nlu_target.ipynb`. Pada mesin pengembang yang menyimpan repo skripsi di `a_skripsi/training/prethesis`, backend juga menemukan model di sana secara otomatis.
 
-Pengaturan di `.env` (lihat `.env.example`): `NPC_METHOD` (`campuran`, `fuzzy`, `utility`, `bt`, atau `llm` untuk mode lama), `NPC_WRITER` (`otomatis` atau `templat`), `NPC_WRITER_ORDER` (prioritas rantai penulis: `claude_bedrock`, `claude_api`, `openrouter`, `tautan`), `NPC_OPENROUTER_MODEL`, dan opsional `AMAZON_API_KEY` (Bedrock) atau `ANTHROPIC_API_KEY`. Key OpenRouter dan link LLM sendiri (Docker/tunnel) diambil dari panel **Konfigurasi AI**. Metode, urutan rantai, dan model OpenRouter juga bisa diubah dari panel **Otak NPC** (tombol **Cek ulang penulis** memeriksa semua jalur).
+Pengaturan di `.env` (lihat `.env.example`): `NPC_METHOD` (`campuran`, `fuzzy`, `utility`, `bt`, atau `llm` untuk mode lama), `NPC_WRITER` (`otomatis` atau `templat`), `NPC_WRITER_ORDER` (prioritas rantai penulis: `openrouter`, `tautan`), dan `NPC_OPENROUTER_MODEL`. Hanya dua LLM yang dipakai: OpenRouter dan LLM sendiri lewat link (Ollama di Docker yang dibuka lewat tunnel, lihat `ai-docker/`). Key OpenRouter dan link diambil dari panel **Konfigurasi AI**. Metode, urutan rantai, model OpenRouter, dan model link bisa diubah dari panel **Otak NPC** (tombol **Tes koneksi semua prioritas** memeriksa semua jalur).
 
 Setelah mengubah logika bot di notebook, jalankan ulang notebook sampai skenario/pengujiannya lulus, lalu ekspor ulang:
 
@@ -161,14 +161,13 @@ docker compose exec ollama ollama list
 
 `OLLAMA_MODEL=8` memilih `qwen3:8b`; `OLLAMA_MODEL=14` memilih `qwen3:14b`. Untuk mengunduh hanya model 8B, isi `OLLAMA_MODELS_TO_PULL=qwen3:8b`. Pastikan model yang dipilih sudah diunduh. Model 14B memerlukan sumber daya lebih besar; kecepatan bergantung pada mesin.
 
-### B. AI melalui API, tanpa menjalankan Ollama
+### B. AI melalui OpenRouter, tanpa menjalankan Ollama
 
-Ubah `.env`:
+Ubah `.env` (key juga bisa diisi dari panel **Konfigurasi AI**):
 
 ```dotenv
 AI_PROVIDER=api
-OPENAI_API_KEY=isi_key_pribadi_di_sini
-OPENAI_MODEL=gpt-5-mini
+OPENROUTER_API_KEY=isi_key_pribadi_di_sini
 ```
 
 Jalankan hanya service aplikasi berikut, beserta dependency-nya:

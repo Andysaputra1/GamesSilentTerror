@@ -21,7 +21,6 @@ from services.npc_brain.runtime import (
 )  # fmt: skip
 
 RAHASIA = {
-    "amazon": "kunci-bedrock-rahasia-uji",
     "openrouter": "sk-or-rahasia-uji",
     "token": "tok-rahasia",
 }
@@ -68,10 +67,6 @@ class WriterChainTests(unittest.TestCase):
         # Tanpa jaringan: cek jalur (Claude 8 token, endpoint OpenRouter/link) diganti mock.
         self.cek = self.enterContext(patch.object(type(self.runtime), "_cek_penulis"))
         self.enterContext(patch("services.npc_brain.runtime.ai_runtime.current", konfigurasi_ai))
-        settings = self.enterContext(patch("services.npc_brain.runtime.settings"))
-        settings.amazon_api_key = SecretStr(RAHASIA["amazon"])
-        settings.anthropic_api_key = None
-        settings.npc_bedrock_region = "us-east-1"
 
     def tearDown(self):
         penulis, urutan, model, model_tautan = self.awal
@@ -84,29 +79,29 @@ class WriterChainTests(unittest.TestCase):
             )
         self.runtime.penulis = None
 
-    def test_runtime_and_notebook_share_writer_paths(self):
-        self.assertEqual(tuple(self.nlg.JALUR_PENULIS), JALUR_PENULIS)
+    # Game hanya memakai sebagian jalur notebook: OpenRouter dan link LLM sendiri.
+    def test_game_paths_are_notebook_paths(self):
+        self.assertEqual(JALUR_PENULIS, ("openrouter", "tautan"))
+        self.assertLessEqual(set(JALUR_PENULIS), set(self.nlg.JALUR_PENULIS))
 
     def test_chain_follows_panel_order_and_skips_missing_keys(self):
         status = self.runtime.atur(
             penulis="otomatis",
-            urutan_penulis=["openrouter", "claude_api", "tautan"],
+            urutan_penulis=["tautan", "openrouter"],
             model_openrouter="anthropic/claude-sonnet-5.5",
         )
         self.assertTrue(tunggu(lambda: self.cek.called))  # rantai berubah → cek di latar
         penulis = self.runtime.penulis
-        self.assertEqual([p.jalur for p in penulis.daftar], ["openrouter", "tautan"])
-        self.assertEqual(penulis.daftar[0].model, "anthropic/claude-sonnet-5.5")
-        self.assertEqual(penulis.daftar[1].url, "https://llm-uji.example")
+        self.assertEqual([p.jalur for p in penulis.daftar], ["tautan", "openrouter"])
+        self.assertEqual(penulis.daftar[1].model, "anthropic/claude-sonnet-5.5")
+        self.assertEqual(penulis.daftar[0].url, "https://llm-uji.example")
         baris = {b["jalur"]: b for b in status["rantai_penulis"]}
-        self.assertEqual(
-            [b["jalur"] for b in status["rantai_penulis"]],
-            ["openrouter", "claude_api", "tautan", "claude_bedrock"],
-        )
-        self.assertEqual(baris["openrouter"]["keadaan"], "dipakai")
-        self.assertEqual(baris["claude_api"]["status"], "key belum diisi")
-        self.assertEqual(baris["claude_bedrock"]["keadaan"], "nonaktif")
-        self.assertEqual((status["penulis"], status["penulis_aktif"]), ("openrouter", True))
+        self.assertEqual([b["jalur"] for b in status["rantai_penulis"]], ["tautan", "openrouter"])
+        self.assertEqual(baris["tautan"]["keadaan"], "dipakai")
+        self.assertEqual((status["penulis"], status["penulis_aktif"]), ("tautan", True))
+        # Jalur Claude lama di konfigurasi tersimpan diabaikan, bukan membuat seluruh konfigurasi ditolak.
+        status = self.runtime.atur(urutan_penulis=["claude_bedrock", "openrouter", "claude_api"])
+        self.assertEqual(status["urutan_penulis"], ["openrouter"])
 
     # Model link dipilih di panel; kosong = model Konfigurasi AI (OLLAMA_MODEL).
     def test_link_model_follows_panel_choice(self):
@@ -159,9 +154,9 @@ class WriterChainTests(unittest.TestCase):
             def _tulis(self, sistem, pesan):
                 return self.berhasil("Aku curiga sama ECHO, dia diam terus dari tadi.")
 
-        self.runtime.atur(penulis="otomatis", urutan_penulis=["claude_bedrock", "openrouter"])
-        bedrock, openrouter = Jalur("claude_bedrock", 401), Jalur("openrouter")
-        self.runtime.penulis = nlg.PenulisBerantai([bedrock, openrouter])
+        self.runtime.atur(penulis="otomatis", urutan_penulis=["tautan", "openrouter"])
+        tautan, openrouter = Jalur("tautan", 401), Jalur("openrouter")
+        self.runtime.penulis = nlg.PenulisBerantai([tautan, openrouter])
         self.runtime.penulis.cek()
         self.runtime.konfigurasi.validasi = False
         try:
@@ -173,10 +168,10 @@ class WriterChainTests(unittest.TestCase):
         finally:
             self.runtime.konfigurasi.validasi = True
         self.assertEqual((tulisan["sumber"], tulisan["penulis"]), ("llm", "openrouter"))
-        self.assertEqual(bedrock.panggilan, 0)
+        self.assertEqual(tautan.panggilan, 0)
         baris = {b["jalur"]: b for b in self.runtime.ringkasan()["rantai_penulis"]}
-        self.assertEqual(baris["claude_bedrock"]["keadaan"], "ditolak")
-        self.assertEqual(baris["claude_bedrock"]["status"], "key ditolak (401)")
+        self.assertEqual(baris["tautan"]["keadaan"], "ditolak")
+        self.assertEqual(baris["tautan"]["status"], "key ditolak (401)")
         self.assertEqual(baris["openrouter"]["keadaan"], "dipakai")
         # Jalur sehat yang sedang istirahat tidak disebut "dipakai": kalimat berikutnya dari templat.
         openrouter.gagal("timeout")
@@ -196,10 +191,6 @@ class WriterCheckTests(unittest.TestCase):
         self.enterContext(
             patch("services.npc_brain.runtime.ai_runtime.diatur_panel", return_value=True)
         )
-        settings = self.enterContext(patch("services.npc_brain.runtime.settings"))
-        settings.amazon_api_key = SecretStr(RAHASIA["amazon"])
-        settings.anthropic_api_key = None
-        settings.npc_bedrock_region = "us-east-1"
         # Tanpa jaringan: cek tiap jalur menunggu aba-aba lalu melapor sesuai kelasnya.
         self.lepas = threading.Event()
         nlg = self.runtime.nlg
@@ -211,8 +202,7 @@ class WriterCheckTests(unittest.TestCase):
 
             return _cek
 
-        for kelas, hasil in ((nlg.PenulisClaude, 401), (nlg.PenulisOpenRouter, "ok"),
-                             (nlg.PenulisTautan, "tidak terhubung")):  # fmt: skip
+        for kelas, hasil in ((nlg.PenulisOpenRouter, "ok"), (nlg.PenulisTautan, "tidak terhubung")):
             self.enterContext(patch.object(kelas, "_cek", cek_tiruan(hasil)))
 
     def test_flag_stays_on_until_the_last_queued_check_finishes(self):
@@ -229,8 +219,6 @@ class WriterCheckTests(unittest.TestCase):
             status = self.runtime.segarkan_penulis(latar=False)
         baris = {b["jalur"]: b for b in status["rantai_penulis"]}
         self.assertFalse(status["sedang_cek_penulis"])
-        self.assertEqual((baris["claude_bedrock"]["keadaan"], baris["claude_bedrock"]["status"]),
-                         ("ditolak", "key ditolak (401)"))  # fmt: skip
         self.assertEqual(baris["openrouter"]["keadaan"], "dipakai")
         self.assertEqual(baris["openrouter"]["hasil_cek"]["keadaan"], "berhasil")
         self.assertGreater(baris["openrouter"]["hasil_cek"]["waktu"], 0)
@@ -238,7 +226,6 @@ class WriterCheckTests(unittest.TestCase):
         self.assertEqual(baris["tautan"]["keadaan"], "istirahat")
         self.assertEqual(baris["tautan"]["hasil_cek"]["keadaan"], "gagal")
         self.assertEqual(baris["tautan"]["alamat"], {"host": "llm-uji.example", "sumber": "panel"})
-        self.assertEqual(baris["claude_api"]["status"], "key belum diisi")
         teks = "\n".join(log.output) + json.dumps(status, ensure_ascii=False)
         for rahasia in RAHASIA.values():
             self.assertNotIn(rahasia, teks)
@@ -283,7 +270,7 @@ class NpcConfigStoreTests(unittest.TestCase):
         from services.persistence_service import PersistenceError
 
         sebelum = {"metode": "campuran", "penulis_diminta": "otomatis", "validasi": True,
-                   "urutan_penulis": ["claude_bedrock", "openrouter"], "model_openrouter": "",
+                   "urutan_penulis": ["openrouter", "tautan"], "model_openrouter": "",
                    "model_tautan": ""}  # fmt: skip
         with (
             patch.object(layanan, "brain_runtime") as runtime,
@@ -295,12 +282,12 @@ class NpcConfigStoreTests(unittest.TestCase):
                 layanan.save_npc_configuration("bt", "otomatis", True, ["tautan"], "")
         runtime.atur.assert_called_with(
             metode="campuran", penulis="otomatis", validasi=True,
-            urutan_penulis=["claude_bedrock", "openrouter"], model_openrouter="", model_tautan="",
+            urutan_penulis=["openrouter", "tautan"], model_openrouter="", model_tautan="",
         )  # fmt: skip
 
 
 class WriterSettingsTests(unittest.TestCase):
-    def test_env_order_model_and_region_are_validated(self):
+    def test_env_order_and_model_are_validated(self):
         self.assertEqual(
             Settings(npc_writer_order=" openrouter , tautan ").npc_writer_order, "openrouter,tautan"
         )
@@ -308,12 +295,14 @@ class WriterSettingsTests(unittest.TestCase):
             {"npc_writer_order": "openrouter,gpt"},
             {"npc_openrouter_model": "opus"},
             {"npc_openrouter_model": "anthropic/../key"},
-            {"npc_bedrock_region": "x.evil.com/#"},
         ):
             with self.assertRaises(ValueError):
                 Settings(**salah)
-        self.assertEqual(Settings(npc_bedrock_region="ap-southeast-1").npc_bedrock_region,
-                         "ap-southeast-1")  # fmt: skip
+        # .env lama dengan jalur Claude tetap bisa start; jalur itu diabaikan.
+        self.assertEqual(
+            Settings(npc_writer_order="claude_bedrock,claude_api,openrouter,tautan").npc_writer_order,
+            "openrouter,tautan",
+        )
 
 
 class PanelWriterApiTests(unittest.TestCase):

@@ -138,11 +138,12 @@ test('user editor uses selected account, clears secrets, and separates destructi
 test('NPC brain menu shows the writer chain, reorders it, and saves method and priority', async (t) => {
   const chain = [
     {
-      jalur: 'claude_bedrock',
-      keadaan: 'ditolak',
-      status: 'key ditolak (401)',
-      model: 'anthropic.claude-opus-5-5',
+      jalur: 'tautan',
+      keadaan: 'istirahat',
+      status: 'tidak terhubung',
+      model: 'qwen3:14b',
       panggilan: 0,
+      alamat: { host: 'llm-uji.trycloudflare.com', sumber: 'panel' },
     },
     {
       jalur: 'openrouter',
@@ -153,21 +154,6 @@ test('NPC brain menu shows the writer chain, reorders it, and saves method and p
       token_masuk: 900,
       token_keluar: 60,
       hasil_cek: { keadaan: 'berhasil', waktu: 1800000000, durasi_ms: 1250, detail: 'ok' },
-    },
-    {
-      jalur: 'tautan',
-      keadaan: 'istirahat',
-      status: 'tidak terhubung',
-      model: 'qwen3:14b',
-      panggilan: 0,
-      alamat: { host: 'llm-uji.trycloudflare.com', sumber: 'panel' },
-    },
-    {
-      jalur: 'claude_api',
-      keadaan: 'nonaktif',
-      status: 'dinonaktifkan',
-      model: null,
-      panggilan: 0,
     },
   ];
   const status = {
@@ -181,7 +167,7 @@ test('NPC brain menu shows the writer chain, reorders it, and saves method and p
     penulis_diminta: 'otomatis',
     validasi: true,
     penulis_aktif: true,
-    urutan_penulis: ['claude_bedrock', 'openrouter', 'tautan'],
+    urutan_penulis: ['tautan', 'openrouter'],
     model_openrouter: '',
     model_tautan: '',
     model_tautan_bawaan: 'qwen3:14b',
@@ -194,8 +180,6 @@ test('NPC brain menu shows the writer chain, reorders it, and saves method and p
     metode: { campuran: 'Campuran', fuzzy: 'Fuzzy', utility: 'Utility', bt: 'BT', llm: 'LLM' },
     penulis: { otomatis: 'Rantai LLM', templat: 'Templat' },
     jalur_penulis: {
-      claude_bedrock: { label: 'Claude · Amazon Bedrock', sumber: 'AMAZON_API_KEY di server' },
-      claude_api: { label: 'Claude API · Anthropic', sumber: 'ANTHROPIC_API_KEY di server' },
       openrouter: { label: 'OpenRouter', sumber: 'API key di menu Konfigurasi AI' },
       tautan: { label: 'LLM sendiri lewat link', sumber: 'URL tunnel di menu Konfigurasi AI' },
     },
@@ -230,20 +214,14 @@ test('NPC brain menu shows the writer chain, reorders it, and saves method and p
   const rows = () => [...doc.querySelectorAll('#npc-chain li')];
   assert.deepEqual(
     rows().map((row) => row.querySelector('strong').textContent),
-    [
-      '1. Claude · Amazon Bedrock',
-      '2. OpenRouter',
-      '3. LLM sendiri lewat link',
-      'Claude API · Anthropic',
-    ],
+    ['1. LLM sendiri lewat link', '2. OpenRouter'],
   );
-  assert.match(rows()[0].textContent, /Ditolak.*key ditolak \(401\)/);
+  assert.match(rows()[0].textContent, /qwen3:14b · llm-uji\.trycloudflare\.com \(panel\)/);
+  assert.match(rows()[0].textContent, /Istirahat.*tidak terhubung/);
   assert.match(rows()[1].textContent, /3 panggilan · token 900\/60 sejak cek terakhir/);
   assert.match(rows()[1].textContent, /Hit berhasil.*Cek terakhir:.*1\.25 detik/);
-  assert.match(rows()[2].textContent, /qwen3:14b · llm-uji\.trycloudflare\.com \(panel\)/);
-  assert.match(rows()[2].textContent, /Istirahat.*tidak terhubung/);
   assert.equal(doc.querySelector('#npc-chain b'), null); // data server dirender sebagai teks
-  // OpenRouter dinaikkan ke prioritas pertama, link LLM dimatikan, Claude API dinyalakan.
+  // OpenRouter dinaikkan ke prioritas pertama, lalu link LLM dimatikan.
   rows()[1].querySelector('button[aria-label^="Naikkan"]').click();
   const toggle = (label) => {
     const box = rows()
@@ -253,7 +231,6 @@ test('NPC brain menu shows the writer chain, reorders it, and saves method and p
     box.onchange();
   };
   toggle('LLM sendiri');
-  toggle('Claude API');
   doc.querySelector('#npc-method').value = 'bt';
   doc.querySelector('#npc-method').dispatchEvent(new w.Event('change'));
   doc.querySelector('#npc-openrouter-model').value = ' anthropic/claude-sonnet-5.5 ';
@@ -282,7 +259,7 @@ test('NPC brain menu shows the writer chain, reorders it, and saves method and p
     metode: 'bt',
     penulis: 'otomatis',
     validasi: true,
-    urutan_penulis: ['openrouter', 'claude_bedrock', 'claude_api'],
+    urutan_penulis: ['openrouter'],
     model_openrouter: 'anthropic/claude-sonnet-5.5',
     model_tautan: 'qwen3:4b-instruct',
   });

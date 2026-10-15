@@ -162,15 +162,8 @@ def config_view():
         "provider": config.ai_provider,
         "endpoint": config.ollama_base_url,
         "model": (
-            config.ollama_model
-            if config.ai_provider == "docker"
-            else (
-                config.openrouter_model
-                if config.api_backend == "openrouter"
-                else config.openai_model
-            )
+            config.ollama_model if config.ai_provider == "docker" else config.openrouter_model
         ),
-        "api_backend": config.api_backend,
         "api_configured": bool(config.openrouter_api_key_value),
         "key_source": config.openrouter_key_source,
         "default_configured": bool(settings.openrouter_default or settings.openrouter_api_key),
@@ -247,7 +240,7 @@ async def check_ai(token=Depends(require_panel)):
     import asyncio
 
     config = ai_runtime.current().model_copy(
-        update={"api_backend": "openrouter", "ollama_model": "qwen3:14b"}
+        update={"ollama_model": "qwen3:14b"}
     )
     try:
         if config.ai_provider == "docker":

@@ -15,12 +15,12 @@ from config.mysql import MySQLSettings
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 PROJECT_DIR = BACKEND_DIR.parent
 
-# Jalur rantai penulis kalimat NPC (sama dengan JALUR_PENULIS di notebook npc_nlg; diuji di test_npc_writer).
-JALUR_PENULIS_NPC = ("claude_bedrock", "claude_api", "openrouter", "tautan")
+# Jalur rantai penulis kalimat NPC yang dipakai game (bagian dari JALUR_PENULIS notebook npc_nlg).
+JALUR_PENULIS_NPC = ("openrouter", "tautan")
+# Jalur Claude yang sudah dihapus: diabaikan bila masih ada di .env atau konfigurasi tersimpan.
+JALUR_PENULIS_LAMA = ("claude_bedrock", "claude_api")
 # penyedia/model (mis. anthropic/claude-opus-5.5); segmen tidak boleh diawali titik agar path URL tetap lurus.
 POLA_MODEL_OPENROUTER = re.compile(r"[a-z0-9][a-z0-9._-]*/[A-Za-z0-9_:-][A-Za-z0-9._:-]*")
-# Region AWS (mis. us-east-1): disisipkan ke host endpoint Bedrock, jadi harus berbentuk region.
-POLA_REGION_AWS = re.compile(r"[a-z]{2}(-[a-z]+)+-\d+")
 
 
 class Settings(MySQLSettings):
@@ -45,7 +45,6 @@ class Settings(MySQLSettings):
     openrouter_custom_configured: bool = False
     openrouter_model: str = "qwen/qwen3-14b"
     ollama_tunnel_token: SecretStr | None = None
-    api_backend: Literal["openai", "openrouter"] = "openrouter"
     history_admin_usernames: str = ""
     admin_usernames: str = "user1"
     google_client_id: str = ""
@@ -72,16 +71,8 @@ class Settings(MySQLSettings):
             raise ValueError("OLLAMA_MODEL harus 8 atau 14.")
         return models[selected]
 
-    # ``openai_api_env`` remains accepted only as a compatibility alias. New
-    # installations should always use the official OPENAI_API_KEY name.
-    openai_api_key: SecretStr | None = Field(
-        default=None,
-        validation_alias=AliasChoices("OPENAI_API_KEY", "openai_api_env", "OPENAI_API_ENV"),
-    )
-    openai_model: str = "gpt-5-mini"
     openai_timeout_seconds: float = Field(default=30.0, gt=0)
     openai_max_output_tokens: int = Field(default=320, ge=64, le=2_000)
-    openai_reasoning_effort: Literal["minimal", "low", "medium", "high"] = "minimal"
     intent_model_path: Path = BACKEND_DIR / "artifacts" / "svm" / "intent_classifier.pkl"
 
     # OTAK NPC (hasil ekspor notebook skripsi): metode penalaran, penulis kalimat, dan lokasi IndoBERT.
@@ -90,7 +81,7 @@ class Settings(MySQLSettings):
     # otomatis = rantai penulis LLM (urutan di bawah, bisa diubah di panel), semua gagal → templat;
     # templat = tanpa LLM sama sekali; claude = nilai lama, diperlakukan seperti otomatis.
     npc_writer: Literal["otomatis", "claude", "templat"] = "otomatis"
-    # Prioritas awal rantai penulis: Bedrock → Claude API → OpenRouter → LLM sendiri lewat link (Docker/tunnel).
+    # Prioritas awal rantai penulis: OpenRouter → LLM sendiri lewat link (Docker/tunnel).
     npc_writer_order: str = ",".join(JALUR_PENULIS_NPC)
     # Model OpenRouter penulis kalimat; kosong = Claude Opus yang sama dengan notebook.
     npc_openrouter_model: str = ""
@@ -99,17 +90,8 @@ class Settings(MySQLSettings):
     npc_target_model_dir: Path | None = None
     npc_nlu_device: Literal["cpu", "cuda"] = "cpu"
     npc_step_seconds: float = Field(default=3.0, ge=1.0, le=30.0)
-    anthropic_api_key: SecretStr | None = None
-    # Bedrock API key (bearer) untuk Claude di Amazon Bedrock; nama AMAZON_API_KEY mengikuti proyek skripsi.
-    amazon_api_key: SecretStr | None = Field(
-        default=None, validation_alias=AliasChoices("AMAZON_API_KEY", "AWS_BEARER_TOKEN_BEDROCK")
-    )
-    npc_bedrock_region: str = "us-east-1"
 
-    @field_validator(
-        "npc_intent_model_dir", "npc_target_model_dir", "anthropic_api_key", "amazon_api_key",
-        mode="before",
-    )  # fmt: skip
+    @field_validator("npc_intent_model_dir", "npc_target_model_dir", mode="before")
     @classmethod
     # VALIDATOR: nilai kosong di .env berarti "tidak diatur", bukan folder kerja atau key kosong.
     def empty_as_none(cls, value: object) -> object:
@@ -120,6 +102,7 @@ class Settings(MySQLSettings):
     # VALIDATOR: daftar jalur dipisah koma tanpa duplikat; nama yang tidak dikenal ditolak saat startup.
     def validate_writer_order(cls, value: object) -> str:
         jalur = [j.strip() for j in str(value or "").split(",") if j.strip()]
+        jalur = [j for j in jalur if j not in JALUR_PENULIS_LAMA]
         if not set(jalur) <= set(JALUR_PENULIS_NPC) or len(set(jalur)) != len(jalur):
             raise ValueError("NPC_WRITER_ORDER hanya boleh berisi " + ", ".join(JALUR_PENULIS_NPC))
         return ",".join(jalur)
@@ -132,14 +115,6 @@ class Settings(MySQLSettings):
         if model and not POLA_MODEL_OPENROUTER.fullmatch(model):
             raise ValueError("NPC_OPENROUTER_MODEL harus berbentuk penyedia/model.")
         return model
-
-    @field_validator("npc_bedrock_region")
-    @classmethod
-    # VALIDATOR: region masuk ke host Bedrock; nilai selain bentuk region AWS ditolak saat startup.
-    def validate_bedrock_region(cls, value: str) -> str:
-        if not POLA_REGION_AWS.fullmatch(value):
-            raise ValueError("NPC_BEDROCK_REGION harus berbentuk region AWS, mis. us-east-1.")
-        return value
 
     auth_session_hours: int = Field(default=24, ge=1, le=24 * 30)
 
@@ -159,14 +134,6 @@ class Settings(MySQLSettings):
     # PROPERTY: pecah konfigurasi CORS menjadi daftar origin browser yang diizinkan.
     def allowed_origins(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
-
-    @property
-    # PROPERTY: ambil nilai secret untuk klien API di backend; jangan tampilkan nilainya di log/frontend.
-    def openai_api_key_value(self) -> str | None:
-        """Return the key only for the server-side OpenAI client."""
-        if self.openai_api_key is None:
-            return None
-        return self.openai_api_key.get_secret_value().strip() or None
 
 
 @lru_cache

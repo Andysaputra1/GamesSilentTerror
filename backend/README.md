@@ -92,9 +92,9 @@ jika keduanya diberikan, nama MYSQL_* diprioritaskan. Nilai DB_* harus diteruska
 ke environment container jika menjalankan backend lewat Docker.
 
 Secret tidak disimpan dalam mysql.json atau kode controller. Lihat `.env.example`.
-`OPENAI_API_KEY` (atau alias lama `openai_api_env`) hanya dibaca backend.
+`OPENROUTER_API_KEY` dan `OLLAMA_TUNNEL_TOKEN` hanya dibaca backend.
 Default model dan batas respons tetap di settings.py.
-Pilih `AI_PROVIDER=docker` untuk Ollama lokal atau `AI_PROVIDER=api` untuk OpenAI.
+Pilih `AI_PROVIDER=docker` untuk Ollama (lokal/tunnel) atau `AI_PROVIDER=api` untuk OpenRouter.
 `OLLAMA_MODEL` memilih model lokal (default qwen3:8b). Recreate service ai-engine
 setelah mengubah .env; lihat ../OLLAMA.md untuk perintah dan pemeriksaan status.
 

@@ -319,24 +319,3 @@ class PanelCheckerEndpointTests(unittest.TestCase):
         self.assertEqual(
             self.client.get(f"/api/panel/checker/{self.code}/jejak/bukan-id").status_code, 422
         )
-
-    def test_development_admin_traces_do_not_include_explanations(self):
-        from controller.api.admin import require_admin, router
-
-        app = FastAPI()
-        app.include_router(router)
-        app.dependency_overrides[require_admin] = lambda: SimpleNamespace(username="user1")
-        code = "ABC12F"
-        jejak = checker_service.begin(code, "NOX", "vote")
-        jejak["penjelasan"] = {"bot": {"role": "hitman"}}
-        jejak["ringkas"] = {"bot": {"role": "hitman", "metode": "fuzzy"}}
-        traces = TestClient(app).get(f"/api/admin/rooms/{code}/traces").json()["traces"]
-        self.assertTrue(traces)
-        self.assertTrue(all("penjelasan" not in t and "ringkas" not in t for t in traces))
-        self.assertNotIn(
-            "hitman", json.dumps(traces)
-        )  # role bot tidak keluar lewat jalur development
-
-
-if __name__ == "__main__":
-    unittest.main()

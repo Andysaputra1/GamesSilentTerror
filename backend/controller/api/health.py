@@ -24,19 +24,12 @@ async def app_status() -> dict[str, object]:
         "model_ready": analysis_service.model_ready,
         "ai_provider": selected.ai_provider,
         "ai_model": (
-            selected.ollama_model
-            if selected.ai_provider == "docker"
-            else (
-                selected.openrouter_model
-                if selected.api_backend == "openrouter"
-                else selected.openai_model
-            )
+            selected.ollama_model if selected.ai_provider == "docker" else selected.openrouter_model
         ),
         "ollama_ready": (
             await model_available(config=selected) if selected.ai_provider == "docker" else None
         ),
         "openrouter_configured": bool(selected.openrouter_api_key_value),
-        "openai_configured": selected.openai_api_key_value is not None,
         "database_ready": database_is_ready(),
         "server_date": datetime.now(timezone.utc),
     }

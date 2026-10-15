@@ -26,13 +26,7 @@ async def run_probe(message, scenario):
         "timings": {},
         "provider": config.ai_provider,
         "model": (
-            config.ollama_model
-            if config.ai_provider == "docker"
-            else (
-                config.openrouter_model
-                if config.api_backend == "openrouter"
-                else config.openai_model
-            )
+            config.ollama_model if config.ai_provider == "docker" else config.openrouter_model
         ),
         "request": None,
         "response": None,
