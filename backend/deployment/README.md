@@ -158,6 +158,9 @@ Script setup_panel.py menyiapkan PANEL_ENCRYPTION_KEY sekali dan mempertahankann
 saat password admin diganti. Kirim PANEL_ENCRYPTION_KEY ke container backend.
 Backup kunci ini terpisah dari database: key panel tidak bisa didekripsi jika kunci
 server hilang atau diganti. Pemakaian HTTPS wajib pada deployment publik.
+Token tunnel (LLM_TOKEN ai-docker) diisi di kolom yang sama dan disimpan terenkripsi dengan cara
+yang sama; token panel menimpa OLLAMA_TUNNEL_TOKEN dari environment, dan centang "Hapus token"
+mengembalikannya ke environment.
 Lokal: Qwen3 `qwen3:14b`, masukkan URL dasar tunnel HTTPS di panel. Endpoint harus
 meneruskan POST /api/chat ke Ollama dan model harus sudah diunduh pada mesin lokal.
 Jika tunnel menggunakan Bearer auth, set OLLAMA_TUNNEL_TOKEN pada backend.

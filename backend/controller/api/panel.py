@@ -168,6 +168,11 @@ def config_view():
         "key_source": config.openrouter_key_source,
         "default_configured": bool(settings.openrouter_default or settings.openrouter_api_key),
         "custom_configured": config.openrouter_custom_configured,
+        "token_source": (
+            "panel"
+            if ai_runtime.diatur_panel("ollama_tunnel_token")
+            else "env" if settings.ollama_tunnel_token else "none"
+        ),
         "persisted": bool(ai_runtime.override),
     }
 
@@ -183,6 +188,8 @@ class Configuration(BaseModel):
     endpoint: str = Field(default="", max_length=2048)
     api_key: SecretStr | None = None
     key_source: Literal["default", "custom"] | None = None
+    tunnel_token: SecretStr | None = None
+    clear_tunnel_token: bool = False
 
 
 # Terima hanya tunnel HTTPS publik tanpa kredensial atau parameter URL.
@@ -214,6 +221,9 @@ def set_config(body: Configuration, token=Depends(require_panel)):
     api_key = body.api_key.get_secret_value().strip() if body.api_key else ""
     if api_key and (len(api_key) > 1024 or any(c.isspace() for c in api_key)):
         raise HTTPException(400, "Format API key tidak valid.")
+    tunnel_token = body.tunnel_token.get_secret_value().strip() if body.tunnel_token else ""
+    if tunnel_token and (len(tunnel_token) > 512 or any(c.isspace() for c in tunnel_token)):
+        raise HTTPException(400, "Format token tunnel tidak valid.")
     endpoint = body.endpoint.strip()
     if endpoint:
         endpoint = validate_endpoint(endpoint)
@@ -223,7 +233,12 @@ def set_config(body: Configuration, token=Depends(require_panel)):
         endpoint = ai_runtime.current().ollama_base_url
     try:
         save_panel_configuration(
-            body.provider, endpoint, api_key=api_key or None, key_source=body.key_source
+            body.provider,
+            endpoint,
+            api_key=api_key or None,
+            key_source=body.key_source,
+            tunnel_token=tunnel_token or None,
+            clear_tunnel_token=body.clear_tunnel_token,
         )
     except PersistenceError as error:
         raise HTTPException(503, "Konfigurasi gagal disimpan.") from error

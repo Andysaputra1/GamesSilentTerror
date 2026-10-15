@@ -203,6 +203,15 @@ function showConfig(data) {
   };
   keySourceView();
   $('endpoint').value = data.endpoint.startsWith('https://') ? data.endpoint : '';
+  $('tunnel-token').value = '';
+  $('clear-token').checked = false;
+  $('clear-token-row').hidden = data.token_source !== 'panel';
+  $('token-status').textContent =
+    {
+      panel: 'Token tersimpan di panel (terenkripsi). Kosongkan untuk tetap memakainya.',
+      env: 'Memakai OLLAMA_TUNNEL_TOKEN dari .env server. Isi di sini untuk menggantinya.',
+    }[data.token_source] ??
+    'Belum ada token. Tunnel ai-docker menolak permintaan tanpa token (401).';
   $('key-status').textContent = data.api_configured
     ? 'API key tersedia di server.'
     : 'Sumber key yang disimpan belum tersedia. Pilih sumber lalu simpan.';
@@ -1484,6 +1493,9 @@ $('config-form').onsubmit = handle(async () => {
           $('provider').value === 'api' && $('key-source').value === 'custom'
             ? $('api-key').value.trim() || null
             : null,
+        tunnel_token:
+          $('provider').value === 'docker' ? $('tunnel-token').value.trim() || null : null,
+        clear_tunnel_token: $('provider').value === 'docker' && $('clear-token').checked,
       },
       'PUT',
     );

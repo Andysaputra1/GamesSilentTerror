@@ -67,7 +67,7 @@ tunnel yang sama dengan menu Konfigurasi AI:
 Backend mengenali Ollama (`/api/tags`, `/api/chat`) maupun server kompatibel OpenAI
 (`/v1/models`, `/v1/chat/completions`). Jika model yang dipilih tidak ada di link, dipakai model
 sekeluarga (mis. `qwen3:8b` untuk `qwen3:14b`) atau model pertama yang tersedia; panel
-menampilkan model yang benar-benar dipakai. Bearer token tunnel memakai `OLLAMA_TUNNEL_TOKEN`.
+menampilkan model yang benar-benar dipakai. Bearer token tunnel diisi di panel Konfigurasi AI (terenkripsi), atau `OLLAMA_TUNNEL_TOKEN` di environment sebagai cadangan.
 ## Memilih provider chat backend
 
 Isi file .env di root:

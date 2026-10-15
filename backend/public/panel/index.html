@@ -257,6 +257,22 @@
                   <p class="hint">
                     Masukkan alamat dasar tunnel, tanpa /api/chat. Model lokal: qwen3:14b.
                   </p>
+                  <label
+                    >Token tunnel (LLM_TOKEN di ai-docker/.env)
+                    <input
+                      id="tunnel-token"
+                      type="password"
+                      autocomplete="new-password"
+                      maxlength="512"
+                      placeholder="Tempel LLM_TOKEN"
+                      spellcheck="false"
+                    />
+                  </label>
+                  <p id="token-status" class="hint"></p>
+                  <label id="clear-token-row" class="check" hidden
+                    ><input id="clear-token" type="checkbox" /> Hapus token yang tersimpan di
+                    panel</label
+                  >
                 </div>
                 <div id="api-settings">
                   <label

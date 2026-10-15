@@ -78,6 +78,33 @@ class PanelSecretsTests(unittest.TestCase):
         )
         self.assertNotIn("replacement-key", self.stored)
 
+    # TOKEN TUNNEL: disimpan terenkripsi dari panel, bertahan saat dikosongkan, dihapus → kembali ke .env.
+    def test_tunnel_token_from_panel_is_encrypted_kept_and_clearable(self):
+        with patch.object(settings, "ollama_tunnel_token", SecretStr("env-token")):
+            body = {"provider": "docker", "endpoint": "https://example.com"}
+            with patch("controller.api.panel.validate_endpoint", side_effect=lambda e: e):
+                self.assertEqual(self.client.get("/api/panel/config").json()["token_source"], "env")
+                result = self.client.put(
+                    "/api/panel/config", json={**body, "tunnel_token": "panel-token-123"}
+                )
+                self.assertEqual(result.json()["token_source"], "panel")
+                self.assertNotIn("panel-token-123", result.text + self.stored)
+                ai_runtime.reset()
+                load_panel_configuration()
+                token = ai_runtime.current().ollama_tunnel_token.get_secret_value()
+                self.assertEqual(token, "panel-token-123")
+                self.client.put("/api/panel/config", json={**body, "tunnel_token": "  "})
+                token = ai_runtime.current().ollama_tunnel_token.get_secret_value()
+                self.assertEqual(token, "panel-token-123")  # kosong: token lama dipertahankan
+                bad = self.client.put("/api/panel/config", json={**body, "tunnel_token": "a b"})
+                self.assertEqual(bad.status_code, 400)
+                result = self.client.put(
+                    "/api/panel/config", json={**body, "clear_tunnel_token": True}
+                )
+                self.assertEqual(result.json()["token_source"], "env")
+                token = ai_runtime.current().ollama_tunnel_token.get_secret_value()
+                self.assertEqual(token, "env-token")
+
     def test_missing_encryption_key_cannot_save_plaintext(self):
         with patch.object(settings, "panel_encryption_key", None):
             with self.assertRaises(PersistenceError):

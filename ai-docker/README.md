@@ -30,19 +30,11 @@ Dua model disiapkan. Model yang dipakai bot dipilih di panel → **Otak NPC** �
 1. Buka Docker Desktop, lalu klik dua kali `jalankan.bat`.
    - Model yang belum ada diunduh ke volume `silent_terror_ai_model`. Ukurannya sekitar 2,5 GB untuk 4B dan 9 GB untuk 14B.
    - Di akhir, skrip mencetak **Link** (juga disalin ke clipboard) dan **Token**.
-2. Di VM, langkah ini cukup **sekali**. Tambahkan baris berikut ke `.env.azure`:
-
-   ```dotenv
-   OLLAMA_TUNNEL_TOKEN=<token dari jalankan.bat>
-   ```
-
-   Lalu buat ulang container backend:
-
-   ```bash
-   sudo docker compose --env-file .env.azure -f docker-compose.azure.yml up -d --force-recreate backend
-   ```
-
-3. Panel → **Konfigurasi AI**: pilih "LLM lokal · Ollama melalui tunnel", tempel link, lalu Simpan.
+2. Panel → **Konfigurasi AI**: pilih "LLM lokal · Ollama melalui tunnel", tempel link dan
+   token, lalu Simpan. Token disimpan terenkripsi dan cukup diisi sekali; link perlu diisi
+   ulang setiap kali tunnel berganti. Kolom token yang dikosongkan mempertahankan token lama.
+3. (Opsional, cadangan) Token juga bisa ditaruh di VM sebagai `OLLAMA_TUNNEL_TOKEN=...` di
+   `.env.azure`. Token dari panel selalu didahulukan.
 4. Panel → **Otak NPC**:
    1. Aktifkan jalur "LLM sendiri lewat link".
    2. Klik **Tes koneksi semua prioritas**.

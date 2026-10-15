@@ -53,6 +53,7 @@ def _decode_config(stored):
 
     override = dict(stored)
     override.pop("api_backend", None)  # kunci lama; OpenAI langsung sudah dihapus
+    token = override.pop("ollama_tunnel_token_encrypted", None)
     encrypted = override.pop("openrouter_key_encrypted", None)
     source = override.setdefault("openrouter_key_source", "custom" if encrypted else "default")
     override["openrouter_custom_configured"] = bool(encrypted)
@@ -66,6 +67,14 @@ def _decode_config(stored):
         except (InvalidToken, UnicodeError) as error:
             raise PersistenceError(
                 "API key panel tidak dapat dibuka. Periksa PANEL_ENCRYPTION_KEY server."
+            ) from error
+    # Token tunnel panel menimpa OLLAMA_TUNNEL_TOKEN .env; tanpa token panel, .env tetap dipakai.
+    if token:
+        try:
+            override["ollama_tunnel_token"] = SecretStr(_cipher().decrypt(token.encode()).decode())
+        except (InvalidToken, UnicodeError) as error:
+            raise PersistenceError(
+                "Token tunnel panel tidak dapat dibuka. Periksa PANEL_ENCRYPTION_KEY server."
             ) from error
     return override
 
@@ -89,7 +98,9 @@ def load_panel_configuration():
 
 
 # Enkripsi kunci, simpan konfigurasi secara atomik, lalu terapkan override.
-def save_panel_configuration(provider, endpoint, api_key=None, key_source=None):
+def save_panel_configuration(
+    provider, endpoint, api_key=None, key_source=None, tunnel_token=None, clear_tunnel_token=False
+):
     import json
     from sqlalchemy import text
     from services.persistence_service import PersistenceService
@@ -122,6 +133,13 @@ def save_panel_configuration(provider, endpoint, api_key=None, key_source=None):
                 stored["openrouter_key_encrypted"] = _cipher().encrypt(api_key.encode()).decode()
             elif previous.get("openrouter_key_encrypted"):
                 stored["openrouter_key_encrypted"] = previous["openrouter_key_encrypted"]
+            # Token tunnel: isi baru menggantikan, kosong mempertahankan, hapus kembali ke .env.
+            if tunnel_token:
+                stored["ollama_tunnel_token_encrypted"] = (
+                    _cipher().encrypt(tunnel_token.encode()).decode()
+                )
+            elif previous.get("ollama_tunnel_token_encrypted") and not clear_tunnel_token:
+                stored["ollama_tunnel_token_encrypted"] = previous["ollama_tunnel_token_encrypted"]
             if (
                 provider == "api"
                 and source == "custom"
