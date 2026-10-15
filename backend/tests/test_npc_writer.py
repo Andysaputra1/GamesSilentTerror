@@ -64,7 +64,7 @@ class WriterChainTests(unittest.TestCase):
 
     def setUp(self):
         k = self.runtime.konfigurasi
-        self.awal = (k.penulis, list(k.urutan_penulis), k.model_openrouter)
+        self.awal = (k.penulis, list(k.urutan_penulis), k.model_openrouter, k.model_tautan)
         # Tanpa jaringan: cek jalur (Claude 8 token, endpoint OpenRouter/link) diganti mock.
         self.cek = self.enterContext(patch.object(type(self.runtime), "_cek_penulis"))
         self.enterContext(patch("services.npc_brain.runtime.ai_runtime.current", konfigurasi_ai))
@@ -74,9 +74,14 @@ class WriterChainTests(unittest.TestCase):
         settings.npc_bedrock_region = "us-east-1"
 
     def tearDown(self):
-        penulis, urutan, model = self.awal
+        penulis, urutan, model, model_tautan = self.awal
         with patch.object(type(self.runtime), "segarkan_penulis"):
-            self.runtime.atur(penulis=penulis, urutan_penulis=urutan, model_openrouter=model)
+            self.runtime.atur(
+                penulis=penulis,
+                urutan_penulis=urutan,
+                model_openrouter=model,
+                model_tautan=model_tautan,
+            )
         self.runtime.penulis = None
 
     def test_runtime_and_notebook_share_writer_paths(self):
@@ -103,6 +108,17 @@ class WriterChainTests(unittest.TestCase):
         self.assertEqual(baris["claude_bedrock"]["keadaan"], "nonaktif")
         self.assertEqual((status["penulis"], status["penulis_aktif"]), ("openrouter", True))
 
+    # Model link dipilih di panel; kosong = model Konfigurasi AI (OLLAMA_MODEL).
+    def test_link_model_follows_panel_choice(self):
+        self.runtime.atur(penulis="otomatis", urutan_penulis=["tautan"], model_tautan="")
+        self.assertEqual(self.runtime.penulis.daftar[0].model, "qwen3:14b")
+        status = self.runtime.atur(model_tautan="qwen3:4b-instruct")
+        self.assertEqual(self.runtime.penulis.daftar[0].model, "qwen3:4b-instruct")
+        self.assertEqual(
+            (status["model_tautan"], status["model_tautan_bawaan"]),
+            ("qwen3:4b-instruct", "qwen3:14b"),
+        )
+
     def test_status_never_contains_secret_values(self):
         status = self.runtime.atur(penulis="otomatis", urutan_penulis=list(JALUR_PENULIS))
         teks = json.dumps(status, ensure_ascii=False)
@@ -115,6 +131,7 @@ class WriterChainTests(unittest.TestCase):
             {"urutan_penulis": ["gpt"]},
             {"urutan_penulis": ["openrouter", "openrouter"]},
             {"model_openrouter": "claude opus"},
+            {"model_tautan": "qwen3 14b"},
         ):
             with self.assertRaises(ValueError):
                 self.runtime.atur(metode="bt", **salah)
@@ -254,7 +271,7 @@ class NpcConfigStoreTests(unittest.TestCase):
             layanan.load_npc_configuration()
             runtime.atur.assert_called_once_with(
                 metode="bt", penulis="claude", validasi=True,
-                urutan_penulis=None, model_openrouter=None,
+                urutan_penulis=None, model_openrouter=None, model_tautan=None,
             )  # fmt: skip
             runtime.atur.side_effect = ValueError("jalur tidak dikenal")
             baca.return_value = {"metode": "bt", "urutan_penulis": ["gpt"]}
@@ -266,7 +283,8 @@ class NpcConfigStoreTests(unittest.TestCase):
         from services.persistence_service import PersistenceError
 
         sebelum = {"metode": "campuran", "penulis_diminta": "otomatis", "validasi": True,
-                   "urutan_penulis": ["claude_bedrock", "openrouter"], "model_openrouter": ""}  # fmt: skip
+                   "urutan_penulis": ["claude_bedrock", "openrouter"], "model_openrouter": "",
+                   "model_tautan": ""}  # fmt: skip
         with (
             patch.object(layanan, "brain_runtime") as runtime,
             patch.object(layanan.PersistenceService, "_run", side_effect=PersistenceError("db")),
@@ -277,7 +295,7 @@ class NpcConfigStoreTests(unittest.TestCase):
                 layanan.save_npc_configuration("bt", "otomatis", True, ["tautan"], "")
         runtime.atur.assert_called_with(
             metode="campuran", penulis="otomatis", validasi=True,
-            urutan_penulis=["claude_bedrock", "openrouter"], model_openrouter="",
+            urutan_penulis=["claude_bedrock", "openrouter"], model_openrouter="", model_tautan="",
         )  # fmt: skip
 
 
@@ -311,7 +329,8 @@ class PanelWriterApiTests(unittest.TestCase):
 
     def test_save_sends_order_and_model_to_runtime(self):
         ringkasan = {"metode": "bt", "penulis_diminta": "otomatis", "validasi": True,
-                     "urutan_penulis": ["openrouter", "tautan"], "model_openrouter": ""}  # fmt: skip
+                     "urutan_penulis": ["openrouter", "tautan"], "model_openrouter": "",
+                     "model_tautan": "qwen3:4b-instruct"}  # fmt: skip
         with (
             patch("services.npc_config_service.brain_runtime") as runtime,
             patch("services.npc_config_service.PersistenceService._run") as simpan,
@@ -320,12 +339,14 @@ class PanelWriterApiTests(unittest.TestCase):
             response = self.client.put(
                 "/api/panel/npc",
                 json={"metode": "bt", "penulis": "otomatis", "validasi": True,
-                      "urutan_penulis": ["openrouter", "tautan"], "model_openrouter": ""},
+                      "urutan_penulis": ["openrouter", "tautan"], "model_openrouter": "",
+                      "model_tautan": "qwen3:4b-instruct"},
             )  # fmt: skip
         self.assertEqual(response.status_code, 200)
         runtime.atur.assert_called_once_with(
             metode="bt", penulis="otomatis", validasi=True,
             urutan_penulis=["openrouter", "tautan"], model_openrouter="",
+            model_tautan="qwen3:4b-instruct",
         )  # fmt: skip
         simpan.assert_called_once()
         bad = self.client.put(

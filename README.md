@@ -343,7 +343,7 @@ backend/              Python FastAPI + Socket.IO
   deployment/         Konfigurasi produksi Azure (Caddy, SQL salinan)
   scripts/            setup_panel.py, ekspor_otak_npc.py, setup_azure.py
 proxy/                Gateway Nginx
-ai-docker/            LLM penulis kalimat bot (Qwen3 4B) di laptop + tunnel untuk VM; jalankan.bat
+ai-docker/            LLM penulis kalimat bot (Qwen3 4B/14B) di laptop + tunnel untuk VM; jalankan.bat
 docker-compose.yml    Service development dan volume
 ```
 

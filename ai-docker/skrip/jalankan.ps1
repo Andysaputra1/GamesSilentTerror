@@ -38,12 +38,13 @@ if (-not (Test-Path .env)) {
         '# Dibuat otomatis oleh jalankan.bat. Jangan di-commit.',
         '# LLM_TOKEN harus sama dengan OLLAMA_TUNNEL_TOKEN di .env.azure VM.',
         "LLM_TOKEN=$token",
-        'LLM_MODEL=qwen3:4b-instruct'
+        'LLM_MODELS=qwen3:4b-instruct qwen3:14b'
     ) | Set-Content .env -Encoding ascii
     Tulis '[+] Token baru dibuat di ai-docker\.env' Green
 }
 $token = Baca-Env 'LLM_TOKEN' ''
-$model = Baca-Env 'LLM_MODEL' 'qwen3:4b-instruct'
+$modelSemua = Baca-Env 'LLM_MODELS' 'qwen3:4b-instruct qwen3:14b'
+$model = ($modelSemua -split '\s+')[0]  # model pertama dipakai untuk tes chat
 if (-not $token) { Gagal 'LLM_TOKEN di ai-docker\.env kosong. Hapus file .env lalu jalankan lagi.' }
 
 # 3. GPU NVIDIA dipakai bila ada; kalau Docker tidak bisa memakainya, jatuh ke CPU.
@@ -61,7 +62,7 @@ function Naikkan($berkas) {
     $keluar | ForEach-Object { Write-Host $_ }
     return @{ Kode = $kode; Teks = ($keluar -join "`n") }
 }
-Tulis ("[ ] Menyalakan container (" + $(if ($gpu) { 'GPU NVIDIA' } else { 'CPU' }) + ', model ' + $model + ')...')
+Tulis ("[ ] Menyalakan container (" + $(if ($gpu) { 'GPU NVIDIA' } else { 'CPU' }) + ', model ' + $modelSemua + ')...')
 $hasil = Naikkan $berkas
 if ($hasil.Kode -ne 0 -and $gpu -and $hasil.Teks -match '(?i)nvidia|gpu|device driver|could not select device') {
     Tulis '[!] GPU tidak bisa dipakai Docker; mencoba CPU (lebih lambat).' Yellow
@@ -128,7 +129,8 @@ Tulis '  1. Sekali saja: isi .env.azure dengan baris'
 Tulis "       OLLAMA_TUNNEL_TOKEN=$token"
 Tulis '     lalu: sudo docker compose --env-file .env.azure -f docker-compose.azure.yml up -d --force-recreate backend'
 Tulis '  2. Panel > Konfigurasi AI: pilih "LLM lokal - Ollama melalui tunnel", tempel link di atas, Simpan.'
-Tulis '  3. Panel > Otak NPC: pastikan jalur "LLM sendiri lewat link" aktif, lalu klik "Cek ulang penulis".'
+Tulis '  3. Panel > Otak NPC: aktifkan "LLM sendiri lewat link", klik "Tes koneksi semua prioritas",'
+Tulis '     lalu pilih model di "Model LLM link" dan Simpan.'
 Tulis ''
 Tulis 'Link berganti setiap tunnel dinyalakan ulang: ulangi langkah 2-3. Laptop harus tetap menyala.' Yellow
 Tulis 'Matikan dengan hentikan.bat. Lihat link lagi dengan lihat-link.bat.'

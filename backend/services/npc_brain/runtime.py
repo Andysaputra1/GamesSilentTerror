@@ -41,6 +41,10 @@ warnings.filterwarnings("ignore", category=DeprecationWarning, module=r"skfuzzy(
 METODE_MODUL = {"fuzzy": "otak_fuzzy", "utility": "otak_utility", "bt": "otak_bt"}
 URUTAN_CAMPURAN = ("fuzzy", "utility", "bt")
 METODE_VALID = {"campuran", "fuzzy", "utility", "bt", "llm"}
+# Nama model di link LLM (Ollama/OpenAI), mis. qwen3:4b-instruct atau qwen3:14b.
+POLA_MODEL_TAUTAN = re.compile(
+    r"[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9._-]+)*(?::[A-Za-z0-9._-]+)?"
+)
 # "claude" = nilai lama penulis, diperlakukan seperti otomatis.
 PENULIS_VALID = {"otomatis", "claude", "templat"}
 # Jalur rantai penulis: claude_bedrock, claude_api, openrouter, tautan (link LLM sendiri).
@@ -150,6 +154,7 @@ class KonfigurasiNPC:
     # Prioritas rantai penulis; jalur yang tidak tercantum dinonaktifkan.
     urutan_penulis: list = field(default_factory=lambda: list(JALUR_PENULIS))
     model_openrouter: str = ""  # kosong = model OpenRouter dari notebook
+    model_tautan: str = ""  # kosong = model Ollama dari Konfigurasi AI/.env (OLLAMA_MODEL)
 
 
 # Nilai SecretStr tanpa spasi; None jika tidak diatur.
@@ -175,6 +180,19 @@ def folder_model(nilai, jenis) -> Path | None:
     return next((Path(p) for p in kandidat if p and Path(p).is_dir()), None)
 
 
+# Daftar model di link LLM (Ollama /api/tags, atau OpenAI /v1/models) memakai klien penulis yang sama
+# (token tunnel ikut). Kosong bila link tidak menjawab.
+def _daftar_model_tautan(penulis, batas=8):
+    data, _ = penulis._minta("GET", f"{penulis.url}/api/tags", batas=batas)
+    if isinstance(data, dict) and isinstance(data.get("models"), list):
+        nama = [m.get("name") or m.get("model") for m in data["models"]]
+    else:
+        data, _ = penulis._minta("GET", f"{penulis.url}/v1/models", batas=batas)
+        ok = isinstance(data, dict) and isinstance(data.get("data"), list)
+        nama = [m.get("id") for m in data["data"]] if ok else []
+    return sorted({n for n in nama if isinstance(n, str) and n})
+
+
 class BrainRuntime:
     def __init__(self):
         self.lock = threading.RLock()
@@ -197,6 +215,8 @@ class BrainRuntime:
         self._cek_tertunda = 0
         # Host link LLM dan asalnya (panel/.env) untuk ditampilkan di panel.
         self.alamat_tautan = None
+        # Model yang ada di link LLM (hasil cek terakhir), untuk pilihan model di panel.
+        self.model_tautan_tersedia = []
         self.pertandingan: dict[str, dict[str, OtakBot]] = {}
         self._thread = None
         self.eksekutor_keputusan = ThreadPoolExecutor(1, thread_name_prefix="otak-npc")
@@ -289,7 +309,7 @@ class BrainRuntime:
         }
         model = {
             "openrouter": self.konfigurasi.model_openrouter or None,
-            "tautan": config.ollama_model,
+            "tautan": self.konfigurasi.model_tautan or config.ollama_model,
         }
         try:
             rantai, self.keterangan_penulis = self.nlg.buat_rantai(
@@ -348,6 +368,12 @@ class BrainRuntime:
                         "detail": status,
                     }
                     hasil.append((p.jalur, p.model, status))
+                    if p.jalur == "tautan":
+                        self.model_tautan_tersedia = (
+                            _daftar_model_tautan(p, self.nlg.BATAS_CEK_DETIK)
+                            if status == "ok"
+                            else []
+                        )
                 logger.info("Cek penulis: %s", "; ".join(f"{j}={h}" for j, _, h in hasil))
         except Exception:
             logger.exception("Cek rantai penulis gagal.")
@@ -359,7 +385,13 @@ class BrainRuntime:
     # PANEL: ubah metode/penulis/validasi/rantai saat server berjalan. Metode berlaku untuk pertandingan
     # berikutnya; rantai penulis langsung dipakai kalimat berikutnya. Semua nilai divalidasi dulu (atomik).
     def atur(
-        self, metode=None, penulis=None, validasi=None, urutan_penulis=None, model_openrouter=None
+        self,
+        metode=None,
+        penulis=None,
+        validasi=None,
+        urutan_penulis=None,
+        model_openrouter=None,
+        model_tautan=None,
     ):
         if metode is not None and metode not in METODE_VALID:
             raise ValueError("Metode NPC tidak dikenal.")
@@ -375,9 +407,15 @@ class BrainRuntime:
             model_openrouter = model_openrouter.strip()
             if model_openrouter and not POLA_MODEL_OPENROUTER.fullmatch(model_openrouter):
                 raise ValueError("Model OpenRouter harus berbentuk penyedia/model.")
+        if model_tautan is not None:
+            model_tautan = model_tautan.strip()
+            if model_tautan and (
+                len(model_tautan) > 100 or not POLA_MODEL_TAUTAN.fullmatch(model_tautan)
+            ):
+                raise ValueError("Nama model link LLM tidak valid (contoh: qwen3:4b-instruct).")
         with self.lock:
             k = self.konfigurasi
-            sebelum = (k.penulis, list(k.urutan_penulis), k.model_openrouter)
+            sebelum = (k.penulis, list(k.urutan_penulis), k.model_openrouter, k.model_tautan)
             if metode is not None:
                 k.metode = metode
             if validasi is not None:
@@ -388,7 +426,14 @@ class BrainRuntime:
                 k.urutan_penulis = urutan_penulis
             if model_openrouter is not None:
                 k.model_openrouter = model_openrouter
-            rantai_berubah = sebelum != (k.penulis, list(k.urutan_penulis), k.model_openrouter)
+            if model_tautan is not None:
+                k.model_tautan = model_tautan
+            rantai_berubah = sebelum != (
+                k.penulis,
+                list(k.urutan_penulis),
+                k.model_openrouter,
+                k.model_tautan,
+            )
         if rantai_berubah:
             self.segarkan_penulis()
         return self.ringkasan()
@@ -408,6 +453,9 @@ class BrainRuntime:
                 "model_penulis": berikut.model if berikut else None,
                 "urutan_penulis": list(self.konfigurasi.urutan_penulis),
                 "model_openrouter": self.konfigurasi.model_openrouter,
+                "model_tautan": self.konfigurasi.model_tautan,
+                "model_tautan_bawaan": ai_runtime.current().ollama_model,
+                "model_tautan_tersedia": list(self.model_tautan_tersedia),
                 "rantai_penulis": self._status_rantai(penulis, berikut),
                 "pertandingan_aktif": len(self.pertandingan),
             }

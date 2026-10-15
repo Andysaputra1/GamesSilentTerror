@@ -183,6 +183,9 @@ test('NPC brain menu shows the writer chain, reorders it, and saves method and p
     penulis_aktif: true,
     urutan_penulis: ['claude_bedrock', 'openrouter', 'tautan'],
     model_openrouter: '',
+    model_tautan: '',
+    model_tautan_bawaan: 'qwen3:14b',
+    model_tautan_tersedia: ['qwen3:14b', 'qwen3:4b-instruct'],
     rantai_penulis: chain,
     sedang_cek_penulis: true, // cek berjalan di latar → panel menjadwalkan refresh otomatis
     pertandingan_aktif: 2,
@@ -255,12 +258,20 @@ test('NPC brain menu shows the writer chain, reorders it, and saves method and p
   doc.querySelector('#npc-method').dispatchEvent(new w.Event('change'));
   doc.querySelector('#npc-openrouter-model').value = ' anthropic/claude-sonnet-5.5 ';
   doc.querySelector('#npc-openrouter-model').dispatchEvent(new w.Event('input'));
+  // Model link: bawaan Konfigurasi AI + model yang ditemukan di link.
+  assert.deepEqual(
+    [...doc.querySelectorAll('#npc-link-model option')].map((o) => o.textContent),
+    ['Bawaan (qwen3:14b)', 'qwen3:14b', 'qwen3:4b-instruct'],
+  );
+  doc.querySelector('#npc-link-model').value = 'qwen3:4b-instruct';
+  doc.querySelector('#npc-link-model').dispatchEvent(new w.Event('change'));
   // Refresh otomatis (cek di latar) hanya memperbarui status; editan yang belum disimpan tetap.
   assert.ok(refreshes.length > 0);
   refreshes.splice(0).forEach((refresh) => refresh());
   await settle();
   assert.equal(doc.querySelector('#npc-method').value, 'bt');
   assert.equal(doc.querySelector('#npc-openrouter-model').value, ' anthropic/claude-sonnet-5.5 ');
+  assert.equal(doc.querySelector('#npc-link-model').value, 'qwen3:4b-instruct');
   assert.equal(rows()[0].querySelector('strong').textContent, '1. OpenRouter');
   // Cek ulang memakai konfigurasi tersimpan: selama ada editan, diminta simpan dulu tanpa request.
   await doc.querySelector('#check-writers').onclick({ preventDefault() {} });
@@ -273,6 +284,7 @@ test('NPC brain menu shows the writer chain, reorders it, and saves method and p
     validasi: true,
     urutan_penulis: ['openrouter', 'claude_bedrock', 'claude_api'],
     model_openrouter: 'anthropic/claude-sonnet-5.5',
+    model_tautan: 'qwen3:4b-instruct',
   });
   assert.equal(doc.querySelector('#npc-method').value, 'bt');
   await doc.querySelector('#check-writers').onclick({ preventDefault() {} });

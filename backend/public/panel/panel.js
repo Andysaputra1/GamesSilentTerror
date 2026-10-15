@@ -1078,6 +1078,22 @@ function scheduleNpcRefresh(status) {
 }
 // Tampilkan status pemuatan otak, sumber NLU, dan penulis kalimat yang benar-benar aktif.
 // form=false (refresh otomatis, hasil cek) hanya memperbarui status; isi form dan urutan rantai lokal tetap.
+// Pilihan model link: bawaan Konfigurasi AI, lalu model yang ditemukan di link saat tes terakhir.
+function fillLinkModels(status, selected) {
+  const available = status.model_tautan_tersedia ?? [];
+  const options = [['', `Bawaan (${status.model_tautan_bawaan || 'Konfigurasi AI'})`]];
+  for (const model of available) options.push([model, model]);
+  if (selected && !available.includes(selected))
+    options.push([selected, `${selected} (belum terlihat di link)`]);
+  $('npc-link-model').replaceChildren(
+    ...options.map(([value, label]) => {
+      const option = node('option', label);
+      option.value = value;
+      return option;
+    }),
+  );
+  $('npc-link-model').value = selected;
+}
 function showNpc(data, { form = true } = {}) {
   const status = data.status;
   $('check-writers').disabled = !!status.sedang_cek_penulis;
@@ -1098,6 +1114,8 @@ function showNpc(data, { form = true } = {}) {
     $('npc-openrouter-model').value = status.model_openrouter ?? '';
     npcDirty = false;
   }
+  // Daftar model link ikut diperbarui setelah tes koneksi; pilihan yang belum disimpan dipertahankan.
+  fillLinkModels(status, npcDirty ? $('npc-link-model').value : (status.model_tautan ?? ''));
   renderChain();
   const nlu = {
     indobert: 'IndoBERT (intent + target)',
@@ -1573,6 +1591,7 @@ $('npc-form').onsubmit = handle(async () => {
         validasi: $('npc-validate').checked,
         urutan_penulis: npcChain.filter((item) => item.dipakai).map((item) => item.jalur),
         model_openrouter: $('npc-openrouter-model').value.trim(),
+        model_tautan: $('npc-link-model').value,
       },
       'PUT',
     );
@@ -1586,7 +1605,13 @@ $('npc-form').onsubmit = handle(async () => {
 });
 // Refresh manual memuat ulang form dari server (editan yang belum disimpan dibuang).
 $('refresh-npc').onclick = handle(() => loadNpc());
-for (const id of ['npc-method', 'npc-writer', 'npc-validate', 'npc-openrouter-model'])
+for (const id of [
+  'npc-method',
+  'npc-writer',
+  'npc-validate',
+  'npc-openrouter-model',
+  'npc-link-model',
+])
   for (const type of ['input', 'change'])
     $(id).addEventListener(type, () => {
       npcDirty = true;

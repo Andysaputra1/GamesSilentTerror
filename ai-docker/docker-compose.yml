@@ -1,4 +1,4 @@
-# LLM penulis kalimat bot (Qwen3 4B) di laptop, dibuka ke VM lewat Cloudflare Tunnel.
+# LLM penulis kalimat bot (Qwen3 4B dan 14B) di laptop, dibuka ke VM lewat Cloudflare Tunnel.
 # Jalankan lewat jalankan.bat (membuat token, memilih GPU/CPU, lalu menampilkan link).
 # Alur: VM backend --HTTPS + Bearer token--> tunnel --> gerbang (cek token) --> ollama.
 name: silent-terror-ai
@@ -26,13 +26,14 @@ services:
       retries: 30
       start_period: 10s
 
-  # Sekali jalan: unduh model bila belum ada, lalu keluar dengan kode 0.
+  # Sekali jalan: unduh model yang belum ada, muat model pertama, lalu keluar dengan kode 0.
   model:
     image: ollama/ollama:latest
     restart: 'on-failure:3'
     environment:
       OLLAMA_HOST: 'http://ollama:11434'
-      LLM_MODEL: '${LLM_MODEL:-qwen3:4b-instruct}'
+      # Model yang dipakai bot dipilih di panel > Otak NPC > Model LLM link.
+      LLM_MODELS: '${LLM_MODELS:-qwen3:4b-instruct qwen3:14b}'
     depends_on:
       ollama:
         condition: service_healthy
@@ -40,14 +41,17 @@ services:
       - /bin/sh
       - -ec
       - |
-        if ollama show "$$LLM_MODEL" >/dev/null 2>&1; then
-          echo "Model sudah ada: $$LLM_MODEL"
-        else
-          ollama pull "$$LLM_MODEL"
-        fi
-        # Muat ke memori sekarang agar kalimat pertama bot tidak kena waktu muat model.
-        ollama run "$$LLM_MODEL" "Balas: ok" >/dev/null
-        echo "Model siap: $$LLM_MODEL"
+        for model in $$LLM_MODELS; do
+          if ollama show "$$model" >/dev/null 2>&1; then
+            echo "Model sudah ada: $$model"
+          else
+            ollama pull "$$model"
+          fi
+        done
+        # Muat model pertama ke memori agar kalimat pertama bot tidak kena waktu muat model.
+        set -- $$LLM_MODELS
+        ollama run "$$1" "Balas: ok" >/dev/null
+        echo "Model siap: $$LLM_MODELS"
 
   # Gerbang: hanya meneruskan endpoint yang dipakai backend dan hanya dengan Bearer token yang benar.
   gerbang:
@@ -78,6 +82,6 @@ services:
         condition: service_healthy
 
 volumes:
-  # Volume khusus: hanya berisi model 4B, jadi backend VM (yang meminta qwen3:14b) otomatis memakai model sekeluarga ini.
+  # Volume khusus untuk model di LLM_MODELS.
   model:
     name: silent_terror_ai_model

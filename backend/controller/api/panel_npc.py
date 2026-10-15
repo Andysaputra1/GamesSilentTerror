@@ -51,6 +51,8 @@ class NPCConfig(BaseModel):
         Field(default=None, max_length=4)
     )
     model_openrouter: str | None = Field(default=None, max_length=100)
+    # Model di link LLM; "" = model Ollama dari Konfigurasi AI/.env.
+    model_tautan: str | None = Field(default=None, max_length=100)
 
 
 @router.get("/api/panel/npc")
@@ -64,7 +66,12 @@ def npc_status(token=Depends(require_panel)):
 def npc_update(body: NPCConfig, token=Depends(require_panel)):
     try:
         status = save_npc_configuration(
-            body.metode, body.penulis, body.validasi, body.urutan_penulis, body.model_openrouter
+            body.metode,
+            body.penulis,
+            body.validasi,
+            body.urutan_penulis,
+            body.model_openrouter,
+            body.model_tautan,
         )
     except ValueError as error:
         raise HTTPException(400, str(error)) from error

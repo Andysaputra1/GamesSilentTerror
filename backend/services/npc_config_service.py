@@ -34,6 +34,7 @@ def load_npc_configuration():
                 validasi=stored.get("validasi"),
                 urutan_penulis=stored.get("urutan_penulis"),
                 model_openrouter=stored.get("model_openrouter"),
+                model_tautan=stored.get("model_tautan"),
             )
         except ValueError:
             logger.warning("Konfigurasi NPC tersimpan tidak valid; memakai nilai .env.")
@@ -41,7 +42,9 @@ def load_npc_configuration():
 
 
 # Validasi lewat runtime terlebih dahulu, simpan nilai efektifnya, lalu kembalikan ringkasan terbaru.
-def save_npc_configuration(metode, penulis, validasi, urutan_penulis=None, model_openrouter=None):
+def save_npc_configuration(
+    metode, penulis, validasi, urutan_penulis=None, model_openrouter=None, model_tautan=None
+):
     before = brain_runtime.ringkasan()
     summary = brain_runtime.atur(
         metode=metode,
@@ -49,6 +52,7 @@ def save_npc_configuration(metode, penulis, validasi, urutan_penulis=None, model
         validasi=validasi,
         urutan_penulis=urutan_penulis,
         model_openrouter=model_openrouter,
+        model_tautan=model_tautan,
     )
     config = {
         "metode": summary["metode"],
@@ -56,6 +60,7 @@ def save_npc_configuration(metode, penulis, validasi, urutan_penulis=None, model
         "validasi": summary["validasi"],
         "urutan_penulis": summary["urutan_penulis"],
         "model_openrouter": summary["model_openrouter"],
+        "model_tautan": summary["model_tautan"],
     }
 
     def write(database):
@@ -77,6 +82,7 @@ def save_npc_configuration(metode, penulis, validasi, urutan_penulis=None, model
             validasi=before["validasi"],
             urutan_penulis=before["urutan_penulis"],
             model_openrouter=before["model_openrouter"],
+            model_tautan=before["model_tautan"],
         )
         raise
     return summary
