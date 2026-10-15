@@ -42,12 +42,14 @@ class GameLifecycleTests(unittest.TestCase):
         # Tanpa bot AI langsung siap; semua manusia tetap menunggu waktu baca minimal.
         self.assertEqual(self.state()["phase"], "preparing")
         for index in range(count):
-            response = self.client.post(
-                self.base + "/ready",
-                json={"match_id": self.match.id},
-                headers={"x-user": f"player{index}"},
-            )
-            self.assertEqual(response.status_code, 200)
+            for action in ("ready", "reveal"):
+                response = self.client.post(
+                    f"{self.base}/{action}",
+                    json={"match_id": self.match.id},
+                    headers={"x-user": f"player{index}"},
+                )
+                self.assertEqual(response.status_code, 200)
+            self.assertTrue(self.state(f"player{index}")["preparation"]["revealed"])
         self.assertEqual(self.state()["phase"], "preparing")
         self.now = self.match.preparation["min_until"]
         self.rooms.tick_all()

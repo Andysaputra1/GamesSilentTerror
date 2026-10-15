@@ -201,7 +201,6 @@
   min-height: 0;
   overflow-y: auto;
   padding-right: 6px;
-  scrollbar-width: thin;
 }
 .survey-question {
   margin: 0;

@@ -780,4 +780,128 @@ describe('Game', () => {
     expect(pick.textContent).toContain('◆ Incaran');
     expect(pick.querySelector('.sr-only')?.textContent).toContain('Hostage pilihan rekan: NOX');
   });
+
+  function preparing(revealed = false, elapsed = 3): GameSnapshot {
+    const state = snapshot();
+    state.game.phase = 'preparing';
+    state.game.preparation = {
+      ready: true,
+      detail: 'AI siap.',
+      progress: 1,
+      starts_in: 12,
+      max_wait: 80,
+      agreed: 0,
+      required: 2,
+      consented: false,
+      bots: 1,
+      elapsed,
+      revealed,
+      unrevealed: revealed ? 1 : 2,
+    };
+    return state;
+  }
+
+  // KARTU ROLE: pembukaan pertama dilaporkan ke server dan dikirim ulang sampai server mencatatnya.
+  it('reports the first role reveal and retries until the server records it', () => {
+    const request = vi
+      .spyOn(TestBed.inject(GameService), 'request')
+      .mockReturnValue(of(preparing()));
+    component.code = 'ABC123';
+    component.refresh();
+    expect(request).toHaveBeenLastCalledWith('ABC123', undefined, 'play');
+    component.toggleRole();
+    expect(request).toHaveBeenLastCalledWith('ABC123', { match_id: 'match-1' }, 'reveal');
+    component.refresh(); // server belum mencatat: kirim ulang
+    expect(request).toHaveBeenLastCalledWith('ABC123', { match_id: 'match-1' }, 'reveal');
+    request.mockReturnValue(of(preparing(true)));
+    component.refresh();
+    component.refresh(); // sudah tercatat: kembali polling biasa
+    expect(request).toHaveBeenLastCalledWith('ABC123', undefined, 'play');
+    expect(component.notice).toBe('');
+    expect(render().querySelector('.splash')?.textContent).toContain(
+      'Menunggu 1 pemain membuka kartu role',
+    );
+  });
+
+  // KARTU ROLE: setelah 10 detik belum dibuka, layar meredup dan kartu besar minta diketuk.
+  it('dims the screen after ten seconds until the role card is opened', () => {
+    component.game = preparing(false, 9).game;
+    expect(component.revealPrompt).toBe(false);
+    component.game = preparing(false, 10).game;
+    expect(component.revealPrompt).toBe(true);
+    const nudge = render().querySelector('.reveal-nudge') as HTMLElement;
+    expect(nudge.textContent).toContain('Ketuk kartumu');
+    vi.spyOn(TestBed.inject(GameService), 'request').mockReturnValue(of(preparing(false, 10)));
+    (nudge.querySelector('.role-flip') as HTMLButtonElement).click();
+    expect(component.revealRole).toBe(true);
+    expect(render().querySelector('.reveal-nudge')).toBeNull();
+    // Sudah tercatat di server (mis. setelah memuat ulang halaman): tidak ditegur lagi.
+    component.revealRole = false;
+    component.game = preparing(true, 30).game;
+    expect(component.revealPrompt).toBe(false);
+  });
+
+  // TRANSISI: dari layar persiapan, tirai "Ronde 1 dimulai" menutup splash lalu membuka meja.
+  it('uses the start curtain when leaving the preparation screen', () => {
+    const request = vi
+      .spyOn(TestBed.inject(GameService), 'request')
+      .mockReturnValue(of(preparing(true)));
+    component.code = 'ABC123';
+    component.refresh();
+    request.mockReturnValue(of(snapshot()));
+    component.refresh();
+    expect(component.transition).toEqual(
+      expect.objectContaining({ phase: 'start', title: 'Ronde 1 dimulai' }),
+    );
+  });
+
+  // 5 DETIK TERAKHIR: angka besar hanya di fase berjalan, bukan saat persiapan, transisi, atau selesai.
+  it('shows a large countdown in the last five seconds of a phase', () => {
+    component.game = snapshot().game;
+    component.seconds = 6;
+    expect(component.finalCountdown).toBe(false);
+    component.seconds = 5;
+    expect(component.finalCountdown).toBe(true);
+    const overlay = render().querySelector('.final-count') as HTMLElement;
+    expect(overlay.getAttribute('aria-hidden')).toBe('true');
+    expect(overlay.textContent).toContain('5');
+    expect(overlay.textContent).toContain('Diskusi segera berakhir');
+    expect(render().querySelector('.timer')?.classList).toContain('final');
+    // Chat tetap bisa dipakai: overlay tidak menggantikan atau menonaktifkan input.
+    expect((render().querySelector('.composer input') as HTMLInputElement).disabled).toBe(false);
+    component.seconds = 0;
+    expect(component.finalCountdown).toBe(false);
+    component.seconds = 3;
+    component.transition = { phase: 'night', title: 'Malam', subtitle: '' };
+    expect(component.finalCountdown).toBe(false);
+    component.transition = null;
+    component.game.winner = 'hitman';
+    expect(component.finalCountdown).toBe(false);
+  });
+
+  // CHAT: pemain yang membaca riwayat tidak ditarik turun; pesan sendiri dan tombol "pesan baru" menurunkan.
+  it('keeps the reader position while scrolled up and offers a jump to new messages', () => {
+    const state = snapshot();
+    const request = vi.spyOn(TestBed.inject(GameService), 'request').mockReturnValue(of(state));
+    component.code = 'ABC123';
+    component.refresh();
+    expect(component.chatAtBottom).toBe(true);
+    component.chatAtBottom = false; // pemain menggulir ke atas
+    const next = snapshot();
+    next.game.messages = [{ id: 'm1', sender: 'NOX', message: 'Halo' }];
+    request.mockReturnValue(of(next));
+    component.refresh();
+    expect(component.newBelow).toBe(1);
+    expect(render().querySelector('.chat-jump')?.textContent).toContain('1 pesan baru');
+    const own = snapshot();
+    own.game.messages = [...next.game.messages, { id: 'm2', sender: 'alice', message: 'Aku?' }];
+    request.mockReturnValue(of(own));
+    component.refresh();
+    expect(component.newBelow).toBe(0);
+    expect(component.chatAtBottom).toBe(true);
+    component.chatAtBottom = false;
+    component.newBelow = 4;
+    (render().querySelector('.chat-jump') as HTMLButtonElement).click();
+    expect([component.newBelow, component.chatAtBottom]).toEqual([0, true]);
+  });
 });

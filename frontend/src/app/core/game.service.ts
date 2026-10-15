@@ -20,6 +20,10 @@ export interface Preparation {
   required: number;
   consented: boolean;
   bots: number;
+  // Buka kartu role: ronde 1 menunggu semua manusia (opsional agar cocok dengan backend versi lama).
+  elapsed?: number;
+  revealed?: boolean;
+  unrevealed?: number;
 }
 // Komposisi role room (publik); jumlah Hitman dan Spy mengikuti jumlah pemain dan ditentukan backend.
 export interface RoleComposition {

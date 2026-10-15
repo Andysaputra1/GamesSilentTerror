@@ -145,6 +145,35 @@
     transform: translateY(40px);
   }
 }
+@keyframes hitung-akhir {
+  0% {
+    opacity: 0;
+    transform: scale(1.35);
+  }
+  20% {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0.6;
+    transform: scale(0.94);
+  }
+}
+@keyframes tirai {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes sorot {
+  50% {
+    box-shadow: 0 0 0 12px rgb(232 192 115 / 0.35);
+  }
+}
+@keyframes ketuk {
+  50% {
+    transform: translateY(-10px);
+  }
+}
 @keyframes konfeti {
   0% {
     opacity: 1;
@@ -442,7 +471,12 @@
   .victory-title,
   .outcome-stamp,
   .lineup li,
-  .survey {
+  .survey,
+  .chat-jump,
+  .final-count b,
+  .reveal-nudge,
+  .nudge-card,
+  .nudge-hand {
     animation: none !important;
   }
   .phase-transition {

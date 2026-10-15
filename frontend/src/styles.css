@@ -8,8 +8,8 @@
   font-display: swap;
   src: url('/assets/fonts/fraunces-latin.woff2') format('woff2');
   unicode-range:
-    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308,
-    U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 @font-face {
   font-family: 'Fraunces';
@@ -29,8 +29,8 @@
   font-display: swap;
   src: url('/assets/fonts/patrick-hand-latin.woff2') format('woff2');
   unicode-range:
-    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308,
-    U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 @font-face {
   font-family: 'Patrick Hand';
@@ -142,7 +142,9 @@ a {
   padding-bottom: 24px;
   border-bottom: 1px solid var(--color-line);
 }
-.operation-header > app-profile-menu { margin-left: auto; }
+.operation-header > app-profile-menu {
+  margin-left: auto;
+}
 .operation-brand {
   font-size: 13px;
   font-weight: 800;
@@ -297,4 +299,116 @@ a {
   color: var(--card-ink);
   background: var(--card-blue);
   border: 2px solid var(--card-ink);
+}
+
+/* SCROLLBAR KAYU: papan kayu kecil di alur gelap, untuk semua panel yang bisa digulir.
+   Chromium mengabaikan gaya ini pada elemen yang memakai scrollbar-width/scrollbar-color,
+   jadi properti itu hanya dipasang di browser tanpa ::-webkit-scrollbar (Firefox). */
+::-webkit-scrollbar {
+  width: 13px;
+  height: 13px;
+}
+::-webkit-scrollbar-track {
+  border-radius: 8px;
+  background: rgb(74 47 26 / 0.14);
+  box-shadow:
+    inset 0 0 0 1px rgb(74 47 26 / 0.2),
+    inset 1px 1px 3px rgb(40 22 10 / 0.3);
+}
+/* Papan kayu: serat memanjang, lingkar tahun melintang, dan bevel terang/gelap. */
+::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background:
+    repeating-linear-gradient(
+        90deg,
+        rgb(58 34 17 / 0.3) 0 1px,
+        transparent 1px 3px,
+        rgb(255 222 170 / 0.14) 3px 4px,
+        transparent 4px 6px
+      )
+      padding-box,
+    repeating-linear-gradient(
+        180deg,
+        rgb(50 26 10 / 0.14) 0 1px,
+        transparent 1px 17px,
+        rgb(255 214 160 / 0.08) 17px 19px,
+        transparent 19px 41px
+      )
+      padding-box,
+    repeating-linear-gradient(
+        180deg,
+        transparent 0 11px,
+        rgb(50 26 10 / 0.1) 11px 12px,
+        transparent 12px 29px
+      )
+      padding-box,
+    linear-gradient(90deg, #5c3a1e, #8a5f36 35%, #a2723f 55%, #6e4625) padding-box;
+  box-shadow:
+    inset 0 1px 0 rgb(255 226 180 / 0.4),
+    inset 0 -1px 0 rgb(30 16 6 / 0.5);
+}
+::-webkit-scrollbar-thumb:horizontal {
+  background:
+    repeating-linear-gradient(
+        180deg,
+        rgb(58 34 17 / 0.3) 0 1px,
+        transparent 1px 3px,
+        rgb(255 222 170 / 0.14) 3px 4px,
+        transparent 4px 6px
+      )
+      padding-box,
+    repeating-linear-gradient(
+        90deg,
+        rgb(50 26 10 / 0.14) 0 1px,
+        transparent 1px 17px,
+        rgb(255 214 160 / 0.08) 17px 19px,
+        transparent 19px 41px
+      )
+      padding-box,
+    repeating-linear-gradient(
+        90deg,
+        transparent 0 11px,
+        rgb(50 26 10 / 0.1) 11px 12px,
+        transparent 12px 29px
+      )
+      padding-box,
+    linear-gradient(180deg, #5c3a1e, #8a5f36 35%, #a2723f 55%, #6e4625) padding-box;
+}
+::-webkit-scrollbar-thumb:vertical:hover,
+::-webkit-scrollbar-thumb:vertical:active {
+  background:
+    repeating-linear-gradient(
+        90deg,
+        rgb(58 34 17 / 0.3) 0 1px,
+        transparent 1px 3px,
+        rgb(255 222 170 / 0.14) 3px 4px,
+        transparent 4px 6px
+      )
+      padding-box,
+    repeating-linear-gradient(
+        180deg,
+        rgb(50 26 10 / 0.14) 0 1px,
+        transparent 1px 17px,
+        rgb(255 214 160 / 0.08) 17px 19px,
+        transparent 19px 41px
+      )
+      padding-box,
+    repeating-linear-gradient(
+        180deg,
+        transparent 0 11px,
+        rgb(50 26 10 / 0.1) 11px 12px,
+        transparent 12px 29px
+      )
+      padding-box,
+    linear-gradient(90deg, #6e4625, #a2723f 35%, #c08d56 55%, #80552e) padding-box;
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-color: #8a5f36 rgb(74 47 26 / 0.15);
+    scrollbar-width: thin;
+  }
 }

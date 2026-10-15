@@ -193,6 +193,7 @@ class NPCServiceBrainTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("AI siap", self.match.preparation["detail"])
         rows = self.survey.record_match_bots.call_args.args[0]
         self.assertEqual(len(rows), 5)
+        self.match.reveal_role("human", now=self.match.preparation["started_at"])
         self.match.tick(self.match.preparation["min_until"])
         self.assertEqual(self.match.phase, "day")
 

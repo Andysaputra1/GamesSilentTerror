@@ -33,6 +33,8 @@ class Participant:
 # Layar persiapan: minimal cukup untuk membaca panduan, maksimal agar model yang gagal dimuat tidak menahan room.
 PREPARATION_MIN_SECONDS = 10
 PREPARATION_MAX_SECONDS = 90
+# Setelah AI siap dan waktu baca minimal lewat, ronde 1 menunggu manusia yang belum membuka kartu role paling lama ini.
+REVEAL_WAIT_SECONDS = 15
 
 # Komposisi role per jumlah peserta: (hitman, spy, stalker); sisanya civilian.
 # Dipilih lewat simulasi keseimbangan semua kursi bot metode campuran, dengan pengumuman jumlah Hitman tersisa
@@ -165,6 +167,7 @@ class Match:
         self.next_gag = 1
         self.skip_consents = set()
         self.ready_consents = set()
+        self.revealed = set()
         self.preparation = None
         self.events = ["Permainan dimulai. Diskusikan alibi tanpa membocorkan identitasmu."]
         if preparing:
@@ -175,6 +178,7 @@ class Match:
                 "ready": not bots,
                 "detail": "Tidak ada bot di ruangan." if not bots else "Menyiapkan AI bot…",
                 "progress": 1.0 if not bots else 0.0,
+                "started_at": now,
                 "min_until": now + PREPARATION_MIN_SECONDS,
                 "ready_at": now if not bots else None,
             }
@@ -212,12 +216,31 @@ class Match:
         self.ready_consents.add(name)
         self.try_begin(time.time() if now is None else now)
 
-    # Mulai jika AI siap dan waktu baca minimal lewat; tombol Siap tidak melewati minimum.
+    # PERSIAPAN: manusia membuka kartu role-nya; ronde 1 menunggu semua (lihat try_begin).
+    def reveal_role(self, name, now=None):
+        player = self.players.get(name)
+        if self.phase != "preparing" or not player or player.bot:
+            raise ValueError("Kartu role dibuka hanya oleh pemain manusia saat persiapan.")
+        self.revealed.add(name)
+        self.try_begin(time.time() if now is None else now)
+
+    # Manusia yang belum membuka kartu role.
+    def unrevealed(self):
+        return [p.name for p in self.players.values() if not p.bot and p.name not in self.revealed]
+
+    # Saat ronde 1 boleh mulai bila semua kartu sudah dibuka (AI siap dan waktu baca minimal lewat).
+    def _start_at(self):
+        prep = self.preparation
+        return max(prep["min_until"], prep["ready_at"]) if prep["ready"] else None
+
+    # Mulai jika AI siap, waktu baca minimal lewat, dan semua manusia sudah membuka kartu role;
+    # pemain yang belum membuka ditunggu paling lama REVEAL_WAIT_SECONDS. Tombol Siap tidak melewati minimum.
     def try_begin(self, now=None):
-        if self.phase != "preparing" or not self.preparation["ready"]:
+        start_at = self._start_at() if self.phase == "preparing" else None
+        if start_at is None:
             return False
         now = time.time() if now is None else now
-        if now >= self.preparation["min_until"]:
+        if now >= start_at and (not self.unrevealed() or now >= start_at + REVEAL_WAIT_SECONDS):
             self.begin(now)
             return True
         return False
@@ -230,6 +253,7 @@ class Match:
         self.phase = "day"
         self.deadline = now + self.durations["day"]
         self.ready_consents.clear()
+        self.revealed.clear()
         self.events.append(
             event or "Permainan dimulai. Diskusikan alibi tanpa membocorkan identitasmu."
         )
@@ -486,7 +510,8 @@ class Match:
         if self.phase == "preparing":
             # Batas tunggu habis: mulai dengan cadangan bawaan daripada menahan pemain selamanya.
             if now >= self.deadline:
-                self.begin(now, "AI belum siap penuh; permainan dimulai dengan bot cadangan.")
+                cadangan = "AI belum siap penuh; permainan dimulai dengan bot cadangan."
+                self.begin(now, None if self.preparation["ready"] else cadangan)
             else:
                 self.try_begin(now)
             return
@@ -532,11 +557,14 @@ class Match:
         self.messages = self.messages[-100:]
         return record
 
-    # Data layar persiapan: progres AI, hitung mundur mulai, dan jumlah manusia yang sudah siap.
+    # Data layar persiapan: progres AI, hitung mundur mulai, jumlah manusia yang sudah siap dan sudah membuka kartu.
     def preparation_view(self, viewer):
         now = time.time()
         prep = self.preparation
-        starts_at = max(prep["min_until"], prep["ready_at"]) if prep["ready"] else None
+        unrevealed = self.unrevealed()
+        starts_at = self._start_at()
+        if starts_at is not None and unrevealed:
+            starts_at += REVEAL_WAIT_SECONDS  # batas atas; mulai lebih cepat begitu semua kartu dibuka
         return {
             "ready": prep["ready"],
             "detail": prep["detail"],
@@ -547,6 +575,9 @@ class Match:
             "required": sum(not p.bot for p in self.players.values()),
             "consented": viewer in self.ready_consents,
             "bots": sum(p.bot for p in self.players.values()),
+            "elapsed": max(0, int(now - prep["started_at"])),
+            "revealed": viewer in self.revealed,
+            "unrevealed": len(unrevealed),
         }
 
     # Username dari label (target keputusan bot); nama yang bukan label dikembalikan apa adanya.

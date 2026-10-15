@@ -84,6 +84,12 @@ def ready(code: str, body: ReadyOption, user=Depends(require_authenticated_user)
     return game_result(lambda: room_service.ready(code, user.username, match_id=body.match_id))
 
 
+@router.post("/{code}/reveal")
+# BUKA KARTU: manusia sudah melihat role-nya; ronde 1 menunggu semua (dibatasi waktu).
+def reveal(code: str, body: ReadyOption, user=Depends(require_authenticated_user)):
+    return game_result(lambda: room_service.reveal(code, user.username, match_id=body.match_id))
+
+
 @router.get("/{code}/game")
 # SNAPSHOT: hanya data publik dan informasi privat akun yang meminta.
 def state(code: str, user=Depends(require_authenticated_user)):

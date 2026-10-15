@@ -1,11 +1,13 @@
 import { backendUrl } from '../../core/backend-url';
 import { isPlatformBrowser, NgTemplateOutlet } from '@angular/common';
 import {
+  afterNextRender,
   ChangeDetectorRef,
   Component,
   DestroyRef,
   ElementRef,
   Inject,
+  Injector,
   OnDestroy,
   OnInit,
   PLATFORM_ID,
@@ -77,6 +79,9 @@ export class Game implements OnInit, OnDestroy {
   endView: 'reveal' | 'survey' | 'board' = 'reveal';
   durations: PhaseDurations | null = null;
   @ViewChild('messageList') private messageList?: ElementRef<HTMLElement>;
+  // CHAT: pemain di dasar daftar ikut turun ke pesan baru; yang sedang membaca riwayat tidak ditarik.
+  chatAtBottom = true;
+  newBelow = 0;
   private lastMessageId = '';
   private messagesLoaded = false;
   private feltSize = { width: 0, height: 0 };
@@ -130,6 +135,13 @@ export class Game implements OnInit, OnDestroy {
     night: '☾',
     tribunal: '⚖',
     finished: '★',
+    start: '◆',
+  };
+  // Lima detik terakhir tiap fase: angka besar di tengah layar (tidak menghalangi klik).
+  readonly finalLabels: Record<string, string> = {
+    day: 'Diskusi segera berakhir',
+    night: 'Malam segera berakhir',
+    tribunal: 'Vote segera ditutup',
   };
   readonly transitions: Record<string, { title: string; subtitle: string }> = {
     day: { title: 'Pagi tiba', subtitle: 'Diskusi dibuka. Baca alibi dan cari kejanggalan.' },
@@ -557,6 +569,36 @@ export class Game implements OnInit, OnDestroy {
     return total > 0 ? Math.max(0, Math.min(1, this.seconds / total)) : 1;
   }
 
+  get finalCountdown(): boolean {
+    const state = this.game;
+    return (
+      !!state &&
+      !state.winner &&
+      !this.transition &&
+      state.phase in this.finalLabels &&
+      this.seconds > 0 &&
+      this.seconds <= 5
+    );
+  }
+
+  // KARTU ROLE: setelah 10 detik persiapan, pemain yang belum membuka kartu diminta membukanya.
+  get revealPrompt(): boolean {
+    const prep = this.game?.phase === 'preparing' ? this.game.preparation : null;
+    return !!prep && !this.revealRole && !prep.revealed && (prep.elapsed ?? 0) >= 10;
+  }
+
+  // Buka/tutup kartu role; pembukaan pertama dilaporkan ke server (ronde 1 menunggu semua pemain).
+  toggleRole(): void {
+    this.revealRole = !this.revealRole;
+    if (this.revealRole) this.refresh();
+  }
+
+  // Kartu sudah dibuka di layar ini, tetapi server belum mencatatnya.
+  private get revealPending(): boolean {
+    const state = this.game;
+    return this.revealRole && state?.phase === 'preparing' && !state.preparation?.revealed;
+  }
+
   get timerUrgent(): boolean {
     return (
       !!this.game && !this.game.winner && this.game.phase !== 'preparing' && this.seconds <= 10
@@ -568,7 +610,7 @@ export class Game implements OnInit, OnDestroy {
     this.mobileTab = tab;
     if (tab === 'chat') {
       this.unread = 0;
-      this.scrollChat();
+      this.jumpToLatest();
     }
   }
 
@@ -607,6 +649,7 @@ export class Game implements OnInit, OnDestroy {
     private readonly router: Router,
     private readonly cdr: ChangeDetectorRef,
     private readonly destroy: DestroyRef,
+    private readonly injector: Injector,
   ) {}
 
   // INIT: polling menjaga snapshot setelah reconnect; Socket.IO membawa pesan/error langsung.
@@ -657,7 +700,22 @@ export class Game implements OnInit, OnDestroy {
     this.feltObserver?.disconnect();
   }
 
-  // CHAT: gulir ke pesan terbaru bila pemain sedang di bawah; hitung pesan belum dibaca untuk tab HP.
+  // CHAT: posisi gulir dicatat saat pemain menggulir; di dasar = ikut turun saat ada pesan baru.
+  onChatScroll(): void {
+    const list = this.messageList?.nativeElement;
+    if (!list) return;
+    this.chatAtBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 48;
+    if (this.chatAtBottom) this.newBelow = 0;
+  }
+
+  jumpToLatest(): void {
+    this.newBelow = 0;
+    this.chatAtBottom = true;
+    this.scrollChat();
+  }
+
+  // CHAT: gulir ke pesan terbaru bila pemain sedang di bawah atau baru mengirim pesan; selain itu
+  // tampilkan tombol "pesan baru". Hitung pesan belum dibaca untuk tab HP.
   private afterMessages(): void {
     const messages = this.game?.messages ?? [];
     const last = messages[messages.length - 1]?.id ?? '';
@@ -671,17 +729,25 @@ export class Game implements OnInit, OnDestroy {
     const added = firstLoad ? 0 : index >= 0 ? messages.length - index - 1 : messages.length;
     this.lastMessageId = last;
     if (added && this.mobileTab !== 'chat') this.unread = Math.min(99, this.unread + added);
-    const list = this.messageList?.nativeElement;
-    if (firstLoad || !list || list.scrollHeight - list.scrollTop - list.clientHeight < 140)
-      this.scrollChat();
+    const sentByMe = messages
+      .slice(-added || messages.length)
+      .some((m) => m.sender === this.game?.me.name);
+    if (firstLoad || this.chatAtBottom || (added && sentByMe)) this.jumpToLatest();
+    else if (added) this.newBelow = Math.min(99, this.newBelow + added);
   }
 
+  // Gulir setelah Angular merender pesan baru; setTimeout bisa jalan sebelum render (aplikasi zoneless),
+  // sehingga daftar berhenti setinggi satu pesan di atas dasar.
   private scrollChat(): void {
     if (!isPlatformBrowser(this.platform)) return;
-    setTimeout(() => {
-      const list = this.messageList?.nativeElement;
-      if (list) list.scrollTop = list.scrollHeight;
-    });
+    afterNextRender(
+      () => {
+        const list = this.messageList?.nativeElement;
+        if (list) list.scrollTop = list.scrollHeight;
+      },
+      { injector: this.injector },
+    );
+    this.cdr.markForCheck();
   }
 
   // AKHIR: pengumuman pemenang tampil dulu, lalu otomatis lanjut ke kuesioner bila belum diisi.
@@ -696,16 +762,22 @@ export class Game implements OnInit, OnDestroy {
     }, 10000);
   }
 
-  // TRANSISI FASE: overlay singkat (malam meredup, pagi terang) setiap kali fase berganti.
-  private showTransition(phase: string): void {
+  // TRANSISI FASE: overlay singkat (malam meredup, pagi terang) setiap kali fase berganti. Dari layar
+  // persiapan, tirai gelap menutup splash, lalu terbuka memperlihatkan meja (fade-out → fade-in).
+  private showTransition(phase: string, fromSplash = false): void {
     const info = this.transitions[phase];
     if (!info) return;
-    this.transition = { phase, ...info };
+    this.transition = fromSplash
+      ? { phase: 'start', title: 'Ronde 1 dimulai', subtitle: info.subtitle }
+      : { phase, ...info };
     if (this.transitionTimer) clearTimeout(this.transitionTimer);
-    this.transitionTimer = setTimeout(() => {
-      this.transition = null;
-      this.cdr.markForCheck();
-    }, 2600);
+    this.transitionTimer = setTimeout(
+      () => {
+        this.transition = null;
+        this.cdr.markForCheck();
+      },
+      fromSplash ? 3000 : 2600,
+    );
   }
 
   // PERSIAPAN: pemain menandai sudah membaca panduan; ronde 1 tetap menunggu AI siap.
@@ -770,9 +842,12 @@ export class Game implements OnInit, OnDestroy {
       });
   }
 
-  // SNAPSHOT: polling tidak ditumpuk; pilihan target direset saat ronde/fase berubah.
+  // SNAPSHOT: polling tidak ditumpuk; pilihan target direset saat ronde/fase berubah. Kartu yang sudah
+  // dibuka tetapi belum tercatat dikirim ulang sampai server mengonfirmasi.
   refresh(): void {
-    if (!this.busy && this.code) this.request();
+    if (this.busy || !this.code) return;
+    if (this.revealPending && this.game) this.request({ match_id: this.game.id }, 'reveal');
+    else this.request();
   }
 
   // Sinkronkan snapshot/aksi server, reset pilihan fase lama, dan tampilkan kegagalan request.
@@ -816,13 +891,13 @@ export class Game implements OnInit, OnDestroy {
           // Overlay transisi hanya saat fase berganti di pertandingan yang sama (bukan saat halaman dibuka).
           const shown = `${this.game.id}/${this.game.phase}`;
           if (this.shownPhase.startsWith(this.game.id + '/') && this.shownPhase !== shown)
-            this.showTransition(this.game.phase);
+            this.showTransition(this.game.phase, this.shownPhase.endsWith('/preparing'));
           this.shownPhase = shown;
           if (this.game.winner) {
             this.loadSurvey();
             this.startEnding();
           }
-          if (body) {
+          if (body && action !== 'reveal') {
             this.notice = 'Pilihan dikunci oleh server.';
             this.error = '';
           }

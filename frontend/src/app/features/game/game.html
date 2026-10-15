@@ -12,7 +12,7 @@
       class="role-flip"
       [class.open]="revealRole || !!state.winner"
       [disabled]="!!state.winner"
-      (click)="revealRole = !revealRole"
+      (click)="toggleRole()"
       [attr.aria-pressed]="revealRole"
       [attr.aria-label]="revealRole ? 'Sembunyikan role' : 'Lihat role saya'"
     >
@@ -126,14 +126,18 @@
                 }
               } @else {
                 <p class="role-note hand">
-                  Role hanya untukmu. Jangan sampai terlihat pemain lain!
+                  Ketuk kartu untuk melihat role. Role hanya untukmu, jangan sampai terlihat pemain
+                  lain!
                 </p>
               }
             </div>
             @if (state.preparation; as prep) {
               <div class="paper splash-status" aria-live="polite">
                 <p class="splash-state">
-                  @if (prep.ready) {
+                  @if (prep.ready && prep.unrevealed) {
+                    Menunggu {{ prep.unrevealed }} pemain membuka kartu role · paling lama
+                    {{ prep.starts_in }} detik
+                  } @else if (prep.ready) {
                     {{ prep.starts_in ? 'Ronde 1 dimulai dalam ' + prep.starts_in + ' detik' : 'Memulai ronde 1…' }}
                   } @else {
                     Menyiapkan AI… ({{ prep.max_wait }} detik lagi paling lama)
@@ -156,18 +160,32 @@
                   (click)="readyUp()"
                   [disabled]="busy || prep.consented"
                 >
-                  <span>{{ prep.consented ? 'Menunggu pertandingan dimulai…' : 'Saya sudah paham, siap!' }}</span>
+                  <span
+                    >{{ prep.consented ? 'Menunggu pertandingan dimulai…' : 'Saya sudah paham, siap!' }}</span
+                  >
                 </button>
                 <small
                   >{{ prep.agreed }} / {{ prep.required }} pemain siap. Layar persiapan berlangsung
-                  minimal 10 detik. Ronde 1 dimulai otomatis setelah hitung mundur dan AI
-                  siap.</small
+                  minimal 10 detik. Ronde 1 dimulai otomatis setelah AI siap dan semua pemain
+                  membuka kartu role (pemain yang belum membuka ditunggu paling lama 15
+                  detik).</small
                 >
               </div>
             }
           </aside>
         </div>
       </section>
+      @if (revealPrompt) {
+        <!-- Belum membuka kartu setelah 10 detik: layar meredup, kartu besar di tengah minta diketuk. -->
+        <div class="reveal-nudge" role="dialog" aria-modal="true" aria-labelledby="nudge-title">
+          <h2 id="nudge-title">Kartu role-mu belum dibuka</h2>
+          <p class="hand">Ketuk kartumu. Pertandingan menunggu semua pemain melihat role-nya.</p>
+          <div class="nudge-card">
+            <ng-container *ngTemplateOutlet="roleFlip; context: { $implicit: state }" />
+          </div>
+          <span class="nudge-hand" aria-hidden="true">☝</span>
+        </div>
+      }
     } @else {
       <!-- HUD: papan fase, timer, aturan, dan profil. -->
       <header class="hud" animate.enter="game-enter">
@@ -196,6 +214,7 @@
           <div
             class="timer"
             [class.urgent]="timerUrgent"
+            [class.final]="finalCountdown"
             role="timer"
             [attr.aria-label]="state.winner ? 'Permainan selesai' : 'Sisa waktu ' + seconds + ' detik'"
           >
@@ -228,6 +247,16 @@
           </div>
         </div>
       </header>
+
+      @if (finalCountdown) {
+        <!-- 5 detik terakhir: angka besar di tengah; pointer-events: none agar chat dan vote tetap bisa dipakai. -->
+        <div class="final-count" [attr.data-phase]="state.phase" aria-hidden="true">
+          @for (n of [seconds]; track n) {
+            <b>{{ n }}</b>
+          }
+          <small>{{ finalLabels[state.phase] }}</small>
+        </div>
+      }
 
       @if (error) {
         <p class="alert toast" role="alert">
@@ -367,7 +396,10 @@
                         >
                       }
                     </div>
-                    <ul class="voter-details sr-only" [attr.aria-label]="'Pemilih ' + nama(player.name)">
+                    <ul
+                      class="voter-details sr-only"
+                      [attr.aria-label]="'Pemilih ' + nama(player.name)"
+                    >
                       @for (voter of votersFor(player.name); track voter) {
                         <li>{{ nama(voter) }}</li>
                       }
@@ -398,7 +430,8 @@
                     <span aria-hidden="true">◆</span> Pilihan rekan:
                     @for (ally of allyPlan; track ally.name) {
                       <span class="ally-choice"
-                        ><b>{{ nama(ally.name) }}</b> → {{ nama(ally.target) || 'belum memilih' }}</span
+                        ><b>{{ nama(ally.name) }}</b> →
+                        {{ nama(ally.target) || 'belum memilih' }}</span
                       >
                     }
                   </p>
@@ -486,18 +519,25 @@
             }}</span>
           </header>
           <p class="hint chat-hint">{{ chatHint }}</p>
-          <div class="messages" #messageList aria-live="polite">
-            @for (chat of state.messages; track chat.id) {
-              <article
-                class="message"
-                [class.self]="chat.sender === state.me.name"
-                [style.--tag]="colorFor(chat.sender)"
-              >
-                <small><i aria-hidden="true"></i>{{ nama(chat.sender) }}</small>
-                <p>{{ chat.message }}</p>
-              </article>
-            } @empty {
-              <p class="hint empty">Belum ada percakapan. Mulai diskusi saat siang.</p>
+          <div class="messages-wrap">
+            <div class="messages" #messageList aria-live="polite" (scroll)="onChatScroll()">
+              @for (chat of state.messages; track chat.id) {
+                <article
+                  class="message"
+                  [class.self]="chat.sender === state.me.name"
+                  [style.--tag]="colorFor(chat.sender)"
+                >
+                  <small><i aria-hidden="true"></i>{{ nama(chat.sender) }}</small>
+                  <p>{{ chat.message }}</p>
+                </article>
+              } @empty {
+                <p class="hint empty">Belum ada percakapan. Mulai diskusi saat siang.</p>
+              }
+            </div>
+            @if (newBelow) {
+              <button type="button" class="chat-jump" (click)="jumpToLatest()">
+                ↓ {{ newBelow }} pesan baru
+              </button>
             }
           </div>
           <form class="composer" (ngSubmit)="sendMessage()">

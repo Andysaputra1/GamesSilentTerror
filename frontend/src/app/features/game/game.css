@@ -406,7 +406,6 @@ textarea:focus-visible {
   gap: 12px;
   overflow-y: auto;
   padding: 2px 4px 4px 2px;
-  scrollbar-width: thin;
 }
 .private-card {
   flex: none;
@@ -463,7 +462,6 @@ textarea:focus-visible {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  scrollbar-width: thin;
 }
 .event {
   padding-left: 10px;

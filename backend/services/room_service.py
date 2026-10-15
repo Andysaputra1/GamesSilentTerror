@@ -207,6 +207,19 @@ class RoomService:
                 match.ready_consent(username)
             return self.state(code, username)
 
+    # BUKA KARTU: ronde 1 menunggu semua manusia melihat role-nya (paling lama REVEAL_WAIT_SECONDS).
+    @traced
+    def reveal(self, code, username, *, match_id):
+        with self.lock:
+            room = self.get(code, username)
+            match = room.match
+            if not match or match.id != match_id:
+                raise ValueError("Pertandingan sudah berganti. Perbarui halaman.")
+            match.tick()
+            if match.phase == "preparing":
+                match.reveal_role(username)
+            return self.state(code, username)
+
     # PEMULIHAN: cari pertandingan akun dari server, bukan mengandalkan sessionStorage tab.
     def current(self, username):
         """Pulihkan lobby/hasil setelah login ulang, tanpa data role privat."""

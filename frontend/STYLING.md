@@ -16,6 +16,8 @@ Mulai dari **src/styles.css**, bagian DESIGN TOKENS:
 | --color-gold / --color-paper | Aksen emas dan panel krem |
 | --radius-panel | Lengkungan sudut panel |
 
+Scrollbar semua halaman bergaya papan kayu (`::-webkit-scrollbar` di akhir **src/styles.css**). Chromium mengabaikan gaya itu pada elemen yang memakai `scrollbar-width` atau `scrollbar-color`, jadi jangan pasang kedua properti itu di komponen; Firefox mendapat warna kayu lewat blok `@supports not selector(::-webkit-scrollbar)`.
+
 Font Fraunces (judul) dan Patrick Hand (tulisan tangan) disimpan sendiri di
 `public/assets/fonts` (lisensi OFL di folder yang sama) dan didaftarkan lewat `@font-face`
 di awal **src/styles.css**, sehingga tampil tanpa internet atau layanan pihak ketiga.
@@ -35,7 +37,7 @@ Patrick Hand) dan selalu satu layar (100dvh) tanpa scroll halaman; hanya isi pan
 yang bergulir. Gayanya dibagi lima berkas karena batas 12 kB per stylesheet komponen:
 `game.css` (token `--pad`/`--game-gap`, kertas, papan, tombol, HUD, panel kiri, kartu role),
 `game-table.css` (papan tersangka, kartu pemain, efek vote, baki aksi, chat, tab HP),
-`game-screens.css` (transisi fase, layar persiapan `.splash`), `game-end.css` (pengumuman
+`game-screens.css` (transisi fase termasuk tirai mulai `[data-phase='start']`, layar persiapan `.splash`, ajakan membuka kartu `.reveal-nudge`, tombol pesan baru `.chat-jump`, hitung mundur 5 detik `.final-count`), `game-end.css` (pengumuman
 pemenang `.end-stage`, kuesioner `.survey`, modal aturan), dan `game-motion.css` (animasi,
 responsif, `prefers-reduced-motion`). Panas vote diatur `--heat` (0–1) per kartu; jumlah kolom
 meja dipilih `Game.tableColumns` dari ukuran papan. Karakter dan warna label pemain mengikuti
