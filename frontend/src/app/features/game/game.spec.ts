@@ -252,8 +252,8 @@ describe('Game', () => {
     expect(leading?.textContent).toContain('Terancam');
   });
 
-  // KARAKTER: ditentukan urutan kursi, tidak pernah dari role (tidak membocorkan rahasia).
-  it('assigns avatars and colors by seat order, never by role', () => {
+  // KARAKTER: skin pilihan dari server, cadangan urutan kursi, tidak pernah dari role (tidak membocorkan rahasia).
+  it('uses server skins, falls back to seat order, never by role', () => {
     const game = snapshot().game;
     component.game = game;
     const before = [
@@ -271,6 +271,12 @@ describe('Game', () => {
       component.colorFor('NOX'),
     ]).toEqual(before);
     expect(component.skinFor('alice')).not.toBe(component.skinFor('NOX'));
+    game.players = game.players.map((player) => ({
+      ...player,
+      skin_id: player.name === 'alice' ? 'kiera' : 'sadie',
+    }));
+    expect(component.skinFor('alice')).toBe('/assets/characters/skin_kiera.png');
+    expect(component.skinFor('NOX')).toBe('/assets/characters/skin_sadie.png');
     expect(component.roleCard('spy')).toBe('/assets/cards/card_spy.png');
     expect(component.roleCard('unknown')).toBe('/assets/cards/card_blank.png');
   });

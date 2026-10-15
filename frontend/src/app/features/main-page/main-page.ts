@@ -19,6 +19,7 @@ import { FormsModule } from '@angular/forms';
 import { ProfileMenu } from '../../core/profile-menu';
 import { RoleRevealCard } from '../../core/role-reveal-card/role-reveal-card';
 import { RoomService } from '../../core/room.service';
+import { SessionService } from '../../core/session.service';
 import { validateRoomCode, saveRoomSession, DEFAULT_CAPACITY } from '../../shared/room-helpers';
 
 type RoleId = 'hitman' | 'spy' | 'stalker' | 'civilian';
@@ -105,6 +106,8 @@ export class MainPage implements OnInit, OnDestroy {
   private skinFadeTimer?: ReturnType<typeof setTimeout>;
   private skinRevealTimer?: ReturnType<typeof setTimeout>;
   private activeSkinIndex = 0;
+  private savedSkinId = '';
+  private skinSaveTimer?: ReturnType<typeof setTimeout>;
   skinTransitionState: SkinTransitionState = 'idle';
 
   @ViewChild('caseFileDialog') private caseFileDialog?: ElementRef<HTMLElement>;
@@ -119,6 +122,7 @@ export class MainPage implements OnInit, OnDestroy {
     @Inject(PLATFORM_ID) private readonly platformId: object,
     private readonly router: Router,
     private readonly rooms: RoomService,
+    private readonly session: SessionService,
     private readonly destroy: DestroyRef,
   ) {}
 
@@ -126,15 +130,33 @@ export class MainPage implements OnInit, OnDestroy {
     if (!isPlatformBrowser(this.platformId)) return;
     try {
       const storedUser = localStorage.getItem('shadow_heist_user');
-      const user = storedUser ? (JSON.parse(storedUser) as { username?: string }) : null;
+      const user = storedUser
+        ? (JSON.parse(storedUser) as { username?: string; skinId?: string })
+        : null;
       this.username = user?.username || this.username;
+      this.showSavedSkin(user?.skinId);
     } catch {}
     this.startRoleDeckShuffle();
+    // Skin di browser bisa basi bila diganti dari perangkat lain; server yang menentukan.
+    this.session
+      .refreshProfile()
+      .pipe(takeUntilDestroyed(this.destroy))
+      .subscribe({
+        next: (profile) => {
+          if (!this.skinSaveTimer) this.showSavedSkin(profile.skinId);
+        },
+        error: () => {},
+      });
   }
 
   ngOnDestroy(): void {
     this.stopRoleDeckShuffle();
     this.stopSkinTransition();
+    // Pilihan yang belum sempat dikirim tetap disimpan walau pengguna langsung pindah halaman.
+    if (this.skinSaveTimer) {
+      clearTimeout(this.skinSaveTimer);
+      this.saveSkin();
+    }
   }
 
   get activeRole(): RoleCardPreview {
@@ -168,6 +190,39 @@ export class MainPage implements OnInit, OnDestroy {
   private advanceSkin(): void {
     this.activeSkinIndex = (this.activeSkinIndex + 1) % this.previewSkins.length;
     this.deckAnnouncement = `Skin karakter diganti ke ${this.activeSkin.label}.`;
+    this.scheduleSkinSave();
+  }
+
+  private showSavedSkin(skinId: string | undefined): void {
+    const index = this.previewSkins.findIndex((skin) => skin.id === skinId);
+    if (index < 0) return;
+    this.activeSkinIndex = index;
+    this.savedSkinId = this.previewSkins[index]!.id;
+  }
+
+  // Simpan setelah pengguna berhenti menekan gantungan agar klik beruntun hanya mengirim satu request.
+  private scheduleSkinSave(): void {
+    if (this.skinSaveTimer) clearTimeout(this.skinSaveTimer);
+    this.skinSaveTimer = setTimeout(() => this.saveSkin(), 600);
+  }
+
+  private saveSkin(): void {
+    this.skinSaveTimer = undefined;
+    const skin = this.activeSkin;
+    if (skin.id === this.savedSkinId) return;
+    this.session.updateSkin(skin.id).subscribe({
+      next: (saved) => {
+        this.savedSkinId = saved;
+        if (saved === this.activeSkin.id) {
+          this.deckAnnouncement = `Skin ${skin.label} tersimpan di akunmu.`;
+        }
+      },
+      error: () => {
+        // Kembalikan tampilan ke skin yang benar-benar tersimpan agar sama dengan yang muncul di game.
+        if (this.activeSkin.id === skin.id) this.showSavedSkin(this.savedSkinId);
+        this.deckAnnouncement = 'Skin gagal disimpan. Coba lagi.';
+      },
+    });
   }
 
   private prefersReducedMotion(): boolean {

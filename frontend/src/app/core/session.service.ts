@@ -39,17 +39,54 @@ export class SessionService {
       .pipe(
         timeout(10_000),
         map(toUserProfile),
-        tap((profile) => {
-          if (
-            !token ||
-            this.loggingOut() ||
-            localStorage.getItem('shadow_heist_access_token') !== token
-          ) {
-            throw new Error('Sesi berubah. Silakan login kembali.');
-          }
-          localStorage.setItem('shadow_heist_user', JSON.stringify(profile));
+        tap((profile) => this.storeProfile(token, profile)),
+      );
+  }
+
+  // Ambil profil terbaru dari server (termasuk skin yang mungkin diganti di perangkat lain).
+  refreshProfile() {
+    const token = localStorage.getItem('shadow_heist_access_token');
+    return this.http
+      .get<{ username: string; display_name: string; skin_id?: string }>(
+        backendUrl() + '/api/auth/me',
+        { headers: new HttpHeaders({ Authorization: 'Bearer ' + (token ?? '') }) },
+      )
+      .pipe(
+        timeout(10_000),
+        map(toUserProfile),
+        tap((profile) => this.storeProfile(token, profile)),
+      );
+  }
+
+  // Simpan skin pilihan ke akun; lobby dan pertandingan membacanya dari server, bukan dari browser.
+  updateSkin(skinId: string) {
+    const token = localStorage.getItem('shadow_heist_access_token');
+    return this.http
+      .put<{ skin_id: string }>(
+        backendUrl() + '/api/auth/skin',
+        { skin_id: skinId },
+        { headers: new HttpHeaders({ Authorization: 'Bearer ' + (token ?? '') }) },
+      )
+      .pipe(
+        timeout(10_000),
+        map((response) => response.skin_id),
+        tap((saved) => {
+          const profile = JSON.parse(localStorage.getItem('shadow_heist_user') ?? '{}');
+          this.storeProfile(token, { ...profile, skinId: saved });
         }),
       );
+  }
+
+  // Tulis profil hanya bila sesi tidak berganti selama request berjalan.
+  private storeProfile(token: string | null, profile: UserProfile): void {
+    if (
+      !token ||
+      this.loggingOut() ||
+      localStorage.getItem('shadow_heist_access_token') !== token
+    ) {
+      throw new Error('Sesi berubah. Silakan login kembali.');
+    }
+    localStorage.setItem('shadow_heist_user', JSON.stringify(profile));
   }
 
   // Hapus hanya data akun dan pointer ruangan milik aplikasi dari penyimpanan browser.

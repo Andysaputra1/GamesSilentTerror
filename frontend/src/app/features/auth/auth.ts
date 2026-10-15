@@ -36,7 +36,7 @@ import { profileCountdown, PROFILE_COUNTDOWN_TARGET } from '../../core/profile-c
 interface LoginResponse {
   access_token: string;
   expires_at: string;
-  user: { username: string; display_name: string };
+  user: { username: string; display_name: string; skin_id?: string };
 }
 
 // DECORATOR: sambungkan class Auth ke HTML/CSS login dan aktifkan binding form.
@@ -377,7 +377,11 @@ export class Auth implements OnInit, AfterViewInit {
       // Simpan dengan camelCase untuk konsistensi TypeScript.
       localStorage.setItem(
         'shadow_heist_user',
-        JSON.stringify({ username: response.user.username, displayName: response.user.display_name }),
+        JSON.stringify({
+          username: response.user.username,
+          displayName: response.user.display_name,
+          skinId: response.user.skin_id,
+        }),
       );
       sessionStorage.removeItem('shadow_heist_game_entry');
     } catch {

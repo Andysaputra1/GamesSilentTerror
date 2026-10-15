@@ -27,7 +27,7 @@ class MatchSimulationTests(unittest.TestCase):
                             view = game.snapshot(name)
                             me = view["me"]
                             self.assertTrue(
-                                all(set(p) == {"name", "alive"} for p in view["players"])
+                                all(set(p) == {"name", "alive", "skin_id"} for p in view["players"])
                             )
                             if not player.alive:
                                 self.assertFalse(me["can_chat"] or me["can_act"] or me["can_vote"])

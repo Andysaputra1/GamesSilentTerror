@@ -59,8 +59,25 @@ def phase_durations(count, quick=False):
     return {"day": count * 20, "night": count * 5, "tribunal": ceil(count * 7.5)}
 
 
+# Avatar pertandingan: manusia (urutan masuk ruangan) memakai skin pilihannya, bot memakai skin tetapnya.
+# Skin yang sudah dipakai pemain sebelumnya diganti skin yang masih kosong; setelah keenam skin
+# terpakai (lebih dari 6 peserta), skin boleh kembar.
+def assign_skins(humans, bots, skin_map=None):
+    taken = set()
+    skins = {}
+    for name in list(humans) + list(bots):
+        if name in bots:
+            wanted = SKIN_BY_BOT.get(name, ALL_SKINS[0])
+        else:
+            wanted = (skin_map or {}).get(name, "dexter")
+        free = [skin for skin in ALL_SKINS if skin not in taken]
+        skins[name] = free[0] if wanted in taken and free else wanted
+        taken.add(skins[name])
+    return skins
+
+
 class Match:
-    # Role mengikuti KOMPOSISI_PERAN; skin_map mempertahankan avatar manusia yang dipilih.
+    # Role mengikuti KOMPOSISI_PERAN; skin_map berisi avatar pilihan tiap manusia (lihat assign_skins).
     # preparing=True menahan ronde 1 di layar persiapan sampai AI siap (lihat begin/mark_ai_ready).
     def __init__(
         self,
@@ -82,12 +99,9 @@ class Match:
         roles += ["civilian"] * (len(names) - len(roles))
         self.rng.shuffle(roles)
         self.players = {}
+        skins = assign_skins(humans, bots, skin_map)
         for name, role in zip(names, roles):
-            if name in bots:
-                skin = SKIN_BY_BOT.get(name, self.rng.choice(ALL_SKINS))
-            else:
-                skin = skin_map.get(name, "dexter") if skin_map else "dexter"
-            self.players[name] = Participant(name, role, name in bots, skin_id=skin)
+            self.players[name] = Participant(name, role, name in bots, skin_id=skins[name])
         self.id = uuid4().hex
         self.round = 1
         self.ai_controlled = (
@@ -545,6 +559,7 @@ class Match:
                 {
                     "name": p.name,
                     "alive": p.alive,
+                    "skin_id": p.skin_id,
                     **({"role": p.role, "hostage": p.hostage, "bot": p.bot} if self.winner else {}),
                 }
                 for p in self.players.values()

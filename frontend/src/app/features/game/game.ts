@@ -30,7 +30,7 @@ import { ProfileMenu } from '../../core/profile-menu';
 import { PhaseDurations } from '../../core/room.service';
 import { FullscreenPrompt } from '../../core/fullscreen-prompt';
 
-// Karakter meja dan warna label pemain: berdasarkan urutan kursi, bukan role atau status rahasia.
+// Karakter cadangan dan warna label pemain: berdasarkan urutan kursi, bukan role atau status rahasia.
 const SKINS = ['arthur', 'jenny', 'dexter', 'eloise', 'kiera', 'sadie'];
 const TAG_COLORS = [
   '#b8452f',
@@ -459,8 +459,12 @@ export class Game implements OnInit, OnDestroy {
     return Math.max(0, this.game?.players.findIndex((player) => player.name === name) ?? 0);
   }
 
+  // Skin pilihan akun (dibagikan server tanpa kembar); urutan kursi hanya cadangan snapshot lama.
   skinFor(name: string): string {
-    return `/assets/characters/skin_${SKINS[this.playerIndex(name) % SKINS.length]}.png`;
+    const chosen = this.game?.players.find((player) => player.name === name)?.skin_id;
+    const skin =
+      chosen && SKINS.includes(chosen) ? chosen : SKINS[this.playerIndex(name) % SKINS.length];
+    return `/assets/characters/skin_${skin}.png`;
   }
 
   colorFor(name: string): string {

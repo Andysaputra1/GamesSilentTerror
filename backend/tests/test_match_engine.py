@@ -11,6 +11,7 @@ from controller.api.rooms import router
 from controller.middleware.auth import require_authenticated_user
 from realtime.socket_handlers import SocketGameController
 from services.match_engine import KOMPOSISI_PERAN, Match
+from services.skin_constants import ALL_SKINS
 from services.room_service import RoomService
 
 
@@ -79,6 +80,25 @@ class EngineTests(unittest.TestCase):
         for humans in [[], ["a"] * 4, list("abcdefghijk")]:
             with self.assertRaises(ValueError):
                 Match(humans, [])
+
+    # SKIN: pilihan akun dipakai bila belum diambil pemain lain; bentrokan diberi skin kosong.
+    def test_skins_follow_preference_without_duplicates(self):
+        game = Match(
+            ["host", "tamu", "baru"],
+            ["NOX", "ECHO"],
+            skin_map={"host": "kiera", "tamu": "kiera", "baru": "dexter"},
+        )
+        skins = {name: game.get_skin(name) for name in game.players}
+        # tamu kalah cepat dari host untuk kiera; NOX (arthur) dan ECHO (dexter) ikut bergeser.
+        self.assertEqual(
+            skins,
+            {"host": "kiera", "tamu": "arthur", "baru": "dexter", "NOX": "eloise", "ECHO": "jenny"},
+        )
+        # Skin bersifat publik (bukan rahasia role) dan dikirim ke semua viewer.
+        self.assertEqual({p["name"]: p["skin_id"] for p in game.snapshot("tamu")["players"]}, skins)
+        # Lebih dari 6 peserta: semua skin terpakai, sisanya boleh kembar.
+        crowded = Match(list("abcdefgh"), [])
+        self.assertEqual({crowded.get_skin(name) for name in "abcdef"}, set(ALL_SKINS))
 
     def test_four_player_mode_and_roster_based_timers(self):
         for count in range(4, 11):
@@ -181,7 +201,7 @@ class EngineTests(unittest.TestCase):
         for viewer in self.game.players:
             snapshot = self.game.snapshot(viewer)
             for player in snapshot["players"]:
-                self.assertEqual(set(player), {"name", "alive"})
+                self.assertEqual(set(player), {"name", "alive", "skin_id"})
             self.assertNotIn("civilian", " ".join(snapshot["events"]))
             self.assertNotIn("actions", snapshot)
             self.assertNotIn("votes", snapshot)
@@ -356,7 +376,7 @@ class SyndicateTests(unittest.TestCase):
                 self.assertEqual(remaining(), expected)
             # Role korban tetap rahasia; roster lawan tetap nama dan status hidup saja.
             view = self.game.snapshot("spy")
-            self.assertTrue(all(set(p) == {"name", "alive"} for p in view["players"]))
+            self.assertTrue(all(set(p) == {"name", "alive", "skin_id"} for p in view["players"]))
 
     def test_hitman_count_is_available_during_preparation(self):
         game = Match([], self.NAMES, now=0, rng=random.Random(3), preparing=True)

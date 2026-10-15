@@ -52,7 +52,14 @@ export interface MatchView {
   tribunal_votes: { target: string; voters: string[] }[];
   discussion_skip: { agreed: number; required: number; consented: boolean; can_consent: boolean };
   events: string[];
-  players: { name: string; bot?: boolean; alive: boolean; role?: string; hostage?: boolean }[];
+  players: {
+    name: string;
+    bot?: boolean;
+    alive: boolean;
+    role?: string;
+    hostage?: boolean;
+    skin_id?: string;
+  }[];
   messages: GameMessage[];
   me: {
     name: string;
