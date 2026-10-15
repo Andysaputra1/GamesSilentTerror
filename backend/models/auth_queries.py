@@ -43,7 +43,7 @@ def create_account(database: Session, *, username: str, display_name: str, passw
 # QUERY SELECT: cari satu akun berdasarkan username dengan parameter SQL terikat; hasil bisa kosong.
 def account_by_username(database: Session, username: str):
     sql = text("""
-        SELECT id, username, display_name, password_hash, is_active
+        SELECT id, username, display_name, password_hash, is_active, skin_id
         FROM user_accounts WHERE username = :username
     """)
     return database.execute(sql, {"username": username}).mappings().one_or_none()
@@ -102,7 +102,7 @@ def account_by_google_subject(database, subject):
     return (
         database.execute(
             text("""
-        SELECT u.id, u.username, u.display_name, u.is_active
+        SELECT u.id, u.username, u.display_name, u.is_active, u.skin_id
         FROM user_accounts u JOIN account_identities i ON i.user_id = u.id
         WHERE i.google_subject = :subject
     """),
@@ -121,7 +121,7 @@ def account_by_login(database, identifier):
     return (
         database.execute(
             text("""
-        SELECT u.id, u.username, u.display_name, u.password_hash, u.is_active
+        SELECT u.id, u.username, u.display_name, u.password_hash, u.is_active, u.skin_id
         FROM user_accounts u JOIN account_identities i ON i.user_id = u.id
         WHERE i.email = :email
     """),

@@ -9,13 +9,12 @@ backend/
   config/
     settings.py                 # Pengaturan aplikasi/AI dan pembaca environment
     mysql.py                    # Host, port, database, kredensial, pool
-    upload.py                   # Folder tujuan, batas ukuran/jumlah, tipe upload
   controller/
     controller_main.py          # Menggabungkan router HTTP
     api/
       auth.py
-      game.py
       health.py
+      panel.py                  # Panel administrator (/panel)
       rooms.py                  # Lobby, start, snapshot privat, aksi/vote, checker
     middleware/
       auth.py                   # Validasi bearer token sebelum controller
@@ -23,10 +22,9 @@ backend/
   migrations/                   # SQL untuk membuat/mengubah struktur tabel
   models/
     auth_queries.py             # SELECT/INSERT/DELETE akun dan sesi
-    game_queries.py             # SELECT/INSERT/UPDATE pemain, chat, analisis
+    game_queries.py             # SELECT/INSERT/UPDATE pemain dan chat
   module/
     mysql_connector.py          # Engine, connection pool, session, health probe
-    upload.py                   # Helper simpan satu file atau batch
     create_user.py              # CLI akun tambahan untuk multiplayer lokal
   services/                     # Logika password, sesi login, AI, dan game
   schemas/                      # Validasi request/response API
@@ -97,31 +95,6 @@ Default model dan batas respons tetap di settings.py.
 Pilih `AI_PROVIDER=docker` untuk Ollama (lokal/tunnel) atau `AI_PROVIDER=api` untuk OpenRouter.
 `OLLAMA_MODEL` memilih model lokal (default qwen3:8b). Recreate service ai-engine
 setelah mengubah .env; lihat ../OLLAMA.md untuk perintah dan pemeriksaan status.
-
-## Module upload (padanan helper Multer)
-
-```python
-from config.upload import PROFILE_PICTURE, ASSET_ICON
-from module.upload import save_upload, save_uploads
-
-# Di dalam fungsi async yang menerima FastAPI UploadFile:
-stored = await save_upload(file, PROFILE_PICTURE)
-# stored.filename, stored.relative_path, stored.size, stored.content_type
-
-assets = await save_uploads(files, ASSET_ICON)
-```
-
-App icon: 5 MiB/file; asset icon: 5 MiB/file, maksimal 50 file; profile picture:
-2 MiB/file. Saat ini menerima PNG, JPEG, WebP dengan pemeriksaan MIME dan
-signature header (bukan decoding seluruh gambar). SVG, video, PDF, dan fitur
-Boarding/PusatInfo dari contoh Node belum disertakan.
-
-Nama file memakai UUID, tidak memakai path dari nama asli. File yang gagal
-disimpan dibersihkan, termasuk file batch yang sudah tersimpan sebelum kegagalan.
-File berada di `backend/public/uploads/`. Helper ini belum membuka endpoint upload
-atau URL publik. Saat membuat endpoint multipart, pasang `python-multipart`,
-validasi autentikasi di controller, dan petakan UploadError menjadi error HTTP.
-Controller menentukan hak akses file dan kebijakan penyajiannya.
 
 ## Menjalankan dan menguji
 

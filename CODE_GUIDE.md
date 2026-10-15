@@ -18,9 +18,9 @@ permintaan pengguna.
 | `backend/services/` | Aturan aplikasi, pertandingan, analisis, dan transaksi |
 | `backend/models/` | Kueri SQL berparameter |
 | `backend/realtime/socket_handlers.py` | Autentikasi socket, otorisasi, penyimpanan, dan siaran chat |
-| `backend/config/` | Konfigurasi environment, database, dan kebijakan upload |
+| `backend/config/` | Konfigurasi environment dan database |
 | `backend/controller/middleware/` | Autentikasi request, batas percobaan login, dan CORS |
-| `backend/module/` | Koneksi database, klien AI, helper upload, dan CLI akun |
+| `backend/module/` | Koneksi database, klien AI, dan CLI akun |
 | `backend/public/panel/` | Halaman administrasi yang disajikan backend |
 | `backend/scripts/` | Penyiapan environment deployment dan kredensial panel |
 | `backend/services/npc_brain/` | Runtime otak NPC; `generated/` adalah ekspor notebook (jangan diedit manual) |

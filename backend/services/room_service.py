@@ -1,5 +1,6 @@
 """Live lobby registry for a single backend process. Restart clears active rooms."""
 
+import logging
 from dataclasses import dataclass, field
 from sqlalchemy import text
 import secrets
@@ -7,6 +8,11 @@ from threading import RLock
 from module.mysql_connector import SessionLocal
 from services.match_engine import Match, phase_durations
 from services.activity_service import activity, traced
+
+logger = logging.getLogger("shadow_heist.rooms")
+
+# Nama NPC; juga dicadangkan agar tidak bisa dipakai sebagai username akun.
+BOT_NAMES = ("NOX", "ECHO", "VEIL", "RAVEN", "ASH", "DUSK", "IRIS", "SAGE", "ONYX", "LARK")
 
 
 @dataclass
@@ -32,8 +38,8 @@ class RoomService:
             return {}
         database = SessionLocal()
         try:
-            placeholders = ', '.join([f':u{i}' for i in range(len(usernames))])
-            params = {f'u{i}': name for i, name in enumerate(usernames)}
+            placeholders = ", ".join([f":u{i}" for i in range(len(usernames))])
+            params = {f"u{i}": name for i, name in enumerate(usernames)}
             sql = text(f"""
                 SELECT username, skin_id FROM user_accounts
                 WHERE username IN ({placeholders})
@@ -100,7 +106,9 @@ class RoomService:
                 if len(room.members) >= room.capacity:
                     raise ValueError(f"Ruangan sudah penuh (maksimal {room.capacity} pemain).")
                 room.members.append(username)
-                room.members_skin[username] = self._fetch_skin_ids([username]).get(username, "dexter")
+                room.members_skin[username] = self._fetch_skin_ids([username]).get(
+                    username, "dexter"
+                )
             return room
 
     # SERVICE LOBBY: periksa kepemilikan lalu aktifkan/nonaktifkan NOX pada ruangan.
@@ -150,22 +158,7 @@ class RoomService:
         if not room.bot_enabled:
             return []
         count = room.capacity - len(room.members)
-        return [
-            name
-            for name in [
-                "NOX",
-                "ECHO",
-                "VEIL",
-                "RAVEN",
-                "ASH",
-                "DUSK",
-                "IRIS",
-                "SAGE",
-                "ONYX",
-                "LARK",
-            ]
-            if name not in room.members
-        ][:count]
+        return [name for name in BOT_NAMES if name not in room.members][:count]
 
     # START: hanya host; role tidak pernah dikembalikan lewat snapshot lobby.
     @traced
@@ -267,7 +260,12 @@ class RoomService:
             for room in self.rooms.values():
                 if room.match:
                     before = (room.match.phase, room.match.round)
-                    room.match.tick()
+                    try:
+                        room.match.tick()
+                    except Exception:
+                        # Satu pertandingan rusak tidak boleh menghentikan timer room lain.
+                        logger.exception("Timer room %s gagal.", room.code)
+                        continue
                     if before != (room.match.phase, room.match.round):
                         activity.record(
                             room.code,

@@ -75,7 +75,12 @@ class AccountTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers["cache-control"], "no-store")
         self.assertEqual(
-            response.json(), {"username": self.body["username"], "display_name": "Andy Saputra", "skin_id": "dexter"}
+            response.json(),
+            {
+                "username": self.body["username"],
+                "display_name": "Andy Saputra",
+                "skin_id": "dexter",
+            },
         )
         self.assertEqual(
             self.client.get("/api/auth/me", headers=headers).json()["display_name"], "Andy Saputra"
@@ -146,11 +151,14 @@ class AccountTests(unittest.TestCase):
             self.assertEqual(
                 db.execute(text("SELECT email_verified FROM account_identities")).scalar(), 0
             )
+        with self.engine.begin() as db:
+            db.execute(text("UPDATE user_accounts SET skin_id = 'jenny'"))
         login = self.client.post(
             "/api/auth/login",
             json={"username": "test@example.com", "password": self.body["password"]},
         )
         self.assertEqual(login.status_code, 200)
+        self.assertEqual(login.json()["user"]["skin_id"], "jenny")  # skin tersimpan, bukan bawaan
         self.assertEqual(self.register().status_code, 409)
         self.assertEqual(self.register(username="another").status_code, 409)
         with self.engine.connect() as db:
@@ -160,6 +168,7 @@ class AccountTests(unittest.TestCase):
         self.assertEqual(self.register(password_confirmation="different-password").status_code, 422)
         self.assertEqual(self.register(email_confirmation="other@example.com").status_code, 422)
         self.assertEqual(self.register(username="NOX").status_code, 409)
+        self.assertEqual(self.register(username="sage").status_code, 409)  # nama NPC lain juga
         self.assertEqual(self.register(username="user1").status_code, 409)
         self.assertEqual(self.register(username="x<script>").status_code, 422)
         for _ in range(16):
@@ -275,7 +284,8 @@ class AccountTests(unittest.TestCase):
         self.assertEqual(changed.status_code, 200)
         again, _ = self.google()
         self.assertEqual(
-            again.json()["user"], {"username": "new_detective", "display_name": "New Name", "skin_id": "dexter"}
+            again.json()["user"],
+            {"username": "new_detective", "display_name": "New Name", "skin_id": "dexter"},
         )
         self.register(username="taken_name")
         for name in ["taken_name", "NOX", "admin"]:

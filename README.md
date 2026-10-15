@@ -328,12 +328,12 @@ Jika mengubah daftar model lokal yang harus diunduh, jalankan pula `docker compo
 ```text
 frontend/             Angular: login, main page, lobby, game/chat, survei
 backend/              Python FastAPI + Socket.IO
-  config/             Konfigurasi aplikasi, AI, MySQL, upload
+  config/             Konfigurasi aplikasi, AI, MySQL
   controller/         Endpoint API dan middleware
   services/           Logika autentikasi, ruangan, engine pertandingan, analisis AI
     npc_brain/        Runtime otak NPC; generated/ = ekspor notebook skripsi
   models/             Query SQL terparameterisasi
-  module/             Konektor MySQL, klien Ollama/OpenRouter, helper upload
+  module/             Konektor MySQL, klien Ollama/OpenRouter, CLI akun
   realtime/           Event Socket.IO
   public/panel/       Halaman panel administrator
   artifacts/svm/      Model intent SVM privat, disediakan terpisah

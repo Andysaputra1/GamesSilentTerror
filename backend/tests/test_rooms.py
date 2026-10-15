@@ -112,3 +112,15 @@ class SocketRoomTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(chats[0].kwargs["to"], room.code)
         self.assertNotEqual(chats[0].kwargs["to"], other.code)
         persistence.return_value.record_bot_message.assert_not_called()
+
+
+class TickAllTests(unittest.TestCase):
+    # Satu pertandingan yang error tidak boleh menghentikan timer room lain.
+    def test_broken_match_does_not_stop_other_rooms(self):
+        rooms = RoomService()
+        rusak, sehat = rooms.create("alice"), rooms.create("bob")
+        rusak.match = Mock(tick=Mock(side_effect=RuntimeError("rusak")), phase="day", round=1)
+        sehat.match = Mock(phase="day", round=1)
+        with self.assertLogs("shadow_heist.rooms", "ERROR"):
+            rooms.tick_all()
+        sehat.match.tick.assert_called_once()

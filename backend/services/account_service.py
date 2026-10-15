@@ -32,16 +32,23 @@ def issue_session(database, account):
     return LoginResult(
         token,
         expires.replace(tzinfo=timezone.utc),
-        AuthenticatedUser(account["id"], account["username"], account["display_name"]),
+        AuthenticatedUser(
+            account["id"],
+            account["username"],
+            account["display_name"],
+            account.get("skin_id") or "dexter",
+        ),
     )
 
 
 def register_account(body):
     """Simpan akun + email dalam satu transaksi dan login setelah pendaftaran."""
-    reserved = {"nox", "echo", "veil", "admin", "user1"}
-    reserved.update(name.strip().casefold() for name in settings.admin_usernames.split(","))
-    if body.username.casefold() in reserved:
-        raise AccountConflict("Username tidak tersedia.")
+    from services.user_management_service import validate_username
+
+    try:
+        validate_username(body.username)
+    except ValueError as error:
+        raise AccountConflict("Username tidak tersedia.") from error
     password_hash = hash_password(body.password)
 
     # Kerjakan perubahan akun dan penerbitan sesi dalam transaksi yang sama.

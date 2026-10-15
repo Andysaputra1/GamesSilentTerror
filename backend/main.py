@@ -60,8 +60,12 @@ async def lifespan(_: FastAPI):
     # Timer server tidak bergantung pada tab pemain atau kecepatan respons LLM.
     async def game_clock():
         while True:
-            room_service.tick_all()
-            npc_service.schedule()
+            try:
+                room_service.tick_all()
+                npc_service.schedule()
+            except Exception:
+                # Error tak terduga tidak boleh mematikan jam permainan untuk seluruh server.
+                logger.exception("Satu putaran jam permainan gagal.")
             await asyncio.sleep(0.5)
 
     clock = asyncio.create_task(game_clock())

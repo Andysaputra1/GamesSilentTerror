@@ -7,16 +7,16 @@ from models import auth_queries
 
 from services.auth_service import auth_service
 from services.password_service import hash_password
-from services.room_service import room_service
+from services.room_service import BOT_NAMES, room_service
 
 
 class UserNotFound(ValueError):
     """ID akun sudah tidak tersedia."""
 
 
-# Tolak identitas yang dicadangkan untuk NPC dan administrator sebelum membuat atau mengganti username.
+# Satu-satunya daftar username terlarang (NPC dan administrator): dipakai panel, pendaftaran, dan profil.
 def validate_username(username):
-    reserved = {"nox", "echo", "veil", "raven", "ash", "dusk", "admin", "administrator", "user1"}
+    reserved = {name.casefold() for name in BOT_NAMES} | {"admin", "administrator", "user1"}
     reserved.update(name.strip().casefold() for name in settings.admin_usernames.split(","))
     reserved.update(name.strip().casefold() for name in settings.history_admin_usernames.split(","))
     if username.casefold() in reserved:

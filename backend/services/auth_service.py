@@ -104,6 +104,7 @@ class AuthService:
                     id=account["id"],
                     username=account["username"],
                     display_name=account["display_name"],
+                    skin_id=account["skin_id"],
                 ),
             )
 
@@ -141,23 +142,9 @@ class AuthService:
         selected_username = username or user.username
         changing_username = selected_username != user.username
         if changing_username:
-            reserved = {
-                "nox",
-                "echo",
-                "veil",
-                "raven",
-                "ash",
-                "dusk",
-                "admin",
-                "administrator",
-                "user1",
-            }
-            reserved.update(name.strip().casefold() for name in settings.admin_usernames.split(","))
-            reserved.update(
-                name.strip().casefold() for name in settings.history_admin_usernames.split(",")
-            )
-            if selected_username.casefold() in reserved:
-                raise ValueError("Username tersebut tidak tersedia.")
+            from services.user_management_service import validate_username
+
+            validate_username(selected_username)
 
         # Nama dan username harus disimpan bersama; benturan username membatalkan seluruh perubahan.
         def operation(database):

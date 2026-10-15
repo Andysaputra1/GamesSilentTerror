@@ -16,13 +16,6 @@ class AIRuntimeService:
         with self.lock:
             return base.model_copy(update=self.override) if self.override else base
 
-    # Validasi pasangan provider/model sebelum mengaktifkan override sementara.
-    def select(self, provider, model):
-        if provider not in {"api", "docker"} or model not in {"8", "14"}:
-            raise ValueError("Provider/model tidak valid.")
-        with self.lock:
-            self.override = {"ai_provider": provider, "ollama_model": f"qwen3:{model}b"}
-
     # Hapus override sehingga request berikutnya memakai konfigurasi environment.
     def reset(self):
         with self.lock:
