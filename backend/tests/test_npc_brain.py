@@ -4,6 +4,7 @@ NLU memakai pengganti deterministik (tanpa IndoBERT) agar test cepat dan tidak b
 """
 
 import asyncio
+import contextlib
 import json
 import random
 import re
@@ -165,6 +166,24 @@ class BrainRuntimeTests(unittest.TestCase):
                 self.assertEqual(len(otak.ingatan.aksi_bot), jumlah_chat)
                 self.assertEqual(len(otak.riwayat), jumlah_chat)
 
+    # Label metode (BT/UA/FL) harus jujur: setiap keputusan chat/vote/aksi bot dihitung oleh modul metodenya
+    # sendiri, dan fungsi keputusan modul metode lain tidak pernah dipanggil untuk bot itu.
+    def test_each_bot_is_decided_only_by_its_labelled_method(self):
+        dipanggil = {}
+        with contextlib.ExitStack() as tumpukan:
+            for metode, modul in self.runtime.modul.items():
+                for nama_fungsi in ("keputusan_chat", "keputusan_vote", "keputusan_aksi"):
+
+                    def rekam(ctx, *args, _asli=getattr(modul, nama_fungsi), _metode=metode):
+                        dipanggil.setdefault(ctx["bot"], set()).add(_metode)
+                        return _asli(ctx, *args)
+
+                    tumpukan.enter_context(patch.object(modul, nama_fungsi, rekam))
+            match, _ = self.main_game(seed=11, jumlah=9)
+        label = {b: o.metode for b, o in self.runtime.pertandingan[match.id].items()}
+        self.assertEqual(set(label.values()), {"fuzzy", "utility", "bt"})
+        self.assertEqual(dipanggil, {bot: {metode} for bot, metode in label.items()})
+
 
 class NPCServiceBrainTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
@@ -193,6 +212,12 @@ class NPCServiceBrainTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("AI siap", self.match.preparation["detail"])
         rows = self.survey.record_match_bots.call_args.args[0]
         self.assertEqual(len(rows), 5)
+        # Label metode di game = metode yang tercatat untuk survei = otak yang dipasang ke bot.
+        otak = {b: self.runtime.otak_bot(self.match.id, b).metode for b in self.match.bot_methods}
+        self.assertEqual(self.match.bot_methods, {r["bot_name"]: r["method"] for r in rows})
+        self.assertEqual(self.match.bot_methods, otak)
+        tampil = {p["name"]: p.get("metode") for p in self.match.snapshot("human")["players"]}
+        self.assertEqual(tampil, {"human": None, **otak})
         self.match.reveal_role("human", now=self.match.preparation["started_at"])
         self.match.tick(self.match.preparation["min_until"])
         self.assertEqual(self.match.phase, "day")
