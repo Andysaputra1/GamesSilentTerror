@@ -211,6 +211,7 @@ class NPCService:
                     return
             rows = self.runtime.siapkan_pertandingan(match, code)
             if rows:
+                match.bot_methods = {row["bot_name"]: row["method"] for row in rows}
                 metode = sorted({row["method"] for row in rows})
                 detail = f"AI siap: {len(rows)} bot ({', '.join(metode)})."
                 try:

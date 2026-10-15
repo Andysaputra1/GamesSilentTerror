@@ -150,6 +150,8 @@ class Match:
         for name, role in zip(names, roles):
             self.players[name] = Participant(name, role, name in bots, skin_id=skins[name])
         self.labels = {name: (labels or {}).get(name, name) for name in names}
+        # Metode otak tiap bot (fuzzy/utility/bt/llm); diisi NPCService saat persiapan, tampil di samping nama.
+        self.bot_methods: dict[str, str] = {}
         self.id = uuid4().hex
         self.round = 1
         self.ai_controlled = (
@@ -650,6 +652,7 @@ class Match:
                     "label": self.labels[p.name],
                     "alive": p.alive,
                     "skin_id": p.skin_id,
+                    **({"metode": self.bot_methods[p.name]} if p.name in self.bot_methods else {}),
                     **({"role": p.role, "hostage": p.hostage, "bot": p.bot} if self.winner else {}),
                 }
                 for p in self.players.values()
