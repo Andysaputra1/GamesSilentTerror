@@ -1,11 +1,9 @@
 import unittest
-from unittest.mock import patch
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from controller.api.rooms import router
 from services.checker_service import CheckerService
-from services.analysis_service import AnalysisService
 
 
 class CheckerTests(unittest.TestCase):
@@ -26,36 +24,3 @@ class CheckerTests(unittest.TestCase):
         app.include_router(router)
         with TestClient(app) as client:
             self.assertEqual(client.get("/api/rooms/ABC123/checker").status_code, 410)
-
-
-class PromptTraceTests(unittest.IsolatedAsyncioTestCase):
-    # TES ASYNC TRACE: cocokkan prompt yang dicatat checker dengan input persis yang diterima adapter mock.
-    async def test_captured_prompt_is_exact_provider_input(self):
-        analysis = AnalysisService()
-        trace = {}
-        sent = []
-
-        # CALLBACK MOCK ASYNC: rekam prompt pengujian lalu kembalikan jawaban tiruan tanpa menghubungi LLM.
-        async def generate(prompt, **kwargs):
-            sent.append(prompt)
-            return "Respons nyata adapter mock"
-
-        with (
-            patch("services.analysis_service.settings") as settings,
-            patch("services.analysis_service.generate_reply", generate),
-        ):
-            settings.ai_provider = "docker"
-            settings.ollama_model = "qwen3:8b"
-            result = await analysis.create_host_response(
-                player_name="alice",
-                message="Halo NOX",
-                intent="neutral",
-                aggressiveness=10,
-                suspicion_score=12.5,
-                suspicion_status="low",
-                trace=trace,
-            )
-        self.assertEqual(trace["prompt"], sent[0])
-        self.assertIn("Halo NOX", trace["prompt"])
-        self.assertEqual(trace["model"], "qwen3:8b")
-        self.assertEqual(result, "Respons nyata adapter mock")

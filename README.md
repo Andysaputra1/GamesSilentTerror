@@ -25,7 +25,7 @@ Engine backend menjadi sumber kebenaran, bukan browser atau AI. Engine memvalida
 
 ## Cara kerja AI
 
-Ada dua jalur AI yang terpisah: **otak bot** (NPC yang ikut bermain) dan **analisis pesan manusia** (untuk arsip/panel).
+Semua AI ada di **otak bot** (NPC yang ikut bermain). Chat manusia hanya diotorisasi, disimpan, dan disiarkan; bot membacanya sendiri lewat IndoBERT.
 
 | Komponen | Dipakai untuk | Kapan berjalan |
 | --- | --- | --- |
@@ -33,7 +33,6 @@ Ada dua jalur AI yang terpisah: **otak bot** (NPC yang ikut bermain) dan **anali
 | **IndoBERT** (validasi ulang) | Memastikan kalimat yang ditulis bot memang terbaca sesuai rencana (misalnya benar-benar menuduh X) | Setiap kali bot akan mengirim chat, sebelum kalimat dikirim (`NPC_VALIDATE_NLG=true`) |
 | **Fuzzy / Utility AI / Behavior Tree** | Penalaran bot: memilih tuduhan, pembelaan, vote, dan skill malam | Setiap langkah bot. `NPC_METHOD=campuran` membagi metode antar bot dalam satu pertandingan; metode tiap bot dicatat di tabel `match_bots` |
 | **NLG** (rantai penulis LLM atau templat) | Mengubah rencana bot menjadi kalimat | Saat bot memutuskan bicara. Jalur LLM yang gagal dilewati; tanpa jalur yang hidup, bot memakai templat |
-| **SVM + fuzzy** | Menganalisis pesan **manusia**: intent, agresivitas, skor kecurigaan | Setiap chat manusia, sebelum disimpan ke MySQL dan disiarkan |
 | **LLM mode lama** (`NPC_METHOD=llm`) | Bot yang sepenuhnya digerakkan LLM, sebagai pembanding | Hanya bila mode ini dipilih |
 
 Tanpa model IndoBERT, bot tetap bermain dengan NLU cadangan (SVM + nama yang disebut) yang kualitasnya lebih rendah; sumber NLU tercatat di trace dan terlihat di panel menu **Otak NPC**.
@@ -243,7 +242,7 @@ Script ini menulis `PANEL_USERNAME=administrator` dan `PANEL_PASSWORD_HASH`, ser
 | Menu | Isi |
 | --- | --- |
 | 01 Konfigurasi AI | Provider AI (`api`/`docker`), model, key OpenRouter, link LLM sendiri; tombol cek/tes koneksi |
-| 02 Checker | Jejak setiap chat manusia (SVM → fuzzy → simpan → siar) dan setiap langkah bot (NLU, penalaran, penulis kalimat) per ruangan |
+| 02 Checker | Jejak setiap chat manusia (otorisasi → simpan → siar) dan setiap langkah bot (NLU, penalaran, penulis kalimat) per ruangan |
 | 03 Riwayat chat | Arsip chat dari MySQL dengan filter dan ekspor CSV |
 | 04 Manajemen user | Tambah user, reset password akun lokal, hapus akun tanpa menghapus riwayat chat |
 | 05 Otak NPC | Metode penalaran, rantai penulis kalimat, status NLU IndoBERT |
@@ -344,10 +343,11 @@ backend/              Python FastAPI + Socket.IO
   deployment/         Konfigurasi produksi Azure (Caddy, SQL salinan)
   scripts/            setup_panel.py, ekspor_otak_npc.py, setup_azure.py
 proxy/                Gateway Nginx
+ai-docker/            LLM penulis kalimat bot (Qwen3 4B) di laptop + tunnel untuk VM; jalankan.bat
 docker-compose.yml    Service development dan volume
 ```
 
-Alur chat manusia: **pesan → otorisasi → SVM/fuzzy → validasi ulang fase/hak chat → penyimpanan MySQL → broadcast**. Secara terpisah, timer menjalankan bot: **snapshot privat → IndoBERT (baca chat) → fuzzy/utility/behavior tree → NLG → validasi IndoBERT → aksi/vote/chat** (mode `llm` lama tetap tersedia). Persentase diam pada fuzzy masih nilai tetap, bukan observasi diam pemain yang sesungguhnya.
+Alur chat manusia: **pesan → otorisasi → validasi ulang fase/hak chat → penyimpanan MySQL → broadcast**. Secara terpisah, timer menjalankan bot: **snapshot privat → IndoBERT (baca chat) → fuzzy/utility/behavior tree → NLG → validasi IndoBERT → aksi/vote/chat** (mode `llm` lama tetap tersedia). Analisis lama SVM → agresivitas → fuzzy 2 input dan balasan NOX sudah dihapus; model SVM hanya dipakai sebagai NLU cadangan bila IndoBERT tidak ada.
 
 Dengan container aplikasi sudah berjalan:
 
@@ -363,7 +363,7 @@ docker compose exec -T ai-engine python -m tests.live_match_smoke
 
 Tes otomatis bukan bukti koneksi AI eksternal sedang aktif; coba chat melalui UI untuk menguji provider sebenarnya. Tes database khusus hanya boleh diarahkan ke database percobaan.
 
-Dokumentasi lanjutan: [panduan membaca kode](CODE_GUIDE.md), [konsep game](GAME_CONCEPT.md), [backend](backend/README.md), [Ollama](OLLAMA.md), [pengaturan styling](frontend/STYLING.md), [deployment frontend](frontend/DEPLOYMENT.md), dan [deployment backend](backend/deployment/README.md).
+Dokumentasi lanjutan: [panduan membaca kode](CODE_GUIDE.md), [konsep game](GAME_CONCEPT.md), [backend](backend/README.md), [Ollama](OLLAMA.md), [LLM laptop untuk VM](ai-docker/README.md), [pengaturan styling](frontend/STYLING.md), [deployment frontend](frontend/DEPLOYMENT.md), dan [deployment backend](backend/deployment/README.md).
 
 ## Mengembangkan frontend melalui Docker
 

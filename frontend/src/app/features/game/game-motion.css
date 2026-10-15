@@ -114,12 +114,6 @@
     transform: translateY(6px);
   }
 }
-@keyframes titik {
-  50% {
-    opacity: 0.25;
-    transform: translateY(-3px);
-  }
-}
 @keyframes panggung {
   from {
     opacity: 0;
@@ -443,7 +437,6 @@
   .player-card.leading::after,
   .timer.urgent b,
   .message,
-  .typing i,
   .end-stage,
   .cheer,
   .victory-title,

@@ -17,7 +17,7 @@ permintaan pengguna.
 | `backend/controller/api/` | Validasi request, autentikasi route, dan respons HTTP |
 | `backend/services/` | Aturan aplikasi, pertandingan, analisis, dan transaksi |
 | `backend/models/` | Kueri SQL berparameter |
-| `backend/realtime/socket_handlers.py` | Autentikasi socket, chat, dan pengiriman balasan NOX |
+| `backend/realtime/socket_handlers.py` | Autentikasi socket, otorisasi, penyimpanan, dan siaran chat |
 | `backend/config/` | Konfigurasi environment, database, dan kebijakan upload |
 | `backend/controller/middleware/` | Autentikasi request, batas percobaan login, dan CORS |
 | `backend/module/` | Koneksi database, klien AI, helper upload, dan CLI akun |
@@ -45,8 +45,8 @@ file saja tidak berarti route tersebut dibuka pada aplikasi utama.
    target, fase, dan cooldown; menyelesaikan malam/Tribunal; kemudian menentukan
    hasil. `snapshot(viewer)` membatasi informasi sesuai pemain yang melihatnya.
    Aturan kemenangan dijelaskan lebih lengkap di `GAME_CONCEPT.md`.
-5. **Chat dan AI:** handler socket memeriksa sesi/hak chat, menganalisis intent dan
-   fuzzy, lalu menyimpan dan menyiarkan pesan. Pada pertandingan, `NPCService`
+5. **Chat dan AI:** handler socket memeriksa sesi/hak chat, lalu menyimpan dan
+   menyiarkan pesan tanpa menganalisisnya. Pada pertandingan, `NPCService`
    mengambil langkah mandiri dari timer untuk setiap bot: snapshot privat ->
    `services/npc_brain` (IndoBERT -> fuzzy/utility/behavior tree hasil ekspor
    notebook -> NLG tervalidasi) -> aksi/vote engine serta chat. Fase diperiksa ulang
@@ -54,7 +54,7 @@ file saja tidak berarti route tersebut dibuka pada aplikasi utama.
    "lantai bicara" (`NPCService._ambil_lantai`): satu bot menyusun/mengetik per
    pertandingan, dan rencana yang lebih tua dari chat bot lain dibatalkan lalu
    diputuskan ulang. Mode `NPC_METHOD=llm` mempertahankan jalur lama
-   (satu prompt LLM). Jalur balasan reaktif lama hanya untuk lobby/kompatibilitas.
+   (satu prompt LLM) sebagai pembanding.
    Setelah Mulai, `Match` berada di fase `preparing` sampai otak bot siap.
 6. **Logout:** `ProfileMenu` → `SessionService` → endpoint logout. Setelah token
    dicabut atau sudah tidak berlaku, data sesi browser dibersihkan dan pengguna

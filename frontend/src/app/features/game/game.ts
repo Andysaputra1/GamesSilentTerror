@@ -68,7 +68,6 @@ export class Game implements OnInit, OnDestroy {
   notice = '';
   connected = false;
   busy = false;
-  thinking = false;
   revealRole = false;
   seconds = 0;
   // Tampilan: tab di HP, panel aturan, dan layar akhir (pengumuman → kuesioner → meja akhir).
@@ -620,7 +619,6 @@ export class Game implements OnInit, OnDestroy {
     });
     this.socket.on('disconnect', () => {
       this.connected = false;
-      this.thinking = false;
       this.cdr.markForCheck();
     });
     this.socket.on('connect_error', () => {
@@ -630,10 +628,6 @@ export class Game implements OnInit, OnDestroy {
     });
     this.socket.on('system_alert', (data: { msg: string }) => {
       this.error = data.msg;
-      this.cdr.markForCheck();
-    });
-    this.socket.on('ai_status', (data: { pending: boolean }) => {
-      this.thinking = data.pending;
       this.cdr.markForCheck();
     });
     this.socket.on('receive_chat', (message: GameMessage) => {
@@ -803,7 +797,6 @@ export class Game implements OnInit, OnDestroy {
           this.seconds = this.game.winner
             ? 0
             : Math.max(0, Math.ceil(this.game.deadline - this.game.server_time));
-          if (this.game.winner) this.thinking = false;
           const phase = `${this.game.id}/${this.game.round}/${this.game.phase}`;
           if (phase !== this.loadedPhase) {
             this.target = '';
@@ -886,7 +879,7 @@ export class Game implements OnInit, OnDestroy {
 
   // CHAT: hanya echo server ditampilkan supaya pesan yang ditolak tidak tampak terkirim.
   sendMessage(): void {
-    if (!this.game?.me.can_chat || !this.connected || !this.draft.trim() || this.thinking) return;
+    if (!this.game?.me.can_chat || !this.connected || !this.draft.trim()) return;
     this.error = '';
     this.socket?.emit('send_chat', { username: this.game.me.name, message: this.draft.trim() });
     this.draft = '';

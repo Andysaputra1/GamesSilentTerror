@@ -12,7 +12,6 @@ from controller.api.users import router as users_router
 from config.settings import Settings
 from services.ai_diagnostics import capture_exchange, record_request, record_response
 from services.ai_probe_service import run_probe
-from services.analysis_service import IntentModelNotReadyError
 from module.openrouter_client import generate_reply
 
 
@@ -83,17 +82,13 @@ class DiagnosticsTests(unittest.IsolatedAsyncioTestCase):
         )
         with (
             patch("services.ai_probe_service.ai_runtime.current", return_value=config),
-            patch(
-                "services.ai_probe_service.analysis_service.predict_intent",
-                side_effect=IntentModelNotReadyError(),
-            ),
             patch("module.openrouter_client.httpx.AsyncClient") as factory,
         ):
             factory.return_value.__aenter__.return_value = client
             result = await run_probe("Apa alibimu?", "night")
         self.assertTrue(result["active"])
         self.assertTrue(result["valid_decision"])
-        self.assertEqual(result["analysis"]["status"], "skipped")
+        self.assertNotIn("analysis", result)
         self.assertIn("STATE_JSON:", result["request"]["body"]["messages"][0]["content"])
         self.assertGreaterEqual(result["duration_ms"], result["timings"]["llm_ms"])
 

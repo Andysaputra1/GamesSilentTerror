@@ -16,14 +16,16 @@ buat migrasi inkremental baru dan backup database terlebih dahulu.
 | game_sessions | Identitas room dan fase dalam persistence (`models/game_queries.py`) |
 | players | Peserta room, status, dan skor (`models/game_queries.py`) |
 | chat_messages | Pesan chat yang disimpan (`models/game_queries.py`) |
-| ai_analyses | Hasil SVM/fuzzy dan respons AI (`models/game_queries.py`) |
+| ai_analyses | Arsip hasil SVM/fuzzy dan balasan NOX lama; tidak ditulis lagi sejak analisis lama dihapus |
 | schema_migrations | Catatan versi skema; dipertahankan untuk administrasi migrasi |
 
 Semua tabel aplikasi masih digunakan. `players` berbeda dari `user_accounts`:
 satu akun dapat menjadi peserta beberapa room. State lengkap pertandingan,
 timer, dan voting masih di memori; volume tidak memulihkan match setelah restart.
 Baseline tidak memasukkan user1, janice, kimberly, ataupun data pertandingan lokal.
-Kolom/enum lama tetap dipertahankan untuk kompatibilitas query saat ini.
+Kolom/enum lama tetap dipertahankan untuk kompatibilitas query saat ini. Kolom `players.aggressiveness`,
+`players.suspicion_score`, `chat_messages.intent`, dan `chat_messages.suspicion_score` tidak diisi lagi
+(analisis SVM/fuzzy lama sudah dihapus); datanya dibiarkan sebagai arsip.
 
 ## Jalankan di VM
 

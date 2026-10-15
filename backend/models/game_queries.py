@@ -42,23 +42,6 @@ def ensure_player(database: Session, room_id: int, username: str) -> int:
     )
 
 
-# QUERY UPDATE: simpan agresivitas dan skor kecurigaan pemain; transaksi diatur service.
-def update_player_scores(
-    database: Session, player_id: int, aggressiveness: int, suspicion_score: float
-):
-    return database.execute(
-        text("""
-        UPDATE players SET aggressiveness = :aggressiveness, suspicion_score = :score
-        WHERE id = :player_id
-    """),
-        {
-            "player_id": player_id,
-            "aggressiveness": aggressiveness,
-            "score": round(suspicion_score, 2),
-        },
-    ).rowcount
-
-
 # QUERY UPDATE: ubah status pemain berdasarkan ID dan kembalikan jumlah baris terpengaruh.
 def update_player_status(database: Session, player_id: int, status: str):
     return database.execute(
@@ -67,21 +50,19 @@ def update_player_status(database: Session, player_id: int, status: str):
     ).rowcount
 
 
-# QUERY INSERT: simpan pesan pemain beserta intent/skor dan kembalikan ID pesan.
+# QUERY INSERT: simpan pesan (pemain atau bot) dan kembalikan ID pesan. Kolom lama intent/suspicion_score
+# di chat_messages dibiarkan NULL; analisis SVM/fuzzy per pesan sudah tidak dipakai.
 def insert_message(
     database: Session,
     *,
     room_id: int,
-    player_id: int,
+    player_id: int | None,
     username: str,
     message: str,
-    intent: str | None,
-    suspicion_score: float,
 ) -> int:
     sql = text("""
-        INSERT INTO chat_messages
-            (game_session_id, player_id, sender_name, message, intent, suspicion_score)
-        VALUES (:room_id, :player_id, :username, :message, :intent, :score)
+        INSERT INTO chat_messages (game_session_id, player_id, sender_name, message)
+        VALUES (:room_id, :player_id, :username, :message)
     """)
     return int(
         database.execute(
@@ -91,40 +72,9 @@ def insert_message(
                 "player_id": player_id,
                 "username": username,
                 "message": message,
-                "intent": intent,
-                "score": round(suspicion_score, 2),
             },
         ).lastrowid
     )
-
-
-# QUERY INSERT: simpan hasil SVM, fuzzy, dan balasan LLM yang terkait dengan satu pesan.
-def insert_analysis(
-    database: Session,
-    *,
-    message_id: int,
-    intent: str,
-    aggressiveness: int,
-    suspicion_score: float,
-    suspicion_status: str,
-    llm_response: str,
-):
-    sql = text("""
-        INSERT INTO ai_analyses
-            (chat_message_id, intent, aggressiveness, suspicion_score, suspicion_status, llm_response)
-        VALUES (:message_id, :intent, :aggressiveness, :score, :status, :response)
-    """)
-    return database.execute(
-        sql,
-        {
-            "message_id": message_id,
-            "intent": intent,
-            "aggressiveness": aggressiveness,
-            "score": round(suspicion_score, 2),
-            "status": suspicion_status,
-            "response": llm_response,
-        },
-    ).lastrowid
 
 
 # QUERY UPDATE: ubah fase ruangan yang ditunjuk ID; tidak menjalankan engine ronde.

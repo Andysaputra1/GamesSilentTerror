@@ -47,58 +47,33 @@ class HistoryAccessTests(unittest.TestCase):
 
 
 class ChatDurabilityTests(unittest.IsolatedAsyncioTestCase):
-    async def run_chat(self, *, ai_fails=False, db_fails=False, bot_db_fails=False):
+    async def run_chat(self, *, db_fails=False):
         rooms = RoomService()
         room = rooms.create("alice")
         rooms.set_bot(room.code, "alice", True)
         sio = Mock(emit=AsyncMock(), enter_room=AsyncMock())
-        analysis = Mock()
-        analysis.predict_intent.return_value = "neutral"
-        analysis.aggressiveness_for_intent.return_value = 0
         persistence = Mock()
         persistence.record_player_message.return_value = 42
         if db_fails:
             persistence.record_player_message.side_effect = PersistenceError("DB unavailable")
-        if bot_db_fails:
-            persistence.record_bot_message.side_effect = PersistenceError("DB unavailable")
-
-        async def respond(**kwargs):
-            persistence.record_player_message.assert_called_once()
-            self.assertTrue(any(call.args[0] == "receive_chat" for call in sio.emit.call_args_list))
-            if ai_fails:
-                raise RuntimeError("simulated provider failure")
-            return "Halo pemain"
-
-        analysis.create_host_response = AsyncMock(side_effect=respond)
-        controller = SocketGameController(sio, analysis, Mock())
+        controller = SocketGameController(sio, Mock())
         controller.socket_players["sid"] = "alice"
         controller.socket_rooms["sid"] = room.code
-        controller.room_analysis[room.code] = analysis
         with (
             patch("realtime.socket_handlers.room_service", rooms),
             patch("realtime.socket_handlers.PersistenceService", return_value=persistence),
         ):
             await controller.send_chat("sid", {"username": "alice", "message": "Halo bot"})
         chats = [c.args[1] for c in sio.emit.call_args_list if c.args[0] == "receive_chat"]
-        return persistence, analysis, chats
+        return persistence, chats
 
-    async def test_human_saved_before_ai_even_when_provider_fails(self):
-        persistence, _, chats = await self.run_chat(ai_fails=True)
+    # Chat manusia disimpan lalu disiarkan; tidak ada balasan bot langsung (bot membaca lewat NPCService).
+    async def test_human_saved_then_echoed_without_direct_bot_reply(self):
+        persistence, chats = await self.run_chat()
         self.assertEqual(persistence.record_player_message.call_args.kwargs["message"], "Halo bot")
         persistence.record_bot_message.assert_not_called()
         self.assertEqual([c["sender"] for c in chats], ["alice"])
 
-    async def test_database_failure_prevents_echo_and_ai(self):
-        _, analysis, chats = await self.run_chat(db_fails=True)
+    async def test_database_failure_prevents_echo(self):
+        _, chats = await self.run_chat(db_fails=True)
         self.assertEqual(chats, [])
-        analysis.create_host_response.assert_not_awaited()
-
-    async def test_bot_saved_with_sender_and_parent(self):
-        persistence, _, chats = await self.run_chat()
-        kwargs = persistence.record_bot_message.call_args.kwargs
-        self.assertEqual((kwargs["username"], kwargs["reply_to_id"]), ("NOX", 42))
-        self.assertEqual([c["sender"] for c in chats], ["alice", "NOX"])
-
-    async def test_bot_database_failure_preserves_human_only(self):
-        _, _, chats = await self.run_chat(bot_db_fails=True)
-        self.assertEqual([c["sender"] for c in chats], ["alice"])

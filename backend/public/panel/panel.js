@@ -136,15 +136,6 @@ function renderReport(container, trace) {
   );
   const sections = [
     [
-      'Analisis SVM / fuzzy',
-      trace.analysis || {
-        intent: trace.intent,
-        aggressiveness: trace.aggressiveness,
-        suspicion_score: trace.suspicion_score,
-        silence_percentage: trace.silence_percentage,
-      },
-    ],
-    [
       'Request LLM · endpoint & parameter',
       trace.request || 'Tidak tercatat pada trace ini. Trace lama tidak direkonstruksi.',
     ],

@@ -1,74 +1,13 @@
-"""Provider selection and Ollama payload/error handling, without network access."""
+"""Settings provider/model dan payload adapter Ollama, tanpa akses jaringan."""
 
 import unittest
 from unittest.mock import AsyncMock, patch
 import httpx
 from config.settings import Settings
 from module import ollama_client
-from services.analysis_service import AnalysisService
 
 
 class ProviderTests(unittest.IsolatedAsyncioTestCase):
-    # HELPER TES ASYNC: panggil jalur respons dengan input tetap; provider dimock oleh masing-masing skenario.
-    async def reply(self):
-        return await AnalysisService().create_host_response(
-            player_name="user1",
-            message="Halo",
-            intent="neutral",
-            aggressiveness=10,
-            suspicion_score=20,
-            suspicion_status="AMAN",
-        )
-
-    # TES ASYNC: mode Docker hanya memakai Ollama dan tidak memanggil klien cloud.
-    async def test_docker_never_calls_openai(self):
-        with (
-            patch(
-                "services.analysis_service.settings", Settings(_env_file=None, ai_provider="docker")
-            ),
-            patch(
-                "services.analysis_service.generate_reply",
-                AsyncMock(return_value="Halo dari lokal."),
-            ),
-            patch("services.analysis_service.AsyncOpenAI") as cloud,
-        ):
-            self.assertEqual(await self.reply(), "Halo dari lokal.")
-            cloud.assert_not_called()
-
-    # TES ASYNC: mode API memakai klien OpenAI mock dan tidak memanggil Ollama.
-    async def test_api_never_calls_ollama(self):
-        with (
-            patch(
-                "services.analysis_service.settings",
-                Settings(
-                    _env_file=None, ai_provider="api", api_backend="openai", OPENAI_API_KEY="test"
-                ),
-            ),
-            patch("services.analysis_service.generate_reply", AsyncMock()) as local,
-            patch("services.analysis_service.AsyncOpenAI") as cloud,
-        ):
-            cloud.return_value.responses.create = AsyncMock(
-                return_value=type("Response", (), {"output_text": "API reply"})()
-            )
-            cloud.return_value.close = AsyncMock()
-            self.assertEqual(await self.reply(), "API reply")
-            local.assert_not_called()
-
-    # TES ASYNC: timeout Ollama menghasilkan pesan kegagalan tanpa beralih ke cloud berbayar.
-    async def test_docker_timeout_is_visible_without_cloud_fallback(self):
-        with (
-            patch(
-                "services.analysis_service.settings", Settings(_env_file=None, ai_provider="docker")
-            ),
-            patch(
-                "services.analysis_service.generate_reply",
-                AsyncMock(side_effect=httpx.ReadTimeout("test")),
-            ),
-            patch("services.analysis_service.AsyncOpenAI") as cloud,
-        ):
-            self.assertIn("Ollama", await self.reply())
-            cloud.assert_not_called()
-
     # TES ASYNC ADAPTER: periksa payload model/non-streaming dan pengambilan teks dengan HTTP mock.
     async def test_ollama_payload_and_response(self):
         request = httpx.Request("POST", "http://ollama:11434/api/chat")

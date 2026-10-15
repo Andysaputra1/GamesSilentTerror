@@ -585,7 +585,7 @@ class SocketGameTests(unittest.IsolatedAsyncioTestCase):
         from services.auth_service import SessionValidationError
 
         sio = Mock(emit=AsyncMock())
-        controller = SocketGameController(sio, Mock(), Mock())
+        controller = SocketGameController(sio, Mock())
         controller.socket_players["sid"] = "alice"
         controller.socket_tokens["sid"] = "revoked-test-token"
         with patch(
@@ -602,7 +602,7 @@ class SocketGameTests(unittest.IsolatedAsyncioTestCase):
         rooms.set_bot(room.code, "alice", True)
         rooms.start(room.code, "alice")
         sio = Mock(emit=AsyncMock(), enter_room=AsyncMock())
-        controller = SocketGameController(sio, Mock(), Mock())
+        controller = SocketGameController(sio, Mock())
         controller.socket_players["sid"] = "alice"
         controller.socket_rooms["sid"] = room.code
         with (
@@ -626,34 +626,3 @@ class SocketGameTests(unittest.IsolatedAsyncioTestCase):
             await controller.send_chat("sid", {"username": "alice", "message": "hostage"})
         self.assertFalse(any(c.args[0] == "receive_chat" for c in sio.emit.call_args_list))
         self.assertEqual(room.match.messages, [])
-
-    async def test_late_ai_cannot_speak_at_night(self):
-        rooms = RoomService()
-        room = rooms.create("alice")
-        rooms.set_bot(room.code, "alice", True)
-        rooms.start(room.code, "alice")
-        room.match.begin()  # lewati layar persiapan
-        room.match.ai_controlled = False  # Uji jalur balasan legacy, bukan scheduler NPC.
-        sio = Mock(emit=AsyncMock(), enter_room=AsyncMock())
-        analysis = Mock()
-        analysis.predict_intent.return_value = "neutral"
-        analysis.aggressiveness_for_intent.return_value = 0
-
-        async def late_reply(**kwargs):
-            room.match.phase = "night"
-            return "Balasan terlambat"
-
-        analysis.create_host_response = AsyncMock(side_effect=late_reply)
-        controller = SocketGameController(sio, analysis, Mock())
-        controller.socket_players["sid"] = "alice"
-        controller.socket_rooms["sid"] = room.code
-        controller.room_analysis[room.code] = analysis
-        with (
-            patch("realtime.socket_handlers.room_service", rooms),
-            patch("realtime.socket_handlers.PersistenceService"),
-        ):
-            await controller.send_chat("sid", {"username": "alice", "message": "halo"})
-        self.assertEqual(len(room.match.messages), 1)
-        analysis.create_host_response.assert_awaited_once()
-        self.assertEqual(room.match.messages[0]["sender"], "alice")
-        self.assertEqual(controller.ai_pending, set())

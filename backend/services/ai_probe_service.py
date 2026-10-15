@@ -6,9 +6,7 @@ from uuid import uuid4
 from datetime import datetime, timezone
 
 from services.ai_runtime_service import ai_runtime
-from services.analysis_service import analysis_service, IntentModelNotReadyError
 from services.ai_diagnostics import capture_exchange, measure
-from services.fuzzy_service import calculate_suspicion, status_for_score
 from services.match_engine import Match
 from services.npc_service import npc_context, decision_prompt, request_decision
 from module.openrouter_client import failure_message
@@ -39,27 +37,9 @@ async def run_probe(message, scenario):
         "request": None,
         "response": None,
         "output": None,
-        "note": "Skenario terisolasi; tidak mengirim chat atau menjalankan aksi di room pemain. SVM/fuzzy adalah analisis pendamping, bukan pengetahuan role NPC.",
+        "note": "Skenario terisolasi; tidak mengirim chat atau menjalankan aksi di room pemain.",
     }
     try:
-        with measure(trace, "analysis_ms"):
-            try:
-                intent = analysis_service.predict_intent(message)
-                weight = analysis_service.aggressiveness_for_intent(intent)
-                score = calculate_suspicion(weight, 20)
-                trace["analysis"] = {
-                    "status": "complete",
-                    "intent": intent,
-                    "aggressiveness": weight,
-                    "silence_percentage": 20,
-                    "suspicion_score": round(score, 2),
-                    "suspicion_status": status_for_score(score),
-                }
-            except IntentModelNotReadyError:
-                trace["analysis"] = {
-                    "status": "skipped",
-                    "reason": "Model SVM belum dimuat; pengujian keputusan NPC tetap berjalan.",
-                }
         with measure(trace, "prompt_ms"):
             match = Match(["Pemain_A", "Pemain_B", "Pemain_C", "Pemain_D", "Pemain_E"], ["NOX"])
             for name, role in zip(

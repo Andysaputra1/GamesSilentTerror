@@ -499,12 +499,6 @@
             } @empty {
               <p class="hint empty">Belum ada percakapan. Mulai diskusi saat siang.</p>
             }
-            @if (thinking) {
-              <p class="typing" role="status">
-                <span aria-hidden="true"><i></i><i></i><i></i></span> Bot sedang menyiapkan balasan.
-                Timer tetap berjalan.
-              </p>
-            }
           </div>
           <form class="composer" (ngSubmit)="sendMessage()">
             <input
@@ -518,7 +512,7 @@
             /><button
               class="send-button"
               aria-label="Kirim pesan"
-              [disabled]="!draft.trim() || !state.me.can_chat || !connected || thinking"
+              [disabled]="!draft.trim() || !state.me.can_chat || !connected"
             >
               ➤
             </button>

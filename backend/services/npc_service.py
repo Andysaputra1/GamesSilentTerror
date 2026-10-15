@@ -394,9 +394,6 @@ class NPCService:
                     context={"match_id": match.id, "round_number": match.round,
                              "phase": match.phase},
                     reply_to_id=None,
-                    intent=None,
-                    aggressiveness=0,
-                    suspicion_score=0,
                 )  # fmt: skip
             except PersistenceError:
                 logger.warning("Chat bot %s tidak tersimpan; tidak disiarkan.", otak.nama)
@@ -534,9 +531,6 @@ class NPCService:
                             "phase": match.phase,
                         },
                         reply_to_id=None,
-                        intent=None,
-                        aggressiveness=0,
-                        suspicion_score=0,
                     )
                     reply = match.add_message(key[3], decision.message.strip())
                 trace["stage"] = "npc_complete"
