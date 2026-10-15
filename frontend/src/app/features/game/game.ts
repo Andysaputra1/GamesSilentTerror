@@ -458,6 +458,16 @@ export class Game implements OnInit, OnDestroy {
     return Math.max(0, this.game?.players.findIndex((player) => player.name === name) ?? 0);
   }
 
+  // Nama tampilan pemain dari snapshot; username tetap dipakai untuk aksi dan vote.
+  nama(name: string | null | undefined): string {
+    if (!name) return '';
+    return this.game?.players.find((player) => player.name === name)?.label ?? name;
+  }
+
+  namaDaftar(names: string[]): string {
+    return names.map((name) => this.nama(name)).join(', ');
+  }
+
   // Skin pilihan akun (dibagikan server tanpa kembar); urutan kursi hanya cadangan snapshot lama.
   skinFor(name: string): string {
     const chosen = this.game?.players.find((player) => player.name === name)?.skin_id;

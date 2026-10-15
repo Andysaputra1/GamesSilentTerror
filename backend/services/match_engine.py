@@ -6,6 +6,7 @@ untuk satu pemain: role, Hostage, Gag, dan hasil Peek tidak masuk data publik.
 
 from math import ceil
 from collections import Counter
+import copy
 from dataclasses import dataclass, field
 import random
 import time
@@ -59,6 +60,49 @@ def phase_durations(count, quick=False):
     return {"day": count * 20, "night": count * 5, "tribunal": ceil(count * 7.5)}
 
 
+# Nama yang tampil di game = nama tampilan akun; username tetap ID engine. Nama yang bentrok (sesama
+# pemain, beda huruf besar/kecil saja, atau sama dengan nama bot) diberi penanda "(username)".
+def label_unik(nama_tampilan, bots=()):
+    nama = {u: (d or "").strip() or u for u, d in nama_tampilan.items()}
+    jumlah = Counter(d.casefold() for d in nama.values())
+    nama_bot = {b.casefold() for b in bots}
+    labels = {
+        u: d if jumlah[d.casefold()] == 1 and d.casefold() not in nama_bot else f"{d} ({u})"
+        for u, d in nama.items()
+    }
+    return labels | {b: b for b in bots}
+
+
+# Salinan snapshot untuk otak bot: semua username diganti label, sehingga bot membaca dan menyebut nama yang
+# sama dengan yang dilihat dan diketik pemain manusia. Target keputusan bot diterjemahkan balik lewat
+# Match.username().
+def snapshot_berlabel(snapshot, labels):
+    def nama(n):
+        return labels.get(n, n) if n else n
+
+    s = copy.deepcopy(snapshot)
+    for p in s["players"]:
+        p["name"] = nama(p["name"])
+    for m in s["messages"]:
+        m["sender"] = nama(m["sender"])
+    for v in s["tribunal_votes"]:
+        v["target"], v["voters"] = nama(v["target"]), [nama(x) for x in v["voters"]]
+    me = s["me"]
+    me["name"], me["vote"], me["last_guard"] = (
+        nama(me["name"]),
+        nama(me["vote"]),
+        nama(me["last_guard"]),
+    )
+    me["allies"] = [nama(x) for x in me["allies"]]
+    me["ally_actions"] = [
+        {**a, "name": nama(a["name"]), "target": nama(a["target"])} for a in me["ally_actions"]
+    ]
+    if me.get("action"):
+        me["action"] = {**me["action"], "target": nama(me["action"]["target"])}
+    me["intel"] = [{**x, "name": nama(x["name"])} for x in me["intel"]]
+    return s
+
+
 # Avatar pertandingan: manusia (urutan masuk ruangan) memakai skin pilihannya, bot memakai skin tetapnya.
 # Skin yang sudah dipakai pemain sebelumnya diganti skin yang masih kosong; setelah keenam skin
 # terpakai (lebih dari 6 peserta), skin boleh kembar.
@@ -89,6 +133,7 @@ class Match:
         rng=None,
         preparing=False,
         skin_map: dict[str, str] | None = None,
+        labels: dict[str, str] | None = None,
     ):
         names = list(humans) + list(bots)
         if not 4 <= len(names) <= 10 or len(set(names)) != len(names):
@@ -102,6 +147,7 @@ class Match:
         skins = assign_skins(humans, bots, skin_map)
         for name, role in zip(names, roles):
             self.players[name] = Participant(name, role, name in bots, skin_id=skins[name])
+        self.labels = {name: (labels or {}).get(name, name) for name in names}
         self.id = uuid4().hex
         self.round = 1
         self.ai_controlled = (
@@ -317,7 +363,7 @@ class Match:
             # Eksekusi Hitman terakhir langsung mengakhiri permainan dan membuka semua role.
             terakhir = not any(p.alive for p in self.players.values() if p.role == "hitman")
             rahasia = "" if terakhir else " Role tetap dirahasiakan sampai permainan selesai."
-            self.events.append(f"Tribunal mengeksekusi {leaders[0]}.{count}{rahasia}")
+            self.events.append(f"Tribunal mengeksekusi {self.labels[leaders[0]]}.{count}{rahasia}")
         else:
             self.events.append("Tribunal berakhir tanpa eksekusi: suara seri atau tidak ada suara.")
         self.check_winner()
@@ -503,6 +549,10 @@ class Match:
             "bots": sum(p.bot for p in self.players.values()),
         }
 
+    # Username dari label (target keputusan bot); nama yang bukan label dikembalikan apa adanya.
+    def username(self, label):
+        return next((u for u, nama in self.labels.items() if nama == label), label)
+
     # Jumlah tiap role sejak awal pertandingan; publik untuk semua pemain (siapa pemegangnya tetap rahasia).
     def composition(self):
         counts = Counter(p.role for p in self.players.values())
@@ -566,6 +616,7 @@ class Match:
             "players": [
                 {
                     "name": p.name,
+                    "label": self.labels[p.name],
                     "alive": p.alive,
                     "skin_id": p.skin_id,
                     **({"role": p.role, "hostage": p.hostage, "bot": p.bot} if self.winner else {}),

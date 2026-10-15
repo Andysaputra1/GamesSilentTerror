@@ -124,3 +124,25 @@ class TickAllTests(unittest.TestCase):
         with self.assertLogs("shadow_heist.rooms", "ERROR"):
             rooms.tick_all()
         sehat.match.tick.assert_called_once()
+
+
+class DisplayNameRoomTests(unittest.TestCase):
+    # Lobby dan pertandingan memakai nama tampilan akun; username tetap kunci anggota.
+    def test_lobby_and_match_use_display_names(self):
+        rooms = RoomService()
+        profil = {"alice": ("dexter", "Alice Wonder"), "bob": ("jenny", "Alice Wonder")}
+        with patch.object(
+            RoomService, "_fetch_profiles", lambda self, names: {n: profil[n] for n in names}
+        ):
+            room = rooms.create("alice")
+            rooms.join(room.code, "bob")
+            rooms.set_bot(room.code, "alice", True)
+            lobby = rooms.snapshot(room)
+            self.assertEqual(
+                [m["label"] for m in lobby["members"]], ["Alice Wonder", "Alice Wonder"]
+            )
+            rooms.start(room.code, "alice")
+        labels = room.match.labels
+        self.assertEqual(labels["alice"], "Alice Wonder (alice)")  # nama sama → diberi penanda
+        self.assertEqual(labels["bob"], "Alice Wonder (bob)")
+        self.assertEqual(labels["NOX"], "NOX")

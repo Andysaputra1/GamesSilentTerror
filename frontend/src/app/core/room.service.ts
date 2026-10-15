@@ -12,6 +12,7 @@ export interface PhaseDurations {
 
 export interface RoomMember {
   name: string;
+  label?: string;
   skin_id: string;
 }
 

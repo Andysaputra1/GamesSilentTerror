@@ -97,7 +97,7 @@ def main():
         assert state(roles["stalker"])["me"]["intel"][0]["role"] == "hitman"
         for name in accounts:
             view = state(name)
-            assert all(set(p) == {"name", "alive", "skin_id"} for p in view["players"])
+            assert all(set(p) == {"name", "label", "alive", "skin_id"} for p in view["players"])
         assert state(roles["civilian"])["me"]["can_vote"]
         # Tanpa vote ronde 1: tidak ada eksekusi. Guard harus tetap melindungi korban.
         wait_phase("day", 2)

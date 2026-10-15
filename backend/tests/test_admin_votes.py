@@ -15,7 +15,7 @@ class PublicVoteTests(unittest.TestCase):
             public = game.snapshot(viewer)
             votes = next(item for item in public["tribunal_votes"] if item["target"] == "f")
             self.assertEqual(votes["voters"], list("abcde"))
-            self.assertTrue(all(set(p) == {"name", "alive", "skin_id"} for p in public["players"]))
+            self.assertTrue(all(set(p) == {"name", "label", "alive", "skin_id"} for p in public["players"]))
         game.phase = "day"
         self.assertEqual(game.snapshot("a")["tribunal_votes"], [])
 

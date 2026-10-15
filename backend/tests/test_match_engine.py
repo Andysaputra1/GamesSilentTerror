@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 from controller.api.rooms import router
 from controller.middleware.auth import require_authenticated_user
 from realtime.socket_handlers import SocketGameController
-from services.match_engine import KOMPOSISI_PERAN, Match
+from services.match_engine import KOMPOSISI_PERAN, Match, label_unik, snapshot_berlabel
 from services.skin_constants import ALL_SKINS
 from services.room_service import RoomService
 
@@ -201,7 +201,7 @@ class EngineTests(unittest.TestCase):
         for viewer in self.game.players:
             snapshot = self.game.snapshot(viewer)
             for player in snapshot["players"]:
-                self.assertEqual(set(player), {"name", "alive", "skin_id"})
+                self.assertEqual(set(player), {"name", "label", "alive", "skin_id"})
             self.assertNotIn("civilian", " ".join(snapshot["events"]))
             self.assertNotIn("actions", snapshot)
             self.assertNotIn("votes", snapshot)
@@ -376,7 +376,9 @@ class SyndicateTests(unittest.TestCase):
                 self.assertEqual(remaining(), expected)
             # Role korban tetap rahasia; roster lawan tetap nama dan status hidup saja.
             view = self.game.snapshot("spy")
-            self.assertTrue(all(set(p) == {"name", "alive", "skin_id"} for p in view["players"]))
+            self.assertTrue(
+                all(set(p) == {"name", "label", "alive", "skin_id"} for p in view["players"])
+            )
 
     def test_hitman_count_is_available_during_preparation(self):
         game = Match([], self.NAMES, now=0, rng=random.Random(3), preparing=True)
@@ -654,3 +656,45 @@ class ChatOrderTests(unittest.TestCase):
             tabel, _ = otak_fuzzy.hitung_bukti(ingatan, view)
             budi = tabel[tabel["pemain"] == "Budi"].iloc[0]
             self.assertEqual(budi["pengalihan"], 0.5)  # dituduh lalu menuduh pihak ketiga
+
+
+class DisplayNameTests(unittest.TestCase):
+    # Nama tampilan dipakai di layar dan oleh bot; username tetap ID engine.
+    def test_labels_are_unique_and_never_copy_a_bot_name(self):
+        labels = label_unik(
+            {
+                "andy88": "Andy Saputra",
+                "andy99": "andy saputra",
+                "budi": "Budi",
+                "x": " ",
+                "nox1": "NOX",
+            },
+            ["NOX", "ECHO"],
+        )
+        self.assertEqual(labels["budi"], "Budi")
+        self.assertEqual(
+            labels["andy88"], "Andy Saputra (andy88)"
+        )  # bentrok beda huruf besar/kecil
+        self.assertEqual(labels["andy99"], "andy saputra (andy99)")
+        self.assertEqual(labels["x"], "x")  # nama tampilan kosong → username
+        self.assertEqual(labels["nox1"], "NOX (nox1)")  # tidak boleh menyamar jadi bot
+        self.assertEqual((labels["NOX"], labels["ECHO"]), ("NOX", "ECHO"))
+
+    def test_bot_snapshot_uses_labels_and_targets_map_back(self):
+        labels = {"andy88": "Andy Saputra", "budi": "Budi", "citra": "Citra", "NOX": "NOX"}
+        match = Match(["andy88", "budi", "citra"], ["NOX"], labels=labels)
+        match.add_message("andy88", "Aku curiga sama Budi")
+        bot = snapshot_berlabel(match.snapshot("NOX"), match.labels)
+        self.assertEqual(
+            {p["name"] for p in bot["players"]}, {"Andy Saputra", "Budi", "Citra", "NOX"}
+        )
+        self.assertEqual(bot["messages"][0]["sender"], "Andy Saputra")
+        self.assertEqual(
+            match.snapshot("NOX")["players"][0]["name"], "andy88"
+        )  # snapshot asli tidak berubah
+        self.assertEqual(match.username("Andy Saputra"), "andy88")
+        match.phase = "tribunal"
+        match.vote("NOX", match.username("Budi"))
+        self.assertEqual(match.votes["NOX"], "budi")
+        match.resolve_votes()
+        self.assertTrue(any(e.startswith("Tribunal mengeksekusi Budi.") for e in match.events))

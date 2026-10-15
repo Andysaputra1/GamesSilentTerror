@@ -64,7 +64,7 @@
                   @for (member of room.members; track member.name) {
                     <article class="room-player">
                       <span class="room-player__mark" aria-hidden="true">◆</span>
-                      <div><b>{{ member.name }}</b><small>{{ member.name === room.owner ? 'HOST' : 'PLAYER' }}</small></div>
+                      <div><b>{{ member.label || member.name }}</b><small>{{ member.name === room.owner ? 'HOST' : 'PLAYER' }}</small></div>
                       @if (member.name === username) { <em>YOU</em> }
                     </article>
                   }

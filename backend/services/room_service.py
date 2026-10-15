@@ -6,7 +6,7 @@ from sqlalchemy import text
 import secrets
 from threading import RLock
 from module.mysql_connector import SessionLocal
-from services.match_engine import Match, phase_durations
+from services.match_engine import Match, label_unik, phase_durations
 from services.activity_service import activity, traced
 
 logger = logging.getLogger("shadow_heist.rooms")
@@ -21,6 +21,7 @@ class Room:
     owner: str
     members: list[str] = field(default_factory=list)
     members_skin: dict[str, str] = field(default_factory=dict)
+    members_label: dict[str, str] = field(default_factory=dict)  # username → nama tampilan
     bot_enabled: bool = False
     match: Match | None = None
     capacity: int = 6
@@ -32,8 +33,8 @@ class RoomService:
         self.rooms: dict[str, Room] = {}
         self.lock = RLock()
 
-    # HELPER: ambil skin_id dari user_accounts untuk daftar username.
-    def _fetch_skin_ids(self, usernames: list[str]) -> dict[str, str]:
+    # HELPER: skin_id dan nama tampilan dari user_accounts; akun yang tidak ditemukan memakai bawaan.
+    def _fetch_profiles(self, usernames: list[str]) -> dict[str, tuple[str, str]]:
         if not usernames:
             return {}
         database = SessionLocal()
@@ -41,17 +42,21 @@ class RoomService:
             placeholders = ", ".join([f":u{i}" for i in range(len(usernames))])
             params = {f"u{i}": name for i, name in enumerate(usernames)}
             sql = text(f"""
-                SELECT username, skin_id FROM user_accounts
+                SELECT username, skin_id, display_name FROM user_accounts
                 WHERE username IN ({placeholders})
             """)
-            result = database.execute(sql, params)
-            skin_map = {row.username: row.skin_id for row in result}
-            for name in usernames:
-                if name not in skin_map:
-                    skin_map[name] = "dexter"
-            return skin_map
+            rows = {
+                row.username: (row.skin_id, row.display_name)
+                for row in database.execute(sql, params)
+            }
+            return {name: rows.get(name, ("dexter", name)) for name in usernames}
         finally:
             database.close()
+
+    # Simpan skin dan nama tampilan anggota baru ke ruangan.
+    def _ingat_profil(self, room, usernames):
+        for name, (skin_id, display_name) in self._fetch_profiles(usernames).items():
+            room.members_skin[name], room.members_label[name] = skin_id, display_name
 
     # SERVICE LOBBY: buat kode unik 6 karakter, tetapkan pemilik sebagai anggota pertama, dan batasi jumlah ruangan.
     @traced
@@ -69,7 +74,7 @@ class RoomService:
             while code in self.rooms:
                 code = secrets.token_hex(3).upper()
             room = Room(code, username, [username], capacity=capacity)
-            room.members_skin = self._fetch_skin_ids([username])
+            self._ingat_profil(room, [username])
             self.rooms[code] = room
             return room
 
@@ -106,9 +111,7 @@ class RoomService:
                 if len(room.members) >= room.capacity:
                     raise ValueError(f"Ruangan sudah penuh (maksimal {room.capacity} pemain).")
                 room.members.append(username)
-                room.members_skin[username] = self._fetch_skin_ids([username]).get(
-                    username, "dexter"
-                )
+                self._ingat_profil(room, [username])
             return room
 
     # SERVICE LOBBY: periksa kepemilikan lalu aktifkan/nonaktifkan NOX pada ruangan.
@@ -129,7 +132,11 @@ class RoomService:
     def snapshot(self, room: Room):
         with self.lock:
             members_with_skin = [
-                {"name": name, "skin_id": room.members_skin.get(name, "dexter")}
+                {
+                    "name": name,
+                    "label": room.members_label.get(name, name),
+                    "skin_id": room.members_skin.get(name, "dexter"),
+                }
                 for name in room.members
             ]
             return {
@@ -173,12 +180,14 @@ class RoomService:
                 )
             if any(self.active(name) for name in room.members):
                 raise ValueError("Ada anggota yang masih mengikuti pertandingan lain.")
-            room.members_skin = self._fetch_skin_ids(room.members)
+            self._ingat_profil(room, room.members)
+            bots = self.bot_names(room)
             # Ronde 1 ditahan di layar persiapan sampai otak bot siap (NPCService.prepare).
             room.match = Match(
                 room.members,
-                self.bot_names(room),
+                bots,
                 skin_map=room.members_skin,
+                labels=label_unik({u: room.members_label.get(u, u) for u in room.members}, bots),
                 quick=quick,
                 preparing=True,
             )
@@ -295,6 +304,7 @@ class RoomService:
                 survey_service.ingat_pertandingan(room)
             room.members.remove(username)
             room.members_skin.pop(username, None)
+            room.members_label.pop(username, None)
             if not room.members:
                 del self.rooms[room.code]
             elif username == room.owner:

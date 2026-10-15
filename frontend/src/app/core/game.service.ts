@@ -54,6 +54,8 @@ export interface MatchView {
   events: string[];
   players: {
     name: string;
+    /** Nama tampilan akun; `name` (username) tetap dipakai untuk aksi dan vote. */
+    label?: string;
     bot?: boolean;
     alive: boolean;
     role?: string;

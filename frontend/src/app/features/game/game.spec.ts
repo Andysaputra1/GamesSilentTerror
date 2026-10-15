@@ -192,6 +192,31 @@ describe('Game', () => {
     expect(navigate).not.toHaveBeenCalled();
   });
 
+  it('shows display names while actions keep the username', () => {
+    const state = snapshot();
+    state.game.players = [
+      { name: 'alice', label: 'Alice Wonder', bot: false, alive: true },
+      { name: 'NOX', label: 'NOX', bot: true, alive: true },
+    ];
+    state.game.phase = 'tribunal';
+    state.game.tribunal_votes = [{ target: 'NOX', voters: ['alice'] }];
+    component.game = state.game;
+    component.code = 'ABC123';
+    fixture.componentRef.changeDetectorRef.markForCheck();
+    fixture.detectChanges();
+    const cards = fixture.nativeElement.querySelectorAll('.player-card');
+    expect((cards[0] as HTMLElement).querySelector('.name-tag')?.textContent).toBe('Alice Wonder');
+    expect((cards[1] as HTMLElement).querySelector('.voter-badges')?.getAttribute('title')).toBe(
+      'Alice Wonder',
+    );
+    expect(component.nama('alice')).toBe('Alice Wonder');
+    expect(component.nama('tamu')).toBe('tamu'); // snapshot lama tanpa label
+    component.target = 'NOX';
+    const request = vi.spyOn(TestBed.inject(GameService), 'request').mockReturnValue(of(state));
+    component.act();
+    expect(request.mock.calls[0][1]).toMatchObject({ target: 'NOX' });
+  });
+
   it('only allows self target for Guard and excludes consecutive target', () => {
     component.game = snapshot().game;
     expect(component.canTarget('alice')).toBe(false);

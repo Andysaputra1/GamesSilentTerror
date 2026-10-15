@@ -144,7 +144,7 @@ class VictoryRulesTests(unittest.TestCase):
             snapshot = self.game.snapshot(viewer)
             self.assertIsNone(snapshot["result"])
             self.assertTrue(
-                all(set(p) == {"name", "alive", "skin_id"} for p in snapshot["players"])
+                all(set(p) == {"name", "label", "alive", "skin_id"} for p in snapshot["players"])
             )
             self.assertEqual(snapshot["me"]["hostage"], viewer == "spy")
             self.assertEqual(snapshot["me"]["gagged"], viewer == "stalker")

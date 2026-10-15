@@ -257,7 +257,7 @@
               <h3>Intel privat · Peek</h3>
               @for (item of state.me.intel; track $index) {
                 <p>
-                  Ronde {{ item.round }}: <b>{{ item.name }}</b> →
+                  Ronde {{ item.round }}: <b>{{ nama(item.name) }}</b> →
                   {{ roleNames[item.role] || item.role }}
                 </p>
               }
@@ -313,7 +313,7 @@
                     <span class="portrait">
                       <img class="skin" [src]="skinFor(player.name)" alt="" />
                     </span>
-                    <b class="name-tag">{{ player.name }}</b>
+                    <b class="name-tag">{{ nama(player.name) }}</b>
                     <!-- prettier-ignore -->
                     <small class="player-sub">{{ state.winner ? (player.bot ? 'BOT' : 'PEMAIN') : '' }}{{ player.name === state.me.name ? (state.winner ? ' · ' : '') + 'KAMU' : '' }}</small>
                     @if (player.role) {
@@ -341,7 +341,7 @@
                       <!-- Label pendek agar tidak terpotong di kartu kecil; rincian untuk pembaca layar. -->
                       <span class="ally-pick"
                         >◆ Incaran<span class="sr-only">
-                          Hostage pilihan rekan: {{ allyPicks(player.name).join(', ') }}</span
+                          Hostage pilihan rekan: {{ namaDaftar(allyPicks(player.name)) }}</span
                         ></span
                       >
                     }
@@ -352,13 +352,13 @@
                   @if (state.phase === 'tribunal') {
                     <span
                       class="vote-count"
-                      [attr.aria-label]="votersFor(player.name).length + ' vote untuk ' + player.name"
+                      [attr.aria-label]="votersFor(player.name).length + ' vote untuk ' + nama(player.name)"
                       >{{ votersFor(player.name).length }} vote</span
                     >
-                    <div class="voter-badges" [attr.title]="votersFor(player.name).join(', ')">
+                    <div class="voter-badges" [attr.title]="namaDaftar(votersFor(player.name))">
                       @for (voter of votersFor(player.name).slice(0, 4); track voter) {
                         <span class="voter-badge" [style.--chip]="voterColor(voter)">{{
-                          voter.slice(0, 2)
+                          nama(voter).slice(0, 2)
                         }}</span>
                       }
                       @if (votersFor(player.name).length > 4) {
@@ -367,9 +367,9 @@
                         >
                       }
                     </div>
-                    <ul class="voter-details sr-only" [attr.aria-label]="'Pemilih ' + player.name">
+                    <ul class="voter-details sr-only" [attr.aria-label]="'Pemilih ' + nama(player.name)">
                       @for (voter of votersFor(player.name); track voter) {
-                        <li>{{ voter }}</li>
+                        <li>{{ nama(voter) }}</li>
                       }
                     </ul>
                   }
@@ -385,12 +385,12 @@
                 <p class="action-text">{{ actionHint }}</p>
                 @if (state.me.action) {
                   <p class="locked">
-                    🔒 Pilihan malammu terkunci: <b>{{ state.me.action.target }}</b>
+                    🔒 Pilihan malammu terkunci: <b>{{ nama(state.me.action.target) }}</b>
                   </p>
                 }
                 @if (state.phase === 'tribunal' && state.me.vote) {
                   <p class="locked">
-                    🔒 Suaramu terkunci: <b>{{ state.me.vote }}</b>
+                    🔒 Suaramu terkunci: <b>{{ nama(state.me.vote) }}</b>
                   </p>
                 }
                 @if (allyPlan.length) {
@@ -398,7 +398,7 @@
                     <span aria-hidden="true">◆</span> Pilihan rekan:
                     @for (ally of allyPlan; track ally.name) {
                       <span class="ally-choice"
-                        ><b>{{ ally.name }}</b> → {{ ally.target || 'belum memilih' }}</span
+                        ><b>{{ nama(ally.name) }}</b> → {{ nama(ally.target) || 'belum memilih' }}</span
                       >
                     }
                   </p>
@@ -493,7 +493,7 @@
                 [class.self]="chat.sender === state.me.name"
                 [style.--tag]="colorFor(chat.sender)"
               >
-                <small><i aria-hidden="true"></i>{{ chat.sender }}</small>
+                <small><i aria-hidden="true"></i>{{ nama(chat.sender) }}</small>
                 <p>{{ chat.message }}</p>
               </article>
             } @empty {
@@ -584,7 +584,7 @@
                 @for (player of winners; track player.name; let index = $index) {
                   <li [style.--i]="index" [style.--tag]="colorFor(player.name)">
                     <img class="lineup-skin" [src]="skinFor(player.name)" alt="" />
-                    <b>{{ player.name }}</b>
+                    <b>{{ nama(player.name) }}</b>
                     <small>{{ winnerLabel(player) }}</small>
                   </li>
                 }

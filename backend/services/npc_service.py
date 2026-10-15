@@ -21,6 +21,7 @@ from services.npc_brain.penjelasan import lengkapi as lengkapi_penjelasan
 from services.npc_brain.penjelasan import ringkas as ringkas_penjelasan
 from services.npc_brain.runtime import brain_runtime
 from services.persistence_service import PersistenceService, PersistenceError
+from services.match_engine import snapshot_berlabel
 from services.room_service import room_service
 from services.survey_service import survey_service
 from services.ai_diagnostics import capture_exchange
@@ -46,7 +47,7 @@ class NPCDecision(BaseModel):
 
 # Konteks hanya memuat pengetahuan NPC sendiri, roster publik, dan chat; tidak pernah role/status lawan.
 def npc_context(match, name):
-    view = match.snapshot(name)
+    view = snapshot_berlabel(match.snapshot(name), match.labels)
     me = view["me"]
     legal = {}
     if me["can_act"]:
@@ -241,7 +242,7 @@ class NPCService:
                 ):
                     return
                 key = (match.id, match.round, match.phase)
-                snapshot = match.snapshot(otak.nama)
+                snapshot = snapshot_berlabel(match.snapshot(otak.nama), match.labels)
                 terlihat = match.messages[-1]["id"] if match.messages else None
             now = time.time()
             otak.langkah += 1
@@ -332,9 +333,9 @@ class NPCService:
             match.npc_decisions.add((key[1], key[2], otak.nama))
             try:
                 if npc["action"] == "vote":
-                    match.vote(otak.nama, npc["target"])
+                    match.vote(otak.nama, match.username(npc["target"]))
                 elif npc["action"] in AKSI_RAHASIA:
-                    match.act(otak.nama, npc["action"], npc["target"])
+                    match.act(otak.nama, npc["action"], match.username(npc["target"]))
                     self.runtime.catat_aksi(otak, match.round, npc["action"], npc["target"])
             except ValueError as error:
                 return True, str(error)
@@ -489,9 +490,9 @@ class NPCService:
                     if decision.target not in legal.get(decision.action, []):
                         raise ValueError("NPC memilih aksi/target yang tidak legal")
                     if decision.action == "vote":
-                        match.vote(key[3], decision.target)
+                        match.vote(key[3], match.username(decision.target))
                     else:
-                        match.act(key[3], decision.action, decision.target)
+                        match.act(key[3], decision.action, match.username(decision.target))
                 # Wait adalah pilihan LLM yang sah; fallback hanya untuk request yang gagal.
                 match.npc_decisions.add(key[1:])
                 decision_applied = True
