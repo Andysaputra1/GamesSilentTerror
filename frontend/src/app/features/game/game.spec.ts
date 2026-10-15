@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 
 import { Game } from './game';
-import { provideHttpClient } from '@angular/common/http';
+import { HttpErrorResponse, provideHttpClient } from '@angular/common/http';
 import { of, Subject, throwError } from 'rxjs';
 import { GameService, GameSnapshot } from '../../core/game.service';
 
@@ -801,8 +801,10 @@ describe('Game', () => {
     return state;
   }
 
-  // KARTU ROLE: pembukaan pertama dilaporkan ke server dan dikirim ulang sampai server mencatatnya.
+  // KARTU ROLE: pembukaan pertama dilaporkan ke server; dikirim ulang tiap 4 detik dengan polling di sela.
   it('reports the first role reveal and retries until the server records it', () => {
+    let now = 50_000;
+    vi.spyOn(Date, 'now').mockImplementation(() => now);
     const request = vi
       .spyOn(TestBed.inject(GameService), 'request')
       .mockReturnValue(of(preparing()));
@@ -811,16 +813,42 @@ describe('Game', () => {
     expect(request).toHaveBeenLastCalledWith('ABC123', undefined, 'play');
     component.toggleRole();
     expect(request).toHaveBeenLastCalledWith('ABC123', { match_id: 'match-1' }, 'reveal');
+    component.refresh(); // belum 4 detik: polling biasa agar layar tetap mengikuti server
+    expect(request).toHaveBeenLastCalledWith('ABC123', undefined, 'play');
+    now += 4000;
     component.refresh(); // server belum mencatat: kirim ulang
     expect(request).toHaveBeenLastCalledWith('ABC123', { match_id: 'match-1' }, 'reveal');
     request.mockReturnValue(of(preparing(true)));
+    now += 4000;
     component.refresh();
+    now += 4000;
     component.refresh(); // sudah tercatat: kembali polling biasa
     expect(request).toHaveBeenLastCalledWith('ABC123', undefined, 'play');
     expect(component.notice).toBe('');
     expect(render().querySelector('.splash')?.textContent).toContain(
       'Menunggu 1 pemain membuka kartu role',
     );
+  });
+
+  // KOMPATIBEL: backend lama tanpa /reveal (404) tidak menampilkan error dan tidak menghentikan polling.
+  it('keeps polling silently when the backend does not know the reveal endpoint', () => {
+    let now = 50_000;
+    vi.spyOn(Date, 'now').mockImplementation(() => now);
+    const api = TestBed.inject(GameService);
+    const request = vi.spyOn(api, 'request').mockReturnValue(of(preparing()));
+    component.code = 'ABC123';
+    component.refresh();
+    request.mockImplementation((_code, body) =>
+      body
+        ? throwError(() => new HttpErrorResponse({ status: 404, error: { detail: 'Not Found' } }))
+        : of(snapshot()),
+    );
+    component.toggleRole();
+    expect(component.error).toBe('');
+    expect(component.busy).toBe(false);
+    component.refresh(); // polling berikutnya tetap GET dan membawa fase terbaru
+    expect(request).toHaveBeenLastCalledWith('ABC123', undefined, 'play');
+    expect(component.game?.phase).toBe('day');
   });
 
   // KARTU ROLE: setelah 10 detik belum dibuka, layar meredup dan kartu besar minta diketuk.

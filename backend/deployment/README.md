@@ -80,7 +80,7 @@ Untuk melihat arsip, buka `/panel` pada origin backend melalui HTTPS dan login
 sebagai administrator. `/history` dan `/admin` mengarah ke panel baru.
 Semua API panel memakai sesi administrator terpisah dari akun pemain.
 
-Database baru menjalankan 001_schema.sql sampai 005_skin_preference.sql otomatis.
+Database baru menjalankan 001_schema.sql sampai 006_fix_role_stalker_enum.sql otomatis.
 Database/volume lama: backup dulu, hentikan backend sementara, lalu jalankan
 `backend/migrations/V5__chat_history.sql` **sekali saja** pada database shadow_heist.
 Contoh dari root repository di VM untuk service MySQL Azure:
@@ -110,7 +110,11 @@ jalankan `SOURCE /docker-entrypoint-initdb.d/004_survey_and_npc.sql;`. Jika
 `V7__add_skin_preference` belum ada atau `SHOW COLUMNS FROM user_accounts LIKE 'skin_id';`
 tidak mengembalikan kolom, jalankan
 `SOURCE /docker-entrypoint-initdb.d/005_skin_preference.sql;` sekali sebelum backend
-versi avatar diaktifkan. Jangan menghapus volume untuk menjalankan migrasi.
+versi avatar diaktifkan. Jika `V8__fix_role_stalker_enum` belum ada (kolom `players.role`
+masih berisi `detective`, bukan `stalker`), pastikan
+`SELECT COUNT(*) FROM players WHERE role = 'detective';` bernilai 0, lalu jalankan
+`SOURCE /docker-entrypoint-initdb.d/006_fix_role_stalker_enum.sql;` sekali. Tanpa ini,
+peserta Stalker gagal diarsipkan. Jangan menghapus volume untuk menjalankan migrasi.
 
 `schema_migrations` menyimpan versi struktur yang sudah diterapkan dan waktunya.
 Saat ini project memakai SQL manual, belum ada migration runner otomatis; tabel ini

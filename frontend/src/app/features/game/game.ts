@@ -83,6 +83,7 @@ export class Game implements OnInit, OnDestroy {
   chatAtBottom = true;
   newBelow = 0;
   private lastMessageId = '';
+  private lastRevealTry = 0;
   private messagesLoaded = false;
   private feltSize = { width: 0, height: 0 };
   private feltObserver?: ResizeObserver;
@@ -843,11 +844,14 @@ export class Game implements OnInit, OnDestroy {
   }
 
   // SNAPSHOT: polling tidak ditumpuk; pilihan target direset saat ronde/fase berubah. Kartu yang sudah
-  // dibuka tetapi belum tercatat dikirim ulang sampai server mengonfirmasi.
+  // dibuka tetapi belum tercatat dikirim ulang paling cepat tiap 4 detik; di sela itu tetap polling,
+  // jadi layar tidak macet bila backend belum mengenal /reveal.
   refresh(): void {
     if (this.busy || !this.code) return;
-    if (this.revealPending && this.game) this.request({ match_id: this.game.id }, 'reveal');
-    else this.request();
+    if (this.revealPending && this.game && Date.now() - this.lastRevealTry >= 4000) {
+      this.lastRevealTry = Date.now();
+      this.request({ match_id: this.game.id }, 'reveal');
+    } else this.request();
   }
 
   // Sinkronkan snapshot/aksi server, reset pilihan fase lama, dan tampilkan kegagalan request.
@@ -903,6 +907,8 @@ export class Game implements OnInit, OnDestroy {
           }
         },
         error: (error: HttpErrorResponse) => {
+          // Pembukaan kartu dikirim ulang oleh polling; backend lama belum punya /reveal (404).
+          if (action === 'reveal') return;
           // GET /game menolak room hilang, keanggotaan lama, atau match belum dimulai.
           // Pulihkan lewat lobby; kesalahan aksi dan jaringan tidak boleh mengeluarkan pemain.
           if (!body && error.status === 400) {
