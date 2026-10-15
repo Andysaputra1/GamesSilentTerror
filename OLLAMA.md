@@ -51,6 +51,9 @@ Ollama menyediakan inference, bukan pipeline training/fine-tuning.
 
 ## Link LLM untuk penulis kalimat NPC
 
+Cara tercepat: `ai-docker/jalankan.bat` (Qwen3 4B + gerbang token + Cloudflare tunnel, lihat
+[ai-docker/README.md](ai-docker/README.md)). Cara manual di bawah memakai Ollama dari compose utama.
+
 Rantai penulis kalimat NPC (panel **Otak NPC**, jalur "LLM sendiri lewat link") memakai URL
 tunnel yang sama dengan menu Konfigurasi AI:
 

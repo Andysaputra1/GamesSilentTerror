@@ -1,0 +1,83 @@
+# LLM penulis kalimat bot (Qwen3 4B) di laptop, dibuka ke VM lewat Cloudflare Tunnel.
+# Jalankan lewat jalankan.bat (membuat token, memilih GPU/CPU, lalu menampilkan link).
+# Alur: VM backend --HTTPS + Bearer token--> tunnel --> gerbang (cek token) --> ollama.
+name: silent-terror-ai
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: silent_terror_ollama
+    restart: unless-stopped
+    # Hanya loopback: untuk tes dari laptop ini. Dari luar wajib lewat gerbang + token.
+    ports:
+      - '127.0.0.1:11440:11434'
+    volumes:
+      - model:/root/.ollama
+    environment:
+      OLLAMA_CONTEXT_LENGTH: '${OLLAMA_CONTEXT_LENGTH:-4096}'
+      # Model tetap di memori 30 menit supaya kalimat bot berikutnya tidak menunggu model dimuat ulang.
+      OLLAMA_KEEP_ALIVE: '${OLLAMA_KEEP_ALIVE:-30m}'
+      # Beberapa bot bisa menulis bersamaan.
+      OLLAMA_NUM_PARALLEL: '${OLLAMA_NUM_PARALLEL:-2}'
+    healthcheck:
+      test: ['CMD', 'ollama', 'list']
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+
+  # Sekali jalan: unduh model bila belum ada, lalu keluar dengan kode 0.
+  model:
+    image: ollama/ollama:latest
+    restart: 'on-failure:3'
+    environment:
+      OLLAMA_HOST: 'http://ollama:11434'
+      LLM_MODEL: '${LLM_MODEL:-qwen3:4b-instruct}'
+    depends_on:
+      ollama:
+        condition: service_healthy
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        if ollama show "$$LLM_MODEL" >/dev/null 2>&1; then
+          echo "Model sudah ada: $$LLM_MODEL"
+        else
+          ollama pull "$$LLM_MODEL"
+        fi
+        # Muat ke memori sekarang agar kalimat pertama bot tidak kena waktu muat model.
+        ollama run "$$LLM_MODEL" "Balas: ok" >/dev/null
+        echo "Model siap: $$LLM_MODEL"
+
+  # Gerbang: hanya meneruskan endpoint yang dipakai backend dan hanya dengan Bearer token yang benar.
+  gerbang:
+    image: nginx:1.31.4-alpine3.24
+    container_name: silent_terror_gerbang
+    restart: unless-stopped
+    environment:
+      LLM_TOKEN: '${LLM_TOKEN:?LLM_TOKEN kosong: jalankan jalankan.bat supaya token dibuat}'
+    volumes:
+      - ./gerbang.conf.template:/etc/nginx/templates/default.conf.template:ro
+    depends_on:
+      ollama:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:8080/sehat']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Quick tunnel Cloudflare: tanpa akun, link https://<acak>.trycloudflare.com berganti setiap tunnel dinyalakan ulang.
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: silent_terror_tunnel
+    restart: unless-stopped
+    command: ['tunnel', '--no-autoupdate', '--url', 'http://gerbang:8080']
+    depends_on:
+      gerbang:
+        condition: service_healthy
+
+volumes:
+  # Volume khusus: hanya berisi model 4B, jadi backend VM (yang meminta qwen3:14b) otomatis memakai model sekeluarga ini.
+  model:
+    name: silent_terror_ai_model

@@ -1,0 +1,10 @@
+# Tambahan untuk laptop dengan GPU NVIDIA (dipakai otomatis oleh jalankan.bat bila nvidia-smi ada).
+services:
+  ollama:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

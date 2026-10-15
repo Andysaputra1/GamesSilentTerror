@@ -1,0 +1,37 @@
+# Diproses envsubst oleh image nginx saat start: hanya ${LLM_TOKEN} yang diganti, variabel nginx tetap.
+# "Bearer " + token 64 karakter melebihi bucket bawaan (64 byte).
+map_hash_bucket_size 128;
+map $http_authorization $token_benar {
+    default 0;
+    "Bearer ${LLM_TOKEN}" 1;
+}
+
+server {
+    listen 8080;
+    client_max_body_size 1m;
+
+    # Healthcheck container, tanpa token dan tanpa menyentuh Ollama.
+    location = /sehat {
+        access_log off;
+        return 200 "ok\n";
+    }
+
+    # Endpoint yang dipakai backend (PenulisTautan): daftar model, info model, chat.
+    location ~ ^/api/(tags|show|chat|version)$ {
+        if ($token_benar = 0) {
+            return 401 "token salah\n";
+        }
+        proxy_pass http://ollama:11434;
+        # Ollama menolak host asing (403); tunnel membawa host trycloudflare.com.
+        proxy_set_header Host localhost:11434;
+        proxy_set_header Authorization "";
+        proxy_http_version 1.1;
+        proxy_buffering off;
+        proxy_read_timeout 300s;
+    }
+
+    # Pull, delete, create, dll. tidak boleh diakses dari luar.
+    location / {
+        return 404 "tidak tersedia\n";
+    }
+}
