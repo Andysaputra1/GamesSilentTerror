@@ -24,7 +24,7 @@ from services.password_service import verify_password
 from services.persistence_service import PersistenceService, PersistenceError
 from services.ai_runtime_service import ai_runtime, save_panel_configuration
 from services.checker_service import checker_service
-from services.npc_brain.runtime import brain_runtime
+from services.npc_brain.runtime import POLA_MODEL_TAUTAN, brain_runtime
 from services.activity_service import activity
 from services.room_service import room_service
 from controller.middleware.auth_limits import limit_auth
@@ -155,6 +155,10 @@ def assets(asset: Literal["panel.js", "panel.css"]):
     return FileResponse(ASSETS / asset, headers={"Cache-Control": "no-store"})
 
 
+# Model yang disiapkan ai-docker (jalankan.bat): 4B cepat, 14B lebih pintar tetapi lebih lambat.
+MODEL_LOKAL = ("qwen3:4b-instruct", "qwen3:14b")
+
+
 # Susun konfigurasi publik dan status kunci tanpa membocorkan isi rahasia.
 def config_view():
     config = ai_runtime.current()
@@ -168,6 +172,11 @@ def config_view():
         "key_source": config.openrouter_key_source,
         "default_configured": bool(settings.openrouter_default or settings.openrouter_api_key),
         "custom_configured": config.openrouter_custom_configured,
+        # Pilihan model lokal: model ai-docker, model di link saat tes terakhir, dan yang aktif.
+        "local_model": config.ollama_model,
+        "local_models": sorted(
+            {*MODEL_LOKAL, *brain_runtime.model_tautan_tersedia, config.ollama_model}
+        ),
         "token_source": (
             "panel"
             if ai_runtime.diatur_panel("ollama_tunnel_token")
@@ -190,6 +199,7 @@ class Configuration(BaseModel):
     key_source: Literal["default", "custom"] | None = None
     tunnel_token: SecretStr | None = None
     clear_tunnel_token: bool = False
+    model: str | None = Field(default=None, max_length=100)
 
 
 # Terima hanya tunnel HTTPS publik tanpa kredensial atau parameter URL.
@@ -224,6 +234,9 @@ def set_config(body: Configuration, token=Depends(require_panel)):
     tunnel_token = body.tunnel_token.get_secret_value().strip() if body.tunnel_token else ""
     if tunnel_token and (len(tunnel_token) > 512 or any(c.isspace() for c in tunnel_token)):
         raise HTTPException(400, "Format token tunnel tidak valid.")
+    model = (body.model or "").strip()
+    if model and not POLA_MODEL_TAUTAN.fullmatch(model):
+        raise HTTPException(400, "Nama model tidak valid (contoh: qwen3:4b-instruct).")
     endpoint = body.endpoint.strip()
     if endpoint:
         endpoint = validate_endpoint(endpoint)
@@ -239,6 +252,7 @@ def set_config(body: Configuration, token=Depends(require_panel)):
             key_source=body.key_source,
             tunnel_token=tunnel_token or None,
             clear_tunnel_token=body.clear_tunnel_token,
+            model=model or None,
         )
     except PersistenceError as error:
         raise HTTPException(503, "Konfigurasi gagal disimpan.") from error
@@ -254,9 +268,7 @@ def set_config(body: Configuration, token=Depends(require_panel)):
 async def check_ai(token=Depends(require_panel)):
     import asyncio
 
-    config = ai_runtime.current().model_copy(
-        update={"ollama_model": "qwen3:14b"}
-    )
+    config = ai_runtime.current()
     try:
         if config.ai_provider == "docker":
             # Only a configured tunnel is accepted for the production panel probe.

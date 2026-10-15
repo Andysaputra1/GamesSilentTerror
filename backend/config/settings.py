@@ -58,9 +58,11 @@ class Settings(MySQLSettings):
 
     @field_validator("ollama_model", mode="before")
     @classmethod
-    # VALIDATOR CLASS METHOD: ubah pilihan 8/14 menjadi nama model Ollama dan tolak pilihan lain.
+    # VALIDATOR CLASS METHOD: ubah pilihan 4/8/14 menjadi nama model Ollama dan tolak pilihan lain.
     def resolve_ollama_model(cls, value: object) -> str:
         models = {
+            "4": "qwen3:4b-instruct",
+            "qwen3:4b-instruct": "qwen3:4b-instruct",
             "8": "qwen3:8b",
             "14": "qwen3:14b",
             "qwen3:8b": "qwen3:8b",
@@ -68,7 +70,7 @@ class Settings(MySQLSettings):
         }
         selected = str(value).strip().lower()
         if selected not in models:
-            raise ValueError("OLLAMA_MODEL harus 8 atau 14.")
+            raise ValueError("OLLAMA_MODEL harus 4, 8, atau 14.")
         return models[selected]
 
     openai_timeout_seconds: float = Field(default=30.0, gt=0)

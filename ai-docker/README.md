@@ -31,7 +31,7 @@ Dua model disiapkan. Model yang dipakai bot dipilih di panel → **Otak NPC** �
    - Model yang belum ada diunduh ke volume `silent_terror_ai_model`. Ukurannya sekitar 2,5 GB untuk 4B dan 9 GB untuk 14B.
    - Di akhir, skrip mencetak **Link** (juga disalin ke clipboard) dan **Token**.
 2. Panel → **Konfigurasi AI**: pilih "LLM lokal · Ollama melalui tunnel", tempel link dan
-   token, lalu Simpan. Token disimpan terenkripsi dan cukup diisi sekali; link perlu diisi
+   token, pilih **Model lokal** (`qwen3:4b-instruct` cepat, `qwen3:14b` lebih pintar), lalu Simpan. Token disimpan terenkripsi dan cukup diisi sekali; link perlu diisi
    ulang setiap kali tunnel berganti. Kolom token yang dikosongkan mempertahankan token lama.
 3. (Opsional, cadangan) Token juga bisa ditaruh di VM sebagai `OLLAMA_TUNNEL_TOKEN=...` di
    `.env.azure`. Token dari panel selalu didahulukan.

@@ -99,7 +99,13 @@ def load_panel_configuration():
 
 # Enkripsi kunci, simpan konfigurasi secara atomik, lalu terapkan override.
 def save_panel_configuration(
-    provider, endpoint, api_key=None, key_source=None, tunnel_token=None, clear_tunnel_token=False
+    provider,
+    endpoint,
+    api_key=None,
+    key_source=None,
+    tunnel_token=None,
+    clear_tunnel_token=False,
+    model=None,
 ):
     import json
     from sqlalchemy import text
@@ -107,7 +113,6 @@ def save_panel_configuration(
 
     stored = {
         "ai_provider": provider,
-        "ollama_model": "qwen3:14b",
         "openrouter_model": "qwen/qwen3-14b",
         "ollama_base_url": endpoint,
     }
@@ -118,6 +123,8 @@ def save_panel_configuration(
                 text("SELECT config FROM panel_configuration WHERE id=1 FOR UPDATE")
             ).scalar()
             previous = json.loads(previous) if isinstance(previous, str) else (previous or {})
+            # Model lokal (ai-docker: qwen3:4b-instruct/qwen3:14b); kosong = pilihan sebelumnya.
+            stored["ollama_model"] = model or previous.get("ollama_model") or "qwen3:14b"
             source = key_source or (
                 "custom"
                 if api_key

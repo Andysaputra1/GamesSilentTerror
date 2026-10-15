@@ -31,9 +31,14 @@ class ProviderTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ValueError):
             Settings(_env_file=None, ai_provider="invalid")
 
-    # TES VALIDASI: petakan pilihan 8/14 ke model yang tepat dan tolak ukuran lain.
+    # TES VALIDASI: petakan pilihan 4/8/14 ke model yang tepat dan tolak ukuran lain.
     def test_model_size_selection(self):
-        for value, expected in [(8, "qwen3:8b"), ("14", "qwen3:14b"), ("qwen3:8b", "qwen3:8b")]:
+        for value, expected in [
+            (8, "qwen3:8b"),
+            ("14", "qwen3:14b"),
+            ("qwen3:8b", "qwen3:8b"),
+            ("4", "qwen3:4b-instruct"),
+        ]:
             with self.subTest(value=value):
                 config = Settings(_env_file=None, ollama_model=value)
                 self.assertEqual(config.ollama_model, expected)

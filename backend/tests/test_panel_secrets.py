@@ -1,6 +1,6 @@
 import json
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 from cryptography.fernet import Fernet
 from pydantic import SecretStr
 from fastapi import FastAPI
@@ -104,6 +104,28 @@ class PanelSecretsTests(unittest.TestCase):
                 self.assertEqual(result.json()["token_source"], "env")
                 token = ai_runtime.current().ollama_tunnel_token.get_secret_value()
                 self.assertEqual(token, "env-token")
+
+    # MODEL LOKAL: dipilih di panel (4B/14B), dipertahankan bila kosong, dan dipakai tes koneksi.
+    def test_local_model_is_selectable_kept_and_used_by_check(self):
+        body = {"provider": "docker", "endpoint": "https://example.com"}
+        with patch("controller.api.panel.validate_endpoint", side_effect=lambda e: e):
+            view = self.client.put("/api/panel/config", json=body).json()
+            self.assertEqual(view["local_model"], "qwen3:14b")  # bawaan pertama kali
+            self.assertIn("qwen3:4b-instruct", view["local_models"])
+            view = self.client.put(
+                "/api/panel/config", json={**body, "model": "qwen3:4b-instruct"}
+            ).json()
+            self.assertEqual((view["local_model"], view["model"]), ("qwen3:4b-instruct",) * 2)
+            self.client.put("/api/panel/config", json=body)  # tanpa model: pilihan lama tetap
+            ai_runtime.reset()
+            load_panel_configuration()
+            self.assertEqual(ai_runtime.current().ollama_model, "qwen3:4b-instruct")
+            bad = self.client.put("/api/panel/config", json={**body, "model": "qwen3 4b; rm"})
+            self.assertEqual(bad.status_code, 400)
+            reply = AsyncMock(return_value="OK")
+            with patch("controller.api.panel.local_reply", reply):
+                self.assertTrue(self.client.post("/api/panel/check-ai").json()["active"])
+            self.assertEqual(reply.call_args.kwargs["config"].ollama_model, "qwen3:4b-instruct")
 
     def test_missing_encryption_key_cannot_save_plaintext(self):
         with patch.object(settings, "panel_encryption_key", None):

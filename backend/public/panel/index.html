@@ -254,8 +254,13 @@
                       type="url"
                       placeholder="https://ollama.domain-kamu.com"
                   /></label>
+                  <p class="hint">Masukkan alamat dasar tunnel, tanpa /api/chat.</p>
+                  <label>Model lokal<select id="local-model"></select></label>
                   <p class="hint">
-                    Masukkan alamat dasar tunnel, tanpa /api/chat. Model lokal: qwen3:14b.
+                    qwen3:4b-instruct: cepat (sekitar 1–2 detik per kalimat). qwen3:14b: lebih
+                    pintar, tetapi lebih lambat (sekitar 6–9 detik). Model lain muncul di sini
+                    setelah Tes koneksi di Otak NPC menemukannya di link. Otak NPC memakai model
+                    ini bila pilihan "Model LLM link" di sana dibiarkan Bawaan.
                   </p>
                   <label
                     >Token tunnel (LLM_TOKEN di ai-docker/.env)

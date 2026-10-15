@@ -203,6 +203,14 @@ function showConfig(data) {
   };
   keySourceView();
   $('endpoint').value = data.endpoint.startsWith('https://') ? data.endpoint : '';
+  $('local-model').replaceChildren(
+    ...(data.local_models ?? [data.local_model]).map((model) => {
+      const option = node('option', model);
+      option.value = model;
+      return option;
+    }),
+  );
+  $('local-model').value = data.local_model;
   $('tunnel-token').value = '';
   $('clear-token').checked = false;
   $('clear-token-row').hidden = data.token_source !== 'panel';
@@ -1496,6 +1504,7 @@ $('config-form').onsubmit = handle(async () => {
         tunnel_token:
           $('provider').value === 'docker' ? $('tunnel-token').value.trim() || null : null,
         clear_tunnel_token: $('provider').value === 'docker' && $('clear-token').checked,
+        model: $('provider').value === 'docker' ? $('local-model').value : null,
       },
       'PUT',
     );
