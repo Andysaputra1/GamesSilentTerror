@@ -2,15 +2,41 @@
 
 Game deduksi sosial berbasis percakapan: Hitman menyusup di antara warga, sementara pemain mencari identitasnya melalui alibi dan observasi chat. **Zero economy** — tanpa budget, pembelian item, atau tebusan.
 
-Nama Silent Terror masih sementara. Nama repository, database, dan container masih menggunakan nama proyek lama, Shadow Heist.
+Repository ini bernama `GamesSilentTerror`. Database (`shadow_heist`), container (`shadow_*`), dan sebagian kode masih memakai nama proyek lama, Shadow Heist.
+
+## Penelitian
+
+Game ini adalah bagian dari skripsi. Naskah penelitiannya ada di sini:
+[Naskah skripsi Silent Terror (OneDrive BINUS)](https://binusianorg-my.sharepoint.com/personal/andy_saputra001_binus_ac_id/_layouts/15/guestaccess.aspx?share=IQDKQcDT5f1NSIhXTwwSsCgVAUckMBzh9nTX9KbN52iZ1sE&e=RmW4Ck).
 
 ## Status proyek
 
-Sudah dapat dimainkan: login, main page, buat/gabung ruangan, 4–10 peserta tanpa batas ronde (berakhir hanya saat salah satu kubu menang), bot opsional, role acak dari server, timer Day → Night → Tribunal, skill/cooldown, voting, eksekusi, dan kondisi kemenangan. Panel administrator menyediakan tambah user, reset password akun lokal, dan penghapusan akun tanpa menghapus riwayat chat. Hanya pembuat ruangan yang mengatur bot dan memulai game.
+Sudah dapat dimainkan dari awal sampai akhir:
+
+- Login username/email + password, daftar akun, login Google, dan pilihan avatar (6 skin karakter, tersimpan per akun).
+- Main page, buat/gabung ruangan, 4–10 peserta, bot opsional untuk mengisi kursi kosong. Hanya pembuat ruangan yang mengatur bot dan memulai game.
+- Role acak dari server, layar persiapan, timer Day → Night → Tribunal tanpa batas ronde (berakhir hanya saat salah satu kubu menang), skill/cooldown, voting, eksekusi, dan kondisi kemenangan.
+- Survei singkat setelah pertandingan; jawabannya dipakai untuk menilai bot per metode penalaran.
+- Panel administrator terpadu di `/panel`: Konfigurasi AI, Checker, Riwayat chat, Manajemen user, Otak NPC, dan Survei.
 
 Role: **Hitman** (Hostage/Gag Order), **Spy** (Guard), **Stalker** (Peek), dan **Civilian** (observasi). Korban Hostage tetap hidup dan kehilangan chat serta voting permanen, tetapi skill malam tetap tersedia sesuai role/cooldown; identitas target tidak diumumkan.
 
-Engine menjadi sumber kebenaran, bukan browser/LLM. NPC mengambil giliran mandiri: model terpilih memilih aksi, vote, dan percakapan dari konteks privat masing-masing. Engine memvalidasi keputusan; fallback aturan mengisi aksi yang kosong jika model gagal. Keputusan `wait` yang valid tetap dihormati. SVM/fuzzy menganalisis pesan manusia untuk arsip. Baca [aturan, alur kode, dan batas implementasi](GAME_CONCEPT.md).
+Engine backend menjadi sumber kebenaran, bukan browser atau AI. Engine memvalidasi setiap aksi/vote/chat bot; fallback aturan mengisi aksi yang kosong jika otak bot gagal. Baca [aturan, alur kode, dan batas implementasi](GAME_CONCEPT.md) serta [panduan membaca kode](CODE_GUIDE.md).
+
+## Cara kerja AI
+
+Ada dua jalur AI yang terpisah: **otak bot** (NPC yang ikut bermain) dan **analisis pesan manusia** (untuk arsip/panel).
+
+| Komponen | Dipakai untuk | Kapan berjalan |
+| --- | --- | --- |
+| **IndoBERT** (2 model: intent + target) | NLU otak bot: membaca chat publik menjadi intent (menuduh, membela, dll.) dan siapa yang dituju | Setiap kali bot mengambil langkah, untuk chat terbaru di ruangan (satu model dipakai bersama semua bot, hasilnya di-cache per pesan) |
+| **IndoBERT** (validasi ulang) | Memastikan kalimat yang ditulis bot memang terbaca sesuai rencana (misalnya benar-benar menuduh X) | Setiap kali bot akan mengirim chat, sebelum kalimat dikirim (`NPC_VALIDATE_NLG=true`) |
+| **Fuzzy / Utility AI / Behavior Tree** | Penalaran bot: memilih tuduhan, pembelaan, vote, dan skill malam | Setiap langkah bot. `NPC_METHOD=campuran` membagi metode antar bot dalam satu pertandingan; metode tiap bot dicatat di tabel `match_bots` |
+| **NLG** (rantai penulis LLM atau templat) | Mengubah rencana bot menjadi kalimat | Saat bot memutuskan bicara. Jalur LLM yang gagal dilewati; tanpa jalur yang hidup, bot memakai templat |
+| **SVM + fuzzy** | Menganalisis pesan **manusia**: intent, agresivitas, skor kecurigaan | Setiap chat manusia, sebelum disimpan ke MySQL dan disiarkan |
+| **LLM mode lama** (`NPC_METHOD=llm`) | Bot yang sepenuhnya digerakkan LLM, sebagai pembanding | Hanya bila mode ini dipilih |
+
+Tanpa model IndoBERT, bot tetap bermain dengan NLU cadangan (SVM + nama yang disebut) yang kualitasnya lebih rendah; sumber NLU tercatat di trace dan terlihat di panel menu **Otak NPC**.
 
 ## Persiapan
 
@@ -24,8 +50,8 @@ Tidak perlu memasang Python, Node.js, atau MySQL di host jika seluruh aplikasi d
 ### 1. Clone repository
 
 ```sh
-git clone https://github.com/Andysaputra1/GamesShadowHeist.git
-cd GamesShadowHeist
+git clone https://github.com/Andysaputra1/GamesSilentTerror.git
+cd GamesSilentTerror
 ```
 
 Semua perintah Compose berikut dijalankan dari folder ini, tempat `docker-compose.yml` berada.
@@ -46,7 +72,7 @@ cp .env.example .env
 
 Lakukan penyalinan hanya saat setup awal; jangan menimpa `.env` yang sudah dikonfigurasi. File ini menyimpan konfigurasi lokal dan secret, sehingga tidak boleh di-commit.
 
-### 3. Siapkan model SVM — untuk analisis intent dan balasan lobby lama
+### 3. Siapkan model SVM — untuk analisis pesan manusia
 
 Minta artifact terlatih `intent_classifier.pkl` kepada pengelola proyek, lalu letakkan di:
 
@@ -56,20 +82,20 @@ backend/artifacts/svm/intent_classifier.pkl
 
 File `.pkl` sengaja diabaikan Git dan **tidak tersedia hanya dengan clone repository**. Gunakan hanya artifact tepercaya karena pemuatan pickle dapat menjalankan kode.
 
-Tanpa model SVM, pesan pemain masih bisa diteruskan dan scheduler NPC pertandingan tetap dapat memanggil LLM. Analisis intent dan balasan reaktif NOX di lobby lama memerlukan SVM. Ini berlaku untuk mode Ollama maupun API. Lihat [panduan artifact SVM](backend/artifacts/svm/README.md).
+Tanpa model SVM, pesan pemain masih bisa diteruskan dan bot tetap bermain, tetapi analisis intent pesan manusia tidak tersedia, dan NLU cadangan bot (dipakai bila IndoBERT tidak ada) hanya menghasilkan intent netral. Lihat [panduan artifact SVM](backend/artifacts/svm/README.md).
 
 ### 4. Siapkan otak NPC (IndoBERT + fuzzy/utility/behavior tree + NLG)
 
-Bot memakai logika notebook skripsi (`training/prethesis/ai_2_dataset_baru`): NLU IndoBERT, penalaran Fuzzy/Utility AI/Behavior Tree, dan NLG. Kode logikanya sudah ada di `backend/services/npc_brain/generated/` (hasil ekspor, jangan diedit manual). Yang perlu disalin hanyalah dua folder model IndoBERT (±440 MB masing-masing, diabaikan Git):
+Bot memakai logika notebook skripsi (`training/prethesis/ai_2_dataset_baru`). Kode logikanya sudah ada di `backend/services/npc_brain/generated/` (hasil ekspor, jangan diedit manual). Yang perlu disalin hanyalah dua folder model IndoBERT (±440 MB masing-masing, diabaikan Git):
 
 ```text
 backend/artifacts/indobert/intent/   ← models/notebook_standalone/intent_classifier_transformer
 backend/artifacts/indobert/target/   ← models/target_classifier/target_classifier_transformer
 ```
 
-Folder target harus memuat `pair_builder.json` dan `ambang_target.json` hasil `nlu_target.ipynb`. Pada mesin pengembang yang menyimpan repo skripsi di `a_skripsi/training/prethesis`, backend juga menemukan model di sana secara otomatis. Tanpa model, bot tetap bermain dengan NLU cadangan (SVM + nama yang disebut) yang kualitasnya lebih rendah; status NLU terlihat di panel menu **Otak NPC**.
+Folder target harus memuat `pair_builder.json` dan `ambang_target.json` hasil `nlu_target.ipynb`. Pada mesin pengembang yang menyimpan repo skripsi di `a_skripsi/training/prethesis`, backend juga menemukan model di sana secara otomatis.
 
-Pengaturan di `.env` (lihat `.env.example`): `NPC_METHOD` (`campuran`, `fuzzy`, `utility`, `bt`, atau `llm` untuk mode lama), `NPC_WRITER` (`otomatis` atau `templat`), `NPC_WRITER_ORDER` (prioritas rantai penulis: `claude_bedrock`, `claude_api`, `openrouter`, `tautan`), `NPC_OPENROUTER_MODEL`, dan opsional `AMAZON_API_KEY` (Bedrock) atau `ANTHROPIC_API_KEY`. Key OpenRouter dan link LLM sendiri (Docker/tunnel) diambil dari Konfigurasi AI panel. Jalur yang ditolak dilewati otomatis; tanpa jalur yang hidup, bot memakai templat bervariasi yang tetap divalidasi IndoBERT. Metode, urutan rantai, dan model OpenRouter juga bisa diubah dari panel Otak NPC (tombol **Cek ulang penulis** memeriksa semua jalur).
+Pengaturan di `.env` (lihat `.env.example`): `NPC_METHOD` (`campuran`, `fuzzy`, `utility`, `bt`, atau `llm` untuk mode lama), `NPC_WRITER` (`otomatis` atau `templat`), `NPC_WRITER_ORDER` (prioritas rantai penulis: `claude_bedrock`, `claude_api`, `openrouter`, `tautan`), `NPC_OPENROUTER_MODEL`, dan opsional `AMAZON_API_KEY` (Bedrock) atau `ANTHROPIC_API_KEY`. Key OpenRouter dan link LLM sendiri (Docker/tunnel) diambil dari panel **Konfigurasi AI**. Metode, urutan rantai, dan model OpenRouter juga bisa diubah dari panel **Otak NPC** (tombol **Cek ulang penulis** memeriksa semua jalur).
 
 Setelah mengubah logika bot di notebook, jalankan ulang notebook sampai skenario/pengujiannya lulus, lalu ekspor ulang:
 
@@ -79,10 +105,6 @@ python scripts/ekspor_otak_npc.py --notebook-dir ../../training/prethesis/ai_2_d
 ```
 
 Tes `test_npc_brain` gagal bila hasil ekspor sudah tidak sama dengan notebook.
-
-**Migrasi database V7** (`backend/migrations/V7__survey_and_npc.sql`; salinan Azure `deployment/mysql/004_survey_and_npc.sql`) menambah tabel survei dan `match_bots`. Terapkan manual pada database lama; skripnya aman dijalankan ulang (`IF NOT EXISTS` dan `INSERT IGNORE`).
-
-CSV jawaban survei (panel → Survei) memakai UTF-8 dengan BOM dan menyimpan jawaban persis seperti diketik pemain, sama seperti CSV riwayat chat. Saat membuka di spreadsheet, impor kolom teks sebagai teks agar jawaban yang diawali `=`, `+`, `-`, atau `@` tidak dievaluasi sebagai formula.
 
 ## Menjalankan aplikasi
 
@@ -165,10 +187,14 @@ API key hanya dibaca backend. Penggunaan API dapat menimbulkan biaya pada akun p
 | Tujuan | Alamat / akses |
 | --- | --- |
 | Aplikasi | http://localhost:4200 |
+| Panel administrator | http://localhost:8000/panel |
 | Status backend | http://localhost:8000/app-status |
 | Dokumentasi API | http://localhost:8000/docs |
 | phpMyAdmin | http://localhost:8000/phpmyadmin/ |
-| Panel backend development | http://localhost:8000/admin |
+| MySQL dari host / DB client | `localhost:3307`, database `shadow_heist` |
+| Ollama dari host (mode lokal) | http://localhost:11435 |
+
+Untuk login phpMyAdmin, gunakan `MYSQL_USER` dan `MYSQL_PASSWORD` dari `.env`, bukan akun game. Backend dan phpMyAdmin berbagi port `8000` melalui gateway Nginx; port `3307` hanya untuk koneksi MySQL, bukan halaman web.
 
 ### Testing lewat LAN
 
@@ -176,34 +202,7 @@ Frontend development mengizinkan `localhost`, `127.0.0.1`, dan IP LAN pengembang
 
 Jalankan `docker compose -f docker-compose.gpu.yml up -d --no-deps ai-engine frontend`, lalu `docker compose -f docker-compose.gpu.yml restart frontend gateway` setelah mengubah konfigurasi (pakai `docker-compose.yml` untuk CPU). Restart backend menghapus pertandingan dalam memori, bukan database/model. Teman satu jaringan membuka `http://192.168.40.176:4200`; jangan memakai IP adapter WSL. Jika masih timeout dari perangkat lain, periksa firewall dan isolasi klien Wi-Fi. Jangan membuka MySQL/admin ke internet atau mematikan firewall keseluruhan.
 
-### Panel backend development
-
-### Akun, desain Kimberly, dan login Google
-
-Halaman login menggunakan `auth.html` + `auth.scss` dari desain Kimberly. File CSS lama dan duplikat `auth_kim.*` sudah digantikan; aset sumber lainnya tetap dipertahankan.
-
-- Register memakai username 3–40 huruf/angka/underscore, email, password 10–128 karakter dan kedua konfirmasi. Password disimpan sebagai PBKDF2; username/email duplikat ditolak. Setelah register berhasil pengguna mendapat sesi dan masuk main page.
-- Login biasa menerima username atau email. Konfirmasi email di form **bukan verifikasi lewat email**. Reset password dan penautan akun belum tersedia; hubungi pengelola.
-- Database lama harus menerapkan `backend/migrations/V4__account_identities.sql` satu kali. Database baru membaca migrasi dari volume init MySQL. Jangan hapus volume untuk migrasi.
-- Google memakai Identity Services popup + callback JavaScript. Isi `GOOGLE_CLIENT_ID=...apps.googleusercontent.com` di `.env`, lalu rebuild/recreate backend. Client Secret tidak digunakan, dan jangan menaruh JSON kredensial mentah di `.env`.
-- Google Console: OAuth client jenis **Web application**, Authorized JavaScript origins `http://localhost:4200`; redirect URI tidak diperlukan untuk alur ini. Domain deployment harus HTTPS dan didaftarkan sebagai origin; IP LAN HTTP tidak didukung login Google. Login password tetap bisa digunakan lewat LAN.
-- Backend memverifikasi signature/audience/issuer/expiry token Google, email verified, dan nonce sekali pakai (5 menit). Identitas memakai Google `sub`; email yang sama tidak otomatis menautkan/mengambil alih akun lama. Token Google tidak disimpan; sesi aplikasi tetap dapat dicabut lewat logout.
-- Pembatasan percobaan 15/menit per alamat peer/endpoint dan nonce disimpan di memori untuk satu worker development. Di belakang gateway beberapa pengguna bisa berbagi batas peer; sebelum production gunakan rate limiter bersama/proxy tepercaya, HTTPS, verifikasi email, reset password, dan audit lanjutan.
-
-Panduan resmi: [Google Identity Services setup](https://developers.google.com/identity/gsi/web/guides/get-google-api-clientid) dan [verifikasi token backend](https://developers.google.com/identity/gsi/web/guides/verify-google-id-token).
-
-### Pengelolaan backend
-
-Buka `/admin` pada port 8000, login dengan admin development `user1` / `user132`. Janice/Kimberly tidak memiliki akses admin. Atur daftar admin lewat `ADMIN_USERNAMES` (dipisahkan koma); panel hanya tersedia ketika `APP_ENVIRONMENT=development`. Kredensial demo ini **bukan pengamanan untuk deployment publik**: ganti akun/password dan nonaktifkan mode development sebelum deployment.
-
-- Pilih provider `api` atau `docker`, serta model Ollama `8`/`14`. Backend memeriksa konfigurasi API/model tersedia sebelum menerima perubahan. Ketersediaan model tidak menjamin respons cepat; Docker CPU bisa lambat.
-- Perubahan berlaku global untuk request AI berikutnya; request berjalan tetap menggunakan provider awal. Override hanya di memori, tidak menulis `.env`. Tombol reset atau restart backend mengembalikan konfigurasi environment.
-- Pilih room untuk melihat aktivitas fungsi yang diinstrumentasi, parameter, hasil/status, dan trace SVM → fuzzy → prompt LLM → output → pengiriman chat. Ini bukan debugger semua fungsi Python. Event `running` adalah catatan saat fungsi mulai; lihat event akhir dengan `call_id` yang sama untuk hasilnya.
-- Log aktivitas dibatasi 2.000 event dalam memori, endpoint menampilkan 200 terbaru. Restart menghapus log ini. Password/token/API key disensor, tetapi chat, prompt, dan informasi role dalam trace tetap sensitif dan hanya untuk admin.
-
-Implementasi: `backend/controller/api/admin.py`, `backend/public/admin/`, `backend/services/ai_runtime_service.py`, dan `backend/services/activity_service.py`. Desain login/main page Angular tidak diubah.
-| MySQL dari host / DB client | `localhost:3307`, database `shadow_heist` |
-| Ollama dari host (mode lokal) | http://localhost:11435 |
+## Mencoba permainan
 
 Login aplikasi development: **`user1` / `user132`**. Akun ini disiapkan oleh migration saat inisialisasi database baru.
 
@@ -211,25 +210,68 @@ Akun demo tambahan: **`janice` / `user132`** dan **`kimberly` / `user132`** mela
 
 Alur mencoba: **Login → Main page → Enter Tribunal → Buat Ruangan / Gabung → + Bot → Mulai Permainan**. Bot mengisi semua kursi kosong sampai kapasitas pilihan host sehingga bisa dicoba sendiri. Tanpa bot, siapkan minimal 4 akun berbeda. Pemilik ruangan menekan Mulai; anggota lain menekan Masuk Permainan ketika game sudah dimulai.
 
-Di game, buka role privatmu. Saat Day, diskusikan alibi; Hitman dapat memilih target Gag. Saat Night, pilih kartu target lalu kunci Hostage/Guard/Peek jika tersedia. Saat Tribunal, pilih kartu tersangka lalu kunci vote. Pemain yang tidak bisa bertindak tetap dapat menonton. Setelah selesai, kembali ke lobby → Keluar ruangan → Buat ruangan baru.
+Di game, buka role privatmu. Saat Day, diskusikan alibi; Hitman dapat memilih target Gag. Saat Night, pilih kartu target lalu kunci Hostage/Guard/Peek jika tersedia. Saat Tribunal, pilih kartu tersangka lalu kunci vote. Pemain yang tidak bisa bertindak tetap dapat menonton. Setelah selesai, isi survei, lalu kembali ke lobby → Keluar ruangan → Buat ruangan baru (satu ruangan hanya untuk satu pertandingan).
 
-Timer mengikuti jumlah peserta awal. Contoh enam pemain: standar 120/30/45 detik; mode cepat 20/15/15 detik. Empat pemain: standar 80/20/30 detik. Durasi tetap selama pertandingan; rincian ada di GAME_CONCEPT.md. Respons Ollama yang selesai setelah fase berubah **tidak ditampilkan** agar tidak menerobos malam atau efek bungkam; gunakan durasi standar untuk mencoba chat AI.
+Timer mengikuti jumlah peserta awal. Contoh enam pemain: standar 120/30/45 detik; mode cepat 20/15/15 detik. Empat pemain: standar 80/20/30 detik. Durasi tetap selama pertandingan; rincian ada di GAME_CONCEPT.md. Keputusan atau balasan bot yang baru selesai setelah fase berubah **dibuang, tidak ditampilkan**, agar tidak menerobos malam atau efek bungkam; gunakan durasi standar untuk mencoba chat AI.
 
 Saat Day, tombol **Setuju skip diskusi** mempercepat ke Night setelah seluruh manusia yang masih hidup setuju. Bot tidak dihitung. Pemain dibungkam/disandera tetap boleh menyetujui karena ini bukan chat atau vote Tribunal; status mereka tetap tidak dipublikasikan. Persetujuan tidak bisa ditarik pada ronde itu. Pemain offline belum dianggap setuju; timer normal tetap berjalan.
 
-Selama pertandingan aktif, membuka halaman aplikasi lain/tab baru atau login ulang akan mengembalikan akun ke `/game` berdasarkan data backend, bukan hanya storage tab. Akun tidak bisa membuat/gabung pertandingan lain sebelum match selesai. Ini berlaku dalam aplikasi ini, bukan memaksa browser meninggalkan situs eksternal. Desain login dan main page tidak diubah.
+Selama pertandingan aktif, membuka halaman aplikasi lain/tab baru atau login ulang akan mengembalikan akun ke `/game` berdasarkan data backend, bukan hanya storage tab. Akun tidak bisa membuat/gabung pertandingan lain sebelum match selesai. Ini berlaku dalam aplikasi ini, bukan memaksa browser meninggalkan situs eksternal.
 
 ### Akun teman untuk multiplayer
 
-Akun yang sama di beberapa tab tetap satu pemain. Buat akun tambahan lewat CLI lokal (password diminta tersembunyi dan disimpan sebagai hash; akun lama tidak ditimpa):
+Akun yang sama di beberapa tab tetap satu pemain. Teman bisa mendaftar sendiri lewat halaman login, ditambahkan dari panel **Manajemen user**, atau dibuat lewat CLI lokal (password diminta tersembunyi dan disimpan sebagai hash; akun lama tidak ditimpa):
 
 ```sh
 docker compose exec ai-engine python -m module.create_user teman1 --name "Teman Satu"
 ```
 
-Gunakan `-f docker-compose.gpu.yml` jika memakai stack NVIDIA. Setiap teman login dengan akun sendiri, lalu gabung memakai kode room yang sama. Pengujian lintas perangkat/LAN memerlukan konfigurasi CORS/host yang sesuai; QC lokal memakai beberapa sesi terpisah pada satu mesin.
+Gunakan `-f docker-compose.gpu.yml` jika memakai stack NVIDIA. Setiap teman login dengan akun sendiri, lalu gabung memakai kode room yang sama. Pengujian lintas perangkat/LAN memerlukan konfigurasi CORS/host yang sesuai.
 
-Untuk login phpMyAdmin, gunakan `MYSQL_USER` dan `MYSQL_PASSWORD` dari `.env`, bukan akun game. Backend dan phpMyAdmin berbagi port `8000` melalui gateway Nginx; port `3307` hanya untuk koneksi MySQL, bukan halaman web.
+## Panel administrator
+
+Panel terpadu ada di http://localhost:8000/panel. Alamat lama `/admin` dan `/history` otomatis diarahkan ke sana. Panel memakai akun administrator tersendiri, **bukan** akun game.
+
+Siapkan password panel sekali dari root repository (membutuhkan Python dengan dependency backend, atau jalankan di container lalu salin hasilnya ke `.env`):
+
+```sh
+python backend/scripts/setup_panel.py .env
+```
+
+Script ini menulis `PANEL_USERNAME=administrator` dan `PANEL_PASSWORD_HASH`, serta membuat `PANEL_ENCRYPTION_KEY` bila belum ada. Pertahankan kunci itu: API key yang disimpan dari panel dienkripsi dengannya. Restart backend setelah menjalankannya. Sesi panel berlaku 8 jam dan otomatis tidak berlaku lagi bila password panel diganti.
+
+| Menu | Isi |
+| --- | --- |
+| 01 Konfigurasi AI | Provider AI (`api`/`docker`), model, key OpenRouter, link LLM sendiri; tombol cek/tes koneksi |
+| 02 Checker | Jejak setiap chat manusia (SVM → fuzzy → simpan → siar) dan setiap langkah bot (NLU, penalaran, penulis kalimat) per ruangan |
+| 03 Riwayat chat | Arsip chat dari MySQL dengan filter dan ekspor CSV |
+| 04 Manajemen user | Tambah user, reset password akun lokal, hapus akun tanpa menghapus riwayat chat |
+| 05 Otak NPC | Metode penalaran, rantai penulis kalimat, status NLU IndoBERT |
+| 06 Survei | Mengatur pertanyaan survei, ringkasan jawaban per metode bot, dan ekspor CSV |
+
+CSV (survei dan riwayat chat) memakai UTF-8 dengan BOM dan menyimpan jawaban persis seperti diketik pemain. Saat membuka di spreadsheet, impor kolom teks sebagai teks agar jawaban yang diawali `=`, `+`, `-`, atau `@` tidak dievaluasi sebagai formula.
+
+`ADMIN_USERNAMES` dan `HISTORY_ADMIN_USERNAMES` di `.env` kini hanya menjadi daftar username yang dicadangkan (tidak boleh dipakai sebagai username akun game).
+
+## Akun dan login Google
+
+Halaman login menggunakan `auth.html` + `auth.scss` dari desain Kimberly.
+
+- Register memakai username 3–40 huruf/angka/underscore, email, password 10–128 karakter dan kedua konfirmasi. Password disimpan sebagai PBKDF2; username/email duplikat ditolak. Setelah register berhasil pengguna mendapat sesi dan masuk main page.
+- Login biasa menerima username atau email. Konfirmasi email di form **bukan verifikasi lewat email**. Reset password mandiri dan penautan akun belum tersedia; reset dilakukan administrator dari panel.
+- Avatar dipilih dari 6 skin (`arthur`, `dexter`, `eloise`, `jenny`, `kiera`, `sadie`); pilihan disimpan di akun (`PUT /api/auth/skin`).
+- Google memakai Identity Services popup + callback JavaScript. Isi `GOOGLE_CLIENT_ID=...apps.googleusercontent.com` di `.env`, lalu rebuild/recreate backend. Client Secret tidak digunakan, dan jangan menaruh JSON kredensial mentah di `.env`.
+- Google Console: OAuth client jenis **Web application**, Authorized JavaScript origins `http://localhost:4200`; redirect URI tidak diperlukan untuk alur ini. Domain deployment harus HTTPS dan didaftarkan sebagai origin; IP LAN HTTP tidak didukung login Google. Login password tetap bisa digunakan lewat LAN.
+- Backend memverifikasi signature/audience/issuer/expiry token Google, email verified, dan nonce sekali pakai (5 menit). Identitas memakai Google `sub`; email yang sama tidak otomatis menautkan/mengambil alih akun lama. Token Google tidak disimpan; sesi aplikasi tetap dapat dicabut lewat logout.
+- Pembatasan percobaan 15/menit per alamat peer/endpoint dan nonce disimpan di memori untuk satu worker. Di belakang gateway beberapa pengguna bisa berbagi batas peer; sebelum production gunakan rate limiter bersama/proxy tepercaya, HTTPS, verifikasi email, reset password, dan audit lanjutan.
+
+Panduan resmi: [Google Identity Services setup](https://developers.google.com/identity/gsi/web/guides/get-google-api-clientid) dan [verifikasi token backend](https://developers.google.com/identity/gsi/web/guides/verify-google-id-token).
+
+## Database
+
+MySQL menyimpan 14 tabel: akun & sesi login, arsip ruangan/pemain/chat/analisis, konfigurasi & sesi panel, jejak checker, serta survei dan metode bot per pertandingan. Pertandingan yang sedang berjalan (role, vote, timer) **tidak** disimpan di database, tetapi di memori backend.
+
+SQL di `backend/migrations/` (V1–V8) dijalankan otomatis hanya saat volume database pertama kali dibuat. Untuk database lama, terapkan file yang belum dijalankan secara manual sesuai urutan versinya, tanpa menghapus volume; salinan untuk Azure ada di `backend/deployment/mysql/`. Lihat [catatan migration](backend/migrations/README.md).
 
 ## Mengelola container dan data
 
@@ -269,7 +311,7 @@ Jika mengubah daftar model lokal yang harus diunduh, jalankan pula `docker compo
 - Model Ollama disimpan di named volume `games_ollama_data`.
 - `down` biasa mempertahankan kedua volume. **Jangan gunakan `docker compose down -v` jika data/model masih diperlukan: opsi itu menghapus named volume beserta isinya.** Volume persisten bukan pengganti backup.
 - Lobby, engine pertandingan, role/aksi/vote, dan konteks AI berada di memori satu proses backend. Reload/reconnect browser memulihkan snapshot dan 100 pesan terbaru selama proses yang sama hidup. Restart/recreate backend menghilangkan pertandingan aktif. Catatan chat/analisis di MySQL tetap tersimpan, tetapi belum memulihkan pertandingan. Jangan menjalankan beberapa worker backend sebelum menambahkan shared state/persistence engine.
-- SQL di `backend/migrations/` dijalankan saat database pertama kali diinisialisasi. Menambah file migration atau mengganti password di `.env` tidak otomatis memperbarui database yang sudah berisi data. Lihat [catatan migration](backend/migrations/README.md).
+- Menambah file migration atau mengganti password di `.env` tidak otomatis memperbarui database yang sudah berisi data.
 
 ## Jika belum berjalan
 
@@ -279,28 +321,33 @@ Jika mengubah daftar model lokal yang harus diunduh, jalankan pula `docker compo
 | Error perangkat/driver NVIDIA | Pastikan file GPU hanya dipakai pada mesin NVIDIA yang didukung; di Mac gunakan file CPU atau mode API. |
 | Port sudah digunakan | Hentikan service lokal lain yang memakai port tersebut. Perubahan port juga perlu diselaraskan dengan URL frontend, CORS, dan proxy. |
 | Login gagal / backend belum siap | Periksa `docker compose ps -a`, log `ai-engine` dan `mysql`, lalu status backend. Database lama mungkin belum memiliki migration akun. |
-| Pesan masuk tetapi NOX tidak membalas | Pastikan bot ditambahkan, `model_ready=true`, dan `database_ready=true` di `/app-status`. Untuk Ollama, periksa `ollama_ready=true` dan daftar model; untuk API, periksa key/provider dan log backend. Key terisi belum berarti key valid. |
+| Bot diam atau kualitasnya turun | Buka panel **Otak NPC**: pastikan NLU tertulis IndoBERT (bukan cadangan) dan minimal satu jalur penulis hidup (atau `NPC_WRITER=templat`). Periksa `database_ready=true` di `/app-status`. Untuk mode `llm`, periksa juga `ollama_ready`/key API. |
+| Panel tidak bisa login | Pastikan `PANEL_PASSWORD_HASH` sudah dibuat dengan `setup_panel.py` dan backend sudah di-restart. |
 | Ruangan tidak ditemukan | Buat ruangan baru setelah backend restart, atau periksa kembali kode undangan. |
 
 ## Struktur dan pengujian
 
 ```text
-frontend/          Angular: login, main page, lobby, game/chat
-backend/           Python FastAPI + Socket.IO
-  config/          Konfigurasi aplikasi, AI, MySQL, upload
-  controller/      Endpoint API dan middleware
-  services/        Logika autentikasi, ruangan, analisis AI
-  models/          Query SQL terparameterisasi
-  module/          Konektor MySQL, klien Ollama, helper upload
-  artifacts/svm/   Model intent privat, disediakan terpisah
+frontend/             Angular: login, main page, lobby, game/chat, survei
+backend/              Python FastAPI + Socket.IO
+  config/             Konfigurasi aplikasi, AI, MySQL, upload
+  controller/         Endpoint API dan middleware
+  services/           Logika autentikasi, ruangan, engine pertandingan, analisis AI
+    npc_brain/        Runtime otak NPC; generated/ = ekspor notebook skripsi
+  models/             Query SQL terparameterisasi
+  module/             Konektor MySQL, klien Ollama/OpenRouter, helper upload
+  realtime/           Event Socket.IO
+  public/panel/       Halaman panel administrator
+  artifacts/svm/      Model intent SVM privat, disediakan terpisah
   artifacts/indobert/ Model IndoBERT intent + target untuk otak NPC (disalin manual)
-  services/npc_brain/ Runtime otak NPC; generated/ = ekspor notebook skripsi
-  migrations/     Skema SQL dan akun development
-proxy/             Gateway Nginx
-docker-compose.yml Service development dan volume
+  migrations/         Skema SQL V1–V8 dan akun development
+  deployment/         Konfigurasi produksi Azure (Caddy, SQL salinan)
+  scripts/            setup_panel.py, ekspor_otak_npc.py, setup_azure.py
+proxy/                Gateway Nginx
+docker-compose.yml    Service development dan volume
 ```
 
-Alur chat pertandingan: **pesan → otorisasi → SVM/fuzzy → validasi ulang fase/hak chat → penyimpanan MySQL → broadcast**. Secara terpisah, timer menjalankan **NPC → snapshot privat → IndoBERT → fuzzy/utility/behavior tree → NLG tervalidasi → aksi/vote/chat** (mode `llm` lama tetap tersedia). Persentase diam pada fuzzy masih nilai tetap, bukan observasi diam pemain yang sesungguhnya.
+Alur chat manusia: **pesan → otorisasi → SVM/fuzzy → validasi ulang fase/hak chat → penyimpanan MySQL → broadcast**. Secara terpisah, timer menjalankan bot: **snapshot privat → IndoBERT (baca chat) → fuzzy/utility/behavior tree → NLG → validasi IndoBERT → aksi/vote/chat** (mode `llm` lama tetap tersedia). Persentase diam pada fuzzy masih nilai tetap, bukan observasi diam pemain yang sesungguhnya.
 
 Dengan container aplikasi sudah berjalan:
 
@@ -316,7 +363,7 @@ docker compose exec -T ai-engine python -m tests.live_match_smoke
 
 Tes otomatis bukan bukti koneksi AI eksternal sedang aktif; coba chat melalui UI untuk menguji provider sebenarnya. Tes database khusus hanya boleh diarahkan ke database percobaan.
 
-Dokumentasi lanjutan: [backend](backend/README.md), [Ollama](OLLAMA.md), [pengaturan styling](frontend/STYLING.md), dan [konsep game](GAME_CONCEPT.md).
+Dokumentasi lanjutan: [panduan membaca kode](CODE_GUIDE.md), [konsep game](GAME_CONCEPT.md), [backend](backend/README.md), [Ollama](OLLAMA.md), [pengaturan styling](frontend/STYLING.md), [deployment frontend](frontend/DEPLOYMENT.md), dan [deployment backend](backend/deployment/README.md).
 
 ## Mengembangkan frontend melalui Docker
 
@@ -348,14 +395,11 @@ dikonfigurasi dalam `angular.json`; jangan menganggapnya sebagai tes siap pakai.
 
 ## Catatan keamanan
 
-### Pipeline checker
-
 Endpoint checker publik lama `GET /api/rooms/{code}/checker` sudah ditutup (HTTP 410).
 Trace/prompt hanya tersedia lewat `/panel` dengan sesi administrator. Data ini dapat
 berisi role dan intel privat NPC, sehingga administrator harus dipisahkan dari peserta
 eksperimen. Trace menunjukkan input/output aplikasi, bukan chain-of-thought internal model.
-Jejak otak bot memuat `penjelasan` (role bot, kecurigaan, penalaran metode); hanya endpoint
-panel yang mengembalikannya, sedangkan daftar trace development `/api/admin/...` membuangnya.
-Silence fuzzy masih konstan 20%, bukan pengukuran aktivitas pemain.
+Jejak otak bot memuat `penjelasan` (role bot, kecurigaan, penalaran metode) dan hanya
+dikembalikan oleh endpoint panel.
 
-Compose ini untuk development lokal, bukan deployment publik siap pakai. Ganti kredensial default dan akun demo sebelum deployment; batasi akses port database/phpMyAdmin, serta siapkan HTTPS dan pengamanan deployment. Jangan commit `.env`, API key, file upload pengguna, atau artifact privat. Folder referensi desain `communicationfolder/` juga diabaikan Git.
+Compose ini untuk development lokal, bukan deployment publik siap pakai. Ganti kredensial default dan akun demo sebelum deployment; batasi akses port database/phpMyAdmin, serta siapkan HTTPS dan pengamanan deployment. Jangan commit `.env`, API key, file upload pengguna, atau artifact privat. Folder dokumen pribadi `communicationfolder/` juga diabaikan Git.
