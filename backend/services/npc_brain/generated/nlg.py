@@ -1,8 +1,8 @@
 """FILE INI DIHASILKAN OTOMATIS oleh scripts/ekspor_otak_npc.py. JANGAN DIEDIT MANUAL.
 
 Sumber : npc_nlg.ipynb
-Sidik  : e63d135d7cda8f8a
-Dibuat : 2026-09-30 07:08 UTC
+Sidik  : cc8f2ddba23a2cb3
+Dibuat : 2026-10-15 11:53 UTC
 
 Perubahan logika bot dilakukan di notebook skripsi, dijalankan ulang sampai semua
 skenario/pengujian lulus, lalu diekspor ulang dengan skrip ini.
@@ -296,15 +296,22 @@ def klaim_diri(kecil):
     klaim = {m.group(2) for m in re.finditer(POLA_KLAIM, kecil) if (m.group(1) or "") not in BUKAN_KLAIM}
     return klaim | {m.group(1) for m in re.finditer(POLA_ROLE_KU, kecil)}
 
-# Nama roster yang disebut di teks (boleh berakhiran -nya, -lah, ...).
+# Nama roster yang disebut di teks (boleh berakhiran -nya, -lah, ...). Nama tampilan bisa lebih dari satu kata:
+# nama lengkap dihitung, begitu juga kata pertamanya ("Andy" untuk "Andy Saputra") bila tidak dipakai pemain lain.
 def nama_disebut(teks, roster):
+    akhiran = "|".join(AKHIRAN_NAMA_NLG)
+    depan = Counter(nama.split()[0].casefold() for nama in roster if nama.split())
+
+    def ada(kata):
+        frasa = r"\s+".join(map(re.escape, kata))
+        return re.search(rf"(?<!\w){frasa}(?:{akhiran})?(?!\w)", teks, flags=re.IGNORECASE)
+
     disebut = set()
-    for kata in re.findall(r"\w+", teks):
-        k = kata.casefold()
-        for nama in roster:
-            n = nama.casefold()
-            if k == n or (k.startswith(n) and k[len(n):] in AKHIRAN_NAMA_NLG):
-                disebut.add(nama)
+    for nama in roster:
+        kata = nama.split()
+        panggilan = len(kata) > 1 and len(kata[0]) >= 3 and depan[kata[0].casefold()] == 1
+        if kata and (ada(kata) or (panggilan and ada(kata[:1]))):
+            disebut.add(nama)
     return disebut
 
 # Daftar pelanggaran aturan; kosong berarti lolos. Aturan sama untuk semua role.
