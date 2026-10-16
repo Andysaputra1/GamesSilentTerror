@@ -21,6 +21,8 @@ class Participant:
     role: str
     bot: bool = False
     alive: bool = True
+    # Keluar di tengah pertandingan: tidak hidup seperti korban eksekusi, tetapi ditandai berbeda.
+    left: bool = False
     hostage: bool = False
     gagged: bool = False
     next_peek: int = 1
@@ -226,9 +228,13 @@ class Match:
         self.revealed.add(name)
         self.try_begin(time.time() if now is None else now)
 
-    # Manusia yang belum membuka kartu role.
+    # Manusia yang belum membuka kartu role (pemain yang sudah keluar tidak ditunggu).
     def unrevealed(self):
-        return [p.name for p in self.players.values() if not p.bot and p.name not in self.revealed]
+        return [
+            p.name
+            for p in self.players.values()
+            if not p.bot and p.alive and p.name not in self.revealed
+        ]
 
     # Saat ronde 1 boleh mulai bila semua kartu sudah dibuka (AI siap dan waktu baca minimal lewat).
     def _start_at(self):
@@ -384,15 +390,49 @@ class Match:
         )
         if len(leaders) == 1:
             self.players[leaders[0]].alive = False
-            remaining = self.hitman_remaining()
-            count = "" if remaining is None else f" Hitman tersisa: {remaining}."
-            # Eksekusi Hitman terakhir langsung mengakhiri permainan dan membuka semua role.
-            terakhir = not any(p.alive for p in self.players.values() if p.role == "hitman")
-            rahasia = "" if terakhir else " Role tetap dirahasiakan sampai permainan selesai."
-            self.events.append(f"Tribunal mengeksekusi {self.labels[leaders[0]]}.{count}{rahasia}")
+            self.events.append(
+                f"Tribunal mengeksekusi {self.labels[leaders[0]]}.{self._catatan_tersingkir()}"
+            )
         else:
             self.events.append("Tribunal berakhir tanpa eksekusi: suara seri atau tidak ada suara.")
         self.check_winner()
+
+    # Akhiran pengumuman eksekusi/keluar: Hitman tersisa (room ≥ 2 Hitman) dan kerahasiaan role.
+    def _catatan_tersingkir(self):
+        remaining = self.hitman_remaining()
+        count = "" if remaining is None else f" Hitman tersisa: {remaining}."
+        # Hitman terakhir yang tersingkir langsung mengakhiri permainan dan membuka semua role.
+        terakhir = not any(p.alive for p in self.players.values() if p.role == "hitman")
+        rahasia = "" if terakhir else " Role tetap dirahasiakan sampai permainan selesai."
+        return count + rahasia
+
+    # KELUAR DI TENGAH PERTANDINGAN: sama dengan dieksekusi (tidak hidup, tanpa chat/vote/aksi,
+    # hasil tetap mengikuti kubu), tetapi ditandai `left` agar roster dan catatan membedakannya.
+    # Role tetap rahasia seperti eksekusi. Pemain yang sudah mati atau match selesai tidak berubah.
+    def leave(self, name, now=None):
+        player = self.players.get(name)
+        if not player or player.bot:
+            raise ValueError("Hanya pemain manusia di pertandingan ini yang dapat keluar.")
+        if not player.alive or self.winner:
+            return False
+        player.alive, player.left = False, True
+        # Suara dan aksi milik pemain ini dibuang. Pilihan orang lain yang menargetkannya juga
+        # dibuang karena target harus hidup (sama seperti korban eksekusi); mereka boleh memilih ulang.
+        self.votes = {v: t for v, t in self.votes.items() if name not in (v, t)}
+        self.actions = {a: x for a, x in self.actions.items() if name not in (a, x["target"])}
+        self.skip_consents.discard(name)
+        self.ready_consents.discard(name)
+        self.events.append(
+            f"{self.labels[name]} meninggalkan permainan.{self._catatan_tersingkir()}"
+        )
+        self.check_winner()
+        # Fase tidak menunggu pemain yang keluar: persiapan dan skip diskusi dicek ulang.
+        now = time.time() if now is None else now
+        if self.phase == "preparing":
+            self.try_begin(now)
+        elif self.phase == "day":
+            self._skip_jika_lengkap(now)
+        return True
 
     def finish(self, winner, reason, explanation):
         """Satu hasil final untuk semua pemain; tidak berubah oleh tick berikutnya."""
@@ -417,7 +457,11 @@ class Match:
         survivors = [p for p in self.players.values() if p.role != "hitman" and p.alive]
         if not alive_hitmen:
             executed = "Semua Hitman" if len(hitmen) > 1 else "Hitman"
-            self.finish("civilians", "hitman_executed", f"{executed} dieksekusi oleh Tribunal.")
+            # Hitman yang keluar tersingkir seperti dieksekusi; alasan hasil tetap hitman_executed.
+            cara = "dieksekusi oleh Tribunal"
+            if any(p.left for p in hitmen):
+                cara = "keluar dari permainan" if all(p.left for p in hitmen) else "tersingkir"
+            self.finish("civilians", "hitman_executed", f"{executed} {cara}.")
         elif not survivors:
             self.finish("hitman", "no_civilians_alive", "Tidak ada warga yang masih hidup.")
         elif all(p.hostage for p in survivors):
@@ -498,8 +542,12 @@ class Match:
         if self.phase != "day" or not player or player.bot or not player.alive:
             raise ValueError("Persetujuan skip hanya untuk pemain manusia hidup saat siang.")
         self.skip_consents.add(name)
+        self._skip_jika_lengkap(now)
+
+    # Siang berakhir bila semua manusia hidup sudah setuju (dicek ulang saat ada pemain keluar).
+    def _skip_jika_lengkap(self, now=None):
         required = {p.name for p in self.players.values() if not p.bot and p.alive}
-        if required and required <= self.skip_consents:
+        if self.phase == "day" and required and required <= self.skip_consents:
             # Gunakan transisi yang sama dengan timer, termasuk kesempatan aksi bot.
             now = time.time() if now is None else now
             self.events.append("Semua pemain manusia menyetujui akhir diskusi.")
@@ -574,7 +622,7 @@ class Match:
             "starts_in": max(0, ceil(starts_at - now)) if starts_at else None,
             "max_wait": max(0, ceil(self.deadline - now)),
             "agreed": len(self.ready_consents),
-            "required": sum(not p.bot for p in self.players.values()),
+            "required": sum(not p.bot and p.alive for p in self.players.values()),
             "consented": viewer in self.ready_consents,
             "bots": sum(p.bot for p in self.players.values()),
             "elapsed": max(0, int(now - prep["started_at"])),
@@ -591,7 +639,7 @@ class Match:
         counts = Counter(p.role for p in self.players.values())
         return {role: counts[role] for role in ("hitman", "spy", "stalker", "civilian")}
 
-    # Room dengan ≥ 2 Hitman mengumumkan Hitman yang masih hidup (hanya berubah saat eksekusi Tribunal).
+    # Room dengan ≥ 2 Hitman mengumumkan Hitman yang masih hidup (berubah saat eksekusi/keluar).
     # Room 1 Hitman: None, karena warga sudah tahu dari game yang selesai atau berlanjut.
     def hitman_remaining(self):
         hitmen = [p for p in self.players.values() if p.role == "hitman"]
@@ -652,6 +700,8 @@ class Match:
                     "label": self.labels[p.name],
                     "alive": p.alive,
                     "skin_id": p.skin_id,
+                    # Keluar sudah diumumkan di catatan, jadi tandanya publik (hanya bila benar).
+                    **({"left": True} if p.left else {}),
                     **({"metode": self.bot_methods[p.name]} if p.name in self.bot_methods else {}),
                     **({"role": p.role, "hostage": p.hostage, "bot": p.bot} if self.winner else {}),
                 }

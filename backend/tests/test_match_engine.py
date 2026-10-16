@@ -515,10 +515,10 @@ class RoomGameTests(unittest.TestCase):
             self.rooms.start(self.room.code, "bob")
         self.rooms.start(self.room.code, "alice")
         self.rooms.join(self.room.code, "bob")
+        # Keluar saat pertandingan aktif kini diizinkan (tereliminasi); lihat test_leave_match.py.
         for operation in [
             lambda: self.rooms.join(self.room.code, "outsider"),
             lambda: self.rooms.set_bot(self.room.code, "alice", False),
-            lambda: self.rooms.leave(self.room.code, "alice"),
             lambda: self.rooms.start(self.room.code, "alice"),
         ]:
             with self.assertRaises(ValueError):

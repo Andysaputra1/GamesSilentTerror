@@ -103,7 +103,7 @@ def play(code: str, body: PlayOption, user=Depends(require_authenticated_user)):
 
 
 @router.post("/{code}/leave")
-# LEAVE: service menolak keluar saat pertandingan aktif.
+# LEAVE: keluar saat pertandingan aktif = tereliminasi seperti dieksekusi (`left`); idempoten.
 def leave(code: str, user=Depends(require_authenticated_user)):
     game_result(lambda: room_service.leave(code, user.username))
     return {"left": True}

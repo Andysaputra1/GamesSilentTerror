@@ -300,15 +300,20 @@ class RoomService:
                             },
                         )
 
-    # LEAVE: pertandingan aktif tidak boleh berubah roster; lobby kosong dibersihkan.
+    # LEAVE: dari lobby/hasil keluar biasa. Dari pertandingan aktif, pemain dianggap tereliminasi
+    # seperti dieksekusi (Match.leave) lalu keanggotaannya dicabut, jadi tidak bisa kembali ke
+    # pertandingan itu. Room tanpa anggota manusia dibersihkan; keluar dua kali tidak mengubah apa pun.
     @traced
     def leave(self, code, username):
         with self.lock:
+            room = self.rooms.get(code.strip().upper())
+            match = room.match if room else None
+            if match and username in match.players and username not in room.members:
+                return  # sudah keluar dari pertandingan ini
             room = self.get(code, username)
             if room.match and not room.match.winner:
-                raise ValueError(
-                    "Tidak dapat keluar dari pertandingan aktif. Kamu bisa menyambung kembali setelah menutup tab."
-                )
+                room.match.tick()
+                room.match.leave(username)
             if room.match:
                 # Survei akhir tetap bisa dikirim setelah keluar (room mungkin segera dibersihkan).
                 # Impor lambat: survey_service mengimpor modul ini.
