@@ -3,7 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { AssetPreloader, MAIN_PAGE_IMAGES } from './asset-preloader';
+import { AssetPreloader, MAIN_CRITICAL_IMAGES } from './asset-preloader';
 import { BOOT_LOADER_MAX_WAIT_MS, BootLoader } from './boot-loader';
 
 @Component({ template: '' })
@@ -38,7 +38,7 @@ describe('BootLoader', () => {
     expect(preload).not.toHaveBeenCalled();
     await TestBed.inject(Router).navigateByUrl('/main');
     await vi.advanceTimersByTimeAsync(500);
-    expect(preload).toHaveBeenCalledWith(MAIN_PAGE_IMAGES);
+    expect(preload).toHaveBeenCalledWith(MAIN_CRITICAL_IMAGES);
     expect(loader.classList).toContain('boot-loader--done');
     await vi.advanceTimersByTimeAsync(800);
     expect(loader.isConnected).toBe(false);

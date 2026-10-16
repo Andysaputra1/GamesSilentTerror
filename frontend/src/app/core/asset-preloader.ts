@@ -7,13 +7,18 @@ export function skinImageUrl(id: string): string {
   return `/assets/characters/skin_${id}.png`;
 }
 
-// Gambar yang langsung terlihat atau dipakai saat ganti skin di halaman utama.
-// Layar loading menunggu daftar ini (dengan batas waktu) sebelum menampilkan Main.
-export const MAIN_PAGE_IMAGES: readonly string[] = [
+// Kerangka halaman utama (latar, binder, tombol). Hanya ini yang ditunggu layar loading;
+// kartu, props, dan skin menyusul di latar belakang agar loading tidak menunggu ±3,8 MB.
+export const MAIN_CRITICAL_IMAGES: readonly string[] = [
   '/assets/backgrounds/backwood.jpg',
   '/assets/backgrounds/binder-cropped.png',
   '/assets/buttons/btn-wood.png',
   '/assets/buttons/btn-leather.png',
+];
+
+// Semua gambar halaman utama, termasuk skin untuk tombol gantungan; dipreload Main setelah render.
+export const MAIN_PAGE_IMAGES: readonly string[] = [
+  ...MAIN_CRITICAL_IMAGES,
   '/assets/decorations/icons/hanger.png',
   ...['hitman', 'stalker', 'spy', 'civilian'].map((role) => `/assets/cards/card_${role}.png`),
   ...['hitman-pistol', 'spy-shades', 'stalker-nerd-eyes'].map(

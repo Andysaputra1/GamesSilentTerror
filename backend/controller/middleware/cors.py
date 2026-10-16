@@ -12,6 +12,7 @@ def configure_cors(app: FastAPI) -> None:
         CORSMiddleware,
         allow_origins=settings.allowed_origins,
         allow_credentials=True,
-        allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+        # PUT wajib ada: simpan skin (/api/auth/skin) dipanggil lintas origin dari frontend Vercel.
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         allow_headers=["*"],
     )
