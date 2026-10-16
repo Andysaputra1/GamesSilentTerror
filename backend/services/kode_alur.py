@@ -36,6 +36,7 @@ KODE_ALUR = {
             ("nlu.intent(", "Model 1: intent + keyakinan"),
             ("KONTEKS_MAKS", "maksimal 12 chat terakhir sebagai konteks"),
             ("nlu.target(", "Model 2: target, memakai intent dan konteks"),
+            ("pemain_disebut(", "pesan neutral: target neutral dari aturan nama (sumber kedua)"),
         ]),
     ],
     "nlu_intent": [
@@ -49,10 +50,10 @@ KODE_ALUR = {
     ],
     "nlu_target": [
         (G + "nlg", "NLUIndoBERT.target", [
-            ('label_intent == "neutral"', "kalimat netral tidak punya target"),
+            ('label_intent == "neutral"', "pesan neutral: hanya relasi neutral (pemain yang diajak bicara), boleh kosong"),
             ("buat_teks_pasangan(", "satu teks pasangan untuk tiap kandidat"),
-            ('relasi != "tidak_ada"', "hanya relasi offend/defend yang dipakai"),
-            ("self.ambang > 0", "aturan minimal satu target"),
+            ('relasi != "tidak_ada"', "kandidat berelasi offend/defend/neutral menjadi target"),
+            ("self.ambang > 0", "aturan minimal satu target (offend/defend)"),
         ]),
         (G + "nlg", "buat_teks_pasangan", [
             ("reversed(chat_sebelumnya)", "konteks terbaru ditulis lebih dulu"),
@@ -290,6 +291,7 @@ KODE_ALUR = {
         (RT, "BrainRuntime.catat_chat", [("catat_aksi_bot", "ingatan: bot sudah bicara (jeda antar-chat)")]),
         ("services.npc_service", "catat_nlu", [
             ("runtime.baca_chat", "kalimat bot dibaca NLU"),
+            ("tandai_dipanggil(", "bot yang dipanggil/dituduh melangkah segera"),
             ("record_nlu", "bacaan disimpan untuk riwayat chat"),
         ]),
     ],

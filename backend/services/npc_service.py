@@ -37,6 +37,8 @@ BATAS_LANGKAH_DETIK = 25
 BATAS_TULIS_DETIK = 25
 # Cadangan saat penulis LLM melewati batas: kalimat templat (tetap divalidasi IndoBERT) jauh lebih cepat.
 BATAS_TEMPLAT_DETIK = 10
+# Pemicu cepat: jarak minimal antar-langkah bot yang dipanggil/dituduh (langkah biasa: NPC_STEP_SECONDS).
+JEDA_SEGERA_DETIK = 1.0
 
 
 class NPCDecision(BaseModel):
@@ -199,6 +201,18 @@ def roster_label(match):
     return [match.labels.get(nama, nama) for nama in match.players]
 
 
+# PEMICU CEPAT: bot yang dipanggil chat baru (target neutral, dari IndoBERT atau aturan nama) atau dituduhnya
+# (target offend) melangkah pada putaran jam berikutnya, tanpa menunggu NPC_STEP_SECONDS. Bacaan NLU yang dipakai
+# sama dengan bacaan bot (memo NLUBersama). Lantai bicara dan aturan chat otak (jatah, jeda, satu jawaban per
+# panggilan) tetap menentukan apakah bot benar-benar bicara.
+def tandai_dipanggil(runtime, match, pengirim, nlu):
+    for t in nlu.get("target", []):
+        if t["relasi"] in ("neutral", "offend") and t["pemain"] != pengirim:
+            otak = runtime.otak_bot(match.id, match.username(t["pemain"]))
+            if otak is not None:
+                otak.segera = True
+
+
 # PENCATAT NLU: baca satu chat pertandingan dengan IndoBERT di thread keputusan (urut dengan langkah bot),
 # simpan bacaannya ke riwayat chat, dan kembalikan hasilnya (None bila otak belum siap atau gagal).
 async def catat_nlu(match, pengirim, teks, message_id=None, runtime=brain_runtime, room_code=None):
@@ -218,6 +232,7 @@ async def catat_nlu(match, pengirim, teks, message_id=None, runtime=brain_runtim
     except Exception:
         logger.exception("NLU chat gagal dicatat.")
         return None
+    tandai_dipanggil(runtime, match, label, nlu)
     if message_id is not None:
         try:
             await asyncio.to_thread(PersistenceService(room_code).record_nlu, message_id, nlu)
@@ -295,12 +310,14 @@ class NPCService:
         self.issued.add(key)
         self._spawn(self.turn(code, match, key, context))
 
-    # Otak mengambil langkah berkala; bot digeser beberapa detik agar tidak berbicara serentak.
+    # Otak mengambil langkah berkala; bot digeser beberapa detik agar tidak berbicara serentak. Bot yang baru
+    # dipanggil atau dituduh (otak.segera) melangkah lebih cepat, minimal JEDA_SEGERA_DETIK sesudah langkah terakhir.
     def _due(self, otak, match, elapsed, now, index):
         start = min(2.0, match.durations[match.phase] / 6) + (index % 4) * 0.7
         if elapsed < start or match.deadline - now < 1.0:
             return False
-        return now - otak.langkah_terakhir >= settings.npc_step_seconds
+        jeda = JEDA_SEGERA_DETIK if otak.segera else settings.npc_step_seconds
+        return now - otak.langkah_terakhir >= jeda
 
     # PERSIAPAN: tunggu otak siap, bagi metode/persona per bot, lalu buka ronde 1.
     async def prepare(self, code, match):
@@ -358,6 +375,7 @@ class NPCService:
                 ):
                     return
                 key = (match.id, match.round, match.phase)
+                otak.segera = False  # snapshot ini sudah memuat chat pemicunya
                 snapshot = snapshot_berlabel(match.snapshot(otak.nama), match.labels)
                 terlihat = match.messages[-1]["id"] if match.messages else None
             now = time.time()

@@ -70,6 +70,8 @@ class NLUBersama:
     def __init__(self, nlu, sumber, maks=4096):
         self.nlu, self.sumber, self.maks = nlu, sumber, maks
         self.ambang = getattr(nlu, "ambang", 0.0)
+        # Kata umum (pair_builder.json) untuk aturan nama di anotasi_chat: tidak pernah dianggap nama pemain.
+        self.common_words = getattr(nlu, "common_words", frozenset())
         self._memo = OrderedDict()
         self._lock = threading.Lock()
 
@@ -102,13 +104,15 @@ class NLUCadangan:
     """Pengganti IndoBERT: intent dari SVM lama dan target dari nama pemain yang disebut.
 
     Kualitasnya jauh di bawah IndoBERT; sumber NLU dicatat di trace agar data penelitian
-    dari mode ini bisa dipisahkan.
+    dari mode ini bisa dipisahkan. Pesan neutral tidak diberi target di sini: anotasi_chat
+    memberi target neutral lewat aturan nama saja (sama dengan persepsi notebook).
     """
 
     ambang = 0.0
 
-    def __init__(self, analysis=None):
+    def __init__(self, analysis=None, common_words=frozenset()):
         self.analysis = analysis
+        self.common_words = frozenset(common_words)
 
     def intent(self, teks, daftar_pemain=()):
         try:
@@ -131,6 +135,18 @@ class NLUCadangan:
         return [{"pemain": p, "relasi": label_intent, "prob": None} for p in disebut] or [
             {"pemain": "tidak_diketahui", "relasi": label_intent, "prob": None}
         ]
+
+
+# Kata umum dari pair_builder.json model target (bila folder ada) untuk aturan nama NLU cadangan;
+# tanpa berkas itu hanya kata ganti dan istilah game yang dilindungi.
+def kata_umum(target_dir) -> frozenset:
+    path = Path(target_dir) / "pair_builder.json" if target_dir else None
+    if not path or not path.is_file():
+        return frozenset()
+    try:
+        return frozenset(json.loads(path.read_text(encoding="utf-8"))["common_words"])
+    except (OSError, ValueError, KeyError):
+        return frozenset()
 
 
 # Target NLU → teks pendek untuk panel, mis. "NOX: offend (0.91)".
@@ -176,6 +192,9 @@ class OtakBot:
     sibuk: bool = False
     langkah_terakhir: float = 0.0
     langkah: int = 0
+    # Pemicu cepat: chat baru memanggil (target neutral) atau menuduh bot ini; langkah berikutnya tidak menunggu
+    # NPC_STEP_SECONDS. Dihapus saat langkah mengambil snapshot.
+    segera: bool = False
 
 
 @dataclass
@@ -318,7 +337,7 @@ class BrainRuntime:
                 logger.exception("IndoBERT gagal dimuat; memakai NLU cadangan.")
         else:
             logger.warning("Folder IndoBERT tidak ditemukan; memakai NLU cadangan (SVM + nama).")
-        return NLUBersama(NLUCadangan(analysis), "cadangan")
+        return NLUBersama(NLUCadangan(analysis, kata_umum(target_dir)), "cadangan")
 
     # RANTAI PENULIS sesuai urutan panel. Key Claude dari environment server; key OpenRouter dan link LLM
     # (Docker/tunnel) dari Konfigurasi AI panel. Jalur tanpa key dilewati; semua gagal → templat.
@@ -618,6 +637,7 @@ class BrainRuntime:
 
     # PENCATAT NLU: baca satu chat dengan IndoBERT seperti ingatan bot (konteks = `riwayat` milik pemanggil,
     # urut kronologis). Hasil sama dengan bacaan bot dan masuk memo NLU, jadi bot tidak menghitung ulang.
+    # Target neutral (pemain yang diajak bicara) ikut dengan asalnya: IndoBERT/cadangan dan/atau aturan nama.
     def baca_chat(self, riwayat, pengirim, teks, roster):
         mulai = time.perf_counter()
         modul = next(iter(self.modul.values()))  # anotasi_chat sama di semua modul notebook
@@ -628,7 +648,8 @@ class BrainRuntime:
         del riwayat[:-50]
         return {"intent": chat["intent"], "confidence": round(chat["conf_intent"], 3),
                 "target": [{"pemain": t["pemain"], "relasi": t["relasi"],
-                            "prob": None if t.get("prob") is None else round(t["prob"], 3)}
+                            "prob": None if t.get("prob") is None else round(t["prob"], 3),
+                            "sumber": list(t.get("sumber", []))}
                            for t in chat["target"]],
                 "sumber": self.nlu.sumber, "ms": round((time.perf_counter() - mulai) * 1000, 1)}  # fmt: skip
 

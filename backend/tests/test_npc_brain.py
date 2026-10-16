@@ -14,7 +14,7 @@ from unittest.mock import AsyncMock, Mock, patch
 
 from services.match_engine import Match
 from services.npc_brain.runtime import BrainRuntime, NLUBersama, NLUCadangan
-from services.npc_service import NPCService
+from services.npc_service import NPCService, catat_nlu
 from services.room_service import RoomService
 
 AKSI_RAHASIA = {"gag", "hostage", "guard", "peek"}
@@ -87,6 +87,24 @@ class BrainRuntimeTests(unittest.TestCase):
                 nlu.intent("Gw curiga sama tester.", ["tester", "NOX"]), ("offend", 0.9)
             )
         model.intent.assert_called_once_with("Gw curiga sama tester.", ("tester", "NOX"))
+
+    def test_baca_chat_adds_neutral_targets_from_the_name_rule(self):
+        # NLU cadangan tidak memberi target untuk pesan neutral; aturan nama di anotasi_chat yang memberinya.
+        roster = ["human", "NOX", "ECHO", "VEIL"]
+        sapa = self.runtime.baca_chat([], "human", "Vei, kamu semalam ngapain?", roster)
+        self.assertEqual(sapa["intent"], "neutral")
+        self.assertEqual(
+            sapa["target"],
+            [{"pemain": "VEIL", "relasi": "neutral", "prob": None, "sumber": ["nama"]}],
+        )
+        semua = self.runtime.baca_chat([], "human", "Ada yang tau sisa waktu?", roster)
+        self.assertEqual(semua["target"], [])
+        # Aturan nama tidak pernah membuat target offend/defend: tuduhan tetap dari NLU (sumber cadangan).
+        tuduh = self.runtime.baca_chat([], "human", "Aku curiga NOX, vote NOX.", roster)
+        self.assertEqual(
+            [(t["pemain"], t["relasi"], t["sumber"]) for t in tuduh["target"]],
+            [("NOX", "offend", ["cadangan"])],
+        )
 
     def test_loaded_runtime_is_not_reloaded_in_background(self):
         # prepare() selalu memanggil mulai_memuat(); NLU yang sedang dipakai tidak boleh tertukar.
@@ -308,6 +326,41 @@ class NPCServiceBrainTests(unittest.IsolatedAsyncioTestCase):
             await asyncio.gather(*list(self.service.tasks))
         langkah = {nama: o.langkah for nama, o in self.runtime.pertandingan[self.match.id].items()}
         self.assertEqual(langkah, {nama: 1 for nama in langkah})
+
+    async def test_called_or_accused_bot_steps_promptly_and_answers_once(self):
+        await self.service.prepare(self.room.code, self.match)
+        self.match.begin(now=time.time() - 30)
+        self.match.deadline = time.time() + 60
+        otak = {
+            nama: self.runtime.otak_bot(self.match.id, nama) for nama in ("NOX", "ECHO", "VEIL")
+        }
+        sekarang = time.time()
+        for o in otak.values():
+            o.langkah_terakhir = sekarang - 1.5  # di bawah NPC_STEP_SECONDS (3 detik)
+        with self.rooms.lock:
+            self.match.add_message("human", "Nox, kamu semalam ngapain?")
+        # Bacaan NLU chat baru (yang sama dengan bacaan bot) memicu langkah segera bot yang dipanggil/dituduh.
+        await catat_nlu(self.match, "human", "Nox, kamu semalam ngapain?", runtime=self.runtime)
+        await catat_nlu(self.match, "human", "Aku curiga ECHO, dia Hitman.", runtime=self.runtime)
+        self.assertEqual(
+            {n: o.segera for n, o in otak.items()}, {"NOX": True, "ECHO": True, "VEIL": False}
+        )
+        elapsed = self.match.durations["day"] - (self.match.deadline - sekarang)
+        self.assertTrue(self.service._due(otak["NOX"], self.match, elapsed, sekarang, 0))
+        self.assertFalse(self.service._due(otak["VEIL"], self.match, elapsed, sekarang, 0))
+        # Batas laju tetap ada: langkah segera minimal JEDA_SEGERA_DETIK sesudah langkah terakhir.
+        otak["NOX"].langkah_terakhir = sekarang - 0.5
+        self.assertFalse(self.service._due(otak["NOX"], self.match, elapsed, sekarang, 0))
+        with patch("services.npc_service.asyncio.sleep", AsyncMock()):
+            otak["NOX"].sibuk = True
+            await self.service.brain_turn(self.room.code, self.match, otak["NOX"])
+            self.assertFalse(otak["NOX"].segera)
+            self.assertEqual(self.match.messages[-1]["sender"], "NOX")
+            self.assertEqual(otak["NOX"].ingatan.aksi_bot[-1]["aksi"], "jawab")
+            # Panggilan yang sudah dijawab tidak dijawab lagi pada langkah berikutnya.
+            otak["NOX"].sibuk = True
+            await self.service.brain_turn(self.room.code, self.match, otak["NOX"])
+        self.assertEqual([a["aksi"] for a in otak["NOX"].ingatan.aksi_bot].count("jawab"), 1)
 
 
 class ExportFreshnessTests(unittest.TestCase):

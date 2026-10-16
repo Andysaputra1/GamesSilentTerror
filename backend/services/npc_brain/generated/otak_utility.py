@@ -1,8 +1,8 @@
 """FILE INI DIHASILKAN OTOMATIS oleh scripts/ekspor_otak_npc.py. JANGAN DIEDIT MANUAL.
 
 Sumber : npc_utility_ai.ipynb
-Sidik  : f39fd68d636e3d45
-Dibuat : 2026-09-30 06:58 UTC
+Sidik  : 0947334304b37856
+Dibuat : 2026-10-16 11:35 UTC
 
 Perubahan logika bot dilakukan di notebook skripsi, dijalankan ulang sampai semua
 skenario/pengujian lulus, lalu diekspor ulang dengan skrip ini.
@@ -275,22 +275,27 @@ class NLUIndoBERT:
         label = {"offense": "offend", "defense": "defend"}.get(config.id2label[index], config.id2label[index])
         return label, float(probs[index])
 
-    # Model 2: relasi setiap pemain roster terhadap pesan ini.
+    # Model 2: relasi setiap pemain roster terhadap pesan ini: offend/defend (dituduh/dibela) atau neutral (diajak
+    # bicara atau dibicarakan). Sama dengan gabung_target di nlu_target: pesan neutral boleh tanpa target, dan aturan
+    # minimal satu target serta "tidak_diketahui" hanya untuk offend/defend.
     def target(self, pengirim, teks, konteks, daftar_pemain, label_intent):
-        if label_intent == "neutral":
-            return []
+        config = self.target_model.config
+        labels = [config.id2label[i] for i in range(len(config.id2label))]
+        if label_intent == "neutral" and "neutral" not in labels:
+            return []  # model target lama belum mengenal relasi neutral
         texts = [buat_teks_pasangan(pengirim, teks, konteks, daftar_pemain, kandidat, self.common_words, label_intent)
                  for kandidat in daftar_pemain]
-        config = self.target_model.config
         probs = self._probabilitas(self.target_tokenizer, self.target_model, texts,
                                    getattr(config, "nlu_max_length", 512))
-        labels = [config.id2label[i] for i in range(probs.shape[1])]
         hasil = []
         for kandidat, baris in zip(daftar_pemain, probs):
             relasi = labels[int(baris.argmax())]
             if relasi != "tidak_ada":
                 hasil.append({"pemain": kandidat, "relasi": relasi, "prob": float(baris.max())})
-        # Aturan minimal satu target: sama dengan evaluasi di nlu_target.
+        if label_intent == "neutral":
+            # Target pesan neutral selalu berelasi neutral (aturan dataset nlu_target); tanpa target = untuk semua.
+            return [t for t in hasil if t["relasi"] == "neutral"]
+        # Aturan minimal satu target (hanya offend/defend): sama dengan evaluasi di nlu_target.
         if not hasil and self.ambang > 0 and label_intent in labels:
             kolom = labels.index(label_intent)
             terbaik = int(probs[:, kolom].argmax())
@@ -307,14 +312,55 @@ def muat_nlu():
         return None
     return NLUIndoBERT(INTENT_MODEL_DIR, TARGET_MODEL_DIR, NLU_DEVICE)
 
-# Menganotasi satu chat; 12 chat sebelumnya beserta anotasinya menjadi konteks Model 2.
+# Aturan nama, sumber kedua target neutral: pemain roster yang disebut nama atau panggilannya di teks. Pencocokan sama
+# dengan samarkan_nama: nama persis, atau panggilan/akhiran (_nama_cocok) yang cocok dengan tepat satu pemain; kata
+# ganti, istilah game, dan kata umum (common_words) tidak pernah dianggap nama. Pengirim tidak dihitung.
+# Masukan : teks, daftar_pemain (roster), pengirim, common_words (pair_builder.json Model 2; kosong bila tidak ada).
+# Keluaran: daftar nama pemain yang disebut, urut kemunculan pertama.
+# Dipakai oleh: anotasi_chat (hanya untuk pesan neutral, jadi aturan ini tidak pernah membuat target offend/defend).
+def pemain_disebut(teks, daftar_pemain, pengirim, common_words):
+    lowered = {name.casefold(): name for name in daftar_pemain}
+    disebut = []
+    for word in re.findall(r"\w+", teks):
+        key = word.casefold()
+        if key in lowered:
+            nama = lowered[key]
+        elif key in KATA_GANTI or key in ISTILAH_GAME or key in common_words:
+            continue
+        else:
+            matches = [name for name in daftar_pemain if _nama_cocok(word, name)]
+            if len(matches) != 1:
+                continue
+            nama = matches[0]
+        if nama != pengirim and nama not in disebut:
+            disebut.append(nama)
+    return disebut
+
+# Persepsi: membaca satu chat dengan IndoBERT, Model 1 (intent) lalu Model 2 (target per pemain roster). Pesan neutral
+# juga mendapat target neutral dari aturan nama (pemain_disebut); target dari kedua sumber digabung per pemain.
+# Masukan : nlu = NLUIndoBERT (atau pembungkus dengan intent/target yang sama); chat = {id, ronde, fase, waktu,
+#           pengirim, teks}; riwayat = chat sebelumnya yang sudah beranotasi (12 terakhir menjadi konteks Model 2);
+#           daftar_pemain = roster.
+# Keluaran: chat yang sama + intent, conf_intent (0–1), target [{pemain, relasi, prob, sumber}], dan sumber_nlu.
+#           sumber = ["indobert"], ["nama"], atau keduanya. Hanya relasi offend/defend yang menjadi bukti (relasi_chat);
+#           target neutral menandai pemain yang diajak bicara (konteks "ditanya").
+# Dipakai oleh: Ingatan.sinkron_snapshot (setiap chat baru) dan validasi_pesan.
 def anotasi_chat(nlu, chat, riwayat, daftar_pemain):
     intent, confidence = nlu.intent(chat["teks"], daftar_pemain)
     konteks = [{
         "pengirim": c["pengirim"], "teks_chat": c["teks"], "label_intent": c.get("intent") or "neutral",
         "target": [{"pemain": t["pemain"], "relasi": t["relasi"]} for t in c.get("target", [])],
     } for c in riwayat[-KONTEKS_MAKS:]]
-    target = nlu.target(chat["pengirim"], chat["teks"], konteks, daftar_pemain, intent)
+    sumber_model = getattr(nlu, "sumber", "indobert")  # pembungkus NLU cadangan di backend menamai sumbernya sendiri
+    target = [{**t, "sumber": [sumber_model]}
+              for t in nlu.target(chat["pengirim"], chat["teks"], konteks, daftar_pemain, intent)]
+    if intent == "neutral":
+        for nama in pemain_disebut(chat["teks"], daftar_pemain, chat["pengirim"], getattr(nlu, "common_words", ())):
+            sama = next((t for t in target if t["pemain"] == nama), None)
+            if sama is None:
+                target.append({"pemain": nama, "relasi": "neutral", "prob": None, "sumber": ["nama"]})
+            else:
+                sama["sumber"].append("nama")
     return {**chat, "intent": intent, "conf_intent": confidence, "target": target, "sumber_nlu": "indobert"}
 
 # Pilihan terbanyak; seri dimenangkan pilihan yang paling awal (aturan Hostage Syndicate di engine).
@@ -330,7 +376,11 @@ def komposisi(view):
 
 @dataclass
 class Ingatan:
-    """Memori pengamatan milik satu bot, untuk role apa pun."""
+    """Memori pengamatan milik satu bot, untuk role apa pun.
+
+    Dibuat sekali per bot per pertandingan: Ingatan(nama_bot, cepat=...). Diisi sinkron_snapshot setiap langkah, serta
+    catat_aksi_bot/catat_aksi_rahasia setelah game menerima tindakan bot; dibaca semua tahap putuskan.
+    """
 
     nama_bot: str
     cepat: bool = False
@@ -339,12 +389,14 @@ class Ingatan:
     chat: list = field(default_factory=list)
     vote: list = field(default_factory=list)
     eksekusi: list = field(default_factory=list)
+    keluar: list = field(default_factory=list)
     mulai_fase: dict = field(default_factory=dict)
     aksi_bot: list = field(default_factory=list)
     aksi_rahasia: list = field(default_factory=list)
     pilihan_syndicate: dict = field(default_factory=dict)
     gag_bot: set = field(default_factory=set)
     intel: list = field(default_factory=list)
+    # Status internal pencatatan: chat yang sudah dicatat, vote terkunci, Tribunal berjalan, roster dan Hitman terakhir.
     _id_chat: set = field(default_factory=set)
     _vote_terkunci: set = field(default_factory=set)
     _tribunal_berjalan: int | None = None
@@ -370,6 +422,11 @@ class Ingatan:
     def catat_eksekusi(self, ronde, pemain, hitman=None):
         self.eksekusi.append({"ronde": ronde, "pemain": pemain, "hitman": hitman})
 
+    # Pemain yang keluar di tengah pertandingan (tanda left): tersingkir seperti korban eksekusi, tetapi bukan hasil
+    # suara Tribunal, jadi tidak pernah menjadi bukti "mendorong eksekusi warga". hitman sama artinya dengan eksekusi.
+    def catat_keluar(self, ronde, pemain, hitman=None):
+        self.keluar.append({"ronde": ronde, "pemain": pemain, "hitman": hitman})
+
     # Dipanggil game setelah chat bot benar-benar terkirim.
     def catat_aksi_bot(self, view, rencana):
         self.aksi_bot.append({
@@ -377,24 +434,45 @@ class Ingatan:
             "aksi": rencana["aksi"], "intent": rencana["intent"], "target": rencana["target"],
         })
 
-    # Aksi rahasia milik bot (hostage/guard/peek/gag); hanya bot sendiri yang tahu.
+    # Aksi rahasia milik bot (hostage/guard/peek/gag); hanya bot sendiri yang tahu. Satu catatan per (ronde, aksi):
+    # bila engine membuang aksi malam karena targetnya keluar lalu bot memilih ulang, target baru menggantikan target
+    # lama.
     def catat_aksi_rahasia(self, ronde, aksi, target):
-        if not any((a["ronde"], a["aksi"]) == (ronde, aksi) for a in self.aksi_rahasia):
+        lama = next((a for a in self.aksi_rahasia if (a["ronde"], a["aksi"]) == (ronde, aksi)), None)
+        if lama is None:
             self.aksi_rahasia.append({"ronde": ronde, "aksi": aksi, "target": target})
+        else:
+            lama["target"] = target
         if aksi == "hostage":
             self.catat_pilihan_syndicate(ronde, self.nama_bot, target)
 
-    # Pilihan Hostage Syndicate (bot sendiri atau rekan), satu per Hitman per malam, urut saat pertama terlihat.
+    # Pilihan Hostage Syndicate (bot sendiri atau rekan), satu per Hitman per malam, urut seperti engine: pilihan baru
+    # di belakang; pilihan ulang seorang Hitman (target lama keluar) pindah ke belakang dengan target baru.
     def catat_pilihan_syndicate(self, ronde, pemain, target):
         pilihan = self.pilihan_syndicate.setdefault(ronde, [])
-        if all(pemain != p for p, _ in pilihan):
-            pilihan.append((pemain, target))
+        if (pemain, target) not in pilihan:
+            pilihan[:] = [(p, t) for p, t in pilihan if p != pemain] + [(pemain, target)]
+
+    # Malam berjalan: pilihan Hostage Syndicate disamakan dengan aksi yang masih ada di engine (snapshot privat).
+    # Pilihan yang sama tetap di urutannya, pilihan baru atau ulang masuk di belakang, dan pilihan yang dibuang engine
+    # (targetnya keluar) tanpa pengganti dihapus.
+    def sinkron_pilihan_syndicate(self, ronde, sekarang):
+        tetap = [x for x in self.pilihan_syndicate.get(ronde, []) if x in sekarang]
+        pilihan = tetap + [x for x in sekarang if x not in tetap]
+        if pilihan:
+            self.pilihan_syndicate[ronde] = pilihan
+        else:
+            self.pilihan_syndicate.pop(ronde, None)
 
     # Target Hostage Syndicate pada malam tertentu (None jika belum ada pilihan).
     def target_syndicate(self, ronde):
         return pilihan_terbanyak([t for _, t in self.pilihan_syndicate.get(ronde, [])])
 
-    # Mengubah snapshot backend menjadi view keputusan sambil mencatat pengamatan baru.
+    # Ingatan: mengubah snapshot backend menjadi view keputusan sambil mencatat pengamatan baru.
+    # Masukan : snapshot = Match.snapshot(nama_bot) {round, phase, deadline, players, messages, tribunal_votes, me};
+    #           waktu_terima = detik saat snapshot diterima; nlu = NLUIndoBERT (None: chat disimpan tanpa anotasi).
+    # Keluaran: view = {ronde, fase, waktu, deadline, durasi, pemain, suara_tribunal, komposisi, hitman_tersisa, saya}.
+    # Dipakai oleh: game sebelum putuskan(ingatan, view); ingatan yang diperbarui dibaca semua tahap berikutnya.
     def sinkron_snapshot(self, snapshot, waktu_terima, nlu=None):
         me = snapshot["me"]
         if me["name"] != self.nama_bot:
@@ -418,22 +496,30 @@ class Ingatan:
             suara = {pemilih: baris["target"] for baris in snapshot["tribunal_votes"] for pemilih in baris["voters"]}
             self._tribunal_berjalan, self._suara_berjalan = ronde, dict(suara)
 
-        # Pemain hanya bisa mati karena eksekusi Tribunal, jadi perubahan roster menandai eksekusi.
+        # Pemain hanya bisa mati karena eksekusi Tribunal atau keluar dari permainan (tanda left di roster), jadi
+        # perubahan roster menandai eksekusi; pemain yang keluar dicatat terpisah, bukan sebagai korban Tribunal.
         hidup = {p["nama"] for p in pemain if p["hidup"]}
+        keluar = {p["name"] for p in snapshot["players"] if p.get("left")}
         if self._hidup_terakhir is None:  # bot baru bergabung: ronde eksekusi sebelumnya tidak diketahui
-            mati, ronde_tribunal = sorted(p["nama"] for p in pemain if not p["hidup"]), None
+            mati, ronde_tribunal, ronde_keluar = sorted(p["nama"] for p in pemain if not p["hidup"]), None, None
         else:
             mati, ronde_tribunal = sorted(self._hidup_terakhir - hidup), (ronde - 1 if fase == "day" else ronde)
-        # Room ≥ 2 Hitman: engine mengumumkan Hitman yang masih hidup. Jumlah tetap → korban warga; turun sebanyak
-        # korban → korban Hitman; selain itu (beberapa eksekusi terlewat sekaligus) role korban tidak disimpulkan.
+            ronde_keluar = ronde
+        # Room ≥ 2 Hitman: engine mengumumkan Hitman yang masih hidup (juga setelah pemain keluar). Jumlah tetap →
+        # korban warga; turun sebanyak korban → korban Hitman; selain itu (beberapa pemain tersingkir sekaligus) role
+        # korban tidak disimpulkan.
         tersisa = snapshot.get("hitman_remaining")
-        sebelum = self._hitman_tersisa if self._hitman_tersisa is not None else \
-            (snapshot.get("composition") or {}).get("hitman")
+        sebelum = self._hitman_tersisa
+        if sebelum is None:  # belum ada pengumuman: mulai dari komposisi awal
+            sebelum = (snapshot.get("composition") or {}).get("hitman")
         hitman = None
         if tersisa is not None and sebelum is not None and mati:
             hitman = {0: False, len(mati): True}.get(sebelum - tersisa)
         for nama in mati:
-            self.catat_eksekusi(ronde_tribunal, nama, hitman)
+            if nama in keluar:
+                self.catat_keluar(ronde_keluar, nama, hitman)
+            else:
+                self.catat_eksekusi(ronde_tribunal, nama, hitman)
         self._hidup_terakhir, self._hitman_tersisa = hidup, tersisa
 
         if fase in URUTAN_FASE and (ronde, fase) not in self.mulai_fase:
@@ -445,18 +531,23 @@ class Ingatan:
         self.intel = [{"ronde": x["round"], "pemain": x["name"], "peran": x["role"]} for x in me.get("intel", [])]
         aksi_rekan = [{"pemain": a["name"], "target": a["target"]} for a in me.get("ally_actions", [])]
         if fase == "night":
-            if me.get("action"):
-                self.catat_aksi_rahasia(ronde, me["action"]["ability"], me["action"]["target"])
-            for a in aksi_rekan:
-                self.catat_pilihan_syndicate(ronde, a["pemain"], a["target"])
+            aksi = me.get("action")
+            if aksi:
+                self.catat_aksi_rahasia(ronde, aksi["ability"], aksi["target"])
+            elif me.get("ability"):
+                # Aksi malam bot dibuang engine (targetnya keluar) dan belum dipilih ulang: tidak lagi dicatat.
+                self.aksi_rahasia = [a for a in self.aksi_rahasia if (a["ronde"], a["aksi"]) != (ronde, me["ability"])]
+            if self.peran == "hitman":
+                milik_bot = [(self.nama_bot, aksi["target"])] if aksi and aksi["ability"] == "hostage" else []
+                self.sinkron_pilihan_syndicate(ronde, milik_bot + [(a["pemain"], a["target"]) for a in aksi_rekan])
 
-        # Server tidak mengirim waktu chat; bot memakai waktu terima dan fase saat itu.
+        # Server tidak mengirim waktu chat; bot memakai waktu terima dan fase saat itu. Chat yang baru terlihat saat
+        # malam/selesai dikirim di akhir fase sebelumnya.
         daftar_pemain = [p["nama"] for p in pemain]
+        fase_chat = {"night": "day", "finished": "tribunal"}.get(fase, fase)
         for pesan in snapshot["messages"]:
             if pesan["id"] in self._id_chat:
                 continue
-            # Chat yang baru terlihat saat malam/selesai dikirim di akhir fase sebelumnya.
-            fase_chat = {"night": "day", "finished": "tribunal"}.get(fase, fase)
             chat = {"id": pesan["id"], "ronde": ronde, "fase": fase_chat, "waktu": waktu_terima,
                     "pengirim": pesan["sender"], "teks": pesan["message"]}
             if nlu is not None:
@@ -498,7 +589,10 @@ def tanda_aktivitas(ingatan, view):
         tanda[pemilih].append((view["ronde"], 2))
     return tanda
 
-# Menduga Hostage dan Gag dari pola publik; pengamat=None berarti sudut pandang publik.
+# Dugaan status tersembunyi: siapa yang kemungkinan disandera (Hostage) atau di-Gag, dari jejak publik saja.
+# Masukan : ingatan, view, pengamat = nama bot (sudut pandang pribadi) atau None (sudut pandang publik).
+# Keluaran: (p_sandera {pemain: 0–1}, p_gag {pemain: 0–1}, korban [{korban, jenis, ronde, p, batas_waktu}]).
+# Dipakai oleh: hitung_bukti (kolom p_sandera, p_gag, dan dituduh_korban).
 def dugaan_status(ingatan, view, pengamat):
     R, fase = view["ronde"], view["fase"]
     hidup = [p["nama"] for p in view["pemain"] if p["hidup"]]
@@ -515,6 +609,7 @@ def dugaan_status(ingatan, view, pengamat):
     for q in hidup:
         if q == pengamat:
             continue
+        # Malam pertama sesudah aktivitas terakhir: aktif siang r → malam r; aktif saat Tribunal r → malam r + 1.
         terakhir = max(tanda[q], default=(0, 2))
         malam = terakhir[0] if terakhir[1] == 0 else terakhir[0] + 1
         terlewat = R - malam
@@ -555,7 +650,7 @@ def dugaan_status(ingatan, view, pengamat):
             continue
         if pengamat is not None and (r - 1) in ingatan.gag_bot:
             continue  # cooldown Gag: tidak mungkin dua ronde berturut-turut
-        faktor = 0.5 if gag_kuat.get(r - 1, 0.0) >= 0.6 else 1.0
+        faktor = 0.5 if gag_kuat.get(r - 1, 0.0) >= 0.6 else 1.0  # ronde lalu kemungkinan Gag: cooldown
         pemilih = {v["pemilih"] for v in ingatan.vote if v["ronde"] == r}
         if r == R:
             pemilih |= set(view["suara_tribunal"])
@@ -574,6 +669,7 @@ def dugaan_status(ingatan, view, pengamat):
             if lain_sesudah < GAG_MIN_PESAN_LAIN or jeda < GAG_JEDA_FRAKSI:
                 continue
             peluang = P_GAG_DASAR * min(1.0, jeda / 0.5)
+            # Mengaku kena Gag pada ronde berikutnya memperkuat dugaan.
             if any(re.search(POLA_GAG, c["teks"], re.I) for c in ingatan.chat
                    if c["pengirim"] == q and c["ronde"] == r + 1):
                 peluang = min(0.9, peluang + 0.2)
@@ -590,6 +686,19 @@ def dugaan_status(ingatan, view, pengamat):
 # Faktor peluruhan: bukti dari ronde lama bernilai lebih kecil.
 def _luruh(ronde, R, faktor):
     return faktor ** max(0, R - ronde)
+
+# Chat ingatan dalam urutan kronologis: ronde, fase, waktu terima, lalu id (id dari engine diawali nomor urut).
+def _chat_urut(ingatan):
+    return sorted(ingatan.chat, key=lambda c: (c["ronde"], URUTAN_FASE[c["fase"]], c["waktu"], c["id"]))
+
+# Vote yang sudah terkunci ditambah suara Tribunal yang sedang berjalan.
+def _semua_vote(ingatan, view):
+    return list(ingatan.vote) + [{"ronde": view["ronde"], "pemilih": v, "target": t}
+                                 for v, t in view["suara_tribunal"].items()]
+
+# Chat bot sendiri pada fase yang sedang berjalan (untuk jatah, jeda, dan bela diri).
+def _aksi_fase(ingatan, view):
+    return [a for a in ingatan.aksi_bot if (a["ronde"], a["fase"]) == (view["ronde"], view["fase"])]
 
 # Pasangan (pemain, relasi) dari chat yang cukup jelas untuk dijadikan bukti.
 def relasi_chat(chat, roster):
@@ -631,7 +740,7 @@ def _klaim_peran(relasi, hidup, pengamat, R, peran_bot=None, komposisi_peran=Non
     for chat, pasangan in relasi:
         s = chat["pengirim"]
         if s not in pengaku["stalker"] or s in pembohong or not re.search(POLA_PEEK, chat["teks"], re.I):
-            continue  # klaim yang pasti bohong tidak dihitung sama sekali
+            continue  # hanya pengaku Stalker yang menyebut peek; pengaku yang pasti bohong diabaikan
         kuat = (0.4 if s in konflik else 0.8) * _luruh(chat["ronde"], R, PELURUHAN_KERAS)
         for target, rel in pasangan:
             if target == s:
@@ -647,7 +756,8 @@ def _klaim_peran(relasi, hidup, pengamat, R, peran_bot=None, komposisi_peran=Non
     return {"pengaku": pengaku, "konflik": konflik, "pembohong": pembohong, "tuduhan_peek": tuduhan_peek,
             "bersih_peek": bersih_peek, "bohong_peek": bohong_peek, "rincian": rincian}
 
-# Pengaruh: berapa pemain lain ikut menuduh target yang sama setelah p menuduh (ronde yang sama).
+# Pengaruh: berapa pemain lain ikut menuduh (lewat chat sesudahnya atau vote) target yang sama setelah p menuduh,
+# pada ronde yang sama; dijumlah per pemain lalu dinormalkan ke 0–1.
 def _pengaruh(relasi, votes, hidup, R):
     nilai = {}
     for i, (chat, pasangan) in enumerate(relasi):
@@ -669,6 +779,8 @@ def _pengaruh(relasi, votes, hidup, R):
 
 POLA_TANYA = r"\?|^\s*(?:siapa|kenapa|gimana|bagaimana|menurut|apa|kok)\b"
 
+POLA_TANYA_LANGSUNG = r"\?|\b(?:siapa|kenapa|knp|gimana|gmn|bagaimana|menurut\w*|apa|apakah|kok|mana|kapan|berapa)\b"
+
 # Hitman yang masih hidup. Hitman tahu pasti (dirinya + rekan hidup). Warga membaca pengumuman engine
 # (room ≥ 2 Hitman); tanpa pengumuman, hanya Hitman hasil Peek yang sudah dieksekusi yang dikurangi.
 def hitman_hidup(ingatan, view):
@@ -680,7 +792,12 @@ def hitman_hidup(ingatan, view):
     tertangkap = {x["pemain"] for x in ingatan.intel if x["peran"] == "hitman"} - hidup
     return max(1, komposisi(view)["hitman"] - len(tertangkap))
 
-# Bukti publik per pemain (0–1) dan konteks permainan; publik=True memakai sudut pandang pengamat netral.
+# Bukti per pemain dan konteks permainan, dihitung ulang dari ingatan setiap langkah. Tabelnya lalu dinilai metode
+# (kecurigaan), dan menjadi bahan fitur Hitman/Spy serta kandidat tindakan.
+# Masukan : ingatan, view; publik=True = sudut pandang pengamat netral tanpa pengetahuan pribadi (dipakai Hitman).
+# Keluaran: (tabel, konteks). tabel = DataFrame satu baris per pemain: bukti 0–1 (tekanan, dukungan, klaim, p_sandera,
+#           ...), penanda kandidat, dan rincian kalimat alasan. konteks = dict dari _konteks_permainan.
+# Dipakai oleh: putuskan (tabel pribadi; Hitman juga tabel publik).
 def hitung_bukti(ingatan, view, publik=False):
     bot, R, peran_bot = view["saya"]["nama"], view["ronde"], view["saya"]["role"]
     pengamat = None if publik else bot
@@ -688,9 +805,9 @@ def hitung_bukti(ingatan, view, publik=False):
     hidup = [p["nama"] for p in view["pemain"] if p["hidup"]]
     jumlah_hitman = komposisi(view)["hitman"]
     p_sandera, p_gag, korban = dugaan_status(ingatan, view, pengamat)
-    chats = sorted(ingatan.chat, key=lambda c: (c["ronde"], URUTAN_FASE[c["fase"]], c["waktu"], c["id"]))
+    chats = _chat_urut(ingatan)
     relasi = [(c, relasi_chat(c, roster)) for c in chats]
-    votes = list(ingatan.vote) + [{"ronde": R, "pemilih": v, "target": t} for v, t in view["suara_tribunal"].items()]
+    votes = _semua_vote(ingatan, view)
     klaim = _klaim_peran(relasi, hidup, pengamat, R, None if publik else peran_bot, komposisi(view))
     # Pemain yang pasti bersih menurut bot warga: dirinya sendiri dan hasil Peek bukan Hitman.
     bersih_pasti, hitman_peek = set(), set()
@@ -816,8 +933,10 @@ def hitung_bukti(ingatan, view, publik=False):
                 if x is None or r is None or x == p or e.get("hitman") is True or x in hitman_diketahui:
                     continue
                 # Sebab korban pasti warga (untuk kalimat alasan); None = tidak pasti, bukti dibobot peluangnya.
-                sebab = ("jumlah Hitman tidak berkurang" if e.get("hitman") is False else "game berlanjut"
-                         if jumlah_hitman == 1 else "aku yakin" if x in bersih_pasti else None)
+                sebab = ("jumlah Hitman tidak berkurang" if e.get("hitman") is False
+                         else "game berlanjut" if jumlah_hitman == 1
+                         else "aku yakin" if x in bersih_pasti
+                         else None)
                 bobot_x = 1.0 if sebab else bobot_eksekusi
                 # Ikut arus mayoritas kurang bermakna daripada menjadi segelintir pendorong eksekusi.
                 pemilih_r = [v for v in ingatan.vote if v["ronde"] == r]
@@ -879,9 +998,21 @@ def hitung_bukti(ingatan, view, publik=False):
                         "eksekusi": rinci_eks, "klaim": klaim["rincian"].get(p), "diserang": sorted(diserang)},
         })
     tabel = pd.DataFrame(baris)
+    return tabel, _konteks_permainan(ingatan, view, publik, chats, relasi, klaim, p_sandera)
 
-    # Konteks permainan. Warga bebas = pemain hidup − Hitman hidup − dugaan korban Hostage (rekan Hitman
-    # tidak pernah disandera). Syndicate menang saat warga bebas ≤ Hitman hidup, jadi urgensi dihitung dari selisihnya.
+# Konteks permainan dari sudut pandang bot: posisi Syndicate, suasana chat, panggilan ke bot, dan suara Tribunal.
+# Hasilnya dibaca izin_chat, calon_chat, dan keputusan vote metode lewat ctx["konteks"].
+# Masukan : ingatan, view, publik, serta chats, relasi, klaim, dan p_sandera yang sudah dihitung hitung_bukti.
+# Keluaran: dict (tabel D di bagian Parameter): warga_bebas, hitman_hidup, urgensi, ketidakjelasan, sedikit_info,
+#           bot_dituduh_baru, ditanya, dipanggil, sumber_panggilan, tanya_terbuka, sudah_diajak, hening, gema,
+#           porsi_suara, porsi_fase, dll.
+# Dipakai oleh: hitung_bukti.
+def _konteks_permainan(ingatan, view, publik, chats, relasi, klaim, p_sandera):
+    bot, R = view["saya"]["nama"], view["ronde"]
+    roster = [p["nama"] for p in view["pemain"]]
+    hidup = [p["nama"] for p in view["pemain"] if p["hidup"]]
+    # Warga bebas = pemain hidup − Hitman hidup − dugaan korban Hostage (rekan Hitman tidak pernah disandera).
+    # Syndicate menang saat warga bebas ≤ Hitman hidup, jadi urgensi dihitung dari selisihnya.
     rekan = set(view["saya"].get("rekan", [])) if not publik else set()
     lain = [q for q in hidup if q != bot and q not in rekan]
     jumlah_hitman_hidup = hitman_hidup(ingatan, view)
@@ -893,22 +1024,33 @@ def hitung_bukti(ingatan, view, publik=False):
     ketidakjelasan = len(tidak_jelas) / max(1, len(ronde_ini))
     if konflik_aktif:
         ketidakjelasan = max(ketidakjelasan, 0.8)
-    aksi_fase = [a for a in ingatan.aksi_bot if (a["ronde"], a["fase"]) == (R, view["fase"])]
+    aksi_fase = _aksi_fase(ingatan, view)
     waktu_bot = max((a["waktu"] for a in aksi_fase), default=-math.inf)
     sudah_bela = any(a["aksi"] == "bela_diri" for a in aksi_fase)
     fase_ini = [(c, pasangan) for c, pasangan in relasi
                 if (c["ronde"], c["fase"]) == (R, view["fase"]) and c["waktu"] > waktu_bot and c["pengirim"] != bot]
     dituduh_baru = any((bot, "offend") in pasangan for _, pasangan in fase_ini)
     divote = view["fase"] == "tribunal" and bot in view["suara_tribunal"].values() and not sudah_bela
+    # Panggilan ke bot: chat pemain lain di fase ini, sesudah chat terakhir bot (jadi belum dijawab), yang menjadikan
+    # bot target neutral (IndoBERT atau aturan nama di anotasi_chat) atau menulis nama bot persis ("teks"). Hanya
+    # pertanyaan langsung yang membuat bot "ditanya"; sebutan tanpa pertanyaan tidak meminta jawaban.
     pola_nama = rf"(?<!\w){re.escape(bot)}(?!\w)"
-    ditanya = next((c["pengirim"] for c, _ in reversed(fase_ini)
-                    if c.get("intent") != "offend" and re.search(pola_nama, c["teks"], re.I)
-                    and re.search(POLA_TANYA, c["teks"], re.I)), None)
+
+    def sumber_panggilan(c):
+        sumber = {s for t in c.get("target", []) if (t["pemain"], t["relasi"]) == (bot, "neutral")
+                  for s in t.get("sumber", ["label"])}
+        return sorted(sumber | ({"teks"} if re.search(pola_nama, c["teks"], re.I) else set()))
+
+    panggilan = next((c for c, _ in reversed(fase_ini)
+                      if c.get("intent") != "offend" and sumber_panggilan(c)
+                      and re.search(POLA_TANYA_LANGSUNG, c["teks"], re.I)), None)
+    ditanya = panggilan["pengirim"] if panggilan else None
     # Pertanyaan pemain lain sejak chat terakhir bot: bot tidak mengulang pertanyaan umum atau
     # ajakan bicara ke pemain yang sama (beberapa bot bertanya serentak terasa seperti mesin).
     tanya_lain = [c for c, _ in fase_ini if re.search(POLA_TANYA, c["teks"], re.I)]
     tanya_terbuka = any(c.get("intent") in (None, "neutral") for c in tanya_lain)
-    # Ajakan bicara dihitung per ronde (sama dengan "diam"): pemain yang sudah diajak siang tidak diajak lagi saat Tribunal.
+    # Ajakan bicara dihitung per ronde (sama dengan "diam"): pemain yang sudah diajak siang tidak diajak lagi
+    # saat Tribunal.
     tanya_ronde = [c for c in ronde_ini if re.search(POLA_TANYA, c["teks"], re.I)]
     sudah_diajak = sorted({p for c in tanya_ronde for p in roster
                            if p != bot and re.search(rf"(?<!\w){re.escape(p)}(?!\w)", c["teks"], re.I)})
@@ -930,16 +1072,18 @@ def hitung_bukti(ingatan, view, publik=False):
             hening = view["waktu"] - terakhir >= ambang_hening
     suara = Counter(view["suara_tribunal"].values())
     total_suara = sum(suara.values())
-    konteks = {
+    return {
         "warga_bebas": warga_bebas,
         "hitman_hidup": jumlah_hitman_hidup,
-        # Satu Hitman: (6 − warga_bebas) ÷ 4 seperti semula; k Hitman: diukur dari selisih warga bebas − k.
+        # Satu Hitman: sama dengan (6 − warga_bebas) ÷ 4; k Hitman: diukur dari selisih warga bebas − k.
         "urgensi": float(np.clip((5 - (warga_bebas - jumlah_hitman_hidup)) / 4, 0, 1)),
         "ketidakjelasan": ketidakjelasan,
         "sedikit_info": 1 - min(1.0, len(ronde_ini) / MIN_PESAN_INFO),
         "jumlah_chat_ronde": len(ronde_ini),
         "bot_dituduh_baru": bool(dituduh_baru or divote),
         "ditanya": ditanya,
+        "dipanggil": 1.0 if panggilan else 0.0,  # 1 = pertanyaan langsung ke bot belum dijawab (input kandidat jawab)
+        "sumber_panggilan": sumber_panggilan(panggilan) if panggilan else [],
         "tanya_terbuka": tanya_terbuka,
         "sudah_diajak": sudah_diajak,
         "hening": bool(hening),
@@ -950,9 +1094,12 @@ def hitung_bukti(ingatan, view, publik=False):
         "porsi_fase": porsi_fase(ingatan, view),
         "konflik_klaim": konflik_aktif,
     }
-    return tabel, konteks
 
-# Fakta pasti yang hanya diketahui bot dari role-nya sendiri.
+# Pengetahuan pasti: fakta yang hanya diketahui bot dari role-nya sendiri (hasil Peek, rekan, korban Hostage, ...).
+# Hasilnya dibaca terapkan_pengetahuan, fitur Hitman/Spy, kandidat tindakan, serta chat_pasti/vote_pasti lewat ctx.
+# Masukan : ingatan (intel, eksekusi, keluar, pilihan_syndicate, chat/vote), view (role, rekan, komposisi, fase).
+# Keluaran: dict {peran, pasti_hitman, hitman_diketahui, bersih, rekan, korban_saya, korban_baru, dijaga, tidak_dijaga}.
+# Dipakai oleh: putuskan.
 def pengetahuan_peran(ingatan, view):
     peran, bot, R = view["saya"]["role"], view["saya"]["nama"], view["ronde"]
     roster = [p["nama"] for p in view["pemain"]]
@@ -965,8 +1112,9 @@ def pengetahuan_peran(ingatan, view):
             bersih.add(x["pemain"])
         elif x["pemain"] not in hitman_diketahui:
             hitman_diketahui.append(x["pemain"])
-    # Korban eksekusi: room 1 Hitman → warga bila game berlanjut; room ≥ 2 Hitman → menurut pengumuman jumlah Hitman.
-    for e in ingatan.eksekusi:
+    # Korban eksekusi dan pemain yang keluar: room 1 Hitman → warga bila game berlanjut; room ≥ 2 Hitman → menurut
+    # pengumuman jumlah Hitman.
+    for e in ingatan.eksekusi + ingatan.keluar:
         if not e["pemain"] or view["fase"] == "finished":
             continue
         if e.get("hitman") is True and e["pemain"] not in hitman_diketahui:
@@ -1001,6 +1149,7 @@ def pengetahuan_peran(ingatan, view):
 # Hitman hanya satu: klaim bersih palsu dari Hitman tetap menunjuk warga, dan warga tidak diuntungkan berbohong.
 # Bila Hitman lebih dari satu, Hitman bisa membersihkan rekannya, jadi bobot klaimnya sudah dipotong di hitung_bukti.
 # Kecurigaan pemain itu dikali (1 − bobot klaim); klaim yang pasti bohong sudah dibuang sebelumnya.
+# Masukan: tabel hasil nilai_kecurigaan dan pengetahuan_peran. Keluaran: salinan tabel + kolom fakta.
 def terapkan_pengetahuan(tabel, pengetahuan):
     tabel = tabel.copy()
     tabel["fakta"] = ""
@@ -1022,7 +1171,7 @@ def terapkan_pengetahuan(tabel, pengetahuan):
                         tabel[kolom] = tabel[kolom].astype(float)
                     tabel.loc[i, kolom] = b[kolom] * faktor
             tabel.loc[i, "fakta"] = "diklaim bersih oleh pengaku Stalker"
-    if "poin" in tabel:
+    if "poin" in tabel:  # poin bendera BT ikut fakta pasti
         tabel.loc[tabel["fakta"] == "hasil Peek: Hitman", "poin"] = 10
         tabel.loc[tabel["fakta"] == "pasti bukan Hitman", "poin"] = 0
     return tabel
@@ -1030,15 +1179,19 @@ def terapkan_pengetahuan(tabel, pengetahuan):
 KOLOM_HITMAN = ["pemain", "menuduh_saya", "pengaruh", "klaim_peran", "kecurigaan_publik", "kredibilitas",
                 "dukungan_suara", "p_sandera", "tidak_dijaga", "ancaman_sekarang", "bicara_ronde_ini"]
 
-# Bahan penalaran Hitman: ancaman tiap warga dan citra publiknya. Rekan Syndicate tidak pernah menjadi target,
-# jadi tidak masuk tabel ini (tidak dituduh, tidak di-vote sebagai kambing hitam, tidak disandera/di-Gag).
+# Fitur Hitman: ancaman tiap warga dan citra publiknya, serta risiko diri sendiri. Rekan Syndicate tidak pernah menjadi
+# target, jadi tidak masuk tabel ini (tidak dituduh, tidak di-vote sebagai kambing hitam, tidak disandera/di-Gag).
+# Tabelnya lalu dinilai metode (ancaman, kambing hitam) dan menjadi bahan kandidat chat, vote, dan aksi Hitman.
+# Masukan : ingatan, view, publik = tabel publik yang sudah dinilai nilai_kecurigaan, pengetahuan, konteks.
+# Keluaran: (DataFrame kolom KOLOM_HITMAN, satu baris per warga hidup; diri {risiko, tekanan_saya, suara_saya}).
+# Dipakai oleh: putuskan (role Hitman).
 def fitur_hitman(ingatan, view, publik, pengetahuan, konteks):
     bot, R = view["saya"]["nama"], view["ronde"]
     roster = [p["nama"] for p in view["pemain"]]
     hidup = [p["nama"] for p in view["pemain"] if p["hidup"]]
-    chats = sorted(ingatan.chat, key=lambda c: (c["ronde"], URUTAN_FASE[c["fase"]], c["waktu"], c["id"]))
+    chats = _chat_urut(ingatan)
     relasi = [(c, relasi_chat(c, roster)) for c in chats]
-    votes = list(ingatan.vote) + [{"ronde": R, "pemilih": v, "target": t} for v, t in view["suara_tribunal"].items()]
+    votes = _semua_vote(ingatan, view)
     klaim = _klaim_peran(relasi, hidup, None, R, komposisi_peran=komposisi(view))
     pengaruh = _pengaruh(relasi, votes, hidup, R)
     pub = publik.set_index("pemain")
@@ -1062,7 +1215,9 @@ def fitur_hitman(ingatan, view, publik, pengetahuan, konteks):
             "pemain": p, "menuduh_saya": min(1.0, menuduh), "pengaruh": pengaruh.get(p, 0.0),
             "klaim_peran": klaim_peran, "kecurigaan_publik": kec, "kredibilitas": 1 - kec,
             "dukungan_suara": konteks["porsi_suara"].get(p, 0.0),
-            "p_sandera": (0.99 if p in pengetahuan["korban_saya"] else 0.8 if p in pengetahuan["korban_baru"]
+            # Korban Hostage Syndicate sendiri: sudah atau kemungkinan besar disandera.
+            "p_sandera": (0.99 if p in pengetahuan["korban_saya"]
+                          else 0.8 if p in pengetahuan["korban_baru"]
                           else float(pub.loc[p, "p_sandera"])),
             "tidak_dijaga": 1.0 if p in pengetahuan["tidak_dijaga"] else 0.5,
             "ancaman_sekarang": min(1.0, sekarang + (0.5 * klaim_peran if bicara else 0.0)),
@@ -1072,15 +1227,19 @@ def fitur_hitman(ingatan, view, publik, pengetahuan, konteks):
             "suara_saya": konteks["porsi_suara"].get(bot, 0.0)}
     return pd.DataFrame(baris, columns=KOLOM_HITMAN), diri
 
-# Seberapa mungkin tiap pemain diincar Hitman, dari sudut pandang warga (bahan Guard Spy).
+# Fitur Spy: seberapa mungkin tiap pemain diincar Hitman, dari sudut pandang warga. Hasilnya (ctx["lindung"]) menjadi
+# bahan kandidat Guard di calon_aksi.
+# Masukan : ingatan, view, tabel = bukti pribadi berisi kecurigaan (sesudah terapkan_pengetahuan), pengetahuan.
+# Keluaran: DataFrame per pemain hidup {menuduh_tersangka, klaim_stalker, pengaruh, terancam, kepercayaan}.
+# Dipakai oleh: putuskan (role Spy).
 def fitur_lindung(ingatan, view, tabel, pengetahuan):
     bot, R = view["saya"]["nama"], view["ronde"]
     roster = [p["nama"] for p in view["pemain"]]
     hidup = [p["nama"] for p in view["pemain"] if p["hidup"]]
     kec = dict(zip(tabel["pemain"], tabel["kecurigaan"]))
-    chats = sorted(ingatan.chat, key=lambda c: (c["ronde"], URUTAN_FASE[c["fase"]], c["waktu"], c["id"]))
+    chats = _chat_urut(ingatan)
     relasi = [(c, relasi_chat(c, roster)) for c in chats]
-    votes = list(ingatan.vote) + [{"ronde": R, "pemilih": v, "target": t} for v, t in view["suara_tribunal"].items()]
+    votes = _semua_vote(ingatan, view)
     klaim = _klaim_peran(relasi, hidup, bot, R, view["saya"]["role"], komposisi(view))
     pengaruh = _pengaruh(relasi, votes, hidup, R)
     baris = []
@@ -1089,8 +1248,9 @@ def fitur_lindung(ingatan, view, tabel, pengetahuan):
                         if c["pengirim"] == p for x, rel in pasangan if rel == "offend" and x != p)
         dari_vote = sum(kec.get(v["target"], 0.0) * _luruh(v["ronde"], R, PELURUHAN) for v in votes
                         if v["pemilih"] == p and v["target"] != p)
-        dari_aksi = sum(kec.get(a["target"], 0.0) * _luruh(a["ronde"], R, PELURUHAN) for a in ingatan.aksi_bot
-                        if p == bot and a["intent"] == "offend" and a["target"] not in (None, bot))
+        # Tuduhan bot sendiri juga tercatat di aksi_bot; diambil yang terbesar agar tidak terhitung dua kali.
+        dari_aksi = (sum(kec.get(a["target"], 0.0) * _luruh(a["ronde"], R, PELURUHAN) for a in ingatan.aksi_bot
+                         if a["intent"] == "offend" and a["target"] not in (None, bot)) if p == bot else 0)
         menuduh_tersangka = min(1.0, max(dari_chat, dari_aksi) + dari_vote)
         stalker = p in klaim["pengaku"]["stalker"] and p not in klaim["pembohong"]
         klaim_stalker = (0.5 if p in klaim["konflik"] else 0.9) if stalker else 0.0
@@ -1110,14 +1270,16 @@ INTENT_AKSI = {"ungkap": "offend", "bela_diri": "defend", "jawab": "neutral", "b
 
 AKSI_RAHASIA = {"hostage", "guard", "peek", "gag"}
 
-# Fase, hak chat, jatah chat, dan jeda; tuduhan baru ke bot boleh dijawab walau masih jeda.
+# Izin chat: fase, hak chat, jatah chat, dan jeda; tuduhan baru ke bot boleh dijawab walau masih jeda.
+# Masukan : ingatan (chat bot di fase ini), view (fase, can_chat, durasi), konteks (bot_dituduh_baru).
+# Keluaran: {boleh, hanya_bela_diri, alasan}. Dipakai oleh: keputusan_chat metode dan calon_chat (lewat ctx["izin"]).
 def izin_chat(ingatan, view, konteks):
     tolak = {"boleh": False, "hanya_bela_diri": False}
     if view["fase"] not in ("day", "tribunal"):
         return {**tolak, "alasan": "Chat hanya ada saat siang dan Tribunal."}
     if not view["saya"]["can_chat"]:
         return {**tolak, "alasan": "Bot tidak boleh chat (Hostage, Gag, atau sudah dieksekusi)."}
-    aksi_fase = [a for a in ingatan.aksi_bot if (a["ronde"], a["fase"]) == (view["ronde"], view["fase"])]
+    aksi_fase = _aksi_fase(ingatan, view)
     if len(aksi_fase) >= MAKS_CHAT_PER_FASE[view["fase"]]:
         return {**tolak, "alasan": "Jatah chat bot pada fase ini sudah habis."}
     jeda = JEDA_CHAT_FRAKSI * view["durasi"][view["fase"]]
@@ -1127,7 +1289,7 @@ def izin_chat(ingatan, view, konteks):
         return {**tolak, "alasan": "Menunggu jeda antar-chat agar tidak spam."}
     return {"boleh": True, "hanya_bela_diri": False, "alasan": ""}
 
-# Vote hanya saat Tribunal dan selama bot masih punya hak suara.
+# Izin vote: hanya saat Tribunal dan selama bot masih punya hak suara. Keluaran: (boleh, alasan).
 def izin_vote(view):
     if view["fase"] != "tribunal":
         return False, "Vote hanya saat Tribunal."
@@ -1148,6 +1310,15 @@ def sudah_aksi(ingatan, view, aksi, target, lingkup="fase"):
 # Apakah bot pernah melakukan tindakan ini kepada siapa pun.
 def pernah_aksi(ingatan, aksi):
     return any(a["aksi"] == aksi for a in ingatan.aksi_bot)
+
+# Syarat chat menuduh warga yang sama untuk ketiga metode: bot belum menuduh atau mengungkap (klaim Stalker) target ini
+# di fase ini, dan tuduhan ke target ini belum digemakan MAKS_GEMA pemain lain (anti-gema).
+# Masukan : ingatan (aksi_bot), view (ronde, fase), konteks (gema_tuduh), target = nama pemain.
+# Keluaran: bool.
+# Dipakai oleh: _calon_chat_warga (kandidat tuduh bersama); pohon BT juga memakainya di cabang tuduh warga.
+def boleh_tuduh(ingatan, view, konteks, target):
+    return (not sudah_aksi(ingatan, view, ["tuduh", "ungkap"], target)
+            and konteks["gema_tuduh"].get(target, 0) < MAKS_GEMA)
 
 # Satu baris tabel untuk pemain tertentu (tetap memuat kolom pemain).
 def baris_pemain(tabel, nama):
@@ -1230,6 +1401,7 @@ def alasan_lindung(r, bot):
     return alasan or [f"{p} dipercaya."]
 
 # Kandidat tersangka (kolom kandidat), diurutkan dari skor tertinggi; seri diputus total bukti mentah, lalu nama.
+# keunggulan = selisih skor teratas dan kedua ÷ 0,30 (0–1): seberapa jelas satu nama menonjol.
 def urutkan_kandidat(tabel, kolom="kecurigaan"):
     kandidat = tabel[tabel["kandidat"]].sort_values([kolom, "bukti_total", "pemain"], ascending=[False, False, True],
                                                    kind="stable")
@@ -1255,19 +1427,25 @@ def _calon_chat_warga(ctx):
                       "input": {"tekanan_bot": baris_bot["tekanan"], "urgensi": konteks["urgensi"]}})
     if izin["hanya_bela_diri"]:
         return calon
-    if konteks["ditanya"] and not konteks["bot_dituduh_baru"]:  # saat dituduh, bela diri sekaligus menjawab
+    # Bot dipanggil (pertanyaan langsung yang belum dijawab): jawab dengan tersangka teratas bila ada. Saat dituduh,
+    # bela diri sekaligus menjawab. Satu jawaban per panggilan: chat bot apa pun menutup panggilan sebelumnya.
+    if konteks["ditanya"] and not konteks["bot_dituduh_baru"]:
         calon.append({"aksi": "jawab", "intent": "offend" if curiga_teratas else "neutral",
                       "target": teratas["pemain"] if curiga_teratas else None, "alasan": bukti_teratas,
-                      "input": {"kecurigaan": float(teratas["kecurigaan"]) if teratas is not None else 0.0,
-                                "keunggulan": keunggulan}})
-    gema_tuduh, gema_bela = konteks["gema_tuduh"], konteks["gema_bela"]
-    # Stalker yang sudah mengungkap X tidak perlu lagi "curiga sama X" di fase yang sama.
-    if (curiga_teratas and not sudah_aksi(ingatan, view, ["tuduh", "ungkap"], teratas["pemain"])
-            and gema_tuduh.get(teratas["pemain"], 0) < MAKS_GEMA):
+                      "penanya": konteks["ditanya"],
+                      "input": {"dipanggil": konteks["dipanggil"],
+                                "kecurigaan": float(teratas["kecurigaan"]) if teratas is not None else 0.0}})
+    gema_bela = konteks["gema_bela"]
+    # Stalker yang sudah mengungkap X tidak perlu lagi "curiga sama X" di fase yang sama; tuduhan yang sudah
+    # digemakan 2 pemain lain tidak diulang (boleh_tuduh, sama dengan cabang tuduh BT).
+    if curiga_teratas and boleh_tuduh(ingatan, view, konteks, teratas["pemain"]):
         calon.append({"aksi": "tuduh", "target": teratas["pemain"], "alasan": bukti_teratas,
                       "input": {"kecurigaan": teratas["kecurigaan"], "keunggulan": keunggulan,
                                 "volume_info": teratas["volume_info"]}})
     suara = konteks["porsi_suara"]
+    # Ajakan bicara saat diskusi ramai, atau saat ruangan hening setelah ada yang sempat bicara.
+    ada_obrolan = (konteks["jumlah_chat_ronde"] >= MIN_PESAN_INFO
+                   or (konteks["hening"] and konteks["jumlah_chat_ronde"] >= 1))
     for _, q in kandidat.sort_values("pemain").iterrows():
         p = q["pemain"]
         pasti_bersih = p in bersih
@@ -1287,9 +1465,6 @@ def _calon_chat_warga(ctx):
                 and not sudah_aksi(ingatan, view, ["info_sandera", "bela_orang"], p, lingkup="game")):
             calon.append({"aksi": "info_sandera", "target": p, "alasan": alasan_percaya(q),
                           "input": {"p_sandera": q["p_sandera"], "urgensi": konteks["urgensi"]}})
-        # Ajakan bicara saat diskusi ramai, atau saat ruangan hening setelah ada yang sempat bicara.
-        ada_obrolan = (konteks["jumlah_chat_ronde"] >= MIN_PESAN_INFO
-                       or (konteks["hening"] and konteks["jumlah_chat_ronde"] >= 1))
         if (q["diam"] >= 0.5 and q["p_sandera"] < 0.5 and ada_obrolan
                 and p not in konteks["sudah_diajak"] and not sudah_aksi(ingatan, view, "ajak_bicara", p, lingkup="ronde")):
             calon.append({"aksi": "ajak_bicara", "target": p, "alasan": [f"{p} belum bicara di ronde ini."],
@@ -1307,12 +1482,16 @@ def _calon_chat_warga(ctx):
                       "input": {"ketidakjelasan": konteks["ketidakjelasan"], "sedikit_info": konteks["sedikit_info"]}})
     return calon
 
+# Calon kambing hitam Hitman: warga yang bukan dugaan korban Hostage, urut nilai kambing_hitam tertinggi lalu nama.
+def _kambing_layak(fitur):
+    return fitur[fitur["p_sandera"] < BATAS_SANDERA_VOTE].sort_values(
+        ["kambing_hitam", "pemain"], ascending=[False, True], kind="stable")
+
 # Kandidat chat Hitman: bicara seperti warga dan memakai bukti publik saja.
 def _calon_chat_hitman(ctx):
     konteks, ingatan, view, izin, bot = ctx["konteks"], ctx["ingatan"], ctx["view"], ctx["izin"], ctx["bot"]
     fitur, diri, publik = ctx["fitur_hitman"], ctx["diri"], ctx["publik"]
-    layak = fitur[fitur["p_sandera"] < BATAS_SANDERA_VOTE].sort_values(
-        ["kambing_hitam", "pemain"], ascending=[False, True], kind="stable")
+    layak = _kambing_layak(fitur)
     kambing = layak.iloc[0] if len(layak) and layak.iloc[0]["kambing_hitam"] >= MIN_KAMBING_HITAM else None
     alasan_kambing = alasan_curiga(baris_pemain(publik, kambing["pemain"]), None) if kambing is not None else []
     nilai_kambing = float(kambing["kambing_hitam"]) if kambing is not None else 0.0
@@ -1325,10 +1504,12 @@ def _calon_chat_hitman(ctx):
                       "input": {"tekanan_saya": diri["tekanan_saya"], "risiko": diri["risiko"]}})
     if izin["hanya_bela_diri"]:
         return calon
+    # Dipanggil: Hitman menjawab seperti warga, dengan kambing hitam bila ada (jawaban menipu dari bukti publik).
     if konteks["ditanya"] and not konteks["bot_dituduh_baru"]:
         calon.append({"aksi": "jawab", "sistem": "h_jawab", "intent": "offend" if kambing is not None else "neutral",
                       "target": kambing["pemain"] if kambing is not None else None, "alasan": alasan_kambing,
-                      "input": {"kambing_hitam": nilai_kambing, "risiko": diri["risiko"]}})
+                      "penanya": konteks["ditanya"],
+                      "input": {"dipanggil": konteks["dipanggil"], "kambing_hitam": nilai_kambing}})
     gema_tuduh, gema_bela = konteks["gema_tuduh"], konteks["gema_bela"]
     if (kambing is not None and not sudah_aksi(ingatan, view, ["tuduh", "klaim_palsu"], kambing["pemain"])
             and gema_tuduh.get(kambing["pemain"], 0) < MAKS_GEMA):
@@ -1361,7 +1542,10 @@ def _calon_chat_hitman(ctx):
                       "input": {"ketidakjelasan": konteks["ketidakjelasan"], "sedikit_info": konteks["sedikit_info"]}})
     return calon
 
-# Kandidat chat sesuai role bot.
+# Kandidat chat sesuai role bot; sama untuk ketiga metode, metode hanya menilai dan memilih.
+# Masukan : ctx dari putuskan (tabel, konteks, pengetahuan, izin; untuk Hitman juga fitur_hitman, diri, publik).
+# Keluaran: daftar kandidat {aksi, target, alasan, input, ...}; input = nilai yang dinilai metode.
+# Dipakai oleh: keputusan_chat metode.
 def calon_chat(ctx):
     return _calon_chat_hitman(ctx) if ctx["peran"] == "hitman" else _calon_chat_warga(ctx)
 
@@ -1372,7 +1556,7 @@ def chat_pasti(ctx):
     hidup = {p["nama"] for p in view["pemain"] if p["hidup"]}
     ph = next((h for h in ctx["pengetahuan"]["hitman_diketahui"]
                if h in hidup and not sudah_aksi(ingatan, view, "ungkap", h)), None)
-    aksi_fase = [a for a in ingatan.aksi_bot if (a["ronde"], a["fase"]) == (view["ronde"], view["fase"])]
+    aksi_fase = _aksi_fase(ingatan, view)
     if (ph is None or view["fase"] not in ("day", "tribunal") or not view["saya"]["can_chat"]
             or len(aksi_fase) >= MAKS_CHAT_PER_FASE[view["fase"]]):
         return None
@@ -1395,9 +1579,7 @@ def keputusan_vote_hitman(ctx):
     boleh, alasan = izin_vote(view)
     if not boleh:
         return rencana_vote("tidak_bisa", alasan=[alasan]), pd.DataFrame()
-    f = ctx["fitur_hitman"]  # tanpa rekan Syndicate
-    layak = f[f["p_sandera"] < BATAS_SANDERA_VOTE].sort_values(
-        ["kambing_hitam", "pemain"], ascending=[False, True], kind="stable")
+    layak = _kambing_layak(ctx["fitur_hitman"])  # tabel fitur Hitman tidak memuat rekan Syndicate
     if layak.empty:
         return rencana_vote("abstain", alasan=["Tidak ada target vote yang berguna."]), pd.DataFrame()
     jejak = layak[["pemain", "kambing_hitam", "kecurigaan_publik", "dukungan_suara"]]
@@ -1419,6 +1601,9 @@ def keputusan_vote_hitman(ctx):
                          float(layak.iloc[0]["kambing_hitam"])), jejak)
 
 # Kandidat aksi rahasia sesuai kemampuan role saat ini; aturan target mengikuti engine.
+# Masukan : ctx (view.saya: ability, can_act, last_guard, aksi_rekan; fitur_hitman, lindung, tabel, pengetahuan).
+# Keluaran: (kemampuan, daftar kandidat {aksi, target, sistem, alasan, input, seri}); seri = pemutus seri.
+# Dipakai oleh: keputusan_aksi metode.
 def calon_aksi(ctx):
     view, bot = ctx["view"], ctx["bot"]
     saya = view["saya"]
@@ -1442,11 +1627,12 @@ def calon_aksi(ctx):
                               "seri": (-r["ancaman"],)})
         # Koordinasi Syndicate: korban malam hanya satu (pilihan terbanyak), jadi ikuti target yang sudah dipilih
         # rekan selama target itu masih layak; memilih target lain hanya memecah suara Syndicate.
-        target_rekan = pilihan_terbanyak([a["target"] for a in saya.get("aksi_rekan", [])])
-        ikut = [c for c in calon if kemampuan == "hostage" and c["target"] == target_rekan]
-        if ikut:
-            ikut[0]["alasan"] = [f"Mengikuti target Hostage rekan Syndicate: {target_rekan}."] + ikut[0]["alasan"]
-            calon = ikut
+        if kemampuan == "hostage":
+            target_rekan = pilihan_terbanyak([a["target"] for a in saya.get("aksi_rekan", [])])
+            ikut = [c for c in calon if c["target"] == target_rekan]
+            if ikut:
+                ikut[0]["alasan"] = [f"Mengikuti target Hostage rekan Syndicate: {target_rekan}."] + ikut[0]["alasan"]
+                calon = ikut
     elif kemampuan == "guard":
         lindung = ctx["lindung"].set_index("pemain")
         tabel = ctx["tabel"].set_index("pemain")
@@ -1473,14 +1659,16 @@ def calon_aksi(ctx):
                           "seri": (-b["kecurigaan"],)})
     return kemampuan, calon
 
+# Bentuk rencana keluaran penalaran. Vote dan aksi rahasia memakai bentuk yang sama {aksi, target, alasan, skor}.
 def rencana_chat_tunggu(alasan):
     return {"kirim": False, "aksi": "tunggu", "intent": None, "target": None, "klaim": False,
             "alasan": [alasan], "skor": None}
 
+# Rencana jawab juga membawa penanya (pemain yang memanggil bot) untuk penulis kalimat.
 def rencana_chat(calon):
     return {"kirim": True, "aksi": calon["aksi"], "intent": calon.get("intent", INTENT_AKSI[calon["aksi"]]),
             "target": calon["target"], "klaim": calon.get("klaim", False), "alasan": calon["alasan"],
-            "skor": calon.get("skor")}
+            "skor": calon.get("skor"), **({"penanya": calon["penanya"]} if calon.get("penanya") else {})}
 
 def rencana_vote(aksi, target=None, alasan=(), skor=None):
     return {"aksi": aksi, "target": target, "alasan": list(alasan), "skor": skor}
@@ -1498,8 +1686,8 @@ def templat_pesan(rencana):
         "ungkap": f"Aku Stalker. Semalam aku peek {t}, dia Hitman. Ayo vote {t}!",
         "bela_diri": "Aku bukan Hitman. " + (rencana["alasan"][1] if len(rencana["alasan"]) > 1 else
                                              "Tuduhan ke aku belum ada buktinya, coba cek lagi."),
-        "jawab": (f"Kalau aku sih curiga {t}. {bukti}" if t else
-                  "Aku belum yakin, belum ada yang benar-benar mencurigakan. Kalian curiga siapa?"),
+        # Jawaban netral yang terbaca netral oleh IndoBERT (versi lama dengan "mencurigakan" terbaca menuduh).
+        "jawab": (f"Kalau aku sih curiga {t}. {bukti}" if t else "Aku belum yakin siapa-siapa. Kalian curiga siapa?"),
         "bela_orang": f"Aku rasa {t} bukan Hitman, tuduhannya belum ada bukti.",
         "tuduh": f"Aku makin curiga sama {t}. {bukti}",
         "klaim_palsu": f"Aku Stalker, semalam aku peek {t}, dia Hitman.",
@@ -1510,7 +1698,10 @@ def templat_pesan(rencana):
     }
     return templat[rencana["aksi"]].strip()
 
-# Bentuk NPCDecision backend: aksi rahasia, vote, atau wait; pesan diisi templat bila chat dikirim.
+# Keluaran ke game: tiga rencana dipetakan ke bentuk NPCDecision backend.
+# Masukan : rencana chat, vote, dan aksi rahasia (keluaran penalaran metode).
+# Keluaran: {action, target, message}; aksi rahasia diutamakan, lalu vote, selain itu wait; message = kalimat templat
+#           bila chat dikirim, kosong bila tidak. Dipakai oleh: putuskan (kunci npc_decision) → NPCService/engine.
 def format_npc(rencana_c, rencana_v, rencana_a):
     if rencana_a["aksi"] in AKSI_RAHASIA:
         action, target = rencana_a["aksi"], rencana_a["target"]
@@ -1546,7 +1737,11 @@ def batasan_nlg(rencana):
     batasan.append("Jangan menyebut aksi malam (Hostage, Gag, Guard, Peek) sebagai perbuatanmu kecuali rencana memintanya.")
     return batasan
 
-# Payload untuk LLM penulis kalimat; None jika bot memilih tidak chat. Role asli bot sengaja tidak dimasukkan.
+# Payload NLG untuk LLM penulis kalimat. Role asli bot sengaja tidak dimasukkan.
+# Masukan : rencana chat (keluaran keputusan_chat), view (nama bot).
+# Keluaran: {pembicara, aksi, intent, target, klaim, bukti, gaya, batasan, cadangan} (+ penanya untuk jawab), atau None
+#           bila bot tidak chat.
+# Dipakai oleh: putuskan (kunci nlg) → npc_nlg menulis kalimat lalu memvalidasinya ulang dengan IndoBERT.
 def siapkan_nlg(rencana, view):
     if not rencana["kirim"]:
         return None
@@ -1555,29 +1750,43 @@ def siapkan_nlg(rencana, view):
         "target": rencana["target"], "klaim": rencana.get("klaim", False), "bukti": rencana["alasan"][:2],
         "gaya": "1–2 kalimat chat santai bahasa Indonesia, seperti pemain manusia.",
         "batasan": batasan_nlg(rencana), "cadangan": templat_pesan(rencana),
+        **({"penanya": rencana["penanya"]} if rencana.get("penanya") else {}),
     }
 
-# Memastikan kalimat hasil NLG tetap sesuai rencana menurut IndoBERT.
+# Memastikan kalimat hasil NLG tetap sesuai rencana menurut IndoBERT. Target neutral (pemain yang disapa) bukan
+# tuduhan atau pembelaan, jadi tidak dihitung sebagai target rencana.
 def validasi_pesan(nlu, teks, rencana, ingatan, view):
     daftar = [p["nama"] for p in view["pemain"]]
     chat = {"id": "validasi", "ronde": view["ronde"], "fase": view["fase"], "waktu": view["waktu"],
             "pengirim": view["saya"]["nama"], "teks": teks}
     hasil = anotasi_chat(nlu, chat, ingatan.chat, daftar)
-    target_prediksi = sorted({t["pemain"] for t in hasil["target"] if t["pemain"] in daftar})
+    target_prediksi = sorted({t["pemain"] for t in hasil["target"]
+                              if t["pemain"] in daftar and t["relasi"] != "neutral"})
     cocok_intent = hasil["intent"] == rencana["intent"]
     cocok_target = rencana["intent"] == "neutral" or rencana["target"] in target_prediksi
     return {"teks": teks, "lolos": cocok_intent and cocok_target, "intent_prediksi": hasil["intent"],
             "confidence": round(hasil["conf_intent"], 3), "target_prediksi": target_prediksi,
             "target_lain": [t for t in target_prediksi if t != rencana["target"]]}
 
-# Kurva respons consideration (hasil selalu 0–1).
+# Kurva respons linear: garis lurus yang dipotong ke 0–1.
+# Masukan : x = satu input 0–1 dari c["input"] kandidat; kemiringan k; awal a.
+# Keluaran: nilai consideration a + k × x, dipotong ke 0–1 (bawaan k = 1, a = 0: nilai = input).
+# Dipakai oleh: PERTIMBANGAN, nilai_ancaman (kambing hitam), keputusan_vote.
 def kurva_linear(x, kemiringan=1.0, awal=0.0):
     return float(np.clip(awal + kemiringan * float(x), 0, 1))
 
+# Kurva respons logistik (kurva S): input di bawah titik tengah diredam, di atasnya cepat mendekati 1.
+# Masukan : x = satu input 0–1; tengah t = input yang menghasilkan 0,5; curam c = kecuraman lereng.
+# Keluaran: nilai consideration 1 ÷ (1 + e^(−c × (x − t))), selalu di antara 0 dan 1.
+# Dipakai oleh: PERTIMBANGAN, nilai_ancaman (kambing hitam), keputusan_vote.
 def kurva_logistik(x, tengah=0.5, curam=10.0):
     return float(1 / (1 + math.exp(-curam * (float(x) - tengah))))
 
-# Perkalian consideration dengan faktor kompensasi IAUS (Dave Mark).
+# Gabungan IAUS: consideration dikalikan, dengan faktor kompensasi Dave Mark agar tindakan yang punya banyak
+# consideration tidak kalah hanya karena lebih banyak bilangan < 1 yang dikalikan.
+# Masukan : nilai = daftar k consideration 0–1; bobot = bobot sistem tindakan (PERTIMBANGAN).
+# Keluaran: bobot × Π(n + (1 − n) × m × n) dengan m = 1 − 1/k; satu consideration 0 memveto, semua 1 = bobot.
+# Dipakai oleh: _nilai_calon, keputusan_vote, nilai_ancaman (kambing hitam).
 def skor_iaus(nilai, bobot=1.0):
     if not nilai:
         return 0.0
@@ -1588,16 +1797,13 @@ def skor_iaus(nilai, bobot=1.0):
         skor *= n + (1 - n) * modifikasi * n
     return bobot * skor
 
-BOBOT_BUKTI = {"dituduh_korban": 0.75, "dorong_salah_eksekusi": 0.65, "klaim": 0.60, "serang_bersih": 0.50,
-               "tekanan": 0.40, "pengalihan": 0.30, "inkonsistensi": 0.30}
-
-BOBOT_ANCAMAN = {"klaim_peran": 0.80, "menuduh_saya": 0.70, "pengaruh": 0.45}
-
 PERTIMBANGAN = {
-    # Chat role warga.
+    # Chat role warga (_calon_chat_warga); bela_orang, info_sandera, dan tanya_info juga dipakai Hitman.
     "bela_diri": (1.3, lambda i: {"tekanan ke bot": kurva_logistik(i["tekanan_bot"], 0.15, 15),
                                   "urgensi": kurva_linear(i["urgensi"], 0.3, 0.7)}),
-    "jawab": (0.95, lambda i: {"ditanya": 1.0, "punya jawaban": kurva_linear(i["kecurigaan"], 0.4, 0.6)}),
+    # Dipanggil = pertanyaan langsung ke bot yang belum dijawab. Bobot 1,2 di atas semua tindakan inisiatif (bela orang
+    # 1,1; tuduh dan klaim palsu 1,0) dan di bawah bela diri 1,3: urutan yang sama dengan cabang 4 BT dan fuzzy.
+    "jawab": (1.2, lambda i: {"dipanggil": kurva_linear(i["dipanggil"])}),
     "tuduh": (1.0, lambda i: {"kecurigaan": kurva_logistik(i["kecurigaan"], 0.45, 12),
                               "keunggulan": kurva_linear(i["keunggulan"], 0.5, 0.5),
                               "volume info": kurva_linear(i["volume_info"], 0.4, 0.6)}),
@@ -1608,15 +1814,15 @@ PERTIMBANGAN = {
     "ajak_bicara": (0.6, lambda i: {"diam": kurva_linear(i["diam"]),
                                     "kecurigaan": kurva_linear(i["kecurigaan"], 0.6, 0.4)}),
     "tanya_info": (0.7, lambda i: {"kebutuhan info": max(i["ketidakjelasan"], i["sedikit_info"])}),
-    # Chat Hitman.
+    # Chat Hitman (_calon_chat_hitman): input dari diri (risiko, tekanan_saya, suara_saya) dan kambing hitam terbaik.
     "h_bela_diri": (1.3, lambda i: {"tekanan ke saya": kurva_logistik(i["tekanan_saya"], 0.15, 15),
                                     "risiko": kurva_linear(i["risiko"], 0.4, 0.6)}),
-    "h_jawab": (0.95, lambda i: {"ditanya": 1.0, "punya kambing hitam": kurva_linear(i["kambing_hitam"], 0.4, 0.6)}),
+    "h_jawab": (1.2, lambda i: {"dipanggil": kurva_linear(i["dipanggil"])}),
     "h_tuduh": (0.9, lambda i: {"kambing hitam": kurva_logistik(i["kambing_hitam"], 0.4, 10),
                                 "perlu pengalihan": kurva_linear(i["risiko"], 0.5, 0.5)}),
     "klaim_palsu": (1.0, lambda i: {"risiko": kurva_logistik(i["risiko"], 0.6, 12),
                                     "suara ke saya": kurva_logistik(i["suara_saya"], 0.35, 12)}),
-    # Aksi rahasia.
+    # Aksi rahasia (calon_aksi): sandera = Hostage, gag = Gag, lindung = Guard, intip = Peek.
     "sandera": (1.0, lambda i: {"ancaman": kurva_linear(i["ancaman"], 0.8, 0.2),
                                 "tidak dijaga": kurva_linear(i["tidak_dijaga"], 0.8, 0.2)}),
     "gag": (1.0, lambda i: {"ancaman sekarang": kurva_logistik(i["ancaman_sekarang"], 0.45, 10),
@@ -1635,32 +1841,53 @@ AMBANG_GAG_UTILITAS = 0.55
 
 PAKSA_VOTE_BUKTI_LEMAH = False
 
-# Noisy-OR: tiap bukti berbobot menambah kecurigaan secara independen; hasil dikali (1 − p_sandera).
+BOBOT_BUKTI = {"dituduh_korban": 0.75, "dorong_salah_eksekusi": 0.65, "klaim": 0.60, "serang_bersih": 0.50,
+               "tekanan": 0.40, "pengalihan": 0.30, "inkonsistensi": 0.30}
+
+BOBOT_ANCAMAN = {"klaim_peran": 0.80, "menuduh_saya": 0.70, "pengaruh": 0.45}
+
+# Kecurigaan dengan noisy-OR: tiap bukti berbobot menambah kecurigaan secara independen tanpa pernah melebihi 1.
+# Masukan : tabel bukti dari hitung_bukti (kolom BOBOT_BUKTI, dukungan, p_sandera, kandidat).
+# Keluaran: tabel + kolom u_<bukti> (bobot × bukti), kecurigaan_mentah = 1 − Π(1 − u), dan
+#           kecurigaan = mentah × (1 − p_sandera) untuk kandidat, 0 untuk yang lain.
+# Dipakai oleh: putuskan (tabel pribadi warga, lalu ditimpa fakta pasti; tabel publik untuk Hitman).
 def nilai_kecurigaan(tabel):
-    tabel = tabel.copy()
     baris = []
     for _, b in tabel.iterrows():
         komponen = {k: BOBOT_BUKTI[k] * float(b[k]) for k in BOBOT_BUKTI}
+        # Tekanan yang juga dibela orang lain kurang meyakinkan.
         komponen["tekanan"] *= 1 - 0.7 * float(b["dukungan"])
         mentah = 1 - float(np.prod([1 - v for v in komponen.values()]))
         baris.append({**{f"u_{k}": v for k, v in komponen.items()}, "kecurigaan_mentah": mentah,
                       "kecurigaan": mentah * (1 - b["p_sandera"]) if b["kandidat"] else 0.0})
     return pd.concat([tabel, pd.DataFrame(baris, index=tabel.index)], axis=1)
 
-# Ancaman (noisy-OR × kredibilitas) dan kambing hitam (IAUS) untuk Hitman.
+# Ancaman tiap warga bagi Hitman (noisy-OR × kredibilitas) dan nilai kambing hitamnya (IAUS tiga consideration).
+# Masukan : fitur dari fitur_hitman (menuduh_saya, pengaruh, klaim_peran, kredibilitas, kecurigaan_publik,
+#           dukungan_suara, p_sandera).
+# Keluaran: fitur + kolom ancaman (target Hostage) dan kambing_hitam (target tuduhan dan vote Hitman).
+# Dipakai oleh: putuskan (role Hitman).
 def nilai_ancaman(fitur):
     baris = []
     for _, r in fitur.iterrows():
         mentah = 1 - float(np.prod([1 - BOBOT_ANCAMAN[k] * float(r[k]) for k in BOBOT_ANCAMAN]))
+        # Kambing hitam yang baik sudah dicurigai publik, sedang didukung suara, dan bukan dugaan korban Hostage.
         kambing = skor_iaus([kurva_logistik(r["kecurigaan_publik"], 0.35, 10),
                              kurva_linear(r["dukungan_suara"], 0.5, 0.5), 1 - float(r["p_sandera"])])
+        # Penuduh yang dipercaya publik lebih berbahaya; yang sudah dicurigai tetap bernilai 60%.
         baris.append({"ancaman": mentah * (0.6 + 0.4 * float(r["kredibilitas"])), "kambing_hitam": kambing})
     return pd.concat([fitur, pd.DataFrame(baris, index=fitur.index, columns=["ancaman", "kambing_hitam"])], axis=1)
 
+# Urutan tersangka warga: kandidat dari kecurigaan tertinggi; seri diputus bukti_total, lalu nama.
+# Masukan : tabel sesudah nilai_kecurigaan dan terapkan_pengetahuan. Keluaran: daftar nama pemain.
+# Dipakai oleh: putuskan (disimpan di hasil dan diteruskan ke kebijakan vote saat bukti lemah).
 def urutan_tersangka(tabel):
     return urutkan_kandidat(tabel)[0]["pemain"].tolist()
 
-# Menilai semua kandidat dengan consideration masing-masing.
+# Utilitas tiap kandidat: input lewat kurva PERTIMBANGAN menjadi consideration, lalu digabung IAUS dan dikali bobot.
+# Masukan : calon = daftar kandidat {aksi, sistem (opsional), input, ...} dari calon_chat / calon_aksi.
+# Keluaran: daftar yang sama (diubah di tempat) + c["pertimbangan"] {nama: nilai 0–1} dan c["skor"] = utilitas.
+# Dipakai oleh: keputusan_chat, keputusan_aksi.
 def _nilai_calon(calon):
     for c in calon:
         bobot, kurva = PERTIMBANGAN[c.get("sistem", c["aksi"])]
@@ -1668,42 +1895,72 @@ def _nilai_calon(calon):
         c["skor"] = skor_iaus(list(c["pertimbangan"].values()), bobot)
     return calon
 
-# Tindakan chat dengan utilitas tertinggi dipilih jika lebih berguna daripada diam.
+# Baris jejak penalaran per kandidat: utilitas dan nilai tiap consideration (dibulatkan 3 desimal).
+# Masukan : calon yang sudah dinilai _nilai_calon. Keluaran: list dict {aksi, target, utilitas, pertimbangan}.
+# Dipakai oleh: keputusan_chat, keputusan_aksi.
+def _jejak_calon(calon):
+    return [{"aksi": c["aksi"], "target": c["target"], "utilitas": c["skor"],
+             "pertimbangan": {k: round(v, 3) for k, v in c["pertimbangan"].items()}} for c in calon]
+
+# Chat: kandidat dengan utilitas tertinggi dikirim hanya jika lebih berguna daripada diam (UTILITAS_TUNGGU).
+# Masukan : ctx dari putuskan (izin chat dan bahan calon_chat).
+# Keluaran: (rencana chat atau tunggu, jejak = DataFrame utilitas tiap kandidat + baris "tunggu").
+# Dipakai oleh: putuskan (bila Stalker tidak punya fakta pasti untuk diungkap).
 def keputusan_chat(ctx):
     if not ctx["izin"]["boleh"]:
         return rencana_chat_tunggu(ctx["izin"]["alasan"]), pd.DataFrame()
     calon = _nilai_calon(calon_chat(ctx))
+    # Skor dibulatkan 9 desimal agar galat floating dianggap seri; seri diputus URUTAN_AKSI, lalu nama target.
     calon.sort(key=lambda c: (-round(c["skor"], 9), URUTAN_AKSI.index(c["aksi"]), c["target"] or ""))
-    jejak = pd.DataFrame([{"aksi": c["aksi"], "target": c["target"], "utilitas": c["skor"],
-                           "pertimbangan": {k: round(v, 3) for k, v in c["pertimbangan"].items()}} for c in calon]
+    jejak = pd.DataFrame(_jejak_calon(calon)
                          + [{"aksi": "tunggu", "target": None, "utilitas": UTILITAS_TUNGGU, "pertimbangan": {}}])
     if not calon or calon[0]["skor"] <= UTILITAS_TUNGGU:
         return rencana_chat_tunggu("Tidak ada tindakan chat yang lebih berguna daripada diam."), jejak
     return rencana_chat(calon[0]), jejak
 
-# Utilitas vote per kandidat dibandingkan dengan utilitas abstain.
+# Urutan pilihan vote: utilitas tertinggi dulu. Seri pemain dengan abstain → pemain (vote); seri antar-pemain → nama
+# tanpa membedakan huruf besar/kecil, lalu nama asli. Nama pengguna di game bebas, jadi hasil tidak boleh bergantung
+# pada huruf kapital (dulu nama berhuruf kecil kalah dari "abstain" saat seri karena urutan abjad).
+# Masukan : baris = [{pilihan, consideration..., utilitas}] untuk pemain layak; abstain = utilitas abstain.
+# Keluaran: DataFrame jejak terurut (baris pertama = pilihan terbaik) dengan kolom yang sama.
+# Dipakai oleh: keputusan_vote.
+def _urutkan_pilihan_vote(baris, abstain):
+    jejak = pd.DataFrame(baris + [{"pilihan": "abstain", "utilitas": abstain}])
+    jejak["_abstain"] = [False] * len(baris) + [True]
+    jejak["_nama"] = jejak["pilihan"].str.casefold()
+    return jejak.sort_values(["utilitas", "_abstain", "_nama", "pilihan"], ascending=[False, True, True, True],
+                             kind="stable").drop(columns=["_abstain", "_nama"])
+
+# Vote warga: utilitas tiap pemain layak (IAUS empat consideration) dibandingkan dengan utilitas abstain.
+# Masukan : ctx dari putuskan (view, tabel kecurigaan, pengetahuan bersih; konteks urgensi, porsi_suara, porsi_fase).
+# Keluaran: (rencana vote / tunggu / abstain / tidak_bisa, jejak = DataFrame consideration dan utilitas per pilihan).
+# Dipakai oleh: putuskan (role warga, bila tidak ada hasil Peek Hitman).
 def keputusan_vote(ctx):
     view, konteks, tabel, bot = ctx["view"], ctx["konteks"], ctx["tabel"], ctx["bot"]
     boleh, alasan = izin_vote(view)
     if not boleh:
         return rencana_vote("tidak_bisa", alasan=[alasan]), pd.DataFrame()
     kandidat, _ = urutkan_kandidat(tabel)
+    # Dugaan korban Hostage dan pemain yang pasti bersih tidak pernah di-vote.
     layak = kandidat[(kandidat["p_sandera"] < BATAS_SANDERA_VOTE) & ~kandidat["pemain"].isin(ctx["pengetahuan"]["bersih"])]
+    # Abstain makin tidak menarik saat warga terdesak: 0,65 saat urgensi 0, 0,15 saat urgensi 1.
     abstain = 0.15 + 0.5 * (1 - konteks["urgensi"])
     baris = []
     for _, c in layak.iterrows():
-        lain = max([s for n, s in zip(layak["pemain"], layak["kecurigaan"]) if n != c["pemain"]], default=0.0)
+        tertinggi_lain = max([s for n, s in zip(layak["pemain"], layak["kecurigaan"]) if n != c["pemain"]], default=0.0)
         pertimbangan = {
             "kecurigaan": kurva_logistik(c["kecurigaan"], 0.45, 10),
             "bukan sandera": 1 - float(c["p_sandera"]),
             "dukungan suara": kurva_linear(konteks["porsi_suara"].get(c["pemain"], 0.0), 0.25, 0.75),
-            "keunggulan": kurva_linear(float(np.clip((c["kecurigaan"] - lain) / 0.30, 0, 1)), 0.4, 0.6),
+            # Selisih dengan pemain layak lain yang paling dicurigai; selisih 0,30 sudah dianggap jelas.
+            "keunggulan": kurva_linear(float(np.clip((c["kecurigaan"] - tertinggi_lain) / 0.30, 0, 1)), 0.4, 0.6),
         }
         baris.append({"pilihan": c["pemain"], **pertimbangan, "utilitas": skor_iaus(list(pertimbangan.values()))})
-    jejak = pd.DataFrame(baris + [{"pilihan": "abstain", "utilitas": abstain}]).sort_values(
-        ["utilitas", "pilihan"], ascending=[False, True], kind="stable")
+    # Seri dengan abstain dimenangkan pemain; seri antar-pemain diputus nama tanpa membedakan huruf kapital.
+    jejak = _urutkan_pilihan_vote(baris, abstain)
     terbaik = jejak.iloc[0]
     porsi = konteks["porsi_fase"]
+    # Pemain mengalahkan abstain: vote langsung bila sangat yakin, selain itu setelah separuh Tribunal.
     if terbaik["pilihan"] != "abstain" and (terbaik["utilitas"] >= UTILITAS_VOTE_LANGSUNG or porsi >= VOTE_TUNGGU_FRAKSI):
         return rencana_vote("vote", terbaik["pilihan"], alasan_curiga(baris_pemain(layak, terbaik["pilihan"]), bot),
                             terbaik["utilitas"]), jejak
@@ -1713,21 +1970,25 @@ def keputusan_vote(ctx):
     return rencana_vote("abstain", alasan=["Abstain lebih berguna daripada vote yang belum yakin."],
                         skor=abstain), jejak
 
-# Aksi rahasia: kandidat dengan utilitas tertinggi; Gag hanya jika utilitasnya cukup.
+# Aksi rahasia: target dengan utilitas tertinggi; Gag hanya bila utilitasnya mencapai AMBANG_GAG_UTILITAS.
+# Masukan : ctx dari putuskan (view.saya: ability, can_act; bahan calon_aksi).
+# Keluaran: (rencana hostage / gag / guard / peek, tunggu, atau tidak_bisa; jejak = DataFrame utilitas tiap target).
+# Dipakai oleh: putuskan.
 def keputusan_aksi(ctx):
     kemampuan, calon = calon_aksi(ctx)
+    # Dicek di sini juga agar "tidak bisa beraksi" terbedakan dari "tidak ada target layak" (calon kosong).
     if not kemampuan or not ctx["view"]["saya"].get("can_act"):
         return rencana_aksi("tidak_bisa", alasan=["Tidak ada aksi rahasia yang tersedia saat ini."]), pd.DataFrame()
     calon = _nilai_calon(calon)
+    # Seri diputus kunci seri dari calon_aksi (misalnya Hostage: tidak dijaga, lalu ancaman), lalu nama target.
     calon.sort(key=lambda c: (-round(c["skor"], 9), *c.get("seri", ()), c["target"]))
-    jejak = pd.DataFrame([{"aksi": c["aksi"], "target": c["target"], "utilitas": c["skor"],
-                           "pertimbangan": {k: round(v, 3) for k, v in c["pertimbangan"].items()}} for c in calon])
+    jejak = pd.DataFrame(_jejak_calon(calon))
     if not calon:
         return rencana_aksi("tunggu", alasan=["Tidak ada target yang layak."]), jejak
     if kemampuan == "gag" and calon[0]["skor"] < AMBANG_GAG_UTILITAS:
         return rencana_aksi("tunggu", alasan=["Belum ada penggalang suara yang layak dibungkam; Gag disimpan."]), jejak
-    c = calon[0]
-    return rencana_aksi(c["aksi"], c["target"], c["alasan"], c["skor"]), jejak
+    terbaik = calon[0]
+    return rencana_aksi(terbaik["aksi"], terbaik["target"], terbaik["alasan"], terbaik["skor"]), jejak
 
 # Mekanik engine: satu suara pun cukup untuk eksekusi. Untuk metode dengan PAKSA_VOTE_BUKTI_LEMAH, abstain di
 # paruh akhir Tribunal diganti vote ke tersangka teratas yang layak (kebijakan per metode, hasil uji A/B).
@@ -1743,7 +2004,11 @@ def pertahanan_suara(ctx, rencana, urutan):
     return rencana_vote("vote", layak[0], alasan + alasan_curiga(baris_pemain(tabel, layak[0]), ctx["bot"]),
                         rencana["skor"])
 
-# Satu siklus keputusan untuk role apa pun: bukti → penalaran metode → rencana chat, vote, dan aksi.
+# Satu siklus keputusan untuk role apa pun; satu-satunya fungsi keputusan yang dipanggil game dan simulasi.
+# Masukan : ingatan (Ingatan bot), view (keluaran Ingatan.sinkron_snapshot).
+# Keluaran: dict {tabel, konteks, pengetahuan, urutan_tersangka, fitur_hitman, lindung, rencana_chat/vote/aksi,
+#           jejak_chat/vote/aksi, npc_decision = {action, target, message} untuk engine, nlg = payload penulis}.
+# Alur: hitung_bukti → pengetahuan_peran → penalaran metode (nilai_*, keputusan_*) → format_npc + siapkan_nlg.
 def putuskan(ingatan, view):
     peran, bot = view["saya"]["role"], view["saya"]["nama"]
     tabel, konteks = hitung_bukti(ingatan, view)
