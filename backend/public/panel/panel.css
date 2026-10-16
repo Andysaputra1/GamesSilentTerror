@@ -647,3 +647,47 @@ body > footer {
     padding: 18px;
   }
 }
+
+/* Chat room (checker dan simulasi): jejak tampil seperti chat di game. */
+.chat-split { grid-template-columns: minmax(300px, 430px) minmax(0, 1fr); }
+.chat-room { display: flex; flex-direction: column; gap: 8px; max-height: 560px; overflow: auto; padding: 12px; background: #0a121d; border: 1px solid #253249; border-radius: 10px; }
+.chat-room:empty::before { content: 'Belum ada chat.'; color: #7f91a9; font-size: 12px; }
+.chat-item { max-width: 92%; border-radius: 12px; padding: 10px 12px; line-height: 1.5; }
+.chat-item .trace-head { margin-bottom: 4px; }
+.chat-text { display: block; white-space: pre-wrap; font-size: 14px; }
+.chat-info, .chat-meta { display: block; margin-top: 4px; font-size: 11px; color: #9aacbf; }
+.trace.chat-item small { margin-top: 4px; }
+.chat-human { align-self: flex-end; background: #1d2a1d; border-color: #3d5a33; border-bottom-right-radius: 3px; }
+.chat-bot { align-self: flex-start; border-bottom-left-radius: 3px; }
+.chat-step { align-self: flex-start; max-width: 80%; padding: 6px 10px; background: transparent; border-style: dashed; font-size: 12px; }
+.chat-system { align-self: center; margin: 4px 0; font-size: 11px; color: #f6d79c; text-align: center; }
+.chat-input { display: flex; gap: 8px; margin-top: 10px; }
+.chat-input input { flex: 1; min-width: 0; }
+.sim-bots { display: flex; flex-wrap: wrap; gap: 10px; flex-basis: 100%; }
+.sim-bots label { min-width: 170px; }
+.sim-actions { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; margin-top: 10px; }
+.sim-actions label { max-width: 230px; }
+.process-steps { margin: 6px 0 12px; padding-left: 0; list-style: none; display: grid; gap: 8px; }
+.process-steps > li { border: 1px solid #293546; border-radius: 9px; padding: 10px 12px; background: #0e1724; min-width: 0; }
+.process-steps .hint { margin: 6px 0 0; }
+.process-head { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.process-time { flex: none; color: #baf578; font-size: 12px; font-weight: 650; }
+@media (max-width: 1000px) { .chat-split { grid-template-columns: 1fr; } }
+
+/* Flowchart proses AI (menu Simulasi). */
+.flow { display: grid; justify-items: center; gap: 4px; padding: 14px; background: #0a121d; border: 1px solid #253249; border-radius: 10px; margin-bottom: 12px; }
+.flow > .hint { justify-self: stretch; margin: 0 0 6px; }
+.flow-row { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px; }
+.flow-branch { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; width: 100%; }
+.flow-lane { display: grid; justify-items: stretch; gap: 4px; padding: 8px; border: 1px dashed #334055; border-radius: 9px; }
+.flow-arrow { color: #5f7088; font-size: 13px; line-height: 1; text-align: center; }
+.flow-node { display: grid; gap: 3px; min-width: 120px; max-width: 220px; padding: 7px 10px; background: #192333; border: 1px solid #303e52; border-radius: 8px; color: #e1eaf6; text-align: left; font-size: 12px; }
+.flow-lane .flow-node { max-width: none; }
+.flow-node strong { font-size: 12px; }
+.flow-kode { color: #8fa3bb; font-family: ui-monospace, Consolas, monospace; font-size: 10px; overflow-wrap: anywhere; }
+.flow-node.selected { border-color: #baf578; }
+.flow-aktif { border-color: #f6d79c; box-shadow: 0 0 0 2px rgba(246, 215, 156, 0.25); }
+.flow-redup { opacity: 0.4; }
+.flow-bots { display: flex; flex-wrap: wrap; gap: 4px; }
+#flow-detail { margin-bottom: 18px; }
+@media (max-width: 700px) { .flow-branch { grid-template-columns: 1fr; } .flow-node { min-width: 0; max-width: none; } }

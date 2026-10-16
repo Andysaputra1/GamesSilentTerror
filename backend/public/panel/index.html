@@ -49,7 +49,8 @@
           ><button data-menu="history"><span>03</span> Riwayat chat</button>
           <button data-menu="users"><span>04</span> Manajemen user</button
           ><button data-menu="npc"><span>05</span> Otak NPC</button
-          ><button data-menu="survey"><span>06</span> Survei</button>
+          ><button data-menu="survey"><span>06</span> Survei</button
+          ><button data-menu="simulasi"><span>07</span> Simulasi</button>
         </nav>
         <section id="menu-npc" class="card" hidden>
           <div class="section-head">
@@ -226,6 +227,88 @@
             </table>
           </div>
         </section>
+        <section id="menu-simulasi" class="card" hidden>
+          <div class="section-head">
+            <div>
+              <span class="eyebrow">SANDBOX</span>
+              <h2>Simulasi chat dengan bot</h2>
+              <p>
+                Pertandingan tiruan dengan engine, otak (Fuzzy, Utility AI, Behavior Tree), NLU
+                IndoBERT, dan penulis kalimat yang sama seperti room asli. Tidak masuk room, riwayat
+                chat, maupun survei. Setiap chat atau tombol jalan membuat semua bot hidup melangkah
+                sekali; klik item chat untuk melihat prosesnya.
+              </p>
+            </div>
+          </div>
+          <form id="sim-setup" class="toolbar">
+            <label>Nama kamu<input id="sim-name" maxlength="40" value="Pemain" /></label
+            ><label
+              >Jumlah pemain (termasuk kamu)<select id="sim-count">
+                <option>4</option>
+                <option selected>5</option>
+                <option>6</option>
+                <option>7</option>
+                <option>8</option>
+                <option>9</option>
+                <option>10</option>
+              </select></label
+            >
+            <div id="sim-bots" class="sim-bots"></div>
+            <button id="sim-start">Mulai simulasi baru</button>
+          </form>
+          <p class="hint">
+            Role dibagi acak seperti di game dan semuanya terlihat di sini. Kamu hanya bisa chat;
+            vote dan aksi malammu tidak dijalankan. Tombol fase berikutnya menyelesaikan fase lewat
+            engine (hasil malam, eksekusi Tribunal), lalu bot melangkah di awal fase baru.
+          </p>
+          <section
+            id="sim-status"
+            class="room-summary"
+            aria-label="Status simulasi"
+            hidden
+          ></section>
+          <div class="split chat-split">
+            <div>
+              <h3>Chat room</h3>
+              <div id="sim-chat" class="chat-room"></div>
+              <form id="sim-form" class="chat-input">
+                <input id="sim-message" maxlength="500" autocomplete="off" disabled /><button
+                  id="sim-send"
+                  disabled
+                >
+                  Kirim
+                </button>
+              </form>
+              <div class="sim-actions">
+                <label
+                  >Waktu game per putaran (detik)<input
+                    id="sim-step"
+                    type="number"
+                    min="0"
+                    max="60"
+                    step="1"
+                    value="3"
+                /></label>
+                <button id="sim-run" type="button" class="secondary" disabled>
+                  Bot jalan sekali
+                </button>
+                <button id="sim-phase" type="button" class="secondary" disabled>
+                  Fase berikutnya
+                </button>
+              </div>
+              <p id="sim-progress" class="hint" role="status" aria-live="polite"></p>
+            </div>
+            <div>
+              <h3>Alur proses AI</h3>
+              <div id="sim-flow" class="flow"></div>
+              <div id="flow-detail" class="report empty-state"></div>
+              <h3>Detail proses</h3>
+              <div id="sim-detail" class="report empty-state">
+                Mulai simulasi, kirim chat, lalu klik chat atau langkah bot untuk melihat prosesnya.
+              </div>
+            </div>
+          </div>
+        </section>
         <section id="menu-ai" class="card">
           <div class="section-head">
             <div>
@@ -259,8 +342,8 @@
                   <p class="hint">
                     qwen3:4b-instruct: cepat (sekitar 1–2 detik per kalimat). qwen3:14b: lebih
                     pintar, tetapi lebih lambat (sekitar 6–9 detik). Model lain muncul di sini
-                    setelah Tes koneksi di Otak NPC menemukannya di link. Otak NPC memakai model
-                    ini bila pilihan "Model LLM link" di sana dibiarkan Bawaan.
+                    setelah Tes koneksi di Otak NPC menemukannya di link. Otak NPC memakai model ini
+                    bila pilihan "Model LLM link" di sana dibiarkan Bawaan.
                   </p>
                   <label
                     >Token tunnel (LLM_TOKEN di ai-docker/.env)
@@ -386,15 +469,16 @@ Aku melihat Pemain_B menghindari pertanyaan. Apa alibimu?</textarea>
             <div id="checker-legend"></div>
           </details>
           <p class="hint">
-            Jejak otak bot berisi parameter dan penalaran metode (bukan LLM). Jejak LLM berisi
-            prompt yang dikirim aplikasi. Jejak selesai tersimpan; aktivitas fungsi adalah buffer
-            live.
+            Room tampil seperti chat di game: gelembung = chat pemain atau bot, baris kecil =
+            langkah bot tanpa chat (vote, aksi rahasia, diam). Klik satu item untuk melihat
+            prosesnya: bacaan NLU, lama tiap tahap, penalaran metode, dan kalimat NLG. Jejak selesai
+            tersimpan; aktivitas fungsi adalah buffer live.
           </p>
-          <div class="split">
+          <div class="split chat-split">
             <div>
-              <h3>Linimasa jejak</h3>
-              <div id="traces" class="trace-list"></div>
+              <h3>Chat room</h3>
               <button id="older-traces" class="secondary" hidden>Jejak lebih lama</button>
+              <div id="traces" class="chat-room"></div>
             </div>
             <div>
               <h3>Detail</h3>
@@ -446,6 +530,7 @@ Aku melihat Pemain_B menghindari pertanyaan. Apa alibimu?</textarea>
                   <th>Room / ronde</th>
                   <th>Pengirim</th>
                   <th>Isi chat</th>
+                  <th>NLU saat itu (intent · target)</th>
                 </tr>
               </thead>
               <tbody id="history-rows"></tbody>

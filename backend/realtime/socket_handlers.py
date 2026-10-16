@@ -11,6 +11,7 @@ from services.room_service import room_service
 from services.checker_service import checker_service
 from services.activity_service import activity
 from services.ai_diagnostics import measure
+from services.npc_service import catat_nlu
 
 from services.auth_service import (
     AuthenticationPersistenceError,
@@ -262,6 +263,12 @@ class SocketGameController:
         with measure(trace, "broadcast_ms"):
             await self.emit_room("receive_chat", accepted, to=code)
         trace["stage"] = "delivered"
+        # TAHAP 5: catat bacaan IndoBERT (intent, target) untuk checker dan riwayat chat panel.
+        if match:
+            with measure(trace, "nlu_ms"):
+                trace["nlu"] = await catat_nlu(
+                    match, sender, message, trace["message_id"], room_code=code
+                )
 
     # KOMPATIBILITAS: aksi memakai endpoint terautentikasi dengan token fase, bukan event lama.
     async def use_gag_order(self, sid: str, data: dict[str, Any]) -> None:

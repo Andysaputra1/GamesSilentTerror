@@ -6,6 +6,26 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 
+# Jejak kosong tanpa didaftarkan ke room (simulasi panel memakai bentuk yang sama).
+def jejak_baru(code, sender, message):
+    return {
+        "id": uuid4().hex,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "room_code": code,
+        "sender": sender,
+        "message": message,
+        "stage": "received",
+        "intent": None,
+        "provider": None,
+        "model": None,
+        "prompt": None,
+        "output": None,
+        "llm_error": None,
+        "error": None,
+        "message_id": None,
+    }
+
+
 class CheckerService:
     # CONSTRUCTOR: siapkan tempat jejak debugging sementara, terpisah menurut kode ruangan.
     def __init__(self):
@@ -13,22 +33,7 @@ class CheckerService:
 
     # METHOD TRACE: buat jejak pesan baru dan batasi riwayat menjadi 100 pesan terbaru per ruangan.
     def begin(self, code, sender, message):
-        trace = {
-            "id": uuid4().hex,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "room_code": code,
-            "sender": sender,
-            "message": message,
-            "stage": "received",
-            "intent": None,
-            "provider": None,
-            "model": None,
-            "prompt": None,
-            "output": None,
-            "llm_error": None,
-            "error": None,
-            "message_id": None,
-        }
+        trace = jejak_baru(code, sender, message)
         self.rooms.setdefault(code, deque(maxlen=100)).appendleft(trace)
         return trace
 

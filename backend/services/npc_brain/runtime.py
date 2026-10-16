@@ -133,6 +133,38 @@ class NLUCadangan:
         ]
 
 
+# Target NLU → teks pendek untuk panel, mis. "NOX: offend (0.91)".
+def teks_target(target):
+    return [
+        f"{t['pemain']}: {t['relasi']}"
+        + (f" ({t['prob']:.2f})" if t.get("prob") is not None else "")
+        for t in target or []
+    ]
+
+
+def _tanpa_lapor(tahap):
+    pass
+
+
+class _JamPenulis:
+    """Penulis yang mencatat total lama panggilan LLM satu kalimat (satu objek per kalimat)."""
+
+    def __init__(self, penulis, lapor=_tanpa_lapor):
+        self.penulis, self.detik, self.lapor = penulis, 0.0, lapor
+
+    def __getattr__(self, nama):
+        return getattr(self.penulis, nama)
+
+    def tulis(self, sistem, pesan):
+        mulai = time.perf_counter()
+        self.lapor("llm")
+        try:
+            return self.penulis.tulis(sistem, pesan)
+        finally:
+            self.detik += time.perf_counter() - mulai
+            self.lapor("validasi")  # aturan + IndoBERT, lalu ulang LLM atau templat bila ditolak
+
+
 @dataclass
 class OtakBot:
     nama: str
@@ -500,20 +532,25 @@ class BrainRuntime:
             if match.id in self.pertandingan:
                 return []
             bots = sorted(p.name for p in match.players.values() if p.bot)
-            metode = self._bagi_metode(match.id, bots)
-            cepat = match.durations == phase_durations(len(match.players), True)
-            otak = {}
-            for nama in bots:
-                m = metode[nama] if metode[nama] == "llm" or metode[nama] in self.modul else "llm"
-                persona = self.nlg.persona_bot(nama, bots) if self.nlg else "santai"
-                ingatan = self.modul[m].Ingatan(nama, cepat=cepat) if m in self.modul else None
-                otak[nama] = OtakBot(nama, m, persona, match.players[nama].role, ingatan)
+            otak = self.buat_otak(match, self._bagi_metode(match.id, bots))
             self.pertandingan[match.id] = otak
             return [
                 {"match_id": match.id, "room_code": room_code, "bot_name": b.nama,
                  "method": b.metode, "persona": b.persona, "role": b.peran}
                 for b in otak.values()
             ]  # fmt: skip
+
+    # Otak tiap bot dengan metode {nama: metode}; dipakai juga simulasi panel (tidak didaftarkan di sini).
+    def buat_otak(self, match, metode):
+        bots = sorted(metode)
+        cepat = match.durations == phase_durations(len(match.players), True)
+        otak = {}
+        for nama in bots:
+            m = metode[nama] if metode[nama] == "llm" or metode[nama] in self.modul else "llm"
+            persona = self.nlg.persona_bot(nama, bots) if self.nlg else "santai"
+            ingatan = self.modul[m].Ingatan(nama, cepat=cepat) if m in self.modul else None
+            otak[nama] = OtakBot(nama, m, persona, match.players[nama].role, ingatan)
+        return otak
 
     def otak_bot(self, match_id, nama) -> OtakBot | None:
         with self.lock:
@@ -528,12 +565,31 @@ class BrainRuntime:
     # KEPUTUSAN (thread otak): sinkron snapshot → anotasi NLU → putuskan() metode bot.
     # Penjelasan panel checker dihitung di thread ini juga (ingatan bot hanya diubah thread ini), hanya
     # untuk langkah yang bisa menjadi jejak: ada vote/aksi atau rencana chat. Langkah diam tidak dicatat.
-    def langkah(self, bot: OtakBot, snapshot, sekarang):
+    # `waktu` mencatat lama tiap tahap (ms) dan `nlu_baru` chat yang baru dibaca IndoBERT di langkah ini.
+    # selalu_jelaskan: simulasi panel ingin penjelasan juga untuk langkah diam; lapor(tahap) memberi tahu
+    # simulasi tahap yang sedang berjalan (flowchart live).
+    def langkah(self, bot: OtakBot, snapshot, sekarang, selalu_jelaskan=False, lapor=_tanpa_lapor):
         modul = self.modul[bot.metode]
+        mulai, lama = time.perf_counter(), len(bot.ingatan.chat)
+        lapor("nlu")
         view = bot.ingatan.sinkron_snapshot(snapshot, sekarang, self.nlu)
+        t_nlu = time.perf_counter()
+        lapor("logika")
         hasil = modul.putuskan(bot.ingatan, view)
-        if hasil["nlg"] is not None or hasil["npc_decision"]["action"] != "wait":
+        t_logika = time.perf_counter()
+        lapor("penjelasan")
+        hasil["nlu_baru"] = [
+            {"pengirim": c["pengirim"], "teks": c["teks"], "intent": c.get("intent"),
+             "confidence": c.get("conf_intent"), "target": teks_target(c.get("target"))}
+            for c in bot.ingatan.chat[lama:]
+        ]  # fmt: skip
+        if selalu_jelaskan or hasil["nlg"] is not None or hasil["npc_decision"]["action"] != "wait":
             hasil["penjelasan"] = jelaskan(bot, modul, view, hasil)
+        hasil["waktu"] = {
+            "nlu_ms": round((t_nlu - mulai) * 1000, 1),
+            "logika_ms": round((t_logika - t_nlu) * 1000, 1),
+            "penjelasan_ms": round((time.perf_counter() - t_logika) * 1000, 1),
+        }
         chat = sorted(bot.ingatan.chat, key=lambda c: c["waktu"])[-8:]
         konteks = {
             "roster": [p["nama"] for p in view["pemain"]],
@@ -547,14 +603,34 @@ class BrainRuntime:
 
     # NLG (thread penulis): rencana → kalimat, dengan pengaman aturan dan validasi IndoBERT.
     # pakai_llm=False: hanya templat, dipakai sebagai cadangan cepat saat penulis LLM melewati batas waktu.
-    def tulis(self, bot: OtakBot, payload, konteks, pakai_llm=True):
+    def tulis(self, bot: OtakBot, payload, konteks, pakai_llm=True, lapor=_tanpa_lapor):
         with self.lock:
             pakai = pakai_llm and self.konfigurasi.penulis != "templat"
             penulis = self.penulis if pakai else None
             nlu = self.nlu if self.konfigurasi.validasi else None
         # Hindari kalimat sendiri yang lalu dan chat terbaru di room (bot lain tidak dikembari).
         hindari = tuple(bot.riwayat[-12:]) + tuple(c["teks"] for c in konteks["chat_terbaru"])
-        return self.nlg.tulis_pesan(payload, konteks, nlu, penulis, bot.persona, hindari=hindari)
+        jam = _JamPenulis(penulis, lapor) if penulis is not None else None
+        lapor("nlg" if jam else "validasi")  # tanpa LLM: templat langsung dinilai aturan + IndoBERT
+        tulisan = self.nlg.tulis_pesan(payload, konteks, nlu, jam, bot.persona, hindari=hindari)
+        tulisan["llm_detik"] = round(jam.detik, 3) if jam else 0.0
+        return tulisan
+
+    # PENCATAT NLU: baca satu chat dengan IndoBERT seperti ingatan bot (konteks = `riwayat` milik pemanggil,
+    # urut kronologis). Hasil sama dengan bacaan bot dan masuk memo NLU, jadi bot tidak menghitung ulang.
+    def baca_chat(self, riwayat, pengirim, teks, roster):
+        mulai = time.perf_counter()
+        modul = next(iter(self.modul.values()))  # anotasi_chat sama di semua modul notebook
+        chat = modul.anotasi_chat(
+            self.nlu, {"pengirim": pengirim, "teks": teks}, riwayat, list(roster)
+        )
+        riwayat.append(chat)
+        del riwayat[:-50]
+        return {"intent": chat["intent"], "confidence": round(chat["conf_intent"], 3),
+                "target": [{"pemain": t["pemain"], "relasi": t["relasi"],
+                            "prob": None if t.get("prob") is None else round(t["prob"], 3)}
+                           for t in chat["target"]],
+                "sumber": self.nlu.sumber, "ms": round((time.perf_counter() - mulai) * 1000, 1)}  # fmt: skip
 
     # Dipanggil setelah pesan benar-benar terkirim.
     def catat_chat(self, bot: OtakBot, view, rencana, teks):

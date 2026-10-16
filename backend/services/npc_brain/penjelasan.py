@@ -564,6 +564,8 @@ def jelaskan(bot, modul, view, hasil):
         metode, peran = identitas["metode"], identitas["role"]
         penjelasan = {"versi": VERSI, "bot": identitas, "catatan": []}
         bagian = {
+            # Chat yang baru dibaca IndoBERT di langkah ini (intent dan target menurut bot).
+            "nlu_dibaca": lambda: _nilai(hasil.get("nlu_baru") or []),
             "keputusan": lambda: _keputusan(hasil),
             "konteks": lambda: _nilai(dict(hasil.get("konteks") or {})),
             "pengetahuan": lambda: _pengetahuan(hasil.get("pengetahuan"), bot),

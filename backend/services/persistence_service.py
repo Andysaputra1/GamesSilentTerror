@@ -101,6 +101,18 @@ class PersistenceService:
             )
         )
 
+    # Bacaan NLU (intent, target) satu pesan untuk riwayat chat panel (kolom migrasi V9).
+    def record_nlu(self, message_id, nlu):
+        import json
+        from sqlalchemy import text
+
+        self._run(
+            lambda db: db.execute(
+                text("UPDATE chat_messages SET nlu=:nlu WHERE id=:id"),
+                {"id": message_id, "nlu": json.dumps(nlu, ensure_ascii=False)},
+            )
+        )
+
     # Simpan pesan bot beserta konteks fase (dan ID pesan yang dijawab, bila ada).
     def record_bot_message(self, *, username, message, context, reply_to_id=None):
         # Simpan pesan bot lalu tautkan konteks fase dan pesan manusia yang dibalas.

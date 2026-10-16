@@ -166,7 +166,7 @@ class HistoryFilterTests(unittest.TestCase):
             db.execute(text("INSERT INTO game_sessions VALUES (1,'ABC123'),(2,'DEF456')"))
             db.execute(
                 text(
-                    "CREATE TABLE chat_messages (id INTEGER, game_session_id INTEGER, sender_name TEXT, sender_kind TEXT, message TEXT, created_at TEXT, match_id TEXT, round_number INTEGER, phase TEXT)"
+                    "CREATE TABLE chat_messages (id INTEGER, game_session_id INTEGER, sender_name TEXT, sender_kind TEXT, message TEXT, created_at TEXT, match_id TEXT, round_number INTEGER, phase TEXT, nlu TEXT)"
                 )
             )
             for i, room, kind, day in [
@@ -178,7 +178,7 @@ class HistoryFilterTests(unittest.TestCase):
             ]:
                 db.execute(
                     text(
-                        "INSERT INTO chat_messages VALUES (:id,:room,'sender',:kind,:message,:date,'match',1,'day')"
+                        "INSERT INTO chat_messages VALUES (:id,:room,'sender',:kind,:message,:date,'match',1,'day',:nlu)"
                     ),
                     {
                         "id": i,
@@ -186,6 +186,7 @@ class HistoryFilterTests(unittest.TestCase):
                         "kind": kind,
                         "message": f"message-{i}",
                         "date": f"2026-09-{day} 01:00:00",
+                        "nlu": '{"intent": "offend", "target": []}' if i == 1 else None,
                     },
                 )
         self.app = FastAPI()
@@ -224,5 +225,9 @@ class HistoryFilterTests(unittest.TestCase):
             rows = list(csv.reader(io.StringIO(exported.content.decode("utf-8-sig"))))
             self.assertEqual(rows[0], ["chat_id", "isi_chat"])
             self.assertEqual([int(row[0]) for row in rows[1:]], expected)
+        # Bacaan NLU saat game berjalan ikut tampil; pesan tanpa bacaan bernilai null.
+        pesan = self.client.get("/api/panel/history", params={"room_code": "ABC123"}).json()
+        self.assertEqual([m["nlu"] for m in pesan["messages"][:2]],
+                         [{"intent": "offend", "target": []}, None])  # fmt: skip
         self.assertEqual(self.client.get("/api/panel/history?sender_kind=bad").status_code, 422)
         self.assertEqual(self.client.get("/api/panel/history.csv?sender_kind=bad").status_code, 422)

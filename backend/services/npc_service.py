@@ -8,6 +8,7 @@ import asyncio
 import json
 import logging
 import time
+from functools import partial
 from time import perf_counter
 from typing import Literal
 
@@ -113,6 +114,118 @@ async def request_decision(prompt, config):
     return NPCDecision.model_validate_json(raw.strip())
 
 
+# Lama tiap tahap satu langkah bot (ms): NLU + sinkron ingatan, logika metode, penjelasan panel, lalu NLG
+# (total, panggilan LLM, dan sisanya = aturan + validasi IndoBERT + templat).
+def waktu_jejak(waktu, tulisan):
+    hasil = dict(waktu or {})
+    if tulisan:
+        nlg, llm = tulisan.get("detik") or 0.0, tulisan.get("llm_detik") or 0.0
+        hasil.update(nlg_ms=round(nlg * 1000, 1), llm_ms=round(llm * 1000, 1),
+                     validasi_ms=round(max(0.0, nlg - llm) * 1000, 1))  # fmt: skip
+    return hasil
+
+
+# Isi jejak checker satu langkah otak; dipakai room asli (NPCService._trace) dan simulasi panel.
+def isi_jejak(trace, match, otak, npc, rencana, tulisan, penolakan, durasi_ms, ditunda, penjelasan,
+              waktu, nlu_sumber):  # fmt: skip
+    penjelasan = lengkapi_penjelasan(penjelasan, npc, rencana, tulisan, penolakan, ditunda)
+    trace.update(match_id=match.id, stage=(
+        "npc_brain_rejected" if penolakan else "npc_brain"
+    ), provider=f"otak:{otak.metode}", model=f"persona:{otak.persona}", intent=rencana.get(
+        "intent"
+    ), output=json.dumps(
+        {
+            "action": npc["action"],
+            "target": npc["target"],
+            "chat": {
+                "aksi": rencana["aksi"],
+                "target": rencana["target"],
+                "klaim": rencana.get("klaim", False),
+                "alasan": rencana["alasan"][:2],
+                "ditunda": ditunda,  # lantai bicara dipakai bot lain: diputuskan ulang nanti
+            },
+            "nlg": (
+                None
+                if not tulisan
+                else {
+                    "sumber": tulisan["sumber"],
+                    "lolos_nlu": tulisan["lolos_nlu"],
+                    "pelanggaran": tulisan["pelanggaran"],
+                }
+            ),
+            "nlu": nlu_sumber,
+        },
+        ensure_ascii=False,
+        ),  # fmt: skip
+        error=penolakan,
+        duration_ms=durasi_ms,
+        timings=waktu,
+        penjelasan=penjelasan,
+        ringkas=ringkas_penjelasan(penjelasan),  # untuk daftar jejak tanpa memuat penjelasan
+    )
+    return trace
+
+
+# NLG dengan batas waktu. Jika penulis LLM terlalu lama, kalimat tetap dikirim dari templat (tetap
+# divalidasi IndoBERT) agar rencana bot tidak hilang. Thread LLM yang tertinggal selesai sendiri;
+# rantai penulis mencatat hasilnya (mis. mengistirahatkan jalur yang lambat) untuk kalimat berikutnya.
+# lapor(tahap): simulasi panel memantau tahap NLG (nlg, llm, validasi).
+async def tulis_kalimat(runtime, otak, payload, konteks, lapor=None):
+    loop = asyncio.get_running_loop()
+    tulis = runtime.tulis if lapor is None else partial(runtime.tulis, lapor=lapor)
+    try:
+        return await asyncio.wait_for(
+            loop.run_in_executor(runtime.eksekutor_nlg, tulis, otak, payload, konteks),
+            timeout=BATAS_TULIS_DETIK,
+        )
+    except TimeoutError:
+        logger.warning("Kalimat %s melewati %s detik; memakai templat.", otak.nama,
+                       BATAS_TULIS_DETIK)  # fmt: skip
+    # Thread bawaan, bukan eksekutor NLG: jangan antre di belakang panggilan LLM yang tertahan.
+    tulisan = await asyncio.wait_for(
+        asyncio.to_thread(tulis, otak, payload, konteks, False),
+        timeout=BATAS_TEMPLAT_DETIK,
+    )
+    batas = {"sumber": "llm", "status": f"melewati batas {BATAS_TULIS_DETIK} detik"}
+    return {**tulisan, "percobaan": [batas, *tulisan["percobaan"]]}
+
+
+# Riwayat pencatat NLU per pertandingan (konteks target, urut kronologis); dibuang saat pertandingan usai.
+riwayat_nlu: dict[str, list] = {}
+
+
+# Roster berlabel dengan urutan yang sama seperti snapshot bot (kunci memo NLU ikut sama).
+def roster_label(match):
+    return [match.labels.get(nama, nama) for nama in match.players]
+
+
+# PENCATAT NLU: baca satu chat pertandingan dengan IndoBERT di thread keputusan (urut dengan langkah bot),
+# simpan bacaannya ke riwayat chat, dan kembalikan hasilnya (None bila otak belum siap atau gagal).
+async def catat_nlu(match, pengirim, teks, message_id=None, runtime=brain_runtime, room_code=None):
+    if runtime.nlu is None or not runtime.modul:
+        return None
+    riwayat = riwayat_nlu.setdefault(match.id, [])
+    label = match.labels.get(pengirim, pengirim)
+    try:
+        nlu = await asyncio.get_running_loop().run_in_executor(
+            runtime.eksekutor_keputusan,
+            runtime.baca_chat,
+            riwayat,
+            label,
+            teks,
+            roster_label(match),
+        )
+    except Exception:
+        logger.exception("NLU chat gagal dicatat.")
+        return None
+    if message_id is not None:
+        try:
+            await asyncio.to_thread(PersistenceService(room_code).record_nlu, message_id, nlu)
+        except PersistenceError:
+            logger.warning("Bacaan NLU tidak tersimpan (migrasi V9?).")
+    return nlu
+
+
 class NPCService:
     # Batasi request LLM bersamaan dan lacak fase agar satu NPC tidak melakukan aksi ganda.
     def __init__(self, sio, *, broadcast=None, runtime=None, analysis=None):
@@ -144,6 +257,8 @@ class NPCService:
             self.issued = {key for key in self.issued if key[0] in active}
             self.preparing &= active
             self.lantai = {m: bot for m, bot in self.lantai.items() if m in active}
+            for match_id in [m for m in riwayat_nlu if m not in active]:
+                del riwayat_nlu[match_id]
             self.runtime.lupakan_kecuali(active)
             for room in list(room_service.rooms.values()):
                 match = room.match
@@ -263,21 +378,27 @@ class NPCService:
             ditunda = hasil["nlg"] is not None and not self._ambil_lantai(match, otak, terlihat)
             if hasil["nlg"] is not None and not ditunda:
                 bicara = True
-                tulisan = await self._tulis_kalimat(loop, otak, hasil["nlg"], konteks)
+                tulisan = await tulis_kalimat(self.runtime, otak, hasil["nlg"], konteks)
                 # Jeda mengetik: balasan instan terasa seperti mesin.
                 typing = min(4.0, max(1.0, len(tulisan["teks"]) / 30))
                 if match.deadline - time.time() > typing + 1:
                     await asyncio.sleep(typing)
-                reply = self._kirim_chat(code, match, key, otak, view, rencana, tulisan)
+                reply, message_id = self._kirim_chat(
+                    code, match, key, otak, view, rencana, tulisan
+                ) or (None, None)
             trace = None
             if reply or npc["action"] != "wait" or penolakan:
                 trace = self._trace(code, match, otak, npc, rencana, tulisan if reply else None,
                                     penolakan, started, ditunda=ditunda,
-                                    penjelasan=hasil.get("penjelasan"))  # fmt: skip
+                                    penjelasan=hasil.get("penjelasan"), waktu=hasil.get("waktu"))  # fmt: skip
             if reply:
                 await self.broadcast("receive_chat", reply, to=code)
             if trace is not None:
                 await self._simpan_trace(code, trace)
+            if reply:  # di latar: lantai bicara tidak ditahan selama NLU membaca kalimat ini
+                self._spawn(
+                    catat_nlu(match, otak.nama, reply["message"], message_id, self.runtime, code)
+                )
         except asyncio.CancelledError:
             raise
         except Exception as error:
@@ -289,28 +410,6 @@ class NPCService:
                 del self.lantai[match.id]
             otak.sibuk = False
             otak.langkah_terakhir = time.time()
-
-    # NLG dengan batas waktu. Jika penulis LLM terlalu lama, kalimat tetap dikirim dari templat (tetap
-    # divalidasi IndoBERT) agar rencana bot tidak hilang. Thread LLM yang tertinggal selesai sendiri;
-    # rantai penulis mencatat hasilnya (mis. mengistirahatkan jalur yang lambat) untuk kalimat berikutnya.
-    async def _tulis_kalimat(self, loop, otak, payload, konteks):
-        try:
-            return await asyncio.wait_for(
-                loop.run_in_executor(
-                    self.runtime.eksekutor_nlg, self.runtime.tulis, otak, payload, konteks
-                ),
-                timeout=BATAS_TULIS_DETIK,
-            )
-        except TimeoutError:
-            logger.warning("Kalimat %s melewati %s detik; memakai templat.", otak.nama,
-                           BATAS_TULIS_DETIK)  # fmt: skip
-        # Thread bawaan, bukan eksekutor NLG: jangan antre di belakang panggilan LLM yang tertahan.
-        tulisan = await asyncio.wait_for(
-            asyncio.to_thread(self.runtime.tulis, otak, payload, konteks, False),
-            timeout=BATAS_TEMPLAT_DETIK,
-        )
-        batas = {"sumber": "llm", "status": f"melewati batas {BATAS_TULIS_DETIK} detik"}
-        return {**tulisan, "percobaan": [batas, *tulisan["percobaan"]]}
 
     # Keputusan masih berlaku jika room, pertandingan, dan fasenya sama serta deadline belum lewat.
     def _berlaku(self, code, match, key):
@@ -359,6 +458,7 @@ class NPCService:
         return True
 
     # Chat dikirim hanya jika fase masih sama dan bot masih boleh bicara; ingatan dicatat setelah terkirim.
+    # Hasil: (pesan engine, ID pesan di database) atau None.
     def _kirim_chat(self, code, match, key, otak, view, rencana, tulisan):
         with room_service.lock:
             if (
@@ -368,7 +468,7 @@ class NPCService:
             ):
                 return None
             try:
-                PersistenceService(code).record_bot_message(
+                message_id = PersistenceService(code).record_bot_message(
                     username=otak.nama,
                     message=tulisan["teks"],
                     context={"match_id": match.id, "round_number": match.round,
@@ -380,50 +480,18 @@ class NPCService:
                 return None
             reply = match.add_message(otak.nama, tulisan["teks"])
             self.runtime.catat_chat(otak, view, rencana, tulisan["teks"])
-            return reply
+            return reply, message_id
 
     # Jejak untuk panel checker: metode, persona, keputusan, dan asal kalimat (tanpa role pemain lain).
     # `penjelasan` (identitas, parameter, penalaran metode, keputusan, NLG) hanya dibaca panel admin.
     def _trace(self, code, match, otak, npc, rencana, tulisan, penolakan, started, ditunda=False,
-               penjelasan=None):  # fmt: skip
-        penjelasan = lengkapi_penjelasan(penjelasan, npc, rencana, tulisan, penolakan, ditunda)
+               penjelasan=None, waktu=None):  # fmt: skip
         trace = checker_service.begin(
             code, otak.nama, tulisan["teks"] if tulisan else npc["action"]
         )
-        trace.update(match_id=match.id, stage=(
-            "npc_brain_rejected" if penolakan else "npc_brain"
-        ), provider=f"otak:{otak.metode}", model=f"persona:{otak.persona}", intent=rencana.get(
-            "intent"
-        ), output=json.dumps(
-            {
-                "action": npc["action"],
-                "target": npc["target"],
-                "chat": {
-                    "aksi": rencana["aksi"],
-                    "target": rencana["target"],
-                    "klaim": rencana.get("klaim", False),
-                    "alasan": rencana["alasan"][:2],
-                    "ditunda": ditunda,  # lantai bicara dipakai bot lain: diputuskan ulang nanti
-                },
-                "nlg": (
-                    None
-                    if not tulisan
-                    else {
-                        "sumber": tulisan["sumber"],
-                        "lolos_nlu": tulisan["lolos_nlu"],
-                        "pelanggaran": tulisan["pelanggaran"],
-                    }
-                ),
-                "nlu": getattr(self.runtime.nlu, "sumber", None),
-            },
-            ensure_ascii=False,
-            ),  # fmt: skip
-            error=penolakan,
-            duration_ms=round((perf_counter() - started) * 1000, 2),
-            penjelasan=penjelasan,
-            ringkas=ringkas_penjelasan(penjelasan),  # untuk daftar jejak tanpa memuat penjelasan
-        )
-        return trace
+        return isi_jejak(trace, match, otak, npc, rencana, tulisan, penolakan,
+                         round((perf_counter() - started) * 1000, 2), ditunda, penjelasan,
+                         waktu_jejak(waktu, tulisan), getattr(self.runtime.nlu, "sumber", None))  # fmt: skip
 
     # Simpan jejak otak ke database di thread latar: tulisan DB (hingga ±12 KB penjelasan per jejak)
     # tidak menahan event loop game. Jejak di memori (checker) sudah tersedia sejak _trace.

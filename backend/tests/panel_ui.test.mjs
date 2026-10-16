@@ -444,9 +444,9 @@ test('checker room shows bots, filters per bot, and explains decisions as text',
   const tabs = [...detail.querySelectorAll('.decision-tab')];
   assert.deepEqual(
     tabs.map((b) => b.textContent),
-    ['Keputusan', 'Parameter', 'Penalaran Fuzzy Mamdani', 'NLG', 'Teknis'],
+    ['Proses', 'Keputusan', 'Parameter', 'Penalaran Fuzzy Mamdani', 'NLG', 'Teknis'],
   );
-  tabs[2].click();
+  tabs[3].click();
   assert.match(detail.textContent, /kecurigaan_publik=tinggi DAN dukungan_suara=tinggi/);
   assert.match(detail.textContent, /Keluaran defuzzifikasi \(centroid, 0–100\): 85/);
   assert.equal(detail.querySelectorAll('meter').length, 6);
@@ -468,4 +468,140 @@ test('checker room shows bots, filters per bot, and explains decisions as text',
   await settle();
   assert.equal(detailCalls, 1);
   assert.equal(w.document.querySelectorAll('#traces .trace').length, 3);
+});
+
+test('simulation shows chat with NLU, live bot positions on the flowchart, and node explanations', async (t) => {
+  const evil = '<img src=x onerror=alert(1)>';
+  const bot = (nama, metode, role) => ({
+    nama,
+    metode,
+    role,
+    persona: 'kalem',
+    ronde: 1,
+    fase: 'day',
+  });
+  const pemain = [
+    { nama: 'Andy', manusia: true, role: 'civilian', status: 'aktif' },
+    { ...bot('NOX', 'fuzzy', 'hitman'), manusia: false, status: 'aktif' },
+    { ...bot('ECHO', 'utility', 'spy'), manusia: false, status: 'aktif' },
+    { ...bot('VEIL', 'bt', 'stalker'), manusia: false, status: 'aktif' },
+  ];
+  const ringkasan = { id: 'sim1', ronde: 1, fase: 'day', pemenang: null, detik: 2, durasi: 80 };
+  const human = {
+    id: 'h'.repeat(32),
+    sender: 'Andy',
+    message: `aku curiga NOX ${evil}`,
+    stage: 'delivered',
+    manusia: true,
+    nlu: {
+      intent: 'offend',
+      confidence: 0.91,
+      target: [{ pemain: 'NOX', relasi: 'offend', prob: 0.88 }],
+      sumber: 'indobert',
+      ms: 812,
+    },
+    timings: { nlu_ms: 812 },
+  };
+  const nox = {
+    id: 'n'.repeat(32),
+    sender: 'NOX',
+    message: 'Aku bukan Hitman.',
+    stage: 'npc_brain',
+    provider: 'otak:fuzzy',
+    duration_ms: 2500,
+    timings: { nlu_ms: 3, logika_ms: 14, penjelasan_ms: 5, nlg_ms: 2400, llm_ms: 1900 },
+    output: JSON.stringify({ nlg: { sumber: 'llm' } }),
+    ringkas: { bot: bot('NOX', 'fuzzy', 'hitman'), keputusan: ['chat bela_diri'], nlg: 'terkirim' },
+    penjelasan: {
+      bot: bot('NOX', 'fuzzy', 'hitman'),
+      nlu_dibaca: [{ pengirim: 'Andy', teks: 'aku curiga NOX', intent: 'offend', target: [] }],
+      keputusan: { chat: { kirim: true, aksi: 'bela_diri', alasan: ['dituduh'] } },
+      engine: { action: 'wait', target: null },
+      nlg: { status: 'terkirim', teks: 'Aku bukan Hitman.', sumber: 'llm', penulis: 'tautan' },
+    },
+  };
+  const echo = {
+    id: 'e'.repeat(32),
+    sender: 'ECHO',
+    message: 'wait',
+    stage: 'npc_brain',
+    provider: 'otak:utility',
+    duration_ms: 20,
+    ringkas: { bot: bot('ECHO', 'utility', 'spy'), keputusan: [] },
+    penjelasan: { bot: bot('ECHO', 'utility', 'spy'), nlg: { status: 'tidak ada chat' } },
+  };
+  let release;
+  const reply = new Promise((resolve) => (release = resolve));
+  const w = setup(t, async (path) => {
+    if (path === '/api/panel/simulasi')
+      return response({
+        ...ringkasan,
+        bisa_chat: true,
+        pemain,
+        jejak: [
+          { id: 's'.repeat(32), sender: 'SISTEM', message: 'Permainan dimulai.', stage: 'sistem' },
+        ],
+      });
+    if (path === '/api/panel/simulasi/sim1/progres')
+      return response({
+        berjalan: true,
+        progres: { NOX: { tahap: 'llm', detik: 1.2 }, ECHO: { tahap: 'menunggu', detik: 1.2 } },
+      });
+    if (path === '/api/panel/simulasi/sim1') {
+      await reply;
+      return response({
+        ...ringkasan,
+        detik: 5,
+        bisa_chat: true,
+        pemain,
+        jejak: [human, nox, echo],
+      });
+    }
+    return undefined;
+  });
+  await login(w);
+  const doc = w.document;
+  await doc.querySelector('[data-menu=simulasi]').onclick({ preventDefault() {} });
+  assert.equal(doc.querySelectorAll('#sim-bots select').length, 4); // 5 pemain = kamu + 4 bot
+  doc.querySelector('#sim-count').value = '4';
+  doc.querySelector('#sim-count').onchange();
+  assert.equal(doc.querySelectorAll('#sim-bots select').length, 3);
+  await doc.querySelector('#sim-setup').onsubmit({ preventDefault() {} });
+  assert.match(doc.querySelector('#sim-chat').textContent, /Permainan dimulai/);
+  assert.match(doc.querySelector('#sim-status').textContent, /Utility AI/);
+  doc.querySelector('#sim-message').value = human.message;
+  const pending = doc.querySelector('#sim-form').onsubmit({ preventDefault() {} });
+  await new Promise((resolve) => setTimeout(resolve, 550)); // satu polling progres
+  const llm = [...doc.querySelectorAll('.flow-node')].find((b) =>
+    /LLM menulis/.test(b.textContent),
+  );
+  assert.match(llm.textContent, /NOX 1.2s/);
+  assert.match(doc.querySelector('#sim-flow').textContent, /Menunggu giliran: ECHO/);
+  assert.match(doc.querySelector('#sim-flow').textContent, /Posisi: NOX di "LLM menulis kalimat"/);
+  assert.match(doc.querySelector('#sim-chat .chat-human').textContent, /aku curiga NOX/); // tampil saat dikirim
+  release();
+  await pending;
+  const chat = doc.querySelector('#sim-chat');
+  assert.equal(chat.querySelector('img'), null);
+  assert.match(
+    chat.querySelector('.chat-human').textContent,
+    /NLU: offend 0.91 · target NOX \(offend 0.88\)/,
+  );
+  assert.match(chat.querySelector('.chat-bot').textContent, /Aku bukan Hitman/);
+  assert.match(chat.querySelector('.chat-step').textContent, /diam/);
+  const detail = doc.querySelector('#sim-detail');
+  assert.match(detail.textContent, /Reaksi bot sesudah pesan ini/);
+  assert.match(detail.textContent, /NOX \(FL\): chat bela_diri/);
+  // Klik reaksi NOX: tab Proses dan waktu tiap kotak flowchart mengikuti langkah NOX.
+  [...detail.querySelectorAll('.room-bot')].find((b) => b.textContent.startsWith('NOX')).click();
+  assert.match(detail.textContent, /4\. NLG: rencana chat menjadi kalimat/);
+  const kotak = (judul) =>
+    [...doc.querySelectorAll('.flow-node')].find((b) => b.textContent.includes(judul));
+  assert.match(kotak('LLM menulis').textContent, /1\.90 dtk/);
+  assert.ok(kotak('UA · Utility AI').classList.contains('flow-redup'));
+  kotak('LLM menulis').click();
+  const info = doc.querySelector('#flow-detail').textContent;
+  assert.match(info, /Output yang diharapkan/);
+  assert.match(info, /PenulisBerantai\.tulis/);
+  assert.match(info, /Aku bukan Hitman\./);
 });

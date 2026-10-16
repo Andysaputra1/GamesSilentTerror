@@ -325,9 +325,9 @@ def rooms(after_id: int = Query(0, ge=0), token=Depends(require_panel)):
             dict(row)
             for row in db.execute(
                 text("""
-        SELECT s.id,s.room_code,COUNT(m.id) AS message_count,MAX(m.created_at) AS last_message_at
+        SELECT s.id,s.room_code,s.created_at,COUNT(m.id) AS message_count,MAX(m.created_at) AS last_message_at
         FROM game_sessions s LEFT JOIN chat_messages m ON m.game_session_id=s.id
-        WHERE s.id > :after GROUP BY s.id,s.room_code ORDER BY s.id LIMIT 201
+        WHERE s.id > :after GROUP BY s.id,s.room_code,s.created_at ORDER BY s.id LIMIT 201
     """),
                 {"after": after_id},
             ).mappings()
@@ -447,13 +447,16 @@ def history(
             dict(row)
             for row in db.execute(
                 text("""
-        SELECT m.id,m.sender_name,m.sender_kind,m.message,m.created_at,m.match_id,m.round_number,m.phase,s.room_code
+        SELECT m.id,m.sender_name,m.sender_kind,m.message,m.nlu,m.created_at,m.match_id,m.round_number,m.phase,s.room_code
         FROM chat_messages m LEFT JOIN game_sessions s ON s.id=m.game_session_id
         WHERE """ + where + " AND m.id>:after ORDER BY m.id LIMIT 201"),
                 params,
             ).mappings()
         ]
     )
+    for row in rows:  # bacaan IndoBERT saat game berjalan (JSON; kosong untuk pesan lama)
+        if isinstance(row["nlu"], str):
+            row["nlu"] = json.loads(row["nlu"])
     return {
         "messages": rows[:200],
         "has_more": len(rows) > 200,

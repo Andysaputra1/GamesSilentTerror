@@ -34,8 +34,10 @@ async function request(path, body, method = 'GET') {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: body ? JSON.stringify(body) : undefined,
-    // Uji AI dan cek rantai penulis menunggu provider; request lain cukup 15 detik.
-    signal: AbortSignal.timeout(/\/(test-ai|cek-penulis)$/.test(path) ? 60000 : 15000),
+    // Uji AI dan cek rantai penulis menunggu provider; simulasi menunggu otak + LLM beberapa bot.
+    signal: AbortSignal.timeout(
+      /\/simulasi/.test(path) ? 180000 : /\/(test-ai|cek-penulis)$/.test(path) ? 60000 : 15000,
+    ),
   });
   if (epoch !== generation) throw new Error('Sesi telah berubah. Respons lama diabaikan.');
   if (response.status === 204) return {};
@@ -67,6 +69,14 @@ function clearSession() {
   $('trace-detail').textContent = '';
   $('events').textContent = '';
   resetChecker();
+  sim = null;
+  simTraces = [];
+  simSelected = '';
+  simProgres = null;
+  flowNode = '';
+  $('sim-chat').replaceChildren();
+  $('sim-detail').textContent = '';
+  $('sim-status').hidden = true;
   $('probe-result').replaceChildren();
   $('ai-status').textContent = 'Belum diperiksa.';
   $('probe-progress').textContent = '';
@@ -255,7 +265,7 @@ async function loadRooms() {
     for (const room of rooms)
       select.add(
         new Option(
-          `${room.room_code} | ${room.message_count} pesan${room.live ? ' | aktif' : ''}`,
+          `${room.room_code} | ${tanggal(room.created_at)} | ${room.message_count} pesan${room.live ? ' | aktif' : ''}`,
           room.room_code,
         ),
       );
@@ -267,7 +277,7 @@ async function loadRooms() {
 // Semua isi dari server ditulis lewat textContent/Option, tidak pernah sebagai HTML.
 let checkerRoom = null,
   traceFilter = '', // '' semua jejak | 'bot' semua keputusan bot | 'bot:NAMA'
-  detailTab = 'keputusan',
+  detailTab = 'proses',
   renderedDetail = ''; // jejak yang sedang tampil: tidak dirender ulang tiap auto-refresh
 const traceDetails = new Map(); // id → jejak lengkap (dengan penjelasan), dimuat saat dibuka
 const METODE_LABEL = {
@@ -276,6 +286,8 @@ const METODE_LABEL = {
   bt: 'Behavior Tree',
   llm: 'LLM (mode lama)',
 };
+// Singkatan metode, sama dengan label nama bot di game.
+const METODE_SINGKAT = { fuzzy: 'FL', utility: 'UA', bt: 'BT', llm: 'LLM' };
 const METODE_CARA = {
   fuzzy:
     'Setiap nilai 0–1 difuzzifikasi menjadi rendah/sedang/tinggi. Aturan JIKA–MAKA menyala dengan kekuatan min(derajat input), keluaran digabung (max) lalu didefuzzifikasi centroid menjadi 0–100 dan dibandingkan ambang.',
@@ -411,6 +423,18 @@ function waktu(iso) {
     ? ''
     : date.toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' });
 }
+// Waktu server (UTC tanpa zona) menjadi tanggal dan jam WIB.
+function tanggal(iso) {
+  if (!iso) return 'tanpa tanggal';
+  const date = new Date(/Z|[+-]\d\d:\d\d$/.test(iso) ? iso : iso + 'Z');
+  return Number.isNaN(date.getTime())
+    ? 'tanpa tanggal'
+    : date.toLocaleString('id-ID', {
+        timeZone: 'Asia/Jakarta',
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      });
+}
 function lastDecision(nama) {
   const trace = traces.find((t) => traceBot(t) === nama);
   if (!trace) return '—';
@@ -487,45 +511,68 @@ function renderFilter() {
   if (![...select.options].some((option) => option.value === traceFilter)) traceFilter = '';
   select.value = traceFilter;
 }
-function traceItem(trace, selected) {
-  const b = node('button', undefined, 'trace' + (selected ? ' selected' : ''));
-  const r = trace.ringkas;
+// CHAT ROOM: jejak ditampilkan seperti chat di game (lama di atas). Chat manusia dan bot menjadi gelembung;
+// langkah bot tanpa chat (vote, aksi, diam) menjadi baris kecil; pengumuman engine menjadi baris sistem.
+// Klik satu item untuk melihat prosesnya. Chat manusia membawa bacaan NLU IndoBERT-nya.
+const isSistem = (t) => t.stage === 'sistem';
+const isHuman = (t) => Boolean(t.manusia || (!t.provider && !t.ringkas && !isSistem(t)));
+function nluTeks(nlu) {
+  if (!nlu) return '—';
+  const target = (nlu.target || []).map(
+    (t) => `${t.pemain} (${t.relasi}${t.prob == null ? '' : ` ${teks(t.prob)}`})`,
+  );
+  return `${nlu.intent} ${teks(nlu.confidence)}${target.length ? ` · target ${target.join(', ')}` : ''}`;
+}
+function chatItem(trace, selected, onSelect) {
+  if (isSistem(trace)) return node('p', trace.message, 'chat-system');
+  const r = trace.ringkas,
+    bot = r?.bot,
+    human = isHuman(trace),
+    bubble = human || r?.nlg === 'terkirim';
+  const kind = human ? 'chat-human' : bubble ? 'chat-bot' : 'chat-step';
+  const b = node('button', undefined, `trace chat-item ${kind}${selected ? ' selected' : ''}`);
+  b.type = 'button';
+  const head = node('span', undefined, 'trace-head');
+  head.append(node('strong', bot?.nama || trace.sender));
+  if (human) head.append(chip('manusia', 'status-muted'));
+  if (bot?.metode) head.append(chip(METODE_SINGKAT[bot.metode] || bot.metode, 'status-good'));
+  if (bot?.role) head.append(chip(ROLE_LABEL[bot.role] || bot.role, roleClass(bot.role)));
+  b.append(head);
+  if (bubble) b.append(node('span', trace.message, 'chat-text'));
+  const info = [];
+  if (human && trace.nlu) info.push(`NLU: ${nluTeks(trace.nlu)}`);
   if (r) {
-    const head = node('span', undefined, 'trace-head');
-    head.append(node('strong', r.bot?.nama || trace.sender));
-    if (r.bot?.metode) head.append(chip(METODE_LABEL[r.bot.metode] || r.bot.metode, 'status-good'));
-    if (r.bot?.role) head.append(chip(ROLE_LABEL[r.bot.role] || r.bot.role, roleClass(r.bot.role)));
-    const meta = [
-      `Ronde ${r.bot?.ronde ?? '?'} · ${FASE_LABEL[r.bot?.fase] || r.bot?.fase || '—'}`,
-      waktu(trace.created_at),
-      r.ditolak && 'ditolak engine',
-      r.nlg === 'ditunda' && 'chat ditunda',
-    ].filter(Boolean);
-    b.append(
-      head,
-      node('span', r.keputusan?.length ? r.keputusan.join(' · ') : trace.message, 'trace-title'),
-      node('small', meta.join(' · ')),
-    );
-  } else {
-    b.append(
-      node('span', `${trace.sender}: ${trace.message}`, 'trace-title'),
-      node(
-        'small',
-        `${trace.stage} · ${duration(trace.duration_ms)}\n${trace.model || 'belum memanggil AI'}`,
-      ),
-    );
-  }
-  b.onclick = () => {
-    selectedTrace = trace.id;
-    renderTraces();
-  };
+    // Chat sudah tampil sebagai gelembung; sisanya vote/aksi rahasia langkah yang sama.
+    const lain = (r.keputusan || []).filter((k) => !bubble || !k.startsWith('chat '));
+    if (lain.length) info.push(lain.join(' · '));
+    else if (!bubble) info.push('diam: tidak chat, vote, atau beraksi');
+  } else if (!human) info.push(`${trace.message} · ${trace.stage}`);
+  const meta = [
+    bot?.ronde && `R${bot.ronde} ${FASE_LABEL[bot.fase] || bot.fase || ''}`.trim(),
+    waktu(trace.created_at),
+    typeof trace.duration_ms === 'number' && `proses ${duration(trace.duration_ms)}`,
+    r?.ditolak && 'ditolak engine',
+    r?.nlg === 'ditunda' && 'chat ditunda',
+  ].filter(Boolean);
+  for (const line of info) b.append(node('small', line, 'chat-info'));
+  b.append(node('small', meta.join(' · '), 'chat-meta'));
+  b.onclick = () => onSelect(trace.id);
   return b;
 }
-// Render daftar jejak (sesuai filter) dan detail jejak terpilih.
+// Render ulang chat; tetap menempel di bawah bila sebelumnya sudah di bawah (seperti chat game).
+function renderChat(box, list, selectedId, onSelect) {
+  const bawah = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+  box.replaceChildren(...list.map((t) => chatItem(t, t.id === selectedId, onSelect)));
+  if (bawah) box.scrollTop = box.scrollHeight;
+}
+function selectTrace(id) {
+  selectedTrace = id;
+  renderTraces();
+}
+// Render chat room (sesuai filter) dan detail item terpilih; default item terbaru.
 function renderTraces() {
   renderFilter();
   const box = $('traces');
-  box.replaceChildren();
   const list = visibleTraces();
   if (!list.length) {
     box.textContent = traces.length
@@ -537,21 +584,34 @@ function renderTraces() {
   }
   const active = list.find((t) => t.id === selectedTrace) || list[0];
   selectedTrace = active.id;
-  for (const trace of list) box.append(traceItem(trace, trace.id === active.id));
+  renderChat(box, [...list].reverse(), active.id, selectTrace);
   showDetail(active).catch((error) => notice(error.message));
 }
-// Jejak otak bot dimuat lengkap sekali (cache); jejak lain memakai laporan pipeline lama.
+// Penjelasan langkah sebelumnya dari bot yang sama (untuk kolom perubahan), bila sudah dimuat.
+function sebelumnya(trace, urut, ambil) {
+  const nama = traceBot(trace),
+    i = urut.findIndex((t) => t.id === trace.id);
+  for (let j = i - 1; j >= 0; j--) if (traceBot(urut[j]) === nama) return ambil(urut[j]);
+  return null;
+}
+// Jejak otak bot dimuat lengkap sekali (cache); chat manusia memakai kartu NLU; jejak lain laporan lama.
 async function showDetail(trace) {
   const container = $('trace-detail');
-  const key = `${trace.id}|${trace.stage}|${trace.duration_ms}`;
+  const key = `${trace.id}|${trace.stage}|${trace.duration_ms}|${traces.length}`;
   if (renderedDetail === key) return;
   renderedDetail = key;
+  const urut = [...visibleTraces()].reverse();
+  const lama = () => sebelumnya(trace, urut, (t) => traceDetails.get(t.id)?.penjelasan);
+  if (isHuman(trace)) {
+    renderHuman(container, trace, urut, selectTrace);
+    return;
+  }
   if (!trace.ringkas) {
     renderReport(container, trace);
     return;
   }
   if (traceDetails.has(trace.id)) {
-    renderDecision(container, traceDetails.get(trace.id));
+    renderDecision(container, traceDetails.get(trace.id), lama());
     return;
   }
   container.classList.remove('empty-state');
@@ -565,7 +625,7 @@ async function showDetail(trace) {
     if (epoch !== generation || !token || code !== $('checker-room').value) return;
     if (traceDetails.size >= 200) traceDetails.delete(traceDetails.keys().next().value);
     traceDetails.set(trace.id, data);
-    if (selectedTrace === trace.id) renderDecision(container, data);
+    if (selectedTrace === trace.id) renderDecision(container, data, lama());
   } catch (error) {
     if (selectedTrace === trace.id) {
       renderedDetail = '';
@@ -573,8 +633,102 @@ async function showDetail(trace) {
     }
   }
 }
-// Kartu keputusan bertab: Keputusan · Parameter · Penalaran metode · NLG · Teknis.
-function renderDecision(container, trace) {
+// Langkah bernomor dengan lama prosesnya: [judul, ms atau null, ...isi (teks/elemen)].
+function processSteps(steps) {
+  const ol = node('ol', undefined, 'process-steps');
+  for (const [judul, ms, ...isi] of steps) {
+    const li = node('li');
+    const head = node('div', undefined, 'process-head');
+    head.append(node('strong', judul));
+    if (ms !== null) head.append(node('span', duration(ms), 'process-time'));
+    li.append(head);
+    for (const x of isi) if (x) li.append(typeof x === 'string' ? node('p', x, 'hint') : x);
+    ol.append(li);
+  }
+  return ol;
+}
+// Chat manusia: langkah server, bacaan NLU IndoBERT (intent, target), dan reaksi bot sesudahnya.
+function renderHuman(container, trace, urut, onSelect) {
+  container.replaceChildren();
+  container.classList.remove('empty-state');
+  const head = node('div', undefined, 'decision-head');
+  head.append(node('strong', trace.sender), chip('manusia', 'status-muted'));
+  head.append(node('span', waktu(trace.created_at), 'room-meta'));
+  const t = trace.timings || {},
+    n = trace.nlu;
+  const steps = [['Diterima server dan izin chat diperiksa', null]];
+  if (t.persistence_ms !== undefined) steps.push(['Disimpan ke database', t.persistence_ms]);
+  if (t.broadcast_ms !== undefined) steps.push(['Dikirim ke semua pemain di room', t.broadcast_ms]);
+  const sasaran = n?.target?.length
+    ? `target ${n.target.map((x) => x.pemain).join(', ')}`
+    : 'tanpa target';
+  steps.push([
+    'NLU IndoBERT membaca maksud (intent) dan sasaran (target)',
+    t.nlu_ms ?? n?.ms ?? null,
+    n
+      ? `Hasil: intent ${n.intent} (keyakinan ${teks(n.confidence)}) · ${sasaran}`
+      : 'Belum dibaca: otak NPC belum siap saat pesan masuk, atau pesan dari versi lama.',
+  ]);
+  container.append(
+    head,
+    node('pre', trace.message || '', 'output'),
+    node('h4', 'Langkah proses pesan', 'report-title'),
+    processSteps(steps),
+  );
+  if (n) {
+    container.append(
+      node('h4', 'Bacaan NLU', 'report-title'),
+      keyValues([
+        ['Intent', `${n.intent} (keyakinan ${teks(n.confidence)})`],
+        ['Model', n.sumber],
+      ]),
+      dataTable({
+        kolom: ['pemain', 'relasi', 'probabilitas'],
+        baris: (n.target || []).map((x) => [x.pemain, x.relasi, x.prob]),
+      }),
+      node(
+        'p',
+        'Intent: offend = menuduh/menyerang, defend = membela, neutral = netral. Target: pemain yang dituju beserta relasinya. Bot membaca chat ini dengan hasil yang sama (memo NLU) di langkah berikutnya.',
+        'hint',
+      ),
+    );
+  }
+  const i = urut.findIndex((x) => x.id === trace.id),
+    reaksi = [];
+  for (const x of urut.slice(i + 1)) {
+    if (isHuman(x)) break;
+    if (x.ringkas) reaksi.push(x);
+  }
+  if (reaksi.length) {
+    const ul = node('ul', undefined, 'decision-list');
+    for (const x of reaksi) {
+      const bot = x.ringkas.bot || {},
+        keputusan = x.ringkas.keputusan?.length ? x.ringkas.keputusan.join(' · ') : 'diam';
+      const b = node(
+        'button',
+        `${bot.nama} (${METODE_SINGKAT[bot.metode] || bot.metode || '?'}): ${keputusan} · ${duration(x.duration_ms)}`,
+        'room-bot',
+      );
+      b.type = 'button';
+      b.onclick = () => onSelect(x.id);
+      const li = node('li');
+      li.append(b);
+      ul.append(li);
+    }
+    container.append(
+      node('h4', 'Reaksi bot sesudah pesan ini (klik untuk melihat prosesnya)', 'report-title'),
+      ul,
+    );
+  }
+  const teknis = node('details'),
+    box = node('div', undefined, 'report');
+  renderReport(box, trace);
+  teknis.append(node('summary', 'Teknis: seluruh jejak'), box);
+  container.append(teknis);
+}
+// Kartu keputusan bertab: Proses · Keputusan · Parameter · Penalaran metode · NLG · Teknis.
+// lama: penjelasan langkah sebelumnya bot yang sama (kolom perubahan di tab Proses), bila ada.
+function renderDecision(container, trace, lama = null) {
   const p = trace.penjelasan;
   container.replaceChildren();
   container.classList.remove('empty-state');
@@ -598,6 +752,7 @@ function renderDecision(container, trace) {
   container.append(head);
   if (p.catatan?.length) container.append(node('p', p.catatan.join(' '), 'hint status-pending'));
   const tabs = [
+    ['proses', 'Proses', () => prosesTab(trace, p, lama)],
     ['keputusan', 'Keputusan', () => decisionTab(p)],
     ['parameter', 'Parameter', () => parameterTab(p)],
     ['penalaran', `Penalaran ${METODE_LABEL[bot.metode] || ''}`.trim(), () => reasoningTab(p)],
@@ -630,7 +785,7 @@ function renderDecision(container, trace) {
     bar.append(b);
   }
   container.append(bar, panel);
-  show(tabs.some((tab) => tab[0] === detailTab) ? detailTab : 'keputusan');
+  show(tabs.some((tab) => tab[0] === detailTab) ? detailTab : 'proses');
 }
 const DIAM = ['tunggu', 'abstain', 'tidak_bisa']; // keputusan tanpa aksi
 function planText(r, chat = false) {
@@ -646,6 +801,113 @@ function engineText(e) {
   const aksi =
     e.action === 'wait' ? 'tidak ada vote/aksi' : `${e.action}${e.target ? ` → ${e.target}` : ''}`;
   return e.ditolak ? `${aksi} (ditolak engine: ${e.ditolak})` : aksi;
+}
+// Kecurigaan per pemain dari tabel tersangka penjelasan ({pemain: nilai}).
+function petaKecurigaan(tabel) {
+  const kolom = tabel?.kolom || [],
+    iP = kolom.indexOf('pemain'),
+    iK = kolom.indexOf('kecurigaan');
+  if (iP < 0 || iK < 0) return null;
+  return Object.fromEntries((tabel.baris || []).map((b) => [b[iP], b[iK]]));
+}
+// Data sementara langkah ini dan perubahannya dari langkah sebelumnya bot yang sama.
+function dataSementara(p, lama) {
+  const kini = petaKecurigaan(p.tersangka);
+  if (!kini) return null;
+  const dulu = petaKecurigaan(lama?.tersangka) || {};
+  const box = node('div');
+  box.append(
+    node(
+      'h4',
+      `Data sementara: ${p.tersangka.judul || 'tersangka'} (kecurigaan 0–1)`,
+      'report-title',
+    ),
+    dataTable({
+      kolom: ['pemain', 'kecurigaan', 'langkah sebelumnya', 'perubahan'],
+      baris: Object.entries(kini).map(([pemain, nilai]) => {
+        const awal = dulu[pemain];
+        const beda = typeof nilai === 'number' && typeof awal === 'number' ? nilai - awal : null;
+        return [
+          pemain,
+          nilai,
+          awal ?? '—',
+          beda === null ? '—' : `${beda > 0 ? '+' : ''}${teks(Number(beda.toFixed(3)))}`,
+        ];
+      }),
+    }),
+  );
+  if (!lama)
+    box.append(
+      node('p', 'Perubahan tampil bila langkah sebelumnya bot ini sudah dibuka/tercatat.', 'hint'),
+    );
+  return box;
+}
+// Tab Proses: urutan kerja satu langkah bot dengan lama tiap tahap, hasil antara, dan perubahannya.
+function prosesTab(trace, p, lama) {
+  const box = node('div');
+  const t = trace.timings || {},
+    k = p.keputusan || {},
+    bot = p.bot || {},
+    nlg = p.nlg || {};
+  const dibaca = (p.nlu_dibaca || []).map(
+    (c) =>
+      `${c.pengirim}: “${c.teks}” → intent ${c.intent} (${teks(c.confidence)})` +
+      (c.target?.length ? ` · target ${c.target.join(', ')}` : ''),
+  );
+  const penalaran = Object.values(p.penalaran || {})
+    .filter((blok) => blok?.hasil)
+    .map((blok) => `${blok.judul}: ${blok.hasil}`);
+  const kalimat =
+    nlg.status === 'terkirim'
+      ? keyValues([
+          ['Kalimat', nlg.teks],
+          ['Sumber', SUMBER_NLG[nlg.sumber] || nlg.sumber],
+          ['Penulis LLM', nlg.penulis || 'tidak ada (templat)'],
+          ['Lama panggilan LLM', duration(t.llm_ms)],
+          ['Aturan + validasi IndoBERT + templat', duration(t.validasi_ms)],
+          ['Status percobaan LLM', nlg.percobaan_llm],
+        ])
+      : `${nlg.status || 'Tidak ada data NLG'}${nlg.keterangan ? `: ${nlg.keterangan}` : ''}`;
+  box.append(
+    node(
+      'p',
+      `Total ${duration(trace.duration_ms)} dari membaca keadaan permainan sampai keputusan diterapkan dan kalimat terkirim.`,
+      'hint',
+    ),
+    processSteps([
+      [
+        '1. NLU IndoBERT: membaca chat baru',
+        t.nlu_ms ?? null,
+        dibaca.length ? listOf(dibaca) : 'Tidak ada chat baru sejak langkah sebelumnya.',
+        'Mendekati 0 ms berarti hasilnya diambil dari memo (chat sudah dibaca sebelumnya).',
+      ],
+      [
+        `2. Logika ${METODE_LABEL[bot.metode] || bot.metode || ''}: menimbang bukti`,
+        t.logika_ms ?? null,
+        penalaran.length ? listOf(penalaran) : 'Tidak ada ringkasan penalaran.',
+        'Rincian hitungan ada di tab Parameter dan Penalaran.',
+      ],
+      [
+        '3. Keputusan',
+        null,
+        keyValues([
+          ['Chat', planText(k.chat, true)],
+          ['Vote', planText(k.vote)],
+          ['Aksi rahasia', planText(k.aksi)],
+        ]),
+      ],
+      ['4. NLG: rencana chat menjadi kalimat', t.nlg_ms ?? null, kalimat],
+      ['5. Diterapkan ke engine', null, engineText(p.engine)],
+      [
+        'Penjelasan untuk panel disusun',
+        t.penjelasan_ms ?? null,
+        'Hanya untuk panel admin; tidak memengaruhi keputusan.',
+      ],
+    ]),
+  );
+  const data = dataSementara(p, lama);
+  if (data) box.append(data);
+  return box;
 }
 function decisionTab(p) {
   const box = node('div');
@@ -863,6 +1125,700 @@ function resetChecker() {
   $('room-summary').replaceChildren();
   $('room-summary').hidden = true;
 }
+// FLOWCHART PROSES AI (menu Simulasi): seluruh jalur AI dari chat pemain sampai output bot.
+// tahap = nama tahap yang dilaporkan server saat simulasi berjalan, untuk menandai posisi tiap bot.
+// metode = kotak cabang metode (dipakai bot dengan metode itu). Teks dibuat singkat dan mudah dipahami.
+const ALUR_AI = {
+  input: {
+    judul: 'Chat pemain masuk',
+    kode: 'Simulasi.kirim · SocketGameController._send_chat · Match.can_chat',
+    tujuan: 'Menerima kalimat pemain pada fase yang boleh chat.',
+    proses:
+      'Server memeriksa izin chat (siang/Tribunal, tidak dibungkam), lalu pesan masuk ke chat pertandingan.',
+    keluaran: 'Pesan {pengirim, teks} di daftar chat room.',
+    alasan: 'Bot membaca chat dari daftar yang sama dengan yang dilihat pemain.',
+  },
+  nlu_pesan: {
+    tahap: ['nlu_pesan'],
+    judul: 'NLU IndoBERT membaca chat',
+    kode: 'BrainRuntime.baca_chat → anotasi_chat',
+    tujuan: 'Memahami chat: maksudnya apa dan ditujukan ke siapa.',
+    proses:
+      'Chat dibaca dua model IndoBERT berurutan (intent lalu target) dengan konteks chat sebelumnya.',
+    keluaran: 'intent + keyakinan, dan daftar target beserta relasinya.',
+    alasan: 'Logika bot bekerja dengan angka, bukan kalimat; NLU menerjemahkan chat menjadi data.',
+  },
+  nlu_intent: {
+    judul: 'Model 1: intent',
+    kode: 'NLUIndoBERT.intent · varian_nama_intent',
+    tujuan: 'Menebak maksud kalimat.',
+    proses:
+      'Nama pemain diganti nama yang dikenal model (3 varian), IndoBERT menghitung probabilitas tiap kelas, lalu dirata-rata.',
+    keluaran: 'offend (menyerang) / defend (membela) / neutral + keyakinan 0–1.',
+    alasan:
+      'Model dilatih dengan nama tertentu; mengganti nama membuat hasil stabil untuk nama apa pun.',
+  },
+  nlu_target: {
+    judul: 'Model 2: target',
+    kode: 'NLUIndoBERT.target · buat_teks_pasangan',
+    tujuan: 'Menebak siapa yang dituju kalimat.',
+    proses:
+      'Untuk tiap pemain dibuat pasangan (kalimat + 12 chat terakhir + kandidat); IndoBERT memberi relasi offend/defend/tidak_ada. Bila semua tidak_ada, ambang memilih minimal satu target.',
+    keluaran: 'Daftar {pemain, relasi, probabilitas}.',
+    alasan:
+      '"Aku curiga dia" baru bermakna bila tahu "dia" siapa; konteks chat sebelumnya membantu.',
+  },
+  nlu_memo: {
+    judul: 'Memo NLU bersama',
+    kode: 'NLUBersama._ingat',
+    tujuan: 'Satu chat dibaca sekali untuk semua bot.',
+    proses:
+      'Hasil disimpan dengan kunci teks + daftar pemain + konteks; bot lain mengambil hasil yang sama.',
+    keluaran: 'Bacaan sama untuk semua bot (mendekati 0 ms bila sudah ada).',
+    alasan:
+      'IndoBERT di CPU butuh sekitar 0,5–1,5 detik per chat; tanpa memo setiap bot mengulang hitungan.',
+  },
+  sinkron: {
+    tahap: ['nlu'],
+    judul: 'Ingatan bot diperbarui',
+    kode: 'Ingatan.sinkron_snapshot (+ anotasi_chat untuk chat baru)',
+    tujuan: 'Menyamakan memori bot dengan keadaan permainan yang ia lihat.',
+    proses:
+      'Snapshot privat bot dibaca: chat baru (diberi NLU), vote, eksekusi, hasil Peek, Gag, fase, dan waktu.',
+    keluaran: 'view: ronde, fase, pemain hidup, izin chat/vote/aksi milik bot.',
+    alasan: 'Bot hanya tahu yang boleh dilihat role-nya; role lawan tidak pernah bocor.',
+  },
+  bukti: {
+    judul: 'Menghitung bukti tiap pemain',
+    kode: 'hitung_bukti · pengetahuan_peran · fitur_hitman / fitur_lindung',
+    tujuan: 'Mengubah riwayat permainan menjadi angka 0–1 per pemain.',
+    proses:
+      'Dari chat ber-NLU dan vote dihitung tekanan, dukungan, inkonsistensi, pengalihan, klaim, diam, dll. Hitman juga menilai ancaman; Spy menilai siapa yang perlu di-Guard.',
+    keluaran: 'Tabel bukti (lihat tab Parameter).',
+    alasan: 'Ketiga metode memakai bukti yang sama, jadi beda perilaku murni dari cara menalar.',
+  },
+  fl: {
+    metode: 'fuzzy',
+    judul: 'FL · Fuzzy Mamdani',
+    kode: 'otak_fuzzy.putuskan',
+    tujuan: 'Menalar dengan aturan bahasa manusia (rendah/sedang/tinggi).',
+    proses:
+      'Bukti → sistem fuzzy bertingkat → kecurigaan; tiap pilihan chat/vote/aksi diberi prioritas 0–100.',
+    keluaran: 'Kecurigaan per pemain dan prioritas tiap pilihan.',
+    alasan: 'Bukti sosial tidak pasti; fuzzy menangani "agak curiga" dengan halus.',
+  },
+  fl_1: {
+    metode: 'fuzzy',
+    judul: 'Fuzzifikasi',
+    kode: 'keanggotaan(x)',
+    tujuan: 'Angka 0–1 menjadi derajat rendah/sedang/tinggi.',
+    proses: 'Fungsi keanggotaan memberi derajat tiap himpunan.',
+    keluaran: 'Mis. tekanan 0,62 → sedang 0,4 dan tinggi 0,6.',
+    alasan: 'Aturan ditulis dengan kata, bukan ambang tajam.',
+  },
+  fl_2: {
+    metode: 'fuzzy',
+    judul: 'Aturan JIKA–MAKA',
+    kode: 'aturan_aktif(nama, a, b)',
+    tujuan: 'Menyalakan aturan yang cocok.',
+    proses:
+      'Kekuatan aturan = min(derajat input). Contoh: JIKA tekanan tinggi DAN dukungan rendah MAKA curiga tinggi.',
+    keluaran: 'Daftar aturan yang menyala dan kekuatannya.',
+    alasan: 'Logikanya mudah dibaca dan dijelaskan.',
+  },
+  fl_3: {
+    metode: 'fuzzy',
+    judul: 'Agregasi + defuzzifikasi',
+    kode: 'fuzzy(nama, a, b) · nilai_kecurigaan (HIERARKI)',
+    tujuan: 'Menggabungkan aturan menjadi satu angka.',
+    proses:
+      'Keluaran aturan digabung (max), lalu centroid → 0–100. Bertingkat: sosial, perilaku, jejak, pribadi, ucapan, bukti_keras → kecurigaan.',
+    keluaran: 'Kecurigaan 0–1 dan prioritas 0–100.',
+    alasan: 'Centroid membuat nilai berubah halus saat bukti berubah.',
+  },
+  fl_4: {
+    metode: 'fuzzy',
+    judul: 'Bandingkan ambang',
+    kode: 'keputusan_chat · keputusan_vote · keputusan_aksi',
+    tujuan: 'Memutuskan bertindak atau menunggu.',
+    proses:
+      'Prioritas terbaik dibandingkan AMBANG_CHAT, VOTE_LANGSUNG/AMBANG_VOTE, dan AMBANG_GAG.',
+    keluaran: 'Rencana chat, vote, dan aksi rahasia.',
+    alasan: 'Bot tidak menuduh tanpa bukti yang cukup.',
+  },
+  ua: {
+    metode: 'utility',
+    judul: 'UA · Utility AI (IAUS)',
+    kode: 'otak_utility.putuskan',
+    tujuan: 'Memberi skor kegunaan setiap pilihan lalu memilih yang terbaik.',
+    proses: 'Bukti → kurva → skor IAUS per pilihan; kecurigaan dari noisy-OR.',
+    keluaran: 'Utilitas 0–1 tiap pilihan dan kecurigaan per pemain.',
+    alasan: 'Mudah menimbang banyak faktor sekaligus, termasuk pilihan untuk diam.',
+  },
+  ua_1: {
+    metode: 'utility',
+    judul: 'Kurva pertimbangan',
+    kode: 'kurva_linear · kurva_logistik',
+    tujuan: 'Bukti menjadi nilai 0–1 yang terasa wajar.',
+    proses: 'Tiap pertimbangan (kecurigaan, urgensi, porsi fase, ...) dilewatkan kurva.',
+    keluaran: 'Nilai pertimbangan 0–1.',
+    alasan: 'Kurva logistik mengabaikan nilai kecil dan cepat menaikkan nilai tinggi.',
+  },
+  ua_2: {
+    metode: 'utility',
+    judul: 'Kecurigaan noisy-OR',
+    kode: 'nilai_kecurigaan (BOBOT_BUKTI)',
+    tujuan: 'Menggabungkan banyak bukti lemah.',
+    proses: 'kecurigaan = 1 − Π(1 − bobot × bukti), lalu dikali (1 − p_sandera).',
+    keluaran: 'Kecurigaan 0–1 per pemain.',
+    alasan: 'Beberapa bukti kecil bersama tetap meyakinkan.',
+  },
+  ua_3: {
+    metode: 'utility',
+    judul: 'Skor IAUS',
+    kode: 'skor_iaus · _nilai_calon',
+    tujuan: 'Memberi skor tiap pilihan.',
+    proses:
+      'Utilitas = bobot × hasil kali pertimbangan, dengan kompensasi jumlah pertimbangan (k).',
+    keluaran: 'Utilitas 0–1 per pilihan chat/vote/aksi.',
+    alasan:
+      'Satu pertimbangan nol membatalkan pilihan; kompensasi menjaga pilihan dengan banyak pertimbangan tetap adil.',
+  },
+  ua_4: {
+    metode: 'utility',
+    judul: 'Pilih utilitas tertinggi',
+    kode: 'keputusan_chat · keputusan_vote · keputusan_aksi',
+    tujuan: 'Memilih aksi terbaik.',
+    proses:
+      'Pilihan tertinggi dipakai bila melebihi UTILITAS_TUNGGU (diam) atau UTILITAS_VOTE_LANGSUNG.',
+    keluaran: 'Rencana chat, vote, dan aksi rahasia.',
+    alasan: 'Diam juga pilihan; bot bergerak hanya bila lebih berguna daripada diam.',
+  },
+  bt: {
+    metode: 'bt',
+    judul: 'BT · Behavior Tree',
+    kode: 'otak_bt.putuskan',
+    tujuan: 'Memilih perilaku lewat pohon prioritas.',
+    proses: 'Bukti → poin bendera merah → pohon Selector/Sequence ditelusuri dari atas.',
+    keluaran: 'Cabang yang berhasil dan rencananya.',
+    alasan: 'Urutan prioritas perilaku terlihat jelas dan mudah diuji.',
+  },
+  bt_1: {
+    metode: 'bt',
+    judul: 'Bendera merah',
+    kode: 'nilai_kecurigaan (BENDERA)',
+    tujuan: 'Bukti menjadi poin.',
+    proses: 'Bendera aktif bila nilai bukti ≥ ambangnya; poin dijumlah, kecurigaan = poin / 5.',
+    keluaran: 'Poin dan kecurigaan per pemain.',
+    alasan: 'Aturan ya/tidak yang jelas.',
+  },
+  bt_2: {
+    metode: 'bt',
+    judul: 'Papan (blackboard)',
+    kode: '_papan(ctx)',
+    tujuan: 'Menyiapkan data untuk pohon.',
+    proses: 'Tersangka, poin, izin chat, fase, dan kandidat dimasukkan ke papan.',
+    keluaran: 'Papan yang dibaca node Kondisi dan Aksi.',
+    alasan: 'Node pohon tetap kecil dan bisa dipakai ulang.',
+  },
+  bt_3: {
+    metode: 'bt',
+    judul: 'Telusuri pohon',
+    kode: 'Selector · Sequence · Kondisi',
+    tujuan: 'Mencari cabang yang berlaku.',
+    proses:
+      'Selector mencoba cabang dari atas sampai satu SUKSES; Sequence berhenti di syarat yang GAGAL.',
+    keluaran: 'Jalur node SUKSES/GAGAL (tab Penalaran).',
+    alasan: 'Prioritas perilaku terlihat dari urutan cabang.',
+  },
+  bt_4: {
+    metode: 'bt',
+    judul: 'Aksi cabang terpilih',
+    kode: 'Aksi (_a_tuduh, _a_vote, _a_aksi)',
+    tujuan: 'Menjalankan aksi di cabang yang berhasil.',
+    proses: 'Node Aksi membuat rencana chat, vote, atau aksi rahasia.',
+    keluaran: 'Rencana chat, vote, dan aksi rahasia.',
+    alasan: 'Satu langkah = satu cabang, sehingga perilaku mudah ditebak.',
+  },
+  keputusan: {
+    judul: 'Keputusan langkah ini',
+    kode: 'rencana_chat · rencana_vote · pertahanan_suara · format_npc · siapkan_nlg',
+    tujuan: 'Menyatukan hasil metode menjadi satu keputusan.',
+    proses:
+      'Rencana chat (intent + target), vote, dan aksi rahasia digabung; vote dijaga agar tidak memecah suara.',
+    keluaran: 'npc_decision {action, target} dan rencana kalimat untuk NLG.',
+    alasan: 'Format sama untuk ketiga metode, jadi engine dan NLG tidak perlu tahu metodenya.',
+  },
+  penjelasan: {
+    tahap: ['penjelasan'],
+    judul: 'Penjelasan untuk panel',
+    kode: 'penjelasan.jelaskan',
+    tujuan: 'Mencatat alasan keputusan untuk admin.',
+    proses: 'Parameter, penalaran, dan keputusan diringkas (maks 12 KB).',
+    keluaran: 'Isi tab Parameter, Penalaran, dan Keputusan.',
+    alasan: 'Keputusan bot bisa diperiksa; tidak memengaruhi keputusan.',
+  },
+  engine: {
+    tahap: ['engine'],
+    judul: 'Vote/aksi ke engine',
+    kode: 'Match.vote · Match.act',
+    tujuan: 'Menjalankan vote atau aksi rahasia sesuai aturan game.',
+    proses:
+      'Engine memeriksa legalitas (fase, cooldown, rekan Syndicate); yang tidak sah ditolak dan dicatat.',
+    keluaran: 'Vote/aksi tercatat, atau alasan penolakan.',
+    alasan: 'Bot tunduk pada aturan yang sama dengan pemain.',
+  },
+  nlg_prompt: {
+    tahap: ['nlg'],
+    judul: 'NLG: susun prompt',
+    kode: 'nlg.buat_prompt',
+    tujuan: 'Rencana chat menjadi instruksi untuk LLM.',
+    proses:
+      'Prompt berisi maksud, target, persona, chat terbaru, dan larangan (tidak membocorkan role, dll.).',
+    keluaran: 'Pesan sistem dan pesan untuk LLM.',
+    alasan: 'LLM hanya menulis kalimat; isi keputusan tetap dari metode.',
+  },
+  nlg_llm: {
+    tahap: ['llm'],
+    judul: 'LLM menulis kalimat',
+    kode: 'PenulisBerantai.tulis (OpenRouter → link Ollama)',
+    tujuan: 'Kalimat bahasa Indonesia yang natural.',
+    proses:
+      'Jalur dicoba sesuai prioritas di panel; jalur gagal/lambat diistirahatkan. Batas 20 detik per kalimat.',
+    keluaran: 'Kalimat mentah dari model.',
+    alasan: 'Lebih variatif dan manusiawi daripada templat.',
+  },
+  nlg_cek: {
+    tahap: ['validasi'],
+    judul: 'Cek aturan + validasi IndoBERT',
+    kode: 'bersihkan · periksa_aturan · validasi_nlu · nilai_kalimat',
+    tujuan: 'Memastikan kalimat sesuai rencana.',
+    proses:
+      'Kalimat dibersihkan dan dicek (target disebut, tidak membocorkan role), lalu IndoBERT membaca ulang: intent dan target harus cocok. Gagal → ulang LLM (maks 2 kali) atau templat.',
+    keluaran: 'Kalimat yang lolos, atau alasan penolakan.',
+    alasan: 'LLM bisa melenceng; validasi menjaga kalimat sesuai keputusan metode.',
+  },
+  nlg_templat: {
+    judul: 'Cadangan templat',
+    kode: 'kalimat_templat · kalimat_cadangan',
+    tujuan: 'Selalu ada kalimat walau LLM gagal.',
+    proses: 'Varian templat sesuai persona diisi nama target, lalu dinilai seperti kalimat LLM.',
+    keluaran: 'Kalimat templat yang lolos.',
+    alasan: 'Game tidak boleh menunggu LLM yang mati atau lambat.',
+  },
+  kirim: {
+    tahap: ['kirim'],
+    judul: 'Chat terkirim',
+    kode: 'Match.add_message · catat_chat · baca_chat',
+    tujuan: 'Menampilkan kalimat bot ke semua pemain.',
+    proses:
+      'Kalimat masuk chat room, ingatan bot mencatat aksinya, dan NLU membaca kalimat bot untuk konteks berikutnya.',
+    keluaran: 'Gelembung chat bot.',
+    alasan: 'Bot lain dan pemain membaca chat ini di langkah berikutnya.',
+  },
+  simpan: {
+    judul: 'Parameter disimpan',
+    kode: 'Ingatan · checker_traces · chat_messages.nlu',
+    tujuan: 'Menyimpan hasil langkah untuk langkah berikutnya dan untuk panel.',
+    proses:
+      'Ingatan bot (chat, vote, aksi rahasia) dipakai langkah berikutnya. Di room asli jejak checker dan bacaan NLU masuk database; simulasi tidak menyimpan ke database.',
+    keluaran: 'Ingatan dan jejak langkah ini.',
+    alasan: 'Bot menimbang kejadian sebelumnya; admin bisa memeriksa ulang.',
+  },
+  output: {
+    tahap: ['selesai'],
+    judul: 'Output',
+    kode: 'jejak checker (isi_jejak)',
+    tujuan: 'Hasil akhir satu langkah bot.',
+    proses: 'Chat (bila ada), vote, atau aksi rahasia, beserta lama prosesnya.',
+    keluaran: 'Item di chat room; klik item itu untuk melihat prosesnya.',
+    alasan: 'Satu langkah bot selesai; bot berikutnya mulai.',
+  },
+};
+// Tata letak: baris berurutan (panah ke bawah), item dalam satu baris dihubungkan panah ke kanan.
+const BARIS_ALUR = [
+  ['input'],
+  ['nlu_pesan'],
+  ['nlu_intent', 'nlu_target', 'nlu_memo'],
+  ['sinkron'],
+  ['bukti'],
+  'cabang',
+  ['keputusan', 'penjelasan'],
+  ['engine'],
+  ['nlg_prompt', 'nlg_llm', 'nlg_cek', 'nlg_templat'],
+  ['kirim', 'simpan'],
+  ['output'],
+];
+const CABANG_ALUR = {
+  fuzzy: ['fl', 'fl_1', 'fl_2', 'fl_3', 'fl_4'],
+  utility: ['ua', 'ua_1', 'ua_2', 'ua_3', 'ua_4'],
+  bt: ['bt', 'bt_1', 'bt_2', 'bt_3', 'bt_4'],
+};
+let simProgres = null, // {nama: {tahap, detik}} selama simulasi berjalan
+  flowNode = '';
+function metodePemain(nama) {
+  return sim?.pemain.find((p) => p.nama === nama)?.metode;
+}
+// Node tempat pemain berada untuk satu tahap live; tahap logika menandai kepala cabang metodenya.
+function nodeTahap(nama, tahap) {
+  if (tahap === 'logika') return { fuzzy: 'fl', utility: 'ua', bt: 'bt' }[metodePemain(nama)];
+  return Object.keys(ALUR_AI).find((id) => ALUR_AI[id].tahap?.includes(tahap));
+}
+// Lama tiap node untuk item chat terpilih (ms), dari timings jejak.
+function waktuNode(trace) {
+  if (!trace) return {};
+  if (isHuman(trace)) return { nlu_pesan: trace.nlu?.ms };
+  const t = trace.timings || {},
+    kepala = { fuzzy: 'fl', utility: 'ua', bt: 'bt' }[trace.ringkas?.bot?.metode];
+  return {
+    sinkron: t.nlu_ms,
+    ...(kepala ? { [kepala]: t.logika_ms } : {}),
+    penjelasan: t.penjelasan_ms,
+    nlg_llm: t.llm_ms,
+    nlg_cek: t.validasi_ms,
+    output: trace.duration_ms,
+  };
+}
+function flowBox(id, posisi, waktuMs, terpakai) {
+  const n = ALUR_AI[id];
+  const kelas = ['flow-node'];
+  if (posisi[id]?.length) kelas.push('flow-aktif');
+  if (terpakai && !terpakai.has(id)) kelas.push('flow-redup');
+  if (flowNode === id) kelas.push('selected');
+  const b = node('button', undefined, kelas.join(' '));
+  b.type = 'button';
+  b.append(node('strong', n.judul), node('small', n.kode.split(' · ')[0], 'flow-kode'));
+  if (typeof waktuMs[id] === 'number')
+    b.append(node('span', duration(waktuMs[id]), 'process-time'));
+  if (posisi[id]?.length) {
+    const bots = node('span', undefined, 'flow-bots');
+    for (const nama of posisi[id]) bots.append(chip(nama, 'status-good'));
+    b.append(bots);
+  }
+  b.onclick = () => {
+    flowNode = id;
+    renderFlow();
+  };
+  return b;
+}
+// Node yang dilalui item terpilih (untuk meredupkan cabang/tahap yang tidak dipakai).
+function jalurTerpakai(trace) {
+  if (!trace || isSistem(trace)) return null;
+  if (isHuman(trace))
+    return new Set(['input', 'nlu_pesan', 'nlu_intent', 'nlu_target', 'nlu_memo']);
+  const r = trace.ringkas || {},
+    metode = r.bot?.metode;
+  const ids = ['sinkron', 'bukti', ...(CABANG_ALUR[metode] || []), 'keputusan', 'penjelasan'];
+  ids.push('engine', 'simpan', 'output');
+  if (r.nlg === 'terkirim') {
+    ids.push('nlg_prompt', 'nlg_cek', 'kirim');
+    if ((trace.timings?.llm_ms || 0) > 0) ids.push('nlg_llm');
+    if (traceSumber(trace) !== 'llm') ids.push('nlg_templat');
+  }
+  return new Set(ids);
+}
+function traceSumber(trace) {
+  try {
+    return JSON.parse(trace.output || '{}').nlg?.sumber;
+  } catch {
+    return null;
+  }
+}
+function renderFlow() {
+  const box = $('sim-flow');
+  const trace = simTraces.find((t) => t.id === simSelected);
+  const posisi = {},
+    antre = [],
+    sedang = [];
+  for (const [nama, p] of Object.entries(simProgres || {})) {
+    if (p.tahap === 'menunggu') {
+      antre.push(nama);
+      continue;
+    }
+    const id = nodeTahap(nama, p.tahap);
+    if (id) (posisi[id] ||= []).push(`${nama} ${teks(p.detik)}s`);
+    if (id && p.tahap !== 'selesai')
+      sedang.push(`${nama} di "${ALUR_AI[id].judul}" (${teks(p.detik)} dtk)`);
+  }
+  const waktuMs = simProgres ? {} : waktuNode(trace);
+  const terpakai = simProgres ? null : jalurTerpakai(trace);
+  const isi = [];
+  isi.push(
+    node(
+      'p',
+      simProgres
+        ? [
+            'Sedang berjalan.',
+            sedang.length && `Posisi: ${sedang.join(' · ')}.`,
+            antre.length && `Menunggu giliran: ${antre.join(', ')}.`,
+          ]
+            .filter(Boolean)
+            .join(' ')
+        : trace && !isSistem(trace)
+          ? `Waktu di kotak = langkah ${trace.ringkas?.bot?.nama || trace.sender} yang dipilih di chat; kotak redup tidak dilalui langkah itu.`
+          : 'Pilih item chat untuk melihat lama tiap tahap. Saat bot berpikir, posisinya tampil di sini.',
+      'hint',
+    ),
+  );
+  BARIS_ALUR.forEach((baris, i) => {
+    if (i) isi.push(node('span', '↓', 'flow-arrow'));
+    if (baris === 'cabang') {
+      const cabang = node('div', undefined, 'flow-branch');
+      for (const ids of Object.values(CABANG_ALUR)) {
+        const lajur = node('div', undefined, 'flow-lane');
+        ids.forEach((id, j) => {
+          if (j) lajur.append(node('span', '↓', 'flow-arrow'));
+          lajur.append(flowBox(id, posisi, waktuMs, terpakai));
+        });
+        cabang.append(lajur);
+      }
+      isi.push(cabang);
+      return;
+    }
+    const row = node('div', undefined, 'flow-row');
+    baris.forEach((id, j) => {
+      if (j) row.append(node('span', '→', 'flow-arrow'));
+      row.append(flowBox(id, posisi, waktuMs, terpakai));
+    });
+    isi.push(row);
+  });
+  box.replaceChildren(...isi);
+  renderFlowDetail(trace);
+}
+// Data node pada item chat terpilih: hasil antara yang benar-benar terjadi di langkah itu.
+function dataNode(id, trace) {
+  if (!trace || isSistem(trace)) return null;
+  if (isHuman(trace)) return id.startsWith('nlu') ? `Bacaan: ${nluTeks(trace.nlu)}` : null;
+  const p = trace.penjelasan || {},
+    t = trace.timings || {},
+    nlg = p.nlg || {},
+    k = p.keputusan || {};
+  const penalaran = Object.values(p.penalaran || {})
+    .filter((blok) => blok?.hasil)
+    .map((blok) => `${blok.judul}: ${blok.hasil}`);
+  if (id === 'sinkron')
+    return listOf(
+      (p.nlu_dibaca || [])
+        .map((c) => `${c.pengirim}: “${c.teks}” → ${c.intent}`)
+        .concat(p.nlu_dibaca?.length ? [] : ['Tidak ada chat baru.']),
+    );
+  if (id === 'bukti') return p.tersangka ? dataTable(p.tersangka) : null;
+  if (ALUR_AI[id].metode) return penalaran.length ? listOf(penalaran) : null;
+  if (id === 'keputusan')
+    return keyValues([
+      ['Chat', planText(k.chat, true)],
+      ['Vote', planText(k.vote)],
+      ['Aksi rahasia', planText(k.aksi)],
+    ]);
+  if (id === 'engine') return engineText(p.engine);
+  if (id.startsWith('nlg'))
+    return nlg.status === 'terkirim'
+      ? keyValues([
+          ['Kalimat', nlg.teks],
+          ['Sumber', SUMBER_NLG[nlg.sumber] || nlg.sumber],
+          ['LLM', duration(t.llm_ms)],
+          ['Cek + validasi', duration(t.validasi_ms)],
+          ['Pelanggaran', nlg.pelanggaran],
+        ])
+      : `${nlg.status || '—'}${nlg.keterangan ? `: ${nlg.keterangan}` : ''}`;
+  if (id === 'kirim') return trace.nlu ? `Kalimat bot dibaca NLU: ${nluTeks(trace.nlu)}` : null;
+  if (id === 'output')
+    return `${trace.ringkas?.keputusan?.join(' · ') || 'diam'} · total ${duration(trace.duration_ms)}`;
+  return null;
+}
+function renderFlowDetail(trace) {
+  const box = $('flow-detail'),
+    n = ALUR_AI[flowNode];
+  if (!n) {
+    box.classList.add('empty-state');
+    box.textContent = 'Klik satu kotak untuk melihat tujuan, proses, kode, output, dan alasannya.';
+    return;
+  }
+  box.classList.remove('empty-state');
+  box.replaceChildren(
+    node('h4', n.judul, 'report-title'),
+    keyValues([
+      ['Tujuan', n.tujuan],
+      ['Proses', n.proses],
+      ['Output yang diharapkan', n.keluaran],
+      ['Alasan dibuat begini', n.alasan],
+    ]),
+    node('small', 'Kode'),
+    node('pre', n.kode.replaceAll(' · ', '\n')),
+  );
+  const data = dataNode(flowNode, trace);
+  if (data) {
+    box.append(node('h4', 'Pada item chat yang dipilih', 'report-title'));
+    box.append(typeof data === 'string' ? node('p', data) : data);
+  }
+}
+// SIMULASI: pertandingan tiruan (admin + bot pilihan) memakai engine, otak, NLU, dan NLG asli di server.
+// Item chat dan detailnya memakai tampilan yang sama dengan checker room.
+const BOT_SIMULASI = [
+  'NOX',
+  'ECHO',
+  'VEIL',
+  'RAVEN',
+  'ASH',
+  'DUSK',
+  'IRIS',
+  'SAGE',
+  'ONYX',
+  'LARK',
+];
+const PILIHAN_METODE = [
+  ['fuzzy', 'FL · Fuzzy Mamdani'],
+  ['utility', 'UA · Utility AI'],
+  ['bt', 'BT · Behavior Tree'],
+];
+let sim = null,
+  simTraces = [],
+  simSelected = '',
+  simBusy = false;
+// Satu pilihan metode per bot; pilihan lama dipertahankan saat jumlah pemain diubah.
+function renderSimSetup() {
+  const lama = [...$('sim-bots').querySelectorAll('select')].map((s) => s.value);
+  const jumlah = Number($('sim-count').value) - 1;
+  $('sim-bots').replaceChildren(
+    ...BOT_SIMULASI.slice(0, jumlah).map((nama, i) => {
+      const label = node('label', `${nama} memakai`);
+      const select = document.createElement('select');
+      for (const [value, text] of PILIHAN_METODE) select.add(new Option(text, value));
+      select.value = lama[i] || PILIHAN_METODE[i % 3][0];
+      label.append(select);
+      return label;
+    }),
+  );
+}
+renderSimSetup();
+function renderSimStatus() {
+  const box = $('sim-status');
+  box.hidden = !sim;
+  if (!sim) {
+    box.replaceChildren();
+    return;
+  }
+  const head = node('div', undefined, 'room-head');
+  head.append(
+    chip(sim.pemenang ? 'Selesai' : 'Simulasi', sim.pemenang ? 'status-pending' : 'status-good'),
+    node('strong', `Ronde ${sim.ronde} · ${FASE_LABEL[sim.fase] || sim.fase}`),
+    node(
+      'span',
+      sim.pemenang
+        ? `Pemenang: ${sim.pemenang === 'hitman' ? 'Hitman' : 'Warga'}`
+        : `detik ke-${teks(sim.detik)} dari ${sim.durasi ?? '—'} detik fase`,
+      'room-meta',
+    ),
+  );
+  box.replaceChildren(
+    head,
+    dataTable({
+      kolom: ['pemain', 'role', 'metode', 'persona', 'status'],
+      baris: sim.pemain.map((p) => [
+        p.manusia ? `${p.nama} (kamu)` : p.nama,
+        ROLE_LABEL[p.role] || p.role,
+        p.manusia ? 'manusia' : METODE_LABEL[p.metode] || p.metode,
+        p.persona,
+        p.status,
+      ]),
+    }),
+  );
+}
+function renderSim() {
+  renderSimStatus();
+  renderChat($('sim-chat'), simTraces, simSelected, selectSim);
+  renderFlow();
+  $('sim-send').disabled = simBusy || !sim?.bisa_chat;
+  $('sim-message').disabled = !sim?.bisa_chat;
+  $('sim-message').placeholder = !sim
+    ? 'Mulai simulasi dulu'
+    : sim.bisa_chat
+      ? 'Tulis chat seperti di game…'
+      : 'Chat terkunci pada fase ini';
+  $('sim-run').disabled = $('sim-phase').disabled = simBusy || !sim || Boolean(sim.pemenang);
+  $('sim-start').disabled = simBusy;
+}
+function selectSim(id) {
+  simSelected = id;
+  renderSim();
+  showSimDetail();
+}
+function showSimDetail() {
+  const box = $('sim-detail'),
+    trace = simTraces.find((t) => t.id === simSelected);
+  if (!trace || isSistem(trace)) {
+    box.classList.add('empty-state');
+    box.textContent = 'Klik chat atau langkah bot untuk melihat prosesnya.';
+  } else if (isHuman(trace)) renderHuman(box, trace, simTraces, selectSim);
+  else if (trace.penjelasan)
+    renderDecision(
+      box,
+      trace,
+      sebelumnya(trace, simTraces, (t) => t.penjelasan),
+    );
+  else renderReport(box, trace);
+}
+// Satu permintaan simulasi; waktu berjalan ditampilkan karena LLM bisa butuh beberapa detik per bot.
+// pantau: tahap tiap bot diambil berkala dan ditandai di flowchart selama permintaan berjalan.
+async function simRequest(path, body, label, pantau = false) {
+  if (simBusy) return null;
+  simBusy = true;
+  renderSim();
+  const epoch = generation,
+    started = performance.now(),
+    id = sim?.id;
+  const timer = setInterval(() => {
+    $('sim-progress').textContent =
+      `${label} ${((performance.now() - started) / 1000).toFixed(1)} dtk`;
+  }, 100);
+  let polling = false;
+  const poll = setInterval(async () => {
+    if (!pantau || !id || polling) return;
+    polling = true;
+    try {
+      const data = await request(`/api/panel/simulasi/${encodeURIComponent(id)}/progres`);
+      if (simBusy && epoch === generation) {
+        simProgres = data.progres;
+        renderFlow();
+      }
+    } catch {
+      // Progres hanya tampilan; kegagalan polling tidak menghentikan simulasi.
+    } finally {
+      polling = false;
+    }
+  }, 400);
+  try {
+    const data = await request(path, body, 'POST');
+    return epoch === generation && token ? data : null;
+  } finally {
+    clearInterval(timer);
+    clearInterval(poll);
+    simProgres = null;
+    $('sim-progress').textContent = '';
+    simBusy = false;
+    renderSim();
+  }
+}
+// Tambahkan jejak baru ke chat dan buka item pilihan (default: item terakhir).
+function terimaSim(data, pilih) {
+  if (!data) return;
+  const { jejak, ...ringkas } = data;
+  sim = ringkas;
+  simTraces.push(...jejak);
+  simSelected = (pilih(jejak) || jejak[jejak.length - 1] || {}).id || simSelected;
+  renderSim();
+  showSimDetail();
+}
+async function simAksi(aksi, label, isi = '') {
+  if (!sim) return;
+  const data = await simRequest(
+    `/api/panel/simulasi/${encodeURIComponent(sim.id)}`,
+    { aksi, teks: isi, detik: Number($('sim-step').value) || 0 },
+    label,
+    true,
+  );
+  terimaSim(data, (jejak) => jejak.find(isHuman));
+}
 // Validasi urutan tanggal dan susun parameter untuk riwayat serta ekspor CSV.
 function historyQuery() {
   const from = $('date-from').value,
@@ -900,6 +1856,7 @@ Ronde ${row.round_number ?? '-'} | ${row.phase || 'legacy'}`,
       `${row.sender_name}
 ${row.sender_kind}`,
       row.message,
+      nluTeks(row.nlu),
     ]) {
       const td = document.createElement('td');
       td.textContent = value;
@@ -954,7 +1911,7 @@ async function selectMenu(name) {
     if (b.dataset.menu === name) b.setAttribute('aria-current', 'page');
     else b.removeAttribute('aria-current');
   }
-  for (const id of ['ai', 'checker', 'history', 'users', 'npc', 'survey'])
+  for (const id of ['ai', 'checker', 'history', 'users', 'npc', 'survey', 'simulasi'])
     $('menu-' + id).hidden = id !== name;
   if (name === 'checker' || name === 'history') await loadRooms();
   if (name === 'checker') await checker();
@@ -962,6 +1919,7 @@ async function selectMenu(name) {
   if (name === 'users') await loadUsers();
   if (name === 'npc') await loadNpc();
   if (name === 'survey') await loadSurvey();
+  if (name === 'simulasi') renderSim();
 }
 
 // OTAK NPC: isi pilihan dari server agar panel tidak perlu tahu daftar metode.
@@ -1568,6 +2526,44 @@ $('older-traces').onclick = handle(async () => {
   $('auto-checker').checked = false;
   await checker(true);
 });
+$('sim-count').onchange = renderSimSetup;
+$('sim-setup').onsubmit = handle(async () => {
+  const data = await simRequest(
+    '/api/panel/simulasi',
+    {
+      nama: $('sim-name').value.trim() || 'Pemain',
+      metode: [...$('sim-bots').querySelectorAll('select')].map((s) => s.value),
+    },
+    'Menyiapkan pertandingan…',
+  );
+  if (!data) return;
+  simTraces = [];
+  simSelected = '';
+  terimaSim(data, () => null);
+  notice('Simulasi dimulai. Kirim chat untuk melihat cara bot membaca dan membalasnya.');
+});
+$('sim-form').onsubmit = handle(async () => {
+  const isi = $('sim-message').value.trim();
+  if (!isi || !sim?.bisa_chat || simBusy) return;
+  // Chat langsung tampil selama bot berpikir; diganti jejak asli dari server setelah selesai.
+  const sementara = {
+    id: 'sementara',
+    sender: sim.pemain.find((p) => p.manusia)?.nama || 'Kamu',
+    message: isi,
+    manusia: true,
+    stage: 'mengirim',
+  };
+  simTraces.push(sementara);
+  try {
+    await simAksi('kirim', 'Bot membaca chat dan berpikir…', isi);
+    $('sim-message').value = '';
+  } finally {
+    simTraces = simTraces.filter((t) => t !== sementara);
+    renderSim();
+  }
+});
+$('sim-run').onclick = handle(() => simAksi('jalan', 'Bot melangkah…'));
+$('sim-phase').onclick = handle(() => simAksi('fase', 'Menyelesaikan fase…'));
 $('history-filter').onsubmit = handle(() => history());
 $('more-history').onclick = handle(async () => {
   $('more-history').disabled = true;
