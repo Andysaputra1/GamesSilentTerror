@@ -137,6 +137,8 @@ export class MainPage implements OnInit, OnDestroy {
       this.showSavedSkin(user?.skinId);
     } catch {}
     this.startRoleDeckShuffle();
+    // Unduh semua skin sekarang; tanpa ini tombol ganti skin menunggu gambar diunduh dulu.
+    for (const skin of this.previewSkins) new Image().src = `/assets/characters/skin_${skin.id}.png`;
     // Skin di browser bisa basi bila diganti dari perangkat lain; server yang menentukan.
     this.session
       .refreshProfile()
