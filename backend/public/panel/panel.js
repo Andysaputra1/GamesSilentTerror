@@ -74,6 +74,8 @@ function clearSession() {
   simSelected = '';
   simProgres = null;
   flowNode = '';
+  renderedFlowDetail = '';
+  kodeCache.clear();
   $('sim-chat').replaceChildren();
   $('sim-detail').textContent = '';
   $('sim-status').hidden = true;
@@ -1626,12 +1628,78 @@ function dataNode(id, trace) {
     return `${trace.ringkas?.keputusan?.join(' · ') || 'diam'} · total ${duration(trace.duration_ms)}`;
   return null;
 }
+// KODE ASLI tiap kotak: dimuat sekali dari server (sumber modul yang sedang berjalan) lalu disimpan di cache.
+const kodeCache = new Map();
+let renderedFlowDetail = ''; // kotak + item chat yang sedang tampil: polling tidak merender ulang kode
+function teksParameter(p) {
+  return p.bawaan === null ? p.nama : `${p.nama}=${p.bawaan}`;
+}
+function kodeView(item) {
+  const box = node('section', undefined, 'kode-fungsi');
+  const param = item.parameter.map(teksParameter).join(', ');
+  const head = node('div', undefined, 'kode-head');
+  head.append(
+    node('strong', item.konstanta ? `${item.nama} (konstanta)` : `${item.nama}(${param})`),
+    node('small', `${item.berkas} · baris ${item.mulai}–${item.akhir}`),
+  );
+  const keluar = item.baris.filter((b) => b.jenis === 'output').map((b) => b.teks.trim());
+  const ringkas = [
+    [
+      'Output (return)',
+      keluar.length
+        ? keluar.join(' | ')
+        : item.konstanta
+          ? 'nilai konstanta di bawah'
+          : 'tanpa return: mengubah data atau objek yang diberikan',
+    ],
+  ];
+  if (!item.konstanta)
+    ringkas.unshift(['Parameter', item.parameter.length ? param : 'tanpa parameter']);
+  box.append(head, keyValues(ringkas));
+  const isi = node('div', undefined, 'kode-isi');
+  for (const b of item.baris) {
+    const row = node('div', undefined, `kode-baris${b.jenis ? ` kode-${b.jenis}` : ''}`);
+    row.append(node('span', String(b.no), 'kode-no'), node('code', b.teks || ' '));
+    isi.append(row);
+    if (b.catatan) isi.append(node('div', `↑ ${b.catatan}`, 'kode-tanda'));
+  }
+  box.append(isi);
+  return box;
+}
+async function tampilkanKode(container, id) {
+  container.append(
+    node('h4', 'Kode asli', 'report-title'),
+    node(
+      'p',
+      'Dibaca langsung dari kode server yang sedang berjalan. Biru = parameter (baris def), hijau = output (return), kuning = baris inti dengan catatan, abu = komentar.',
+      'hint',
+    ),
+  );
+  if (!kodeCache.has(id)) {
+    const status = node('p', 'Memuat kode…', 'hint');
+    container.append(status);
+    try {
+      const data = await request(`/api/panel/kode/${encodeURIComponent(id)}`);
+      kodeCache.set(id, data.kode || []);
+    } catch (error) {
+      status.textContent = `Kode gagal dimuat: ${error.message}`;
+      return;
+    }
+    status.remove();
+  }
+  if (flowNode !== id || !container.isConnected) return; // kotak lain sudah dipilih
+  for (const item of kodeCache.get(id)) container.append(kodeView(item));
+}
 function renderFlowDetail(trace) {
   const box = $('flow-detail'),
     n = ALUR_AI[flowNode];
+  const key = `${flowNode}|${trace?.id || ''}`;
+  if (renderedFlowDetail === key) return;
+  renderedFlowDetail = key;
   if (!n) {
     box.classList.add('empty-state');
-    box.textContent = 'Klik satu kotak untuk melihat tujuan, proses, kode, output, dan alasannya.';
+    box.textContent =
+      'Klik satu kotak untuk melihat tujuan, proses, kode asli, output, dan alasannya.';
     return;
   }
   box.classList.remove('empty-state');
@@ -1643,14 +1711,13 @@ function renderFlowDetail(trace) {
       ['Output yang diharapkan', n.keluaran],
       ['Alasan dibuat begini', n.alasan],
     ]),
-    node('small', 'Kode'),
-    node('pre', n.kode.replaceAll(' · ', '\n')),
   );
   const data = dataNode(flowNode, trace);
   if (data) {
     box.append(node('h4', 'Pada item chat yang dipilih', 'report-title'));
     box.append(typeof data === 'string' ? node('p', data) : data);
   }
+  tampilkanKode(box, flowNode).catch((error) => notice(error.message));
 }
 // SIMULASI: pertandingan tiruan (admin + bot pilihan) memakai engine, otak, NLU, dan NLG asli di server.
 // Item chat dan detailnya memakai tampilan yang sama dengan checker room.

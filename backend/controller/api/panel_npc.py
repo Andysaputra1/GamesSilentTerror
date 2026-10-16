@@ -11,6 +11,7 @@ from controller.middleware.safe_validation import SafeValidationRoute
 from services.npc_brain.runtime import brain_runtime
 from services.npc_config_service import save_npc_configuration
 from services.persistence_service import PersistenceError
+from services.kode_alur import kode_node
 from services.simulasi_service import simulasi_service
 
 router = APIRouter(tags=["panel-npc"], route_class=SafeValidationRoute)
@@ -122,3 +123,13 @@ def simulasi_progres(sim_id: str, token=Depends(require_panel)):
         return simulasi_service.progres(sim_id)
     except KeyError as error:
         raise HTTPException(404, str(error.args[0])) from error
+
+
+@router.get("/api/panel/kode/{node}")
+# FLOWCHART: kode asli di balik satu kotak flowchart (sumber dari modul yang sedang berjalan, bertanda).
+def kode_alur(node: str, token=Depends(require_panel)):
+    try:
+        kode = kode_node(node)
+    except KeyError as error:
+        raise HTTPException(404, "Kotak flowchart tidak dikenal.") from error
+    return {"node": node, "kode": [{k: v for k, v in p.items() if k != "hilang"} for p in kode]}

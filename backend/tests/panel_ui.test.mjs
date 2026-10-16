@@ -547,6 +547,33 @@ test('simulation shows chat with NLU, live bot positions on the flowchart, and n
         berjalan: true,
         progres: { NOX: { tahap: 'llm', detik: 1.2 }, ECHO: { tahap: 'menunggu', detik: 1.2 } },
       });
+    if (path === '/api/panel/kode/nlg_llm')
+      return response({
+        node: 'nlg_llm',
+        kode: [
+          {
+            nama: 'nlg.PenulisBerantai.tulis',
+            berkas: 'backend/services/npc_brain/generated/nlg.py',
+            mulai: 897,
+            akhir: 899,
+            konstanta: false,
+            parameter: [
+              { nama: 'sistem', bawaan: null },
+              { nama: 'pesan', bawaan: null },
+            ],
+            baris: [
+              { no: 897, teks: '    def tulis(self, sistem, pesan):', jenis: 'param' },
+              {
+                no: 898,
+                teks: `        teks, status = p.tulis(sistem, pesan)  # ${evil}`,
+                jenis: 'inti',
+                catatan: 'panggil LLM jalur ini',
+              },
+              { no: 899, teks: '        return teks, status', jenis: 'output' },
+            ],
+          },
+        ],
+      });
     if (path === '/api/panel/simulasi/sim1') {
       await reply;
       return response({
@@ -602,6 +629,14 @@ test('simulation shows chat with NLU, live bot positions on the flowchart, and n
   kotak('LLM menulis').click();
   const info = doc.querySelector('#flow-detail').textContent;
   assert.match(info, /Output yang diharapkan/);
-  assert.match(info, /PenulisBerantai\.tulis/);
   assert.match(info, /Aku bukan Hitman\./);
+  await settle(); // kode asli dimuat dari server
+  const kode = doc.querySelector('#flow-detail .kode-fungsi');
+  assert.match(kode.textContent, /nlg\.PenulisBerantai\.tulis\(sistem, pesan\)/);
+  assert.match(kode.textContent, /nlg\.py · baris 897–899/);
+  assert.match(kode.textContent, /Output \(return\)return teks, status/);
+  assert.equal(kode.querySelector('.kode-inti .kode-no').textContent, '898');
+  assert.equal(kode.querySelector('.kode-tanda').textContent, '↑ panggil LLM jalur ini');
+  assert.equal(kode.querySelector('img'), null); // kode ditampilkan sebagai teks
+  assert.ok(kode.querySelector('.kode-param') && kode.querySelector('.kode-output'));
 });
