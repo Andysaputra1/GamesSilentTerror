@@ -640,3 +640,18 @@ test('simulation shows chat with NLU, live bot positions on the flowchart, and n
   assert.equal(kode.querySelector('img'), null); // kode ditampilkan sebagai teks
   assert.ok(kode.querySelector('.kode-param') && kode.querySelector('.kode-output'));
 });
+
+test('menu dokumen membuka ERD dan Proses AI di tab baru', async (t) => {
+  const w = setup(t);
+  await login(w);
+  const doc = w.document;
+  await doc.querySelector('[data-menu=dokumen]').onclick({ preventDefault() {} });
+  assert.equal(doc.querySelector('#menu-dokumen').hidden, false);
+  assert.equal(doc.querySelector('#menu-ai').hidden, true);
+  const links = [...doc.querySelectorAll('#menu-dokumen a')];
+  assert.deepEqual(
+    links.map((a) => a.getAttribute('href')),
+    ['/panel/dokumen/erd', '/panel/dokumen/proses-ai'],
+  );
+  assert.ok(links.every((a) => a.target === '_blank' && a.rel === 'noopener'));
+});
