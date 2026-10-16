@@ -7,7 +7,7 @@
 .home-desk {
   --home-ink: #382014;
   --home-paper: #fff4d9;
-  --home-serif: 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+  --home-serif: var(--font-display);
 
   position: relative;
   isolation: isolate;
@@ -55,49 +55,8 @@
 }
 
 .home-header app-profile-menu {
-  max-width: min(44vw, 230px);
-}
-
-.home-brand {
-  display: grid;
-  flex: none;
-  place-content: center;
-  width: clamp(170px, 18vw, 240px);
-  min-height: clamp(50px, 5.5vw, 70px);
-  padding: 8px 24px 10px;
-  color: #ffefc8;
-  text-align: center;
-  text-decoration: none;
-  text-shadow:
-    0 2px 1px #2a1209,
-    0 4px 8px #130703a8;
-  background: url('/assets/buttons/btn-wood.png') center / contain no-repeat;
-  filter: drop-shadow(0 5px 7px rgba(17, 5, 1, 0.42));
-  transform: rotate(-0.6deg);
-}
-
-.home-brand > span {
-  font-family: var(--home-serif);
-  font-size: clamp(17px, 1.9vw, 25px);
-  font-weight: 800;
-  line-height: 0.95;
-  white-space: nowrap;
-}
-
-.home-brand i {
-  display: inline-block;
-  margin: 0 0.15em;
-  color: #e9c06d;
-  font-size: 0.35em;
-  font-style: normal;
-  vertical-align: middle;
-}
-
-.home-brand small {
-  margin-top: 4px;
-  color: #e8cea0;
-  font: 700 7px/1 var(--font-body);
-  letter-spacing: 0.16em;
+  min-width: 0;
+  max-width: min(44vw, 260px);
 }
 
 /* ==========================================================================
@@ -177,19 +136,9 @@
 }
 
 .suspect-deck__heading {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  margin-bottom: clamp(10px, 1.35vh, 16px);
-  text-align: center;
+  --stamp-size: clamp(11px, 1.15cqw, 16px);
   flex: none;
-}
-
-.suspect-deck__heading span {
-  margin: 0;
-  color: #805129;
-  font: 800 clamp(16px, 1.45cqw, 21px) / 1.05 var(--font-body);
-  letter-spacing: 0.14em;
+  margin-bottom: clamp(10px, 1.35vh, 16px);
 }
 
 .role-deck-carousel {
@@ -260,8 +209,13 @@
   position: absolute;
   z-index: 5;
   top: 50%;
-  padding: 8px;
+  display: grid;
+  place-items: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 4px 8px 10px;
   border: 0;
+  border-radius: 50%;
   color: #5d3821;
   font: 700 clamp(30px, 4.2cqw, 52px) / 0.8 var(--home-serif);
   background: transparent;
@@ -290,13 +244,19 @@
   transform: translateY(-50%) scale(0.94);
 }
 
+.role-deck__control:focus-visible {
+  outline: 2px solid #754122;
+  outline-offset: 0;
+  background: rgb(255 248 228 / 0.7);
+}
+
 .role-deck__description {
   flex: none;
   width: 94%;
   min-height: 3.3em;
   margin: clamp(4px, 0.55cqw, 9px) 0 0;
   color: #5a3824;
-  font: 600 clamp(9px, 1cqw, 15px) / 1.35 var(--font-body);
+  font: 600 clamp(11px, 1.1cqw, 16px) / 1.4 var(--font-body);
   text-align: center;
 }
 
@@ -400,11 +360,14 @@
   gap: 1.2cqw;
 }
 
-.binder-kicker {
-  margin: 0;
-  color: #81512e;
-  font: 800 1.05cqw/1 var(--font-body);
-  letter-spacing: 0.14em;
+.binder-kicker,
+.room-entry__or {
+  --stamp-size: clamp(10px, 1cqw, 14px);
+}
+
+.room-entry__or {
+  margin: -0.2cqw 0;
+  opacity: 0.85;
 }
 
 .capacity-back {
@@ -416,7 +379,7 @@
   color: #7a4b2e;
   border: 0;
   background: transparent;
-  font: 800 0.78cqw/1 var(--font-body);
+  font: 800 clamp(10px, 0.85cqw, 13px) / 1 var(--font-body);
   letter-spacing: 0.1em;
   cursor: pointer;
   transition: color 150ms ease, transform 150ms ease;
@@ -576,16 +539,6 @@
   cursor: not-allowed;
 }
 
-.leather-button.is-active {
-  filter: brightness(1.15) drop-shadow(0 5px 8px rgba(39, 14, 4, 0.45));
-  transform: translateY(-2px);
-}
-
-.leather-button--small {
-  font-size: 1.6cqw;
-  width: 16cqw;
-}
-
 /* Join form: input + button stacked */
 .join-form {
   display: flex;
@@ -613,7 +566,7 @@
 }
 
 .join-input::placeholder {
-  color: rgba(56, 32, 20, 0.45);
+  color: rgba(56, 32, 20, 0.58);
   letter-spacing: 0.1em;
 }
 
@@ -648,7 +601,8 @@
 }
 
 /* ==========================================================================
-   FOOTER
+   FOOTER - tagline kiri, tombol panduan kanan (gaya .desk-chip dari styles.css).
+   Layout HP ada di main-page-responsive.css.
    ========================================================================== */
 
 .home-footer {
@@ -657,108 +611,26 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 18px;
-  min-height: 18px;
-  padding: 6px 0 0;
-  color: #f3ddad;
-  font: 800 7px/1.35 var(--font-body);
-  letter-spacing: 0.1em;
-  text-shadow: 0 2px 3px #1b0802;
+  gap: 16px;
+  min-height: 40px;
+  padding-top: clamp(6px, 1vh, 10px);
 }
 
-.home-footer button {
-  padding: 0;
-  border: 0;
-  color: #ffedbd;
-  font: inherit;
-  letter-spacing: inherit;
-  background: transparent;
-  transition:
-    color 180ms ease,
-    transform 180ms ease;
+.home-footer__tag {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--desk-muted);
+  font: 700 11px/1.3 var(--font-body);
+  letter-spacing: 0.14em;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 2px #1b0802;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
-.home-footer button:hover {
-  color: #ffffff;
-}
-
-/* ==========================================================================
-   RESPONSIVE - COMPACT BINDER
-   ========================================================================== */
-
-@media (max-width: 1100px) {
-  .suspect-deck {
-    padding: 8% 6% 6%;
-  }
-}
-
-/* ==========================================================================
-   RESPONSIVE - MOBILE (< 650px)
-   ========================================================================== */
-
-@media (max-width: 650px) {
-  .home-desk {
-    padding: 8px 10px 10px;
-  }
-
-  .home-header {
-    gap: 8px;
-    min-height: 44px;
-    padding-bottom: 10px;
-  }
-
-  .home-header app-profile-menu {
-    max-width: 43vw;
-  }
-
-  .home-brand {
-    width: 150px;
-    min-height: 44px;
-    padding: 6px 16px 8px;
-  }
-
-  .home-brand > span {
-    font-size: 15px;
-  }
-
-  .home-brand small {
-    margin-top: 3px;
-    font-size: 5px;
-  }
-
-  .leather-button {
-    font-size: clamp(10px, 1.55cqw, 23px);
-  }
-
-  .leather-button--small {
-    font-size: 1.8cqw;
-  }
-
-  .join-input {
-    font-size: clamp(9px, 1.55cqw, 23px);
-  }
-
-  .suspect-deck__heading {
-    margin-bottom: 6px;
-  }
-
-  .suspect-deck__heading span {
-    font-size: clamp(12px, 1.4cqw, 17px);
-  }
-
-  .role-deck__description {
-    font-size: clamp(7px, 0.95cqw, 12px);
-  }
-
-  .home-footer {
-    min-height: 14px;
-    font-size: 6px;
-    letter-spacing: 0.08em;
-  }
-
-  .home-footer button {
-    display: none;
-  }
+.home-footer__tag b {
+  color: var(--desk-text);
 }
 
 /* ==========================================================================
@@ -772,10 +644,6 @@
 
   .skin-cycle,
   .role-deck__card {
-    transition: none;
-  }
-
-  .home-footer button {
     transition: none;
   }
 

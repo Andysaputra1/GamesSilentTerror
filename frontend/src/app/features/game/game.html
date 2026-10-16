@@ -83,33 +83,23 @@
         </header>
         <div class="splash-body">
           <article class="paper briefing">
-            <img
-              class="decoration briefing-gears"
-              src="/assets/decorations/gears/gear-trio.png"
-              alt=""
-            />
             <header class="briefing-head">
-              <p class="hand">Berkas kasus rahasia</p>
               <h2 id="splash-title">Sebelum lampu dimatikan…</h2>
-              <p>
-                {{ threatLine }} Baca panduan singkat ini sambil menunggu
-                {{ state.preparation?.bots ? state.preparation?.bots + ' bot AI' : 'semua pemain' }}
-                siap.
-              </p>
+              <p>{{ threatLine }}</p>
               @if (composition.length) {
                 <ng-container *ngTemplateOutlet="compositionChips; context: { $implicit: '' }" />
-                <p class="composition-note hand">Jumlah Hitman dan Spy mengikuti jumlah pemain.</p>
               }
             </header>
-            <div class="guide-grid">
-              @for (item of guide; track item.title) {
-                <article class="guide-card">
-                  <span class="guide-icon" aria-hidden="true">{{ item.icon }}</span>
-                  <h3>{{ item.title }}</h3>
-                  <p>{{ item.text }}</p>
-                </article>
+            <!-- Ringkasan satu baris per hal; aturan lengkap ada di tombol "?" saat bermain. -->
+            <ol class="brief-steps">
+              @for (step of briefSteps; track step.title) {
+                <li>
+                  <span class="guide-icon" aria-hidden="true">{{ step.icon }}</span>
+                  <b>{{ step.title }}</b>
+                  <p>{{ step.text }}</p>
+                </li>
               }
-            </div>
+            </ol>
           </article>
           <aside class="splash-side">
             <div class="splash-role">
@@ -164,12 +154,7 @@
                     >{{ prep.consented ? 'Menunggu pertandingan dimulai…' : 'Saya sudah paham, siap!' }}</span
                   >
                 </button>
-                <small
-                  >{{ prep.agreed }} / {{ prep.required }} pemain siap. Layar persiapan berlangsung
-                  minimal 10 detik. Ronde 1 dimulai otomatis setelah AI siap dan semua pemain
-                  membuka kartu role (pemain yang belum membuka ditunggu paling lama 15
-                  detik).</small
-                >
+                <small>{{ prep.agreed }} / {{ prep.required }} pemain siap</small>
               </div>
             }
           </aside>
@@ -238,6 +223,28 @@
           >
             ?
           </button>
+          @if (!state.winner) {
+            <!-- KELUAR: dengan konfirmasi; server menganggap pemain tereliminasi (status "Keluar"). -->
+            <button
+              type="button"
+              class="danger-button leave-match"
+              (click)="leaveMatch()"
+              [disabled]="leaving"
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M6 2.5H3.5a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1H6M10.5 11 13.5 8l-3-3M13.5 8H6" />
+              </svg>
+              <span class="leave-label">Keluar</span>
+            </button>
+          }
           <app-fullscreen-control />
           <div class="profile-chip">
             <app-profile-menu
@@ -271,15 +278,22 @@
             <p class="eyebrow">{{ state.winner ? 'Role kamu' : 'Hanya untukmu' }}</p>
             <ng-container *ngTemplateOutlet="roleFlip; context: { $implicit: state }" />
             @if (revealRole && !state.winner) {
-              <p class="objective"><b>Tujuan kubumu:</b> {{ objective }}</p>
-              <p class="role-help">{{ roleHelp[state.me.role] }}</p>
+              <p class="role-help">
+                <b>{{ roleNames[state.me.role] || state.me.role }}.</b>
+                {{ roleHelp[state.me.role] }}
+              </p>
               @if (allies.length) {
                 <p class="allies">
                   Rekan Syndicate: <b>{{ allies.join(', ') }}</b>
                 </p>
               }
             }
-            <p class="private-status">{{ privateStatus }}</p>
+            <!-- Status hanya muncul bila hak chat/vote berubah (tereliminasi, Hostage, Gag) atau di akhir. -->
+            @if (
+              state.winner || !state.me.alive || state.me.hostage || state.me.gagged || state.me.muted
+            ) {
+              <p class="private-status">{{ privateStatus }}</p>
+            }
           </div>
           @if (state.me.intel.length) {
             <section class="note intel">
@@ -297,9 +311,10 @@
           </button>
           <section class="note events">
             <h3>Catatan pertandingan</h3>
+            <!-- Terbaru di atas agar kejadian terakhir terbaca sekilas. -->
             <div class="events-list">
-              @for (event of state.events; track $index) {
-                <p class="event">{{ event }}</p>
+              @for (event of state.events.slice().reverse(); track $index; let latest = $first) {
+                <p class="event" [class.latest]="latest">{{ event }}</p>
               } @empty {
                 <p class="event">Belum ada kejadian.</p>
               }
@@ -359,7 +374,10 @@
                       >
                     }
                     @if (!player.alive) {
-                      <span class="stamp stamp-dead">Dieksekusi</span>
+                      <!-- Pemain yang keluar tampil seperti korban eksekusi, dengan label berbeda. -->
+                      <span class="stamp stamp-dead" [class.stamp-left]="player.left">{{
+                        player.left ? 'Keluar' : 'Dieksekusi'
+                      }}</span>
                     } @else if (state.winner && player.hostage) {
                       <span class="stamp stamp-hostage">Disandera</span>
                     }

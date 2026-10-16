@@ -50,6 +50,16 @@ describe('active match recovery', () => {
       .flush({ active: null });
   });
 
+  it('opens the game from the lobby without waiting for the active-match lookup', () => {
+    localStorage.setItem('shadow_heist_access_token', 'test-token');
+    sessionStorage.setItem('shadow_heist_game_entry', 'allowed');
+    const result = TestBed.runInInjectionContext(() =>
+      activeMatchGuard({} as never, { url: '/game' } as never),
+    );
+    expect(result).toBe(true);
+    TestBed.inject(HttpTestingController).expectNone((r) => r.url.endsWith('/active'));
+  });
+
   it('does not request private state for anonymous visitors', () => {
     TestBed.inject(ActiveMatchService)
       .lookup()

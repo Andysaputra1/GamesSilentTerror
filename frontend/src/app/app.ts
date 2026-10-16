@@ -3,6 +3,7 @@ import { RouterOutlet, Router } from '@angular/router';
 import { isPlatformBrowser } from '@angular/common';
 import { catchError, exhaustMap, filter, fromEvent, merge, of, Subscription, timer } from 'rxjs';
 import { ActiveMatchService } from './core/active-match.service';
+import { BootLoader } from './core/boot-loader';
 import { SessionService } from './core/session.service';
 
 // DECORATOR: hubungkan komponen dengan selector HTML, template, dan fitur router.
@@ -21,12 +22,15 @@ export class App implements OnInit, OnDestroy {
     private readonly matches: ActiveMatchService,
     private readonly router: Router,
     private readonly session: SessionService,
+    private readonly bootLoader: BootLoader,
     @Inject(PLATFORM_ID) private readonly platform: object,
   ) {}
 
   // Host bisa memulai ketika anggota masih di main/lobby. Cek juga saat kembali ke tab.
   ngOnInit(): void {
     if (!isPlatformBrowser(this.platform)) return;
+    // Layar loading index.html hilang setelah halaman pertama, font, dan gambarnya siap.
+    this.bootLoader.start();
     this.storageMonitor = fromEvent<StorageEvent>(window, 'storage')
       .pipe(
         filter(

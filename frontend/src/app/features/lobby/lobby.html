@@ -1,24 +1,16 @@
 <main class="room-desk">
   <div class="room-desk__content">
     <header class="room-header">
-      <a class="room-brand" routerLink="/main" aria-label="Silent Terror, halaman utama">
+      <a class="desk-brand" routerLink="/main" aria-label="Silent Terror, halaman utama">
         <span>Silent <i aria-hidden="true">◆</i> Terror</span>
         <small>PRIVATE CASE FILES</small>
       </a>
-      <div class="room-header__actions">
-        <button class="room-guide-trigger" type="button" (click)="openHelp($event)">CASE FILE <b aria-hidden="true">↗</b></button>
-        <app-profile-menu
-          [username]="username"
-          (profileChanged)="username = $event.username"
-          [activeMatch]="!!room && room.phase !== 'lobby' && room.phase !== 'finished'"
-        />
-      </div>
+      <app-profile-menu
+        [username]="username"
+        (profileChanged)="username = $event.username"
+        [activeMatch]="!!room && room.phase !== 'lobby' && room.phase !== 'finished'"
+      />
     </header>
-
-    <div class="room-tagline">
-      <p>YOUR PRIVATE TABLE, {{ username }}</p>
-      <p>{{ room ? 'Bagikan kode · Atur meja · Mulai permainan' : 'Memuat room page…' }}</p>
-    </div>
 
     <section class="room-hero" aria-label="Room page">
       <section class="room-binder" [attr.aria-busy]="busy">
@@ -26,29 +18,91 @@
           <section class="room-sheet room-sheet--left" aria-label="Informasi ruangan">
             @if (room) {
               <div class="room-sheet__content room-sheet__content--code">
-                <p class="room-kicker">ROOM PAGE</p>
-                <h1>Your table<br/>is ready.</h1>
+                <p class="stamp-label room-kicker">Room page</p>
+                <h1>Your table is ready.</h1>
                 <div class="room-code-block">
-                  <span>ROOM CODE</span>
-                  <strong>{{ room.code }}</strong>
-                  <button class="room-copy" type="button" (click)="copyCode()">{{ copied ? 'COPIED' : 'COPY CODE' }}</button>
+                  <span class="room-label">Room code</span>
+                  <div class="room-code-block__row">
+                    <strong>{{ room.code }}</strong>
+                    <button class="room-copy" type="button" (click)="copyCode()">
+                      <svg
+                        aria-hidden="true"
+                        viewBox="0 0 16 16"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.5"
+                        stroke-linejoin="round"
+                      >
+                        <rect x="5.5" y="5.5" width="8" height="8" rx="1.5" />
+                        <path
+                          d="M10.5 3.5v-.5A1.5 1.5 0 0 0 9 1.5H4A1.5 1.5 0 0 0 2.5 3v5A1.5 1.5 0 0 0 4 9.5h.5"
+                        />
+                      </svg>
+                      {{ copied ? 'Copied' : 'Copy' }}
+                    </button>
+                  </div>
+                  <p class="room-note">
+                    Bagikan kode ini kepada teman yang sudah login untuk masuk ke meja yang sama.
+                  </p>
                 </div>
-                <p class="room-note">Bagikan kode ini kepada teman yang sudah login untuk masuk ke meja yang sama.</p>
                 <dl class="room-facts">
-                  <div><dt>SEATS</dt><dd>{{ room.members.length + room.bots.length }} / {{ room.capacity ?? capacity }}</dd></div>
-                  <div><dt>STATUS</dt><dd>{{ room.phase === 'lobby' ? 'WAITING' : room.phase }}</dd></div>
+                  <div>
+                    <dt class="room-label">Seats</dt>
+                    <dd>
+                      {{ room.members.length + room.bots.length }} / {{ room.capacity ?? capacity }}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt class="room-label">Status</dt>
+                    <dd>
+                      {{
+                        room.phase === 'lobby'
+                          ? 'Waiting'
+                          : room.phase === 'finished'
+                            ? 'Finished'
+                            : 'In game'
+                      }}
+                    </dd>
+                  </div>
+                  <div class="room-facts__wide">
+                    <dt class="room-label">Timer per fase</dt>
+                    <dd class="room-facts__timer">
+                      Siang {{ durations.day }}s · Malam {{ durations.night }}s · Tribunal
+                      {{ durations.tribunal }}s
+                    </dd>
+                  </div>
                 </dl>
                 @if (room.phase === 'lobby' || room.phase === 'finished') {
-                  <button class="room-leave" type="button" (click)="leaveRoom()" [disabled]="busy">LEAVE ROOM</button>
+                  <button
+                    class="danger-button room-leave"
+                    type="button"
+                    (click)="leaveRoom()"
+                    [disabled]="busy"
+                  >
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 16 16"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.6"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <path
+                        d="M6 2.5H3.5a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1H6M10.5 11 13.5 8l-3-3M13.5 8H6"
+                      />
+                    </svg>
+                    Leave room
+                  </button>
                 }
               </div>
             } @else {
               <div class="room-sheet__content room-sheet__content--loading">
-                <p class="room-kicker">ROOM PAGE</p>
-                <h1>Finding your<br/>table…</h1>
+                <p class="stamp-label room-kicker">Room page</p>
+                <h1>Finding your table…</h1>
                 <span class="room-loader" aria-label="Memuat ruangan"></span>
                 <p>Jika room belum tampil, kembali ke halaman utama lalu buat atau gabung room.</p>
-                <a class="room-return" routerLink="/main">← BACK TO CASE FILE</a>
+                <a class="room-return" routerLink="/main">← Back to main page</a>
               </div>
             }
           </section>
@@ -57,22 +111,37 @@
             @if (room) {
               <div class="room-sheet__content room-sheet__content--roster">
                 <header class="roster-header">
-                  <div><p class="room-kicker">LIVE ROSTER</p><h2>Players at<br/>the table.</h2></div>
-                  <span>{{ room.members.length + room.bots.length }} / {{ room.capacity ?? capacity }}</span>
+                  <div>
+                    <p class="stamp-label room-kicker">Live roster</p>
+                    <h2>Players at the table.</h2>
+                  </div>
+                  <span class="roster-count"
+                    >{{ room.members.length + room.bots.length }} /
+                    {{ room.capacity ?? capacity }}</span
+                  >
                 </header>
                 <div class="room-roster" tabindex="0" aria-label="Daftar peserta room">
                   @for (member of room.members; track member.name) {
                     <article class="room-player">
-                      <span class="room-player__mark" aria-hidden="true">◆</span>
-                      <div><b>{{ member.label || member.name }}</b><small>{{ member.name === room.owner ? 'HOST' : 'PLAYER' }}</small></div>
-                      @if (member.name === username) { <em>YOU</em> }
+                      <span class="room-player__avatar" aria-hidden="true">
+                        <img [src]="skinUrl(member.skin_id)" alt="" />
+                      </span>
+                      <div class="room-player__name">
+                        <b>{{ member.label || member.name }}</b>
+                        <small>{{ member.name === room.owner ? 'Host' : 'Player' }}</small>
+                      </div>
+                      @if (member.name === username) {
+                        <em>You</em>
+                      }
                     </article>
                   }
                   @for (bot of room.bots; track bot) {
                     <article class="room-player room-player--bot">
-                      <span class="room-player__mark" aria-hidden="true">✦</span>
-                      <div><b>{{ bot }}</b><small>BOT</small></div>
-                      <em>BOT</em>
+                      <span class="room-player__avatar" aria-hidden="true">✦</span>
+                      <div class="room-player__name">
+                        <b>{{ bot }}</b
+                        ><small>Bot AI</small>
+                      </div>
                     </article>
                   }
                 </div>
@@ -81,61 +150,144 @@
                   <div class="room-controls">
                     @if (room.owner === username) {
                       <div class="room-control-row">
-                        <div><b>Fill empty seats</b><p>Tambahkan bot untuk melengkapi meja.</p></div>
-                        <button class="room-secondary" type="button" (click)="toggleBot()" [disabled]="busy || room.members.length >= (room.capacity ?? capacity)">
-                          {{ room.bot_enabled ? 'REMOVE BOTS' : '+ BOTS' }}
+                        <div>
+                          <b>Fill empty seats</b>
+                          <p>Tambahkan bot untuk melengkapi meja.</p>
+                        </div>
+                        <button
+                          class="room-secondary"
+                          type="button"
+                          (click)="toggleBot()"
+                          [disabled]="busy || room.members.length >= (room.capacity ?? capacity)"
+                        >
+                          {{ room.bot_enabled ? 'Remove bots' : '+ Bots' }}
                         </button>
                       </div>
-                      <label class="room-quick-mode"><input type="checkbox" [(ngModel)]="quick" [disabled]="busy" /><span>Quick mode</span></label>
-                      <button class="room-primary room-primary--wood" type="button" (click)="startGame()" [disabled]="busy || room.members.length + room.bots.length < 4">
+                      <label class="room-quick-mode"
+                        ><input type="checkbox" [(ngModel)]="quick" [disabled]="busy" /><span
+                          >Quick mode <small>(timer lebih singkat)</small></span
+                        ></label
+                      >
+                      <button
+                        class="room-primary room-primary--wood"
+                        type="button"
+                        (click)="startGame()"
+                        [disabled]="busy || room.members.length + room.bots.length < 4"
+                      >
                         {{ busy ? 'PREPARING…' : 'START GAME' }} <b aria-hidden="true">↗</b>
                       </button>
+                      @if (room.members.length + room.bots.length < 4) {
+                        <p class="room-hint">Butuh minimal 4 pemain (termasuk bot) untuk mulai.</p>
+                      }
                     } @else {
-                      <p class="room-waiting">Waiting for {{ room.owner }} to set the table.</p>
+                      <p class="room-waiting">Waiting for {{ room.owner }} to start the game.</p>
                     }
                   </div>
                 } @else {
                   <div class="room-controls">
-                    <p class="room-waiting">{{ room.phase === 'finished' ? 'This game is finished.' : 'The game has started.' }}</p>
-                    <button class="room-primary" type="button" (click)="enterGame()" [disabled]="busy">
-                      {{ room.phase === 'finished' ? 'VIEW RESULT' : 'ENTER GAME' }} <b aria-hidden="true">↗</b>
+                    <p class="room-waiting">
+                      {{ room.phase === 'finished' ? 'This game is finished.' : 'The game has started.' }}
+                    </p>
+                    <button
+                      class="room-primary room-primary--wood"
+                      type="button"
+                      (click)="enterGame()"
+                      [disabled]="busy"
+                    >
+                      {{ room.phase === 'finished' ? 'VIEW RESULT' : 'ENTER GAME' }}
+                      <b aria-hidden="true">↗</b>
                     </button>
                   </div>
                 }
               </div>
             } @else {
-              <div class="room-sheet__content room-sheet__content--loading room-sheet__content--right-loading">
-                <p class="room-kicker">LIVE ROSTER</p><h2>Waiting for<br/>the table…</h2>
+              <div
+                class="room-sheet__content room-sheet__content--loading room-sheet__content--right-loading"
+              >
+                <p class="stamp-label room-kicker">Live roster</p>
+                <h2>Waiting for the table…</h2>
               </div>
             }
           </section>
         </div>
       </section>
       @if (error) {
-        <p class="room-error" role="alert">{{ error }} <button type="button" (click)="restoreRoom()" [disabled]="busy">RETRY</button></p>
+        <p class="room-error" role="alert">
+          {{ error }}
+          <button type="button" (click)="restoreRoom()" [disabled]="busy">Retry</button>
+        </p>
       }
     </section>
 
     <footer class="room-footer">
-      <span>SILENT TERROR · SOCIAL DEDUCTION PARTY GAME</span>
-      @if (room) { <span>DAY {{ durations.day }}s · NIGHT {{ durations.night }}s · TRIBUNAL {{ durations.tribunal }}s</span> }
+      <p class="room-footer__tag">
+        <b>Silent Terror</b><span class="room-footer__extra"> · Social deduction party game</span>
+      </p>
+      <button
+        class="desk-chip room-guide-trigger"
+        type="button"
+        aria-haspopup="dialog"
+        (click)="openHelp($event)"
+      >
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 16 16"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.4"
+          stroke-linejoin="round"
+        >
+          <path
+            d="M8 4.2C6.6 3 4.4 2.8 2 3.4v9c2.4-.6 4.6-.4 6 .8 1.4-1.2 3.6-1.4 6-.8v-9c-2.4-.6-4.6-.4-6 .8Z"
+          />
+          <path d="M8 4.2v9" />
+        </svg>
+        Buka panduan
+      </button>
     </footer>
   </div>
 </main>
 
 @if (helpOpen) {
   <div class="room-guide-layer" (click)="closeHelp()">
-    <section #helpDialog class="room-guide-dialog" role="dialog" aria-modal="true" aria-labelledby="room-guide-title" (click)="$event.stopPropagation()">
+    <section
+      #helpDialog
+      class="room-guide-dialog"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="room-guide-title"
+      (click)="$event.stopPropagation()"
+    >
       <header>
-        <div><p class="room-kicker">CASE FILE / HOW TO PLAY</p><h2 id="room-guide-title">Keep the table quiet.</h2></div>
-        <button #helpClose type="button" (click)="closeHelp()" aria-label="Tutup panduan">×</button>
+        <div>
+          <p class="stamp-label room-kicker">Case file · How to play</p>
+          <h2 id="room-guide-title">Keep the table quiet.</h2>
+        </div>
+        <button
+          #helpClose
+          class="room-guide-close"
+          type="button"
+          (click)="closeHelp()"
+          aria-label="Tutup panduan"
+        >
+          ×
+        </button>
       </header>
       <div class="room-guide-grid">
-        <article><span>01</span><b>SET THE TABLE</b><p>Mainkan 4–10 peserta, termasuk bot.</p></article>
-        <article><span>02</span><b>READ THE ROOM</b><p>Diskusikan alibi dan cari Hitman.</p></article>
-        <article><span>03</span><b>REACH A VERDICT</b><p>Gunakan Tribunal sebelum Syndicate menang.</p></article>
+        <article>
+          <span>01</span><b>Set the table</b>
+          <p>Mainkan 4–10 peserta, termasuk bot.</p>
+        </article>
+        <article>
+          <span>02</span><b>Read the room</b>
+          <p>Diskusikan alibi dan cari Hitman.</p>
+        </article>
+        <article>
+          <span>03</span><b>Reach a verdict</b>
+          <p>Gunakan Tribunal sebelum Syndicate menang.</p>
+        </article>
       </div>
-      <button class="room-primary" type="button" (click)="closeHelp()">BACK TO ROOM</button>
+      <button class="room-primary" type="button" (click)="closeHelp()">Back to room</button>
     </section>
   </div>
 }

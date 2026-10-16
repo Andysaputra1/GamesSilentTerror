@@ -301,6 +301,288 @@ a {
   border: 2px solid var(--card-ink);
 }
 
+/* MEJA KAYU: token dan kontrol bersama Main, Room, dan Game.
+   --desk-*: tombol gelap transparan di atas kayu (Panduan, profil, Keluar).
+   .stamp-label: label cap tinta di atas kertas; ukurannya lewat --stamp-size. */
+:root {
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-hand: 'Patrick Hand', cursive;
+  --desk-text: #fff3dc;
+  --desk-muted: rgb(255 232 190 / 0.82);
+  --desk-chip-bg: rgb(43 20 8 / 0.62);
+  --desk-chip-bg-hover: rgb(92 46 18 / 0.86);
+  --desk-chip-line: rgb(245 218 169 / 0.6);
+  --desk-focus: #f3d08b;
+  --paper-ink: #3d2416;
+  --paper-label: #84522c;
+  --danger: #8f2a1c;
+  --danger-hover: #a8321f;
+  --radius-control: 10px;
+  --shadow-control:
+    inset 0 1px 0 rgb(255 236 200 / 0.14),
+    0 3px 8px rgb(15 5 1 / 0.35);
+}
+.desk-chip,
+.danger-button {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--desk-chip-line);
+  border-radius: var(--radius-control);
+  color: var(--desk-text);
+  background: var(--desk-chip-bg);
+  box-shadow: var(--shadow-control);
+  font: 700 12px/1 var(--font-body);
+  letter-spacing: 0.1em;
+  text-decoration: none;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transition:
+    background-color 160ms ease,
+    transform 160ms ease;
+}
+.desk-chip svg,
+.danger-button svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+.desk-chip:hover:not(:disabled) {
+  background: var(--desk-chip-bg-hover);
+  transform: translateY(-1px);
+}
+.desk-chip:focus-visible,
+.danger-button:focus-visible {
+  outline: 2px solid var(--desk-focus);
+  outline-offset: 3px;
+}
+/* Tombol keluar: merah tua yang tetap terbaca di atas kayu maupun kertas. */
+.danger-button {
+  border-color: #5e170e;
+  background: var(--danger);
+}
+.danger-button:hover:not(:disabled) {
+  background: var(--danger-hover);
+  transform: translateY(-1px);
+}
+.danger-button:disabled {
+  opacity: 0.6;
+}
+/* Papan nama kayu di kiri atas Main dan Room. */
+.desk-brand {
+  display: grid;
+  flex: none;
+  place-content: center;
+  width: clamp(170px, 18vw, 240px);
+  min-height: clamp(50px, 5.5vw, 70px);
+  padding: 8px 24px 10px;
+  color: #ffefc8;
+  text-align: center;
+  text-decoration: none;
+  text-shadow:
+    0 2px 1px #2a1209,
+    0 4px 8px #130703a8;
+  background: url('/assets/buttons/btn-wood.png') center / contain no-repeat;
+  filter: drop-shadow(0 5px 7px rgb(17 5 1 / 0.42));
+  transform: rotate(-0.6deg);
+}
+.desk-brand > span {
+  font: 800 clamp(17px, 1.9vw, 25px) / 0.95 var(--font-display);
+  white-space: nowrap;
+}
+.desk-brand i {
+  display: inline-block;
+  margin: 0 0.15em;
+  color: #e9c06d;
+  font-size: 0.35em;
+  font-style: normal;
+  vertical-align: middle;
+}
+.desk-brand small {
+  margin-top: 5px;
+  color: #f0d8ab;
+  font: 700 clamp(8px, 0.6vw, 10px) / 1 var(--font-body);
+  letter-spacing: 0.16em;
+}
+.desk-brand:focus-visible {
+  outline: 2px solid var(--desk-focus);
+  outline-offset: 2px;
+}
+@media (max-width: 640px) {
+  .desk-brand {
+    width: 140px;
+    min-height: 46px;
+    padding: 6px 16px 8px;
+  }
+  .desk-brand > span {
+    font-size: 16px;
+  }
+  .desk-brand small {
+    font-size: 7px;
+  }
+}
+.stamp-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6em;
+  margin: 0;
+  color: var(--paper-label);
+  font: 800 var(--stamp-size, 12px) / 1 var(--font-body);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+.stamp-label::before,
+.stamp-label::after {
+  content: '';
+  width: 1.6em;
+  height: 1px;
+  background: currentColor;
+  opacity: 0.55;
+}
+
+/* LAYAR LOADING AWAL: markup #boot-loader di index.html, dihapus oleh core/boot-loader.ts.
+   Latar memakai gradien (bukan gambar) agar langsung tampil sebelum aset apa pun terunduh. */
+.boot-loader {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 24px 16px;
+  color: var(--desk-text);
+  text-align: center;
+  background: radial-gradient(circle at 50% 42%, #5b3319 0%, #2e180b 58%, #1a0c05 100%);
+  transition:
+    opacity 450ms ease,
+    visibility 0s linear 450ms;
+}
+.boot-loader--done {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.boot-loader__emblem {
+  position: relative;
+  width: min(176px, 48vw);
+  aspect-ratio: 1;
+  margin-bottom: 14px;
+}
+.boot-loader__ring {
+  position: absolute;
+  inset: -10%;
+  width: 120%;
+  height: 120%;
+  animation: boot-spin 1.6s linear infinite;
+}
+.boot-loader__track,
+.boot-loader__arc {
+  fill: none;
+  stroke-width: 3;
+}
+.boot-loader__track {
+  stroke: rgb(232 192 115 / 0.22);
+}
+.boot-loader__arc {
+  stroke: #e8c073;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-dasharray: 150 441;
+}
+.boot-loader__writer {
+  display: block;
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 8px 14px rgb(0 0 0 / 0.45));
+}
+/* Tangan bergeser sepanjang baris sambil pensil bergoyang kecil: kesan sedang menulis. */
+.boot-loader__hand {
+  animation: boot-write 2.4s ease-in-out infinite;
+}
+.boot-loader__pencil {
+  transform-origin: 106px 128px;
+  animation: boot-scribble 0.28s ease-in-out infinite alternate;
+}
+.boot-loader__line {
+  fill: none;
+  stroke: #6b4a33;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+}
+.boot-loader__line--live {
+  stroke-dasharray: 23;
+  animation: boot-ink 2.4s ease-in-out infinite;
+}
+.boot-loader__title {
+  margin: 0;
+  font: 800 clamp(28px, 6vw, 40px) / 1 var(--font-display);
+  text-shadow:
+    0 2px 0 #2a1209,
+    0 6px 14px rgb(0 0 0 / 0.5);
+}
+.boot-loader__title span {
+  margin: 0 0.15em;
+  color: #e8c073;
+  font-size: 0.4em;
+  vertical-align: middle;
+}
+.boot-loader__hint {
+  margin: 0;
+  color: var(--desk-muted);
+  font: 700 12px/1 var(--font-body);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+@keyframes boot-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes boot-write {
+  0% {
+    transform: translateX(-22px);
+  }
+  80% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-22px);
+  }
+}
+@keyframes boot-scribble {
+  from {
+    transform: rotate(-5deg) translateY(-1px);
+  }
+  to {
+    transform: rotate(4deg) translateY(1px);
+  }
+}
+@keyframes boot-ink {
+  0% {
+    stroke-dashoffset: 23;
+  }
+  80%,
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .boot-loader,
+  .boot-loader__ring,
+  .boot-loader__hand,
+  .boot-loader__pencil,
+  .boot-loader__line--live {
+    animation: none;
+    transition: none;
+  }
+}
+
 /* SCROLLBAR KAYU: papan kayu kecil di alur gelap, untuk semua panel yang bisa digulir.
    Chromium mengabaikan gaya ini pada elemen yang memakai scrollbar-width/scrollbar-color,
    jadi properti itu hanya dipasang di browser tanpa ::-webkit-scrollbar (Firefox). */

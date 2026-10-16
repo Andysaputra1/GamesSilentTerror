@@ -590,7 +590,8 @@ describe('Game', () => {
     expect(splash.querySelectorAll('.comp-chip').length).toBe(4);
     expect(component.compositionLabel).toBe('2 Hitman · 1 Spy · 1 Stalker · 4 Civilian');
     expect(splash.textContent).toContain('2 Hitman bersembunyi di antara kalian');
-    expect(splash.textContent).toContain('Jumlah Hitman dan Spy mengikuti jumlah pemain');
+    // Persiapan diringkas: empat poin satu baris (aturan lengkap ada di modal "?").
+    expect(splash.querySelectorAll('.brief-steps li').length).toBe(4);
 
     state.game.phase = 'day';
     state.game.me.role = 'spy';
@@ -937,5 +938,73 @@ describe('Game', () => {
     component.newBelow = 4;
     (render().querySelector('.chat-jump') as HTMLButtonElement).click();
     expect([component.newBelow, component.chatAtBottom]).toEqual([0, true]);
+  });
+
+  // KELUAR: konfirmasi dulu; server menandai pemain tereliminasi, lalu tab ini kembali ke menu utama.
+  it('leaves the match after confirmation and returns to the main menu', () => {
+    component.game = snapshot().game;
+    component.code = 'ABC123';
+    sessionStorage.setItem('shadow_heist_room', 'ABC123');
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const leave = vi
+      .spyOn(TestBed.inject(GameService), 'leave')
+      .mockReturnValue(of({ left: true }));
+    (render().querySelector('.leave-match') as HTMLButtonElement).click();
+    expect(confirm).toHaveBeenCalledWith('Keluar dari permainan? Kamu dianggap tereliminasi.');
+    expect(leave).toHaveBeenCalledWith('ABC123');
+    expect(TestBed.inject(Router).navigateByUrl).toHaveBeenCalledWith('/main');
+    expect(component.game).toBeNull();
+    expect(sessionStorage.getItem('shadow_heist_room')).toBeNull();
+    expect(component.leaving).toBe(false);
+  });
+
+  it('stays in the match when leaving is cancelled or the network fails', () => {
+    component.game = snapshot().game;
+    component.code = 'ABC123';
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const leave = vi
+      .spyOn(TestBed.inject(GameService), 'leave')
+      .mockReturnValue(throwError(() => ({ status: 0, error: null })));
+    component.leaveMatch();
+    expect(leave).not.toHaveBeenCalled();
+    confirm.mockReturnValue(true);
+    component.leaveMatch();
+    expect(leave).toHaveBeenCalledTimes(1);
+    expect(component.game).not.toBeNull();
+    expect(component.error).toContain('Gagal keluar');
+    expect(TestBed.inject(Router).navigateByUrl).not.toHaveBeenCalledWith('/main');
+  });
+
+  it('marks players who left apart from executed players', () => {
+    const game = snapshot().game;
+    game.players = [
+      { name: 'alice', bot: false, alive: true },
+      { name: 'bob', bot: false, alive: false, left: true },
+      { name: 'NOX', bot: true, alive: false },
+    ];
+    component.game = game;
+    const stamps = [...render().querySelectorAll('.stamp-dead')].map((s) => s.textContent?.trim());
+    expect(stamps).toEqual(['Keluar', 'Dieksekusi']);
+    expect(fixture.nativeElement.querySelectorAll('.stamp-left').length).toBe(1);
+  });
+
+  it('explains a civilian win when the last Hitman left instead of being executed', () => {
+    const game = snapshot().game;
+    game.phase = 'finished';
+    game.winner = 'civilians';
+    game.players = [
+      { name: 'alice', bot: false, alive: false, left: true, role: 'hitman' },
+      { name: 'NOX', bot: true, alive: true, role: 'civilian' },
+    ];
+    game.result = {
+      reason: 'hitman_executed',
+      team: 'hitman',
+      outcome: 'lost',
+      civilians_alive: 1,
+      civilians_hostage: 0,
+      civilians_eliminated: 0,
+    };
+    component.game = game;
+    expect(component.resultExplanation).toContain('Hitman telah tersingkir');
   });
 });

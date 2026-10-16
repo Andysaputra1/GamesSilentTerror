@@ -9,20 +9,24 @@
   align-items: center;
   gap: 6px;
 }
+/* Gaya kontrol meja (styles.css) agar sejajar dengan kotak akun dan tombol HUD lain. */
 .fullscreen-toggle {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
+  gap: 6px;
   min-height: 40px;
-  padding: 7px 10px;
-  border: 2px solid var(--ink-strong, #2b170c);
-  border-radius: 999px;
-  background: var(--paper, #f6ead0);
-  color: var(--ink, #422719);
-  box-shadow: 0 3px 0 rgb(43 23 12 / 0.55);
+  padding: 7px 12px;
+  border: 1px solid var(--desk-chip-line);
+  border-radius: var(--radius-control);
+  background: var(--desk-chip-bg);
+  color: var(--desk-text);
+  box-shadow: var(--shadow-control);
   font: 16px/1 var(--font-hand, Arial, sans-serif);
   cursor: pointer;
+}
+.fullscreen-toggle:hover:not(:disabled) {
+  background: var(--desk-chip-bg-hover);
 }
 .fullscreen-toggle span[aria-hidden='true'] {
   font: 20px/1 Arial, sans-serif;
@@ -32,7 +36,7 @@
   cursor: wait;
 }
 .fullscreen-toggle:focus-visible {
-  outline: 3px dashed var(--gold, #e8c073);
+  outline: 2px solid var(--desk-focus);
   outline-offset: 3px;
 }
 .fullscreen-error {
@@ -50,7 +54,8 @@
   text-align: right;
 }
 
-@media (max-width: 600px) {
+/* Layar sempit (HUD game tablet/HP): ikon saja; nama tetap lewat aria-label. */
+@media (max-width: 1099px) {
   .fullscreen-label {
     position: absolute;
     width: 1px;

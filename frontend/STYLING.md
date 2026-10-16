@@ -50,10 +50,26 @@ tereksekusi; pembaca layar mendapat teks `.sr-only` "Hitman tersisa x dari n". P
 hanya dirender untuk Hitman: `.ally-tag` di kartu rekan dan `.ally-pick` ("◆ Incaran") di kartu yang
 dipilih rekan saat malam (keduanya di `game-screens.css` karena budget `game-table.css` hampir penuh),
 serta `.ally-plan` di baki aksi (`game-table.css`).
-Breakpoint 1099px: meja + chat dengan tab Meja/Kartu; 759px: satu panel
-per tab (Meja/Chat/Kartu). Perubahan file game ini tidak memengaruhi login/main page. Pada Main, 900px
-mengubah menu tiga kartu menjadi satu kolom dan 760px menumpuk kartu role.
-Lobby menjadi satu kolom pada 760px. Sesuaikan angka tersebut jika perlu.
+Breakpoint 1099px: meja + chat dengan tab Meja/Kartu (HUD: kotak akun hanya avatar); 759px: satu
+panel per tab (Meja/Chat/Kartu), tombol Keluar hanya ikon. Perubahan file game ini tidak memengaruhi
+login/main page.
+
+**Kontrol meja bersama** (akhir `src/styles.css`, dipakai Main, Room, dan HUD game):
+token `--desk-*`, `--paper-*`, `--danger`, `--radius-control`; kelas `.desk-chip` (tombol gelap di
+atas kayu, mis. "Buka panduan"), `.danger-button` (Leave room / Keluar), `.desk-brand` (papan nama
+kayu), dan `.stamp-label` (label cap di atas kertas, ukuran lewat `--stamp-size`). Kotak akun
+(`core/profile-menu.ts`) memakai token yang sama; induk boleh mengatur `--profile-name-max` dan
+`--profile-name-display: none` (avatar saja).
+
+**Main dan Room** memakai binder kulit yang sama (`main-page.css`, `lobby.css`); di HP (<= 640px)
+binder dilepas menjadi dua lembar kertas bertumpuk (`main-page-responsive.css`,
+`lobby-responsive.css`) dan halaman boleh bergulir vertikal.
+
+**Layar loading awal**: markup `#boot-loader` ada di `src/index.html` (di luar `app-root`, jadi tampil
+pada paint pertama) dan gayanya di `styles.css`; `core/boot-loader.ts` menghapusnya setelah halaman
+pertama, font, dan gambar Main (`MAIN_PAGE_IMAGES` di `core/asset-preloader.ts`) siap, paling lama
+8 detik. Gambar besar di `public/assets` sudah diperkecil sesuai ukuran tampil; jaga agar aset baru
+tidak jauh lebih besar dari ukuran tampilnya.
 
 Untuk mengecek perubahan, jalankan dari root repository ketika container frontend aktif:
 

@@ -1,5 +1,5 @@
 .case-file-overlay {
-  --home-serif: 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+  --home-serif: var(--font-display);
 
   position: fixed;
   z-index: 100;

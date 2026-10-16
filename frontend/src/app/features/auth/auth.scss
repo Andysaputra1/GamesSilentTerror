@@ -8,12 +8,13 @@
    - >= 900px : kertas Register di kiri menimpa binder Login di kanan.
    - <  900px : ditumpuk vertikal (Login di atas), form satu kolom.
 
-   Ukuran asli aset (jangan diubah kalau ganti gambar, sesuaikan angkanya):
+   Rasio aset (aspect-ratio di bawah memakai ukuran asli; tombol sudah diperkecil
+   ke lebar 900px dengan rasio yang sama agar unduhan ringan):
      register-paper.png  1410 x 870
      login-binder.png     730 x 900
-     btn-wood.png        1335 x 436   (dipakai untuk papan judul)
-     btn-greenwood.png   1293 x 358
-     btn-leather.png     1354 x 673
+     btn-wood.png        1335 x 436   (kini 900 x 294; dipakai untuk papan judul)
+     btn-greenwood.png   1293 x 358   (kini 900 x 249)
+     btn-leather.png     1354 x 673   (kini 900 x 447)
    ========================================================================== */
 
 

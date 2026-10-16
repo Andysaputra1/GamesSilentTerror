@@ -1,7 +1,7 @@
 <main class="home-desk" [class.home-desk--case-open]="caseFileOpen">
   <div class="home-desk__content">
     <header class="home-header">
-      <a class="home-brand" routerLink="/main" aria-label="Silent Terror, halaman utama">
+      <a class="desk-brand" routerLink="/main" aria-label="Silent Terror, halaman utama">
         <span>Silent <i aria-hidden="true">◆</i> Terror</span>
         <small>PRIVATE CASE FILES</small>
       </a>
@@ -22,11 +22,14 @@
                 [disabled]="skinTransitionState !== 'idle'"
                 (click)="cycleRoleDeckSkin()"
               >
-                <img class="skin-cycle__icon" src="/assets/decorations/icons/hanger.png" alt="" aria-hidden="true" />
+                <img
+                  class="skin-cycle__icon"
+                  src="/assets/decorations/icons/hanger.png"
+                  alt=""
+                  aria-hidden="true"
+                />
               </button>
-              <div class="suspect-deck__heading">
-                <span>ROLE DECK</span>
-              </div>
+              <h2 class="suspect-deck__heading stamp-label">Role deck</h2>
               <div class="role-deck-carousel">
                 <button
                   class="role-deck__control role-deck__control--previous"
@@ -74,11 +77,16 @@
           <!-- Right page: Create/Join UI -->
           <div class="binder-page binder-page--right">
             @if (createSetupOpen) {
-              <button class="capacity-back" type="button" (click)="cancelCreateSetup()" [disabled]="busy">
+              <button
+                class="capacity-back"
+                type="button"
+                (click)="cancelCreateSetup()"
+                [disabled]="busy"
+              >
                 ← BACK
               </button>
               <section class="capacity-picker" aria-labelledby="capacity-picker-title">
-                <p class="binder-kicker">NEW ROOM</p>
+                <p class="binder-kicker stamp-label">New room</p>
                 <h2 id="capacity-picker-title" class="binder-title">
                   <span>How many players</span>
                   <span>at your table?</span>
@@ -100,10 +108,17 @@
                     aria-label="Jumlah pemain"
                   />
                   <div class="capacity-ticks" aria-hidden="true">
-                    @for (count of capacities; track count) { <span>{{ count }}</span> }
+                    @for (count of capacities; track count) {
+                      <span>{{ count }}</span>
+                    }
                   </div>
                 </div>
-                <button class="leather-button" type="button" (click)="onCreateRoom()" [disabled]="busy">
+                <button
+                  class="leather-button"
+                  type="button"
+                  (click)="onCreateRoom()"
+                  [disabled]="busy"
+                >
                   {{ busy ? 'CREATING…' : 'CREATE ROOM' }}
                 </button>
               </section>
@@ -114,9 +129,16 @@
                   <span>your friend's party!</span>
                 </h2>
 
-                <button class="leather-button" type="button" (click)="openCreateSetup()" [disabled]="busy">
+                <button
+                  class="leather-button"
+                  type="button"
+                  (click)="openCreateSetup()"
+                  [disabled]="busy"
+                >
                   CREATE
                 </button>
+
+                <p class="room-entry__or stamp-label" aria-hidden="true">or</p>
 
                 <form class="join-form" (ngSubmit)="onJoinRoom()">
                   <input
@@ -125,7 +147,10 @@
                     name="joinCode"
                     maxlength="6"
                     placeholder="ROOM CODE"
+                    aria-label="Kode ruangan, 6 karakter"
                     autocomplete="off"
+                    autocapitalize="characters"
+                    spellcheck="false"
                     [disabled]="busy"
                     class="join-input"
                   />
@@ -145,8 +170,30 @@
     </section>
 
     <footer class="home-footer">
-      <span>SILENT TERROR · SOCIAL DEDUCTION PARTY GAME</span>
-      <button type="button" (click)="openCaseFile($event)">BUKA PANDUAN <b aria-hidden="true">↗</b></button>
+      <p class="home-footer__tag">
+        <b>Silent Terror</b><span class="home-footer__extra"> · Social deduction party game</span>
+      </p>
+      <button
+        class="desk-chip home-guide"
+        type="button"
+        aria-haspopup="dialog"
+        (click)="openCaseFile($event)"
+      >
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 16 16"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.4"
+          stroke-linejoin="round"
+        >
+          <path
+            d="M8 4.2C6.6 3 4.4 2.8 2 3.4v9c2.4-.6 4.6-.4 6 .8 1.4-1.2 3.6-1.4 6-.8v-9c-2.4-.6-4.6-.4-6 .8Z"
+          />
+          <path d="M8 4.2v9" />
+        </svg>
+        Buka panduan
+      </button>
     </footer>
   </div>
 </main>
@@ -225,7 +272,9 @@
                   </div>
                 </li>
               </ol>
-              <p class="case-file-note">Tidak ada batas ronde. Gunakan setiap fase untuk menguji cerita yang berubah.</p>
+              <p class="case-file-note">
+                Tidak ada batas ronde. Gunakan setiap fase untuk menguji cerita yang berubah.
+              </p>
             </section>
           }
           @case ('roles') {
@@ -241,7 +290,9 @@
                 <article class="role-note role-note--hitman">
                   <span>01 / SYNDICATE</span>
                   <h3>Hitman</h3>
-                  <p>Sandera satu pemain pada malam hari. Gag Order membungkam chat pada siang hari.</p>
+                  <p>
+                    Sandera satu pemain pada malam hari. Gag Order membungkam chat pada siang hari.
+                  </p>
                 </article>
                 <article class="role-note role-note--spy">
                   <span>02 / WARGA</span>
@@ -251,17 +302,26 @@
                 <article class="role-note role-note--stalker">
                   <span>03 / WARGA</span>
                   <h3>Stalker</h3>
-                  <p>Peek role asli satu pemain secara privat. Skill tersedia sekali setiap dua ronde.</p>
+                  <p>
+                    Peek role asli satu pemain secara privat. Skill tersedia sekali setiap dua
+                    ronde.
+                  </p>
                 </article>
                 <article class="role-note role-note--civilian">
                   <span>04 / WARGA</span>
                   <h3>Civilian</h3>
-                  <p>Tanpa aksi malam. Amati percakapan, uji alibi, lalu gunakan suaramu dengan hati-hati.</p>
+                  <p>
+                    Tanpa aksi malam. Amati percakapan, uji alibi, lalu gunakan suaramu dengan
+                    hati-hati.
+                  </p>
                 </article>
               </div>
               <aside class="silence-note">
                 <b>DIAM BUKAN BUKTI.</b>
-                <p>Hostage tetap hidup tetapi kehilangan chat dan voting. Target aksi malam tidak diumumkan.</p>
+                <p>
+                  Hostage tetap hidup tetapi kehilangan chat dan voting. Target aksi malam tidak
+                  diumumkan.
+                </p>
               </aside>
             </section>
           }
@@ -273,17 +333,25 @@
               tabindex="0"
               aria-labelledby="case-file-tab-win"
             >
-              <p class="case-file-intro">Jaga siapa yang masih punya suara, bukan hanya siapa yang masih hidup.</p>
+              <p class="case-file-intro">
+                Jaga siapa yang masih punya suara, bukan hanya siapa yang masih hidup.
+              </p>
               <div class="verdict-grid">
                 <article class="verdict-card verdict-card--citizens">
                   <span>WARGA MENANG</span>
                   <h3>Semua Hitman dieksekusi.</h3>
-                  <p>Baca alibi, lindungi warga, dan gunakan Tribunal sebelum Syndicate menguasai meja.</p>
+                  <p>
+                    Baca alibi, lindungi warga, dan gunakan Tribunal sebelum Syndicate menguasai
+                    meja.
+                  </p>
                 </article>
                 <article class="verdict-card verdict-card--syndicate">
                   <span>SYNDICATE MENANG</span>
                   <h3>Hitman menyamai atau melampaui warga yang masih bebas bersuara.</h3>
-                  <p>Hostage masih hidup, tetapi tidak dihitung sebagai suara bebas untuk menyelamatkan kota.</p>
+                  <p>
+                    Hostage masih hidup, tetapi tidak dihitung sebagai suara bebas untuk
+                    menyelamatkan kota.
+                  </p>
                 </article>
               </div>
               <p class="case-file-note">Diam bisa menjadi strategi—tetapi bukan bukti.</p>

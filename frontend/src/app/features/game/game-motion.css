@@ -241,16 +241,33 @@
     color: #fff;
     font: 800 12px/18px var(--font-display);
   }
+  /* HUD tablet: papan fase di kolom tengah yang fleksibel; kotak akun cukup avatar. */
+  .hud {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
   .hud-brand {
     width: 170px;
     font-size: 12px;
   }
+  .hud-phase {
+    min-width: 0;
+  }
   .phase-sign {
+    width: 100%;
+    max-width: 320px;
     min-width: 0;
     font-size: 14px;
   }
+  .profile-chip {
+    --profile-name-display: none;
+  }
   .guide-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 899px) {
+  .hud-brand {
+    display: none;
   }
 }
 
@@ -265,24 +282,27 @@
   .round-flow {
     display: none;
   }
+  /* Papan fase mengisi sisa kolom (bukan lebar tetap 250px) agar tidak tertimpa timer/tombol. */
   .hud-phase {
-    justify-self: start;
+    justify-self: stretch;
   }
   .phase-sign {
+    width: 100%;
     max-width: 100%;
-    padding: 0.45em 1.7em;
-    font-size: 12px;
+    gap: 0.3em;
+    padding: 0.5em 1.1em;
+    font-size: 11px;
   }
   .phase-sign b {
     overflow: hidden;
     text-overflow: ellipsis;
   }
   .timer {
-    width: 48px;
-    height: 48px;
+    width: 44px;
+    height: 44px;
   }
   .timer b {
-    font-size: 16px;
+    font-size: 15px;
   }
   .round-button {
     width: 36px;
@@ -349,8 +369,27 @@
   .splash-side {
     order: -1;
   }
-  .guide-grid {
+  .guide-grid,
+  .brief-steps {
     grid-template-columns: minmax(0, 1fr);
+  }
+  /* HUD HP: kotak akun cukup avatar, tombol Keluar cukup ikon (teks tetap untuk pembaca layar). */
+  .hud-side {
+    gap: 6px;
+  }
+  .profile-chip {
+    --profile-name-display: none;
+  }
+  .leave-match {
+    padding: 0 10px;
+  }
+  .leave-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
   }
   .briefing,
   .survey,

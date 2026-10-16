@@ -1,0 +1,254 @@
+/* ==========================================================================
+   MAIN PAGE - RESPONSIVE
+   Desktop/tablet: binder kulit satu layar (main-page.css).
+   HP (<= 640px): binder dilepas, dua halaman menjadi kertas bertumpuk dengan gutter 16px;
+   halaman boleh bergulir vertikal agar teks dan tombol tetap berukuran nyaman.
+   ========================================================================== */
+
+@media (max-width: 1100px) {
+  .suspect-deck {
+    padding: 8% 6% 6%;
+  }
+}
+
+@media (max-width: 640px) {
+  :host {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+
+  .home-desk {
+    height: auto;
+    min-height: 100dvh;
+    padding: 10px 16px 12px;
+    overflow: hidden;
+  }
+
+  .home-desk__content {
+    height: auto;
+    min-height: calc(100dvh - 22px);
+  }
+
+  .home-header {
+    gap: 10px;
+    min-height: 48px;
+    padding-bottom: 12px;
+  }
+
+  .home-header app-profile-menu {
+    max-width: calc(100% - 150px);
+    --profile-name-max: 120px;
+  }
+
+  /* Binder -> dua lembar kertas bertumpuk (kertas register yang sama dengan login/game). */
+  .home-hero {
+    display: block;
+    flex: 1 0 auto;
+    container-type: normal;
+  }
+
+  .binder-section {
+    width: 100%;
+    height: auto;
+    aspect-ratio: auto;
+    background: none;
+    filter: none;
+  }
+
+  .binder-content {
+    position: static;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+  }
+
+  .binder-page,
+  .binder-page--left,
+  .binder-page--right {
+    position: relative;
+    isolation: isolate;
+    inset: auto;
+    width: 100%;
+    height: auto;
+    gap: 12px;
+    padding: 26px 22px 24px;
+  }
+
+  .binder-page::before {
+    position: absolute;
+    z-index: -1;
+    inset: 0;
+    content: '';
+    pointer-events: none;
+    border: 18px solid transparent;
+    border-image: url('/assets/auth/register-paper.png') 60 fill / 18px stretch;
+    filter: drop-shadow(0 6px 10px rgb(20 10 5 / 0.45));
+  }
+
+  .suspect-deck {
+    height: auto;
+    padding: 0;
+  }
+
+  .skin-cycle {
+    top: -10px;
+    left: -8px;
+    width: 46px;
+  }
+
+  .suspect-deck__heading {
+    --stamp-size: 12px;
+    margin-bottom: 10px;
+  }
+
+  .role-deck-carousel {
+    flex: none;
+    height: auto;
+    aspect-ratio: 1.3;
+  }
+
+  .role-deck__card {
+    left: 21%;
+    width: 58%;
+  }
+
+  .role-deck__control {
+    font-size: 40px;
+  }
+
+  .role-deck__control--previous {
+    left: -6px;
+  }
+
+  .role-deck__control--next {
+    right: -6px;
+  }
+
+  .role-deck__description {
+    width: 100%;
+    min-height: 0;
+    margin-top: 12px;
+    font-size: 14px;
+  }
+
+  .binder-title {
+    margin-bottom: 2px;
+    font-size: 22px;
+  }
+
+  .binder-title span {
+    white-space: normal;
+  }
+
+  .room-entry,
+  .capacity-picker {
+    gap: 12px;
+  }
+
+  .binder-kicker,
+  .room-entry__or {
+    --stamp-size: 11px;
+  }
+
+  .room-entry__or {
+    margin: 0;
+  }
+
+  .leather-button {
+    width: 170px;
+    font-size: 18px;
+  }
+
+  .join-form {
+    flex-direction: row;
+    justify-content: center;
+    gap: 10px;
+  }
+
+  .join-input {
+    flex: 1 1 auto;
+    width: auto;
+    max-width: 170px;
+    height: 52px;
+    font-size: 16px;
+  }
+
+  .join-form .leather-button {
+    width: 124px;
+    font-size: 16px;
+  }
+
+  .capacity-back {
+    top: 16px;
+    left: 20px;
+    padding: 6px 0;
+    font-size: 12px;
+  }
+
+  .capacity-slider {
+    width: 100%;
+    gap: 10px;
+    margin: 4px 0 8px;
+  }
+
+  .capacity-slider output {
+    width: 84px;
+    gap: 4px;
+    padding: 8px;
+    border-radius: 8px;
+  }
+
+  .capacity-slider__value {
+    font-size: 32px;
+  }
+
+  .capacity-slider__label {
+    font-size: 10px;
+  }
+
+  .capacity-slider input[type='range'] {
+    height: 28px;
+  }
+
+  /* Selector vendor dipisah: satu pseudo-element asing membatalkan seluruh daftar selector. */
+  .capacity-slider input[type='range']::-webkit-slider-runnable-track {
+    height: 6px;
+  }
+
+  .capacity-slider input[type='range']::-moz-range-track {
+    height: 6px;
+  }
+
+  .capacity-slider input[type='range']::-webkit-slider-thumb {
+    width: 24px;
+    height: 24px;
+    margin-top: -10px;
+    border-width: 3px;
+  }
+
+  .capacity-slider input[type='range']::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-width: 3px;
+  }
+
+  .capacity-ticks {
+    width: calc(100% - 20px);
+    font-size: 12px;
+  }
+
+  .binder-error {
+    padding: 10px 14px;
+    font-size: 14px;
+  }
+
+  .home-footer {
+    gap: 10px;
+    padding-top: 14px;
+  }
+
+  .home-footer__extra {
+    display: none;
+  }
+}

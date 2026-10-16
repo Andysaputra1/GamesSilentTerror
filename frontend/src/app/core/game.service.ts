@@ -64,6 +64,8 @@ export interface MatchView {
     metode?: string;
     bot?: boolean;
     alive: boolean;
+    /** Keluar di tengah pertandingan: tidak hidup seperti dieksekusi, tetapi ditampilkan "Keluar". */
+    left?: boolean;
     role?: string;
     hostage?: boolean;
     skin_id?: string;
@@ -141,6 +143,18 @@ export class GameService {
         body,
         headers: this.headers(),
       })
+      .pipe(timeout(10000));
+  }
+
+  // Keluar dari room. Di tengah pertandingan server menganggap pemain tereliminasi (status `left`);
+  // permintaan ulang tetap dijawab berhasil.
+  leave(code: string) {
+    return this.http
+      .post<{ left: boolean }>(
+        `${backendUrl()}/api/rooms/${encodeURIComponent(code)}/leave`,
+        null,
+        { headers: this.headers() },
+      )
       .pipe(timeout(10000));
   }
 

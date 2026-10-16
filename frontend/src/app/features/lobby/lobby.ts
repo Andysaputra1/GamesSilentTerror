@@ -19,13 +19,14 @@ import { finalize } from 'rxjs';
 import { gameEntryStorageKey } from '../../core/flow.guard';
 import { Room, RoomService } from '../../core/room.service';
 import { ProfileMenu } from '../../core/profile-menu';
+import { skinImageUrl } from '../../core/asset-preloader';
 
 // DECORATOR: hubungkan Lobby dengan template, CSS, navigasi, dan binding form.
 @Component({
   selector: 'app-lobby',
   imports: [RouterLink, FormsModule, ProfileMenu],
   templateUrl: './lobby.html',
-  styleUrls: ['./lobby.css'],
+  styleUrls: ['./lobby.css', './lobby-responsive.css'],
 })
 // CLASS KOMPONEN: mengatur buat/gabung ruangan, roster, pilihan bot, dan masuk chat.
 export class Lobby implements OnInit, OnDestroy {
@@ -84,11 +85,31 @@ export class Lobby implements OnInit, OnDestroy {
         JSON.parse(localStorage.getItem('shadow_heist_user') ?? '{}').username || this.username;
     } catch {}
     const code = sessionStorage.getItem('shadow_heist_room');
+    // Tampilkan dulu snapshot dari Main (respons create/join barusan) agar layar room tidak
+    // menunggu satu round trip; restoreRoom/load tetap menggantinya dengan data server.
+    this.room = this.roomSnapshot(code);
     if (localStorage.getItem('shadow_heist_access_token')) this.restoreRoom();
     else if (code) this.load('GET', '/' + encodeURIComponent(code));
     this.timer = setInterval(() => {
       if (this.room && !this.busy) this.load('GET', '/' + this.room.code);
     }, 3000);
+  }
+
+  // Foto skin pemain untuk roster; skin kosong memakai skin bawaan yang sama dengan game.
+  skinUrl(skinId: string | undefined): string {
+    return skinImageUrl(skinId || 'dexter');
+  }
+
+  // Snapshot room tab ini hanya dipakai bila kodenya sama dengan pointer room yang aktif.
+  private roomSnapshot(code: string | null): Room | null {
+    if (!code) return null;
+    try {
+      const room = JSON.parse(sessionStorage.getItem('shadow_heist_room_snapshot') ?? 'null');
+      const valid = room?.code === code && Array.isArray(room.members) && Array.isArray(room.bots);
+      return valid ? (room as Room) : null;
+    } catch {
+      return null;
+    }
   }
 
   // LIFECYCLE METHOD: hentikan polling saat komponen dilepas agar tidak berjalan di belakang.

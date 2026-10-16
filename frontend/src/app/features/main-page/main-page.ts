@@ -1,6 +1,8 @@
 import { isPlatformBrowser } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import {
+  afterNextRender,
+  ChangeDetectorRef,
   Component,
   DestroyRef,
   ElementRef,
@@ -16,6 +18,7 @@ import { Router } from '@angular/router';
 import { finalize } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
+import { AssetPreloader, MAIN_PAGE_IMAGES, SKIN_IDS } from '../../core/asset-preloader';
 import { ProfileMenu } from '../../core/profile-menu';
 import { RoleRevealCard } from '../../core/role-reveal-card/role-reveal-card';
 import { RoomService } from '../../core/room.service';
@@ -47,7 +50,7 @@ interface CaseFileTabOption {
   selector: 'app-main-page',
   imports: [RouterLink, ProfileMenu, RoleRevealCard, FormsModule],
   templateUrl: './main-page.html',
-  styleUrls: ['./main-page.css', './main-page-case-file.css'],
+  styleUrls: ['./main-page.css', './main-page-responsive.css', './main-page-case-file.css'],
 })
 export class MainPage implements OnInit, OnDestroy {
   username = 'guest';
@@ -84,14 +87,10 @@ export class MainPage implements OnInit, OnDestroy {
       description: 'Tanpa aksi malam—baca alibi, bangun kepercayaan, lalu gunakan suaramu.',
     },
   ];
-  readonly previewSkins: readonly SkinPreview[] = [
-    { id: 'sadie', label: 'Sadie' },
-    { id: 'kiera', label: 'Kiera' },
-    { id: 'eloise', label: 'Eloise' },
-    { id: 'jenny', label: 'Jenny' },
-    { id: 'arthur', label: 'Arthur' },
-    { id: 'dexter', label: 'Dexter' },
-  ];
+  readonly previewSkins: readonly SkinPreview[] = SKIN_IDS.map((id) => ({
+    id,
+    label: id[0]!.toUpperCase() + id.slice(1),
+  }));
   readonly capacities = [4, 5, 6, 7, 8, 9, 10] as const;
   deckAnnouncement = '';
 
@@ -124,7 +123,13 @@ export class MainPage implements OnInit, OnDestroy {
     private readonly rooms: RoomService,
     private readonly session: SessionService,
     private readonly destroy: DestroyRef,
-  ) {}
+    private readonly cdr: ChangeDetectorRef,
+    preloader: AssetPreloader,
+  ) {
+    // Setelah render pertama di browser: unduh + decode semua skin, kartu, dan aset Main agar
+    // ganti skin memakai bitmap yang sudah ada. Tidak dijalankan saat SSR dan tidak menahan render.
+    afterNextRender(() => void preloader.preload(MAIN_PAGE_IMAGES));
+  }
 
   ngOnInit(): void {
     if (!isPlatformBrowser(this.platformId)) return;
@@ -137,8 +142,6 @@ export class MainPage implements OnInit, OnDestroy {
       this.showSavedSkin(user?.skinId);
     } catch {}
     this.startRoleDeckShuffle();
-    // Unduh semua skin sekarang; tanpa ini tombol ganti skin menunggu gambar diunduh dulu.
-    for (const skin of this.previewSkins) new Image().src = `/assets/characters/skin_${skin.id}.png`;
     // Skin di browser bisa basi bila diganti dari perangkat lain; server yang menentukan.
     this.session
       .refreshProfile()
@@ -146,6 +149,7 @@ export class MainPage implements OnInit, OnDestroy {
       .subscribe({
         next: (profile) => {
           if (!this.skinSaveTimer) this.showSavedSkin(profile.skinId);
+          this.cdr.markForCheck();
         },
         error: () => {},
       });
@@ -177,14 +181,18 @@ export class MainPage implements OnInit, OnDestroy {
       return;
     }
 
+    // Aplikasi zoneless: timer tidak memicu render, jadi setiap langkah memanggil markForCheck.
+    // Tanpa itu potret tetap pudar sampai ada event lain (kesan ganti skin lambat).
     this.skinTransitionState = 'out';
     this.skinFadeTimer = setTimeout(() => {
       this.skinFadeTimer = undefined;
       this.advanceSkin();
       this.skinTransitionState = 'in';
+      this.cdr.markForCheck();
       this.skinRevealTimer = setTimeout(() => {
         this.skinRevealTimer = undefined;
         this.skinTransitionState = 'idle';
+        this.cdr.markForCheck();
       }, 280);
     }, 160);
   }
@@ -218,17 +226,22 @@ export class MainPage implements OnInit, OnDestroy {
         if (saved === this.activeSkin.id) {
           this.deckAnnouncement = `Skin ${skin.label} tersimpan di akunmu.`;
         }
+        this.cdr.markForCheck();
       },
       error: () => {
         // Kembalikan tampilan ke skin yang benar-benar tersimpan agar sama dengan yang muncul di game.
         if (this.activeSkin.id === skin.id) this.showSavedSkin(this.savedSkinId);
         this.deckAnnouncement = 'Skin gagal disimpan. Coba lagi.';
+        this.cdr.markForCheck();
       },
     });
   }
 
   private prefersReducedMotion(): boolean {
-    return isPlatformBrowser(this.platformId) && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    return (
+      isPlatformBrowser(this.platformId) &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    );
   }
 
   private stopSkinTransition(): void {
@@ -261,6 +274,7 @@ export class MainPage implements OnInit, OnDestroy {
     this.roleDeckShuffleTimer = setInterval(() => {
       this.rotateRoleDeck('next');
       this.deckAnnouncement = '';
+      this.cdr.markForCheck();
     }, 3000);
   }
 
@@ -363,10 +377,14 @@ export class MainPage implements OnInit, OnDestroy {
     this.busy = true;
     this.error = '';
 
-    this.rooms.request('POST', '', { capacity: this.capacity })
+    this.rooms
+      .request('POST', '', { capacity: this.capacity })
       .pipe(
         takeUntilDestroyed(this.destroy),
-        finalize(() => { this.busy = false; }),
+        finalize(() => {
+          this.busy = false;
+          this.cdr.markForCheck();
+        }),
       )
       .subscribe({
         next: (room) => {
@@ -392,10 +410,14 @@ export class MainPage implements OnInit, OnDestroy {
     this.busy = true;
     this.error = '';
 
-    this.rooms.request('POST', '/join', { code: result.code })
+    this.rooms
+      .request('POST', '/join', { code: result.code })
       .pipe(
         takeUntilDestroyed(this.destroy),
-        finalize(() => { this.busy = false; }),
+        finalize(() => {
+          this.busy = false;
+          this.cdr.markForCheck();
+        }),
       )
       .subscribe({
         next: (room) => {

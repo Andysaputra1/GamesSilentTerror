@@ -24,8 +24,13 @@ import { SessionService, UserProfile } from './session.service';
   imports: [FormsModule],
   template: `
     <button #trigger class="profile-trigger" type="button" [attr.aria-expanded]="open()"
-      aria-controls="profile-actions" (click)="toggle()" [disabled]="session.loggingOut()">
-      <i aria-hidden="true">◈</i><b>{{ displayName }}</b><span aria-hidden="true">⌄</span>
+      aria-controls="profile-actions" [attr.title]="displayName" (click)="toggle()"
+      [disabled]="session.loggingOut()">
+      <i aria-hidden="true">{{ initial }}</i><b>{{ displayName }}</b>
+      <svg aria-hidden="true" viewBox="0 0 12 12" width="12" height="12" fill="none"
+        stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="m3 4.5 3 3 3-3" />
+      </svg>
     </button>
     @if (open()) {
       <section id="profile-actions" class="profile-actions" aria-label="Menu akun">
@@ -69,41 +74,57 @@ import { SessionService, UserProfile } from './session.service';
     }
   `,
   styles: `
-    :host { position: relative; display: block; z-index: 20; max-width: 100%; }
+    /* Kotak akun memakai token meja kayu (styles.css) agar sama di Main, Room, dan Game.
+       Induk dapat mengatur --profile-name-max dan --profile-name-display (none = ikon saja). */
+    :host { position: relative; display: block; z-index: 20; max-width: 100%; min-width: 0; }
     button { font: inherit; cursor: pointer; }
-    button:focus-visible { outline: 3px solid #34768e; outline-offset: 3px; }
+    button:focus-visible { outline: 2px solid var(--color-gold); outline-offset: 3px; }
     button:disabled { cursor: wait; opacity: .65; }
-    .profile-trigger { display: flex; align-items: center; gap: 10px; max-width: 100%;
-      border: 1px solid #817357; border-radius: 12px; padding: 8px 12px;
-      background: #f5eee0; color: #28251e; }
-    .profile-trigger i { font-style: normal; font-size: 24px; color: #716038; }
-    .profile-trigger b { max-width: 140px; overflow: hidden; text-overflow: ellipsis; font-size: 14px; }
-    .profile-actions { position: absolute; right: 0; top: calc(100% + 10px); width: min(270px, 85vw);
+    .profile-trigger { display: flex; align-items: center; gap: 9px; max-width: 100%; min-height: 40px;
+      padding: 4px 11px 4px 4px; border: 1px solid var(--desk-chip-line);
+      border-radius: var(--radius-control); background: var(--desk-chip-bg); color: var(--desk-text);
+      box-shadow: var(--shadow-control); transition: background-color 160ms ease; }
+    .profile-trigger:hover:not(:disabled) { background: var(--desk-chip-bg-hover); }
+    .profile-trigger:focus-visible { outline-color: var(--desk-focus); }
+    .profile-trigger i { display: grid; flex: none; place-items: center; width: 30px; height: 30px;
+      border: 1px solid rgb(255 236 200 / .55); border-radius: 50%; background: #f1d7a1;
+      color: #4a2810; font: 700 15px/1 var(--font-display); font-style: normal; }
+    .profile-trigger b { display: var(--profile-name-display, block); min-width: 0;
+      max-width: var(--profile-name-max, 180px); overflow: hidden; text-overflow: ellipsis;
+      white-space: nowrap; font: 600 14px/1.2 var(--font-body); }
+    .profile-trigger svg { flex: none; opacity: .85; transition: transform 160ms ease; }
+    .profile-trigger[aria-expanded='true'] svg { transform: rotate(180deg); }
+    .profile-actions { position: absolute; right: 0; top: calc(100% + 8px); width: min(280px, 85vw);
       max-height: min(520px, calc(100dvh - 24px)); overflow-y: auto; overscroll-behavior: contain;
-      padding: 18px; border: 2px solid #493b28; border-radius: 14px; background: #fff7e5;
-      color: #28251e; box-shadow: 0 10px 28px #24180d33; }
-    .profile-actions p { margin: 0 0 8px; font: 11px Consolas, monospace; letter-spacing: .1em; }
-    .profile-actions strong { display: block; overflow-wrap: anywhere; }
+      padding: 16px; border: 2px solid #6d4025; border-radius: 12px; background: #fff7e5;
+      color: var(--paper-ink); box-shadow: 0 14px 32px rgb(20 8 2 / .42); }
+    .profile-actions p { margin: 0 0 8px; color: var(--paper-label);
+      font: 800 11px/1 var(--font-body); letter-spacing: .16em; }
+    .profile-actions strong { display: block; overflow-wrap: anywhere;
+      font: 700 18px/1.25 var(--font-display); }
     .profile-actions small { display: block; margin-top: 12px; line-height: 1.5; }
     .logout-error { color: #922e2e; }
     .logout-button { display: flex; justify-content: space-between; width: 100%; margin-top: 16px;
-      padding: 12px 14px; border: 1px solid #75422e; border-radius: 9px; background: #75422e; color: #fff7e5; }
+      padding: 12px 14px; border: 1px solid #5c3220; border-radius: 9px; background: #75422e;
+      color: #fff7e5; font-weight: 700; }
     .logout-button:hover:not(:disabled) { background: #59311f; }
     .profile-name { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
     .profile-name strong { min-width: 0; }
-    .edit-name { display: grid; place-items: center; flex: none; padding: 8px; border: 1px solid #817357;
-      border-radius: 8px; background: #f5eee0; color: #493b28; }
+    .edit-name { display: grid; place-items: center; flex: none; padding: 8px; border: 1px solid #a07a55;
+      border-radius: 8px; background: #f5eadb; color: #5a3520; }
+    .edit-name:hover:not(:disabled) { background: #ecdcc4; }
     .name-form { margin-top: 14px; }
-    .name-form label { display: block; margin-bottom: 6px; }
+    .name-form label { display: block; margin-bottom: 6px; font-weight: 600; }
     .name-form input { box-sizing: border-box; width: 100%; min-width: 0; padding: 9px;
-      font: inherit; border: 1px solid #817357; border-radius: 7px; background: #fffdf8; color: #28251e; }
-    .name-form input:focus-visible { outline: 3px solid #34768e; outline-offset: 2px; }
+      font: inherit; border: 1px solid #a07a55; border-radius: 7px; background: #fffdf8;
+      color: var(--paper-ink); }
+    .name-form input:focus-visible { outline: 2px solid var(--color-gold); outline-offset: 2px; }
     .name-actions { display: flex; gap: 8px; margin-top: 12px; }
-    .name-actions button { padding: 8px 12px; border: 1px solid #493b28; border-radius: 7px;
-      background: #f5eee0; color: #28251e; }
+    .name-actions button { padding: 8px 12px; border: 1px solid #6d4025; border-radius: 7px;
+      background: #f5eadb; color: var(--paper-ink); }
     .name-actions button[type=submit] { background: #344c3d; color: #fff7e5; }
     @media (max-height: 620px) {
-      .profile-actions { top: auto; bottom: calc(100% + 10px); }
+      .profile-actions { top: auto; bottom: calc(100% + 8px); }
     }
   `,
 })
@@ -145,6 +166,11 @@ export class ProfileMenu implements OnInit {
   // Nama tampilan dapat berubah tanpa mengganti identifier yang dipakai lobby dan pertandingan.
   get displayName(): string {
     return this.profileName() || this.username;
+  }
+
+  // Huruf pertama nama untuk lingkaran avatar; Array.from menjaga emoji/huruf non-Latin utuh.
+  get initial(): string {
+    return (Array.from(this.displayName.trim())[0] ?? '?').toLocaleUpperCase();
   }
 
   // Baca nama dan username terbaru dari sesi yang tersimpan di browser.

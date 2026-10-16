@@ -72,6 +72,8 @@ export class Game implements OnInit, OnDestroy {
   notice = '';
   connected = false;
   busy = false;
+  // Permintaan keluar sedang dikirim; polling ditahan agar tidak berebut dengan pembersihan room.
+  leaving = false;
   revealRole = false;
   seconds = 0;
   // Tampilan: tab di HP, panel aturan, dan layar akhir (pengumuman → kuesioner → meja akhir).
@@ -163,7 +165,20 @@ export class Game implements OnInit, OnDestroy {
     return this.hitmanCount > 1;
   }
 
-  // Panduan singkat di layar persiapan sebelum ronde 1 (juga dipakai modal aturan).
+  // Ringkasan layar persiapan: satu baris per hal agar terbaca sekilas sambil menunggu.
+  // Penjelasan lengkap tetap di `guide` (modal aturan "?").
+  readonly briefSteps = [
+    {
+      icon: '🎭',
+      title: 'Tujuan',
+      text: 'Warga menang jika semua Hitman dieksekusi; Hitman menang jika menguasai suara.',
+    },
+    { icon: '☀', title: 'Siang', text: 'Diskusikan alibi dan cari kejanggalan.' },
+    { icon: '☾', title: 'Malam', text: 'Chat terkunci; role khusus beraksi diam-diam.' },
+    { icon: '⚖', title: 'Tribunal', text: 'Pilih tersangka. Suara terbanyak tunggal dieksekusi.' },
+  ];
+
+  // Panduan lengkap untuk modal aturan "?" di HUD.
   get guide(): { icon: string; title: string; text: string }[] {
     const banyak = this.multiHitman;
     return [
@@ -336,10 +351,14 @@ export class Game implements OnInit, OnDestroy {
   // Jelaskan alasan kemenangan server, dengan fallback untuk backend versi lama.
   get resultExplanation(): string {
     const hitmen = this.hitmanCount > 1 ? 'Semua Hitman' : 'Hitman';
+    // Hitman yang keluar di tengah pertandingan tersingkir seperti dieksekusi.
+    const out = this.game?.players.some((p) => p.role === 'hitman' && p.left)
+      ? 'tersingkir'
+      : 'dieksekusi';
     const explanations: Record<string, string> = {
       vote_control:
         'Warga hidup yang masih punya hak voting tidak lebih banyak dari Hitman yang masih hidup. Suara warga tidak lagi bisa mengalahkan suara Hitman.',
-      hitman_executed: `${hitmen} telah dieksekusi. Semua anggota kubu warga menang, termasuk yang menjadi Hostage atau sudah dieksekusi.`,
+      hitman_executed: `${hitmen} telah ${out}. Semua anggota kubu warga menang, termasuk yang menjadi Hostage atau sudah dieksekusi.`,
       all_survivors_hostage:
         'Semua anggota kubu warga yang masih hidup telah menjadi Hostage. Hitman menguasai meja.',
       no_civilians_alive:
@@ -853,7 +872,7 @@ export class Game implements OnInit, OnDestroy {
   // dibuka tetapi belum tercatat dikirim ulang paling cepat tiap 4 detik; di sela itu tetap polling,
   // jadi layar tidak macet bila backend belum mengenal /reveal.
   refresh(): void {
-    if (this.busy || !this.code) return;
+    if (this.busy || this.leaving || !this.code) return;
     if (this.revealPending && this.game && Date.now() - this.lastRevealTry >= 4000) {
       this.lastRevealTry = Date.now();
       this.request({ match_id: this.game.id }, 'reveal');
@@ -918,14 +937,7 @@ export class Game implements OnInit, OnDestroy {
           // GET /game menolak room hilang, keanggotaan lama, atau match belum dimulai.
           // Pulihkan lewat lobby; kesalahan aksi dan jaringan tidak boleh mengeluarkan pemain.
           if (!body && error.status === 400) {
-            if (this.poll) clearInterval(this.poll);
-            this.socket?.disconnect();
-            this.game = null;
-            this.code = '';
-            sessionStorage.removeItem('shadow_heist_room');
-            sessionStorage.removeItem('shadow_heist_room_snapshot');
-            sessionStorage.removeItem(gameEntryStorageKey);
-            void this.router.navigateByUrl('/lobby');
+            this.exitRoom('/lobby');
             return;
           }
           this.error =
@@ -956,6 +968,47 @@ export class Game implements OnInit, OnDestroy {
       { match_id: this.game.id, round_number: this.game.round, phase: this.game.phase },
       'skip-discussion',
     );
+  }
+
+  // KELUAR: setelah konfirmasi, server menganggap pemain tereliminasi seperti dieksekusi (status
+  // "Keluar") dan tidak bisa kembali ke pertandingan ini; lalu pemain dibawa ke menu utama.
+  leaveMatch(): void {
+    if (!this.code || this.leaving) return;
+    if (!window.confirm('Keluar dari permainan? Kamu dianggap tereliminasi.')) return;
+    this.leaving = true;
+    this.api
+      .leave(this.code)
+      .pipe(
+        takeUntilDestroyed(this.destroy),
+        finalize(() => {
+          this.leaving = false;
+          this.cdr.markForCheck();
+        }),
+      )
+      .subscribe({
+        next: () => this.exitRoom('/main'),
+        error: (error: HttpErrorResponse) => {
+          // 400 = sudah bukan anggota room (mis. room sudah dibersihkan): tetap tinggalkan layar ini.
+          if (error.status === 400) return this.exitRoom('/main');
+          this.error =
+            typeof error.error?.detail === 'string'
+              ? error.error.detail
+              : 'Gagal keluar dari permainan. Coba lagi.';
+          if (error.status === 401) void this.router.navigateByUrl('/login');
+        },
+      });
+  }
+
+  // Lepas room di tab ini: hentikan polling/socket, hapus pointer room, lalu pindah halaman.
+  private exitRoom(url: string): void {
+    if (this.poll) clearInterval(this.poll);
+    this.socket?.disconnect();
+    this.game = null;
+    this.code = '';
+    sessionStorage.removeItem('shadow_heist_room');
+    sessionStorage.removeItem('shadow_heist_room_snapshot');
+    sessionStorage.removeItem(gameEntryStorageKey);
+    void this.router.navigateByUrl(url);
   }
 
   // TARGET: bantuan UX saja; semua aturan juga diperiksa engine.

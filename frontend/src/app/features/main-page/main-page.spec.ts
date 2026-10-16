@@ -73,6 +73,29 @@ describe('MainPage', () => {
     expect(component.deckAnnouncement).toContain('tersimpan');
   });
 
+  // SKIN (zoneless): timer animasi harus memicu render sendiri; dulu potret tetap pudar
+  // sampai ada event lain sehingga ganti skin terasa lambat.
+  it('renders the next skin when the fade timer ends without any other event', async () => {
+    http.expectOne(me).flush({ username: 'andy', display_name: 'Andy', skin_id: 'kiera' });
+    window.matchMedia = vi
+      .fn()
+      .mockReturnValue({ matches: false }) as unknown as typeof window.matchMedia;
+    vi.useFakeTimers();
+    const frontSkin = () =>
+      (fixture.nativeElement as HTMLElement)
+        .querySelector('.role-deck__card--front .skin-img')
+        ?.getAttribute('src');
+    expect(frontSkin()).toContain('skin_kiera');
+    component.cycleRoleDeckSkin();
+    await vi.advanceTimersByTimeAsync(200);
+    expect(frontSkin()).toContain('skin_eloise');
+    await vi.advanceTimersByTimeAsync(300);
+    const hanger = fixture.nativeElement.querySelector('.skin-cycle') as HTMLButtonElement;
+    expect(hanger.disabled).toBe(false);
+    await vi.advanceTimersByTimeAsync(300); // simpan 600 ms setelah skin berganti
+    http.expectOne(skin).flush({ skin_id: 'eloise' });
+  });
+
   // SKIN: gagal simpan mengembalikan tampilan ke skin yang benar-benar tersimpan.
   it('reverts the skin when saving fails', () => {
     http.expectOne(me).flush({ username: 'andy', display_name: 'Andy', skin_id: 'kiera' });

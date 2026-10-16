@@ -375,12 +375,20 @@ textarea:focus-visible {
   color: #ffd2c9;
   animation: denyut-timer 1s ease-in-out infinite;
 }
+/* Kontrol HUD di atas kayu memakai gaya meja yang sama dengan Main/Room (styles.css):
+   kotak akun, tombol aturan, dan tombol Keluar (.danger-button). */
 .profile-chip {
-  padding: 2px 8px;
-  border: 2px solid var(--ink-strong);
-  border-radius: 999px;
-  background: var(--paper);
-  box-shadow: 0 3px 0 rgb(43 23 12 / 0.55);
+  min-width: 0;
+  --profile-name-max: 130px;
+}
+.hud-side .round-button {
+  border: 1px solid var(--desk-chip-line);
+  background: var(--desk-chip-bg);
+  color: var(--desk-text);
+  box-shadow: var(--shadow-control);
+}
+.hud-side .round-button:hover {
+  background: var(--desk-chip-bg-hover);
 }
 
 /* ---------- Grid satu layar ---------- */
@@ -421,7 +429,6 @@ textarea:focus-visible {
   font-size: 13px;
   line-height: 1.45;
 }
-.objective,
 .allies {
   font-family: var(--font-hand);
   font-size: 15px !important;
@@ -464,10 +471,16 @@ textarea:focus-visible {
   overflow-y: auto;
 }
 .event {
-  padding-left: 10px;
+  padding: 3px 0 3px 10px;
   border-left: 2px solid var(--line);
+  color: #6b4b2e;
   font-family: var(--font-hand);
   font-size: 15px !important;
+}
+.event.latest {
+  border-left-color: #8c3f2b;
+  color: var(--ink-strong);
+  font-weight: 700;
 }
 
 /* Kartu role: bisa dibalik; bagian depan = kartu role + karakter pemain. */

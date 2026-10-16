@@ -95,9 +95,12 @@
   font-size: 0.35em;
   font-style: normal;
 }
+/* Isi persiapan setinggi kontennya dan berada di tengah sisa layar (tanpa kertas kosong). */
 .splash-body {
-  flex: 1;
+  flex: none;
   min-height: 0;
+  margin-block: auto;
+  align-items: start;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(250px, 300px);
   gap: clamp(14px, 2vw, 28px);
@@ -110,21 +113,9 @@
   min-height: 0;
   padding: 30px 34px 26px;
 }
-.briefing-gears {
-  position: absolute;
-  top: -18px;
-  right: 18px;
-  width: 78px;
-  rotate: -6deg;
-  pointer-events: none;
-}
 .briefing-head p {
   margin: 0;
   line-height: 1.5;
-}
-.briefing-head .hand {
-  color: #7f5a37;
-  font-size: 17px;
 }
 .briefing-head h2 {
   margin: 2px 0 6px;
@@ -282,9 +273,37 @@
   justify-content: flex-start;
   margin-top: 10px;
 }
-.briefing-head .composition-note {
-  margin-top: 4px;
-  font-size: 15px;
+.brief-steps {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 20px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.brief-steps li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 10px;
+  padding: 14px;
+  border: 1px solid rgb(139 90 43 / 0.35);
+  border-radius: 8px;
+  background: #fffaf0;
+  box-shadow: 0 3px 0 rgb(139 90 43 / 0.18);
+}
+.brief-steps .guide-icon {
+  grid-row: span 2;
+  font-size: 24px;
+  line-height: 1.1;
+}
+.brief-steps b {
+  font: 700 18px/1.2 var(--font-display);
+  color: #5b311b;
+}
+.brief-steps p {
+  margin: 2px 0 0;
+  font-size: 14px;
+  line-height: 1.45;
 }
 .splash-status {
   display: flex;

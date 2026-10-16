@@ -55,6 +55,9 @@ export const activeMatchGuard: CanActivateFn = (_, state) => {
   const platform = inject(PLATFORM_ID);
   if (!isPlatformBrowser(platform)) return true;
   const isGame = state.url.split('?')[0] === '/game';
+  // Masuk dari lobby (tanda 'allowed'): semua cabang di bawah menghasilkan true, jadi jangan
+  // menahan layar game satu round trip backend. Polling App tetap memulihkan pointer room.
+  if (isGame && sessionStorage.getItem('shadow_heist_game_entry') === 'allowed') return true;
   return service.lookup().pipe(
     map((active) => {
       if (active) {
