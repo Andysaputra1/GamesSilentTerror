@@ -160,8 +160,9 @@ class SocketGameController:
                         "Checker archive could not be saved for room %s", trace["room_code"]
                     )
 
-    # Validasi sesi dan hak chat, simpan pesan, lalu broadcast. Bot membaca chat ini sendiri di langkah
-    # NPCService berikutnya (IndoBERT), jadi handler ini tidak menganalisis atau membalas pesan.
+    # Validasi sesi dan hak chat, simpan pesan, lalu broadcast. Setelah itu IndoBERT membaca pesan sekali
+    # (tahap 5) untuk checker dan riwayat chat; hasilnya masuk memo NLU sehingga bot memakainya di langkah
+    # NPCService berikutnya tanpa menghitung ulang. Handler ini tidak membalas pesan.
     async def _send_chat(self, sid: str, data: dict[str, Any], holder) -> None:
         # TAHAP 1: terima event send_chat; validasi isi pesan dan identitas sesi.
         try:

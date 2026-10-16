@@ -50,8 +50,36 @@
           <button data-menu="users"><span>04</span> Manajemen user</button
           ><button data-menu="npc"><span>05</span> Otak NPC</button
           ><button data-menu="survey"><span>06</span> Survei</button
-          ><button data-menu="simulasi"><span>07</span> Simulasi</button>
+          ><button data-menu="simulasi"><span>07</span> Simulasi</button
+          ><button data-menu="dokumen"><span>08</span> Dokumen</button>
         </nav>
+        <section id="menu-dokumen" class="card" hidden>
+          <div class="section-head">
+            <div>
+              <span class="eyebrow">DOCUMENTATION</span>
+              <h2>Dokumen sistem</h2>
+              <p>
+                Halaman penjelasan yang dibangun langsung dari kode bot dan migrasi database, jadi
+                isinya sama dengan yang berjalan di server. Dibuka di tab baru.
+              </p>
+            </div>
+          </div>
+          <div class="metric-grid">
+            <a class="metric" href="/panel/dokumen/erd" target="_blank" rel="noopener"
+              ><small>Database</small><strong>ERD Silent Terror</strong
+              ><span class="hint"
+                >14 tabel MySQL beserta kunci dan relasinya (migrasi V1–V9).</span
+              ></a
+            >
+            <a class="metric" href="/panel/dokumen/proses-ai" target="_blank" rel="noopener"
+              ><small>Bot</small><strong>Proses AI</strong
+              ><span class="hint"
+                >IndoBERT, Fuzzy, Utility AI, Behavior Tree, dan NLG, dengan satu ronde nyata dan
+                alasan tiap keputusan.</span
+              ></a
+            >
+          </div>
+        </section>
         <section id="menu-npc" class="card" hidden>
           <div class="section-head">
             <div>

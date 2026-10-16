@@ -1978,7 +1978,7 @@ async function selectMenu(name) {
     if (b.dataset.menu === name) b.setAttribute('aria-current', 'page');
     else b.removeAttribute('aria-current');
   }
-  for (const id of ['ai', 'checker', 'history', 'users', 'npc', 'survey', 'simulasi'])
+  for (const id of ['ai', 'checker', 'history', 'users', 'npc', 'survey', 'simulasi', 'dokumen'])
     $('menu-' + id).hidden = id !== name;
   if (name === 'checker' || name === 'history') await loadRooms();
   if (name === 'checker') await checker();

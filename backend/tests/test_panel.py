@@ -44,6 +44,16 @@ class PanelTests(unittest.TestCase):
             self.client.get("/admin", follow_redirects=False).headers["location"], "/panel"
         )
 
+    def test_documents_are_whitelisted_and_sandboxed(self):
+        for nama, judul in [("erd", "ERD Silent Terror"), ("proses-ai", "Proses AI Silent Terror")]:
+            page = self.client.get(f"/panel/dokumen/{nama}")
+            self.assertEqual(page.status_code, 200)
+            self.assertIn(judul, page.text)
+            self.assertTrue(page.headers["content-type"].startswith("text/html"))
+            self.assertTrue(page.headers["content-security-policy"].startswith("sandbox allow-scripts;"))
+        self.assertEqual(self.client.get("/panel/dokumen/..%2Fpanel%2Fpanel.js").status_code, 404)
+        self.assertEqual(self.client.get("/panel/dokumen/lain").status_code, 422)
+
     def test_wrong_password_does_not_access_database(self):
         hashed = base64.b64encode(hash_password("fixture-password").encode()).decode()
         with (

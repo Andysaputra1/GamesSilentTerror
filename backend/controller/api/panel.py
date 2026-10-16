@@ -155,6 +155,20 @@ def assets(asset: Literal["panel.js", "panel.css"]):
     return FileResponse(ASSETS / asset, headers={"Cache-Control": "no-store"})
 
 
+# Sajikan dokumen ERD/Proses AI (HTML mandiri berskrip inline). Sandbox memberi origin terpisah sehingga
+# skrip dokumen tidak bisa membaca data panel di origin yang sama.
+@router.get("/panel/dokumen/{nama}", include_in_schema=False)
+def dokumen(nama: Literal["erd", "proses-ai"]):
+    return FileResponse(
+        ASSETS.parent / "dokumen" / f"{nama}.html",
+        headers={
+            "Cache-Control": "no-cache",
+            "Content-Security-Policy": "sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
 # Model yang disiapkan ai-docker (jalankan.bat): 4B cepat, 14B lebih pintar tetapi lebih lambat.
 MODEL_LOKAL = ("qwen3:4b-instruct", "qwen3:14b")
 

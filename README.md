@@ -17,7 +17,7 @@ Sudah dapat dimainkan dari awal sampai akhir:
 - Main page, buat/gabung ruangan, 4–10 peserta, bot opsional untuk mengisi kursi kosong. Hanya pembuat ruangan yang mengatur bot dan memulai game.
 - Role acak dari server, layar persiapan, timer Day → Night → Tribunal tanpa batas ronde (berakhir hanya saat salah satu kubu menang), skill/cooldown, voting, eksekusi, dan kondisi kemenangan.
 - Survei singkat setelah pertandingan; jawabannya dipakai untuk menilai bot per metode penalaran.
-- Panel administrator terpadu di `/panel`: Konfigurasi AI, Checker, Riwayat chat, Manajemen user, Otak NPC, dan Survei.
+- Panel administrator terpadu di `/panel`: Konfigurasi AI, Checker, Riwayat chat, Manajemen user, Otak NPC, Survei, Simulasi, dan Dokumen (ERD dan Proses AI).
 
 Role: **Hitman** (Hostage/Gag Order), **Spy** (Guard), **Stalker** (Peek), dan **Civilian** (observasi). Korban Hostage tetap hidup dan kehilangan chat serta voting permanen, tetapi skill malam tetap tersedia sesuai role/cooldown; identitas target tidak diumumkan.
 
@@ -242,10 +242,12 @@ Script ini menulis `PANEL_USERNAME=administrator` dan `PANEL_PASSWORD_HASH`, ser
 | --- | --- |
 | 01 Konfigurasi AI | Provider AI (`api`/`docker`), model, key OpenRouter, link LLM sendiri; tombol cek/tes koneksi |
 | 02 Checker | Jejak setiap chat manusia (otorisasi → simpan → siar) dan setiap langkah bot (NLU, penalaran, penulis kalimat) per ruangan |
-| 03 Riwayat chat | Arsip chat dari MySQL dengan filter dan ekspor CSV |
+| 03 Riwayat chat | Arsip chat dari MySQL dengan filter dan ekspor CSV, termasuk intent dan target hasil IndoBERT tiap chat |
 | 04 Manajemen user | Tambah user, reset password akun lokal, hapus akun tanpa menghapus riwayat chat |
 | 05 Otak NPC | Metode penalaran, rantai penulis kalimat, status NLU IndoBERT |
 | 06 Survei | Mengatur pertanyaan survei, ringkasan jawaban per metode bot, dan ekspor CSV |
+| 07 Simulasi | Pertandingan tiruan dengan bot (metode dipilih per bot): chat seperti room asli, flowchart proses AI yang menyala sesuai tahap, dan kode asli tiap tahap |
+| 08 Dokumen | ERD database dan penjelasan Proses AI (`backend/public/dokumen`: salinan hasil pembuat dokumen di `communicationfolder/`, folder yang tidak ikut repo) |
 
 CSV (survei dan riwayat chat) memakai UTF-8 dengan BOM dan menyimpan jawaban persis seperti diketik pemain. Saat membuka di spreadsheet, impor kolom teks sebagai teks agar jawaban yang diawali `=`, `+`, `-`, atau `@` tidak dievaluasi sebagai formula.
 
