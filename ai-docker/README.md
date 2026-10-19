@@ -17,35 +17,33 @@ Dua model disiapkan. Model yang dipakai bot dipilih di panel → **Otak NPC** �
 
 | File | Isi |
 | --- | --- |
-| `jalankan.bat` | Nyalakan semuanya, tunggu model siap, uji link dari internet, tampilkan link + token |
-| `lihat-link.bat` | Tampilkan link dan token yang sedang aktif (tanpa menyalakan ulang) |
+| `jalankan.bat` | Nyalakan semuanya, tunggu model siap, uji link dari internet, lalu kirim link + token ke backend |
+| `lihat-link.bat` | Tampilkan link dan token yang sedang aktif (tanpa menyalakan ulang), lalu kirim lagi ke backend |
+| `uji-waktu.bat` | Ukur lama NLU → logika (fuzzy, utility AI, behavior tree) → NLG/LLM per bot lewat simulasi panel; CSV di `communicationfolder/uji-waktu-<tanggal>/` |
 | `hentikan.bat` | Matikan LLM dan tunnel (model tetap tersimpan) |
 | `docker-compose.yml` | `ollama`, `model` (unduh sekali), `gerbang`, `tunnel` |
 | `docker-compose.gpu.yml` | Tambahan GPU NVIDIA, dipakai otomatis bila `nvidia-smi` ada |
 | `gerbang.conf.template` | Hanya `/api/tags`, `/api/show`, `/api/chat`, `/api/version` dengan token yang benar |
-| `.env` | Dibuat otomatis: `LLM_TOKEN` acak dan `LLM_MODELS` (tidak masuk Git) |
+| `.env` | Dibuat otomatis: `LLM_TOKEN` acak, `LLM_MODELS`, dan login panel (`PANEL_USERNAME`, password terenkripsi DPAPI). Opsional `BACKEND_URL` (bawaan `https://backendthesis.andylabs.site`). Tidak masuk Git |
 
 ## Pemakaian
 
 1. Buka Docker Desktop, lalu klik dua kali `jalankan.bat`.
    - Model yang belum ada diunduh ke volume `silent_terror_ai_model`. Ukurannya sekitar 2,5 GB untuk 4B dan 9 GB untuk 14B.
-   - Di akhir, skrip mencetak **Link** (juga disalin ke clipboard) dan **Token**.
-2. Panel → **Konfigurasi AI**: pilih "LLM lokal · Ollama melalui tunnel", tempel link dan
-   token, pilih **Model lokal** (`qwen3:4b-instruct` cepat, `qwen3:14b` lebih pintar), lalu Simpan. Token disimpan terenkripsi dan cukup diisi sekali; link perlu diisi
-   ulang setiap kali tunnel berganti. Kolom token yang dikosongkan mempertahankan token lama.
-3. (Opsional, cadangan) Token juga bisa ditaruh di VM sebagai `OLLAMA_TUNNEL_TOKEN=...` di
-   `.env.azure`. Token dari panel selalu didahulukan.
-4. Panel → **Otak NPC**:
-   1. Aktifkan jalur "LLM sendiri lewat link".
-   2. Klik **Tes koneksi semua prioritas**.
-   3. Pilih model di **Model LLM link**, lalu Simpan.
-
-   Pilihan "Bawaan" memakai model dari Konfigurasi AI (`qwen3:14b` di VM). Jalur Claude dan OpenRouter yang tidak punya key otomatis dilewati.
-   Setelah pindah ke `qwen3:14b`, tunggu sekitar 1–2 menit sampai model termuat, lalu klik tes koneksi lagi. Tes pertama bisa gagal karena model masih dimuat.
+   - Pertama kali, skrip menanyakan username dan password **panel admin**. Keduanya disimpan di `.env` (password
+     terenkripsi DPAPI, hanya bisa dibuka akun Windows ini) dan tidak ditanya lagi, kecuali login ditolak.
+   - Di akhir, skrip mengirim link + token ke backend lewat API panel (sama dengan mengisi **Konfigurasi AI** lalu
+     Simpan), menjadikan "LLM sendiri lewat link" prioritas pertama di rantai penulis **Otak NPC** (jalur lain yang aktif
+     tetap jadi cadangan), lalu menampilkan hasil tes koneksi dari VM. Provider dan model yang sudah dipilih tidak diubah.
+2. Model link dipilih di panel → **Otak NPC** → **Model LLM link** (`qwen3:4b-instruct` cepat, `qwen3:14b` lebih
+   pintar). Pilihan "Bawaan" memakai model dari Konfigurasi AI. Setelah pindah ke `qwen3:14b`, tunggu sekitar 1–2
+   menit sampai model termuat, lalu klik tes koneksi lagi.
+3. Kalau pengiriman gagal (misalnya backend mati), link sudah ada di clipboard: tempel manual di panel →
+   **Konfigurasi AI** lalu Simpan.
 
 ## Perlu diingat
 
-- **Link berganti** setiap tunnel dinyalakan ulang, misalnya setelah laptop restart atau `hentikan.bat`. Ulangi langkah 3–4. Token tetap sama selama `.env` tidak dihapus.
+- **Link berganti** setiap tunnel dinyalakan ulang, misalnya setelah laptop restart atau `hentikan.bat`. Klik `jalankan.bat` (atau `lihat-link.bat` bila container masih jalan) supaya link baru terkirim. Token tetap sama selama `.env` tidak dihapus.
 - Laptop harus tetap menyala dan Docker berjalan selama game dimainkan. Kalau mati, bot otomatis kembali ke templat.
 - Setiap kalimat dibatasi 20 detik. Kalimat yang lebih lama jatuh ke templat, jadi model besar yang lambat bisa lebih sering memakai templat.
 - Tanpa token, link menjawab 401. Endpoint selain empat di atas (pull, delete, dan sebagainya) menjawab 404.

@@ -3,27 +3,12 @@
 # Sengaja hanya karakter ASCII: PowerShell 5.1 membaca .ps1 tanpa BOM sebagai ANSI.
 
 $ErrorActionPreference = 'Stop'
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 $folder = Split-Path $PSScriptRoot -Parent
 Set-Location $folder
+. (Join-Path $PSScriptRoot 'bersama.ps1')  # Baca-Env, Cari-Link
 
 function Tulis($teks, $warna = 'Gray') { Write-Host $teks -ForegroundColor $warna }
 function Gagal($teks) { Tulis "[x] $teks" Red; exit 1 }
-
-# Nilai dari .env (format KUNCI=nilai).
-function Baca-Env($kunci, $bawaan) {
-    $baris = Get-Content .env | Where-Object { $_ -match "^$kunci=" } | Select-Object -Last 1
-    if ($baris) { $nilai = ($baris -replace "^$kunci=", '').Trim(); if ($nilai) { return $nilai } }
-    return $bawaan
-}
-
-# Link terbaru di log tunnel (log lama dari nyala sebelumnya ikut tercetak, jadi ambil yang terakhir).
-function Cari-Link {
-    $log = (cmd /c "docker logs silent_terror_tunnel 2>&1") -join "`n"
-    $semua = [regex]::Matches($log, 'https://[a-z0-9-]+\.trycloudflare\.com')
-    if ($semua.Count -gt 0) { return $semua[$semua.Count - 1].Value }
-    return $null
-}
 
 # 1. Docker harus hidup.
 cmd /c "docker info >nul 2>&1"
@@ -36,7 +21,7 @@ if (-not (Test-Path .env)) {
     $token = [BitConverter]::ToString($acak).Replace('-', '').ToLower()
     @(
         '# Dibuat otomatis oleh jalankan.bat. Jangan di-commit.',
-        '# LLM_TOKEN harus sama dengan OLLAMA_TUNNEL_TOKEN di .env.azure VM.',
+        '# LLM_TOKEN dikirim ke backend (Konfigurasi AI panel) otomatis oleh jalankan.bat.',
         "LLM_TOKEN=$token",
         'LLM_MODELS=qwen3:4b-instruct qwen3:14b'
     ) | Set-Content .env -Encoding ascii
@@ -124,13 +109,8 @@ Tulis "Model    : $daftar  ($(if ($gpu) { 'GPU' } else { 'CPU' }))"
 Tulis "Tes chat : $detik detik -> $($jawab.message.content.Trim())"
 Tulis "Tanpa token: $tolak $(if ($tolak -eq 401) { '(benar, ditolak)' } else { '(HARUSNYA 401!)' })"
 Tulis ''
-Tulis 'Langkah di VM:' Yellow
-Tulis '  1. Sekali saja: isi .env.azure dengan baris'
-Tulis "       OLLAMA_TUNNEL_TOKEN=$token"
-Tulis '     lalu: sudo docker compose --env-file .env.azure -f docker-compose.azure.yml up -d --force-recreate backend'
-Tulis '  2. Panel > Konfigurasi AI: pilih "LLM lokal - Ollama melalui tunnel", tempel link di atas, Simpan.'
-Tulis '  3. Panel > Otak NPC: aktifkan "LLM sendiri lewat link", klik "Tes koneksi semua prioritas",'
-Tulis '     lalu pilih model di "Model LLM link" dan Simpan.'
+# Link + token langsung dikirim ke backend lewat API panel (login panel ditanya sekali di jendela ini).
+& (Join-Path $PSScriptRoot 'kirim-link.ps1') -Link $link
 Tulis ''
-Tulis 'Link berganti setiap tunnel dinyalakan ulang: ulangi langkah 2-3. Laptop harus tetap menyala.' Yellow
-Tulis 'Matikan dengan hentikan.bat. Lihat link lagi dengan lihat-link.bat.'
+Tulis 'Link berganti setiap tunnel dinyalakan ulang; jalankan.bat atau lihat-link.bat mengirimnya lagi otomatis.' Yellow
+Tulis 'Laptop harus tetap menyala selama game dimainkan. Matikan dengan hentikan.bat.'

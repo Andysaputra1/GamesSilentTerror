@@ -1,19 +1,21 @@
-# Dipanggil lihat-link.bat: tampilkan status container, link tunnel terbaru, dan token tanpa menyalakan ulang apa pun.
+# Dipanggil lihat-link.bat: tampilkan status container, link tunnel terbaru, dan token tanpa menyalakan ulang apa pun,
+# lalu kirim link itu ke backend (berguna bila Docker menyalakan ulang tunnel sendiri, mis. setelah laptop restart).
 
 $folder = Split-Path $PSScriptRoot -Parent
 Set-Location $folder
+. (Join-Path $PSScriptRoot 'bersama.ps1')
 
 docker compose ps -a
-$log = (cmd /c "docker logs silent_terror_tunnel 2>&1") -join "`n"
-$semua = [regex]::Matches($log, 'https://[a-z0-9-]+\.trycloudflare\.com')
-$token = if (Test-Path .env) { ((Get-Content .env | Where-Object { $_ -match '^LLM_TOKEN=' }) -replace '^LLM_TOKEN=', '') } else { '' }
+$link = Cari-Link
+$token = Baca-Env 'LLM_TOKEN'
 
 Write-Host ''
-if ($semua.Count -gt 0) {
-    $link = $semua[$semua.Count - 1].Value
+Write-Host "Token : $(if ($token) { $token } else { 'belum dibuat' })" -ForegroundColor Cyan
+if ($link) {
     try { Set-Clipboard -Value $link } catch {}
     Write-Host "Link  : $link  (disalin ke clipboard)" -ForegroundColor Cyan
+    Write-Host ''
+    & (Join-Path $PSScriptRoot 'kirim-link.ps1') -Link $link
 } else {
     Write-Host 'Link  : belum ada. Jalankan jalankan.bat dulu.' -ForegroundColor Yellow
 }
-Write-Host "Token : $(if ($token) { $token } else { 'belum dibuat' })" -ForegroundColor Cyan
