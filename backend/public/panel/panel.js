@@ -258,6 +258,8 @@ async function loadRooms() {
     if (!data.has_more) break;
     after = data.next_after_id;
   }
+  // API berhalaman urut id naik; pilihan ditampilkan dari ruangan terbaru.
+  rooms.sort((a, b) => b.id - a.id);
   for (const id of ['checker-room', 'history-room']) {
     const select = $(id),
       current = select.value;
