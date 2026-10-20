@@ -314,11 +314,6 @@
   color: #5c1a12;
   rotate: 10deg;
 }
-.stamp-hostage {
-  top: 62%;
-  color: #34688a;
-  rotate: 6deg;
-}
 
 /* VOTE: chip pemilih "pop", kartu bergetar tiap suara baru, bingkai makin merah. */
 .vote-count {

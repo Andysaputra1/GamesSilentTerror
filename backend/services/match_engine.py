@@ -724,6 +724,12 @@ class Match:
                 "next_gag": self.next_gag if hitman else 1,
                 "next_peek": player.next_peek,
                 "allies": self.allies(viewer),
+                # Korban Hostage tim malam ini (pilihan terbanyak, seri → yang paling awal), hanya untuk Syndicate.
+                "syndicate_target": (
+                    self.syndicate_target() if hitman and self.phase == "night" else None
+                ),
+                # Target Gag ronde ini (Gag dipakai bersama Syndicate); warga hanya tahu status dirinya sendiri.
+                "ally_gags": [p.name for p in self.players.values() if p.gagged] if hitman else [],
                 # Pilihan Hostage rekan malam ini agar Syndicate bisa sepakat satu target.
                 "ally_actions": (
                     [

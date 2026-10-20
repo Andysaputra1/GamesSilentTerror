@@ -183,7 +183,13 @@
       </section>
       @if (revealPrompt) {
         <!-- Belum membuka kartu setelah 10 detik: layar meredup, kartu besar di tengah minta diketuk. -->
-        <div class="reveal-nudge" role="dialog" aria-modal="true" aria-labelledby="nudge-title">
+        <div
+          class="reveal-nudge"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="nudge-title"
+          animate.leave="splash-leave"
+        >
           <h2 id="nudge-title">Kartu role-mu belum dibuka</h2>
           <p class="hand">Ketuk kartumu. Pertandingan menunggu semua pemain melihat role-nya.</p>
           <div class="nudge-card">
@@ -292,9 +298,10 @@
         </p>
       }
 
-      <div class="match-grid" [attr.data-tab]="mobileTab" animate.enter="game-enter">
-        <!-- KIRI: kartu rahasia, status, intel, dan catatan pertandingan. -->
-        <aside class="side-panel" aria-label="Kartu dan catatan">
+      <!-- Panel memudar masuk lewat CSS (game-motion.css), juga saat tab HP berganti. -->
+      <div class="match-grid" [attr.data-tab]="mobileTab">
+        <!-- KIRI: kartu rahasia dan status. Hasil aksi rahasia tampil di kartu meja. -->
+        <aside class="side-panel" aria-label="Kartu rahasia">
           <div class="private-card">
             <p class="eyebrow">{{ state.winner ? 'Role kamu' : 'Hanya untukmu' }}</p>
             <ng-container *ngTemplateOutlet="roleFlip; context: { $implicit: state }" />
@@ -316,31 +323,9 @@
               <p class="private-status">{{ privateStatus }}</p>
             }
           </div>
-          @if (state.me.intel.length) {
-            <section class="note intel">
-              <h3>Intel privat · Peek</h3>
-              @for (item of state.me.intel; track $index) {
-                <p>
-                  Ronde {{ item.round }}: <b>{{ nama(item.name) }}</b> →
-                  {{ roleNames[item.role] || item.role }}
-                </p>
-              }
-            </section>
-          }
           <button type="button" class="wood-button plank rules-open" (click)="showRules = true">
             ❔ Cara bermain
           </button>
-          <section class="note events">
-            <h3>Catatan pertandingan</h3>
-            <!-- Terbaru di atas agar kejadian terakhir terbaca sekilas. -->
-            <div class="events-list">
-              @for (event of state.events.slice().reverse(); track $index; let latest = $first) {
-                <p class="event" [class.latest]="latest">{{ event }}</p>
-              } @empty {
-                <p class="event">Belum ada kejadian.</p>
-              }
-            </div>
-          </section>
         </aside>
 
         <!-- TENGAH: papan tersangka dan baki aksi. -->
@@ -352,14 +337,21 @@
               />
             }
             <div class="players" [style.--cols]="tableColumns" [style.--rows]="tableRows">
-              @for (player of state.players; track player.name) {
+              @for (player of state.players; track player.name; let i = $index) {
+                @let intip = peekLabel(player.name);
+                @let sandera = player.alive && isHostage(player.name);
+                <!-- Penanda aksi rahasia (Intip, Jaga, Gag, Sandera) hanya dari data privat pemain ini. -->
                 <div
                   class="player-card"
+                  animate.enter="card-enter"
+                  [class.guarded]="guardTarget === player.name"
+                  [class.peeked]="!!intip"
                   [class.has-votes]="state.phase === 'tribunal' && votersFor(player.name).length > 0"
                   [class.leading]="state.phase === 'tribunal' && leadingTarget === player.name"
                   [attr.data-bump]="votersFor(player.name).length % 2"
                   [style.--heat]="state.phase === 'tribunal' ? voteHeat(player.name) : 0"
                   [style.--tag]="colorFor(player.name)"
+                  [style.--i]="i"
                 >
                   <button
                     type="button"
@@ -367,6 +359,7 @@
                     [class.chosen]="target === player.name"
                     [class.eliminated]="!player.alive"
                     [class.self]="player.name === state.me.name"
+                    [class.held]="sandera"
                     [attr.aria-pressed]="target === player.name"
                     [disabled]="
                       !player.alive ||
@@ -375,6 +368,22 @@
                     "
                     (click)="target = player.name"
                   >
+                    @if (intip) {
+                      <!-- Hasil Peek di atas karakter, seperti judul kartu role di Main. -->
+                      <b class="peek-role" [attr.data-role]="intip">
+                        @if (intip === '?') {
+                          <span aria-hidden="true">👁 ?</span
+                          ><span class="sr-only"
+                            >Diintip malam ini; hasilnya keluar setelah malam</span
+                          >
+                        } @else {
+                          <span class="sr-only">Hasil Intip: </span>{{ roleNames[intip] || intip }}
+                        }
+                      </b>
+                    }
+                    @if (guardTarget === player.name) {
+                      <span class="sr-only">Kamu menjaga pemain ini malam ini.</span>
+                    }
                     <span class="portrait">
                       <img class="skin" [src]="skinFor(player.name)" alt="" />
                     </span>
@@ -407,15 +416,22 @@
                         ></span
                       >
                     }
+                    @if (player.alive && isGagged(player.name)) {
+                      <span class="gag-tag"
+                        >GAG<span class="sr-only">
+                          Order: chat terkunci sampai akhir Tribunal</span
+                        ></span
+                      >
+                    }
                     @if (!player.alive) {
                       <!-- Pemain yang keluar tampil seperti korban eksekusi, dengan label berbeda. -->
                       <span class="stamp stamp-dead" [class.stamp-left]="player.left">{{
                         player.left ? 'Keluar' : 'Dieksekusi'
                       }}</span>
-                    } @else if (state.winner && player.hostage) {
-                      <span class="stamp stamp-hostage">Disandera</span>
+                    } @else if (sandera) {
+                      <span class="stamp stamp-sandera">Disandera</span>
                     }
-                    @if (target === player.name) {
+                    @if (target === player.name && !sandera) {
                       <span class="stamp stamp-target">Target</span>
                     }
                     @if (allyPicks(player.name).length) {

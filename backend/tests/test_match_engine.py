@@ -325,6 +325,14 @@ class SyndicateTests(unittest.TestCase):
         self.game.act("hitman3", "gag", "spy")
         self.assertTrue(self.game.players["spy"].gagged)
 
+    # Target Gag terlihat oleh seluruh Syndicate (juga setelah refresh), tidak oleh warga.
+    def test_gag_target_is_visible_to_the_syndicate_only(self):
+        self.game.act("hitman", "gag", "civilian")
+        for hitman in ("hitman", "hitman2"):
+            self.assertEqual(self.game.snapshot(hitman)["me"]["ally_gags"], ["civilian"])
+        self.assertEqual(self.game.snapshot("spy")["me"]["ally_gags"], [])
+        self.assertTrue(self.game.snapshot("civilian")["me"]["gagged"])
+
     def test_allies_and_their_hostage_choices_are_private_to_the_syndicate(self):
         self.night()
         self.game.act("hitman", "hostage", "stalker")
@@ -332,9 +340,14 @@ class SyndicateTests(unittest.TestCase):
         self.assertEqual(me["allies"], ["hitman", "hitman3"])
         self.assertEqual(me["ally_actions"], [{"name": "hitman", "target": "stalker"}])
         self.assertEqual(self.game.snapshot("hitman")["me"]["ally_actions"], [])
+        # Pilihan berbeda: korban tim tetap satu (seri → yang dipilih paling awal), sama bagi semua Hitman.
+        self.game.act("hitman2", "hostage", "spy")
+        for hitman in ("hitman", "hitman2", "hitman3"):
+            self.assertEqual(self.game.snapshot(hitman)["me"]["syndicate_target"], "stalker")
         for viewer in ("spy", "stalker", "civilian"):
             snapshot = self.game.snapshot(viewer)
             self.assertEqual((snapshot["me"]["allies"], snapshot["me"]["ally_actions"]), ([], []))
+            self.assertIsNone(snapshot["me"]["syndicate_target"])
             self.assertNotIn("hitman", " ".join(snapshot["events"]))
         self.game.players["hitman3"].alive = False
         self.game.phase = "day"

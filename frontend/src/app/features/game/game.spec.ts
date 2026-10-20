@@ -455,8 +455,11 @@ describe('Game', () => {
     expect(component.privateStatus).toContain('Voting dan aksi malam tetap boleh');
     fixture.componentRef.changeDetectorRef.markForCheck();
     fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('.players').textContent).not.toContain('HOSTAGE');
-    expect(fixture.nativeElement.querySelector('.players').textContent).not.toContain('GAG');
+    // Status sendiri hanya di kartu sendiri; kartu pemain lain tidak membawa status apa pun.
+    const [own, other] = fixture.nativeElement.querySelectorAll('.player-card');
+    expect(own.querySelector('.gag-tag')?.textContent).toContain('GAG');
+    expect(other.textContent).not.toContain('HOSTAGE');
+    expect(other.textContent).not.toContain('GAG');
     expect(fixture.nativeElement.querySelector('.players').textContent).not.toContain('BOT');
   });
 
@@ -1031,5 +1034,206 @@ describe('Game', () => {
     };
     component.game = game;
     expect(component.resultExplanation).toContain('Hitman telah tersingkir');
+  });
+
+  // SIAP: tombol Siap yang langsung memulai ronde 1 tidak meninggalkan pesan "Pilihan dikunci" di meja.
+  it('does not leave a locked-choice notice when ready starts round 1', () => {
+    const request = vi
+      .spyOn(TestBed.inject(GameService), 'request')
+      .mockReturnValue(of(preparing(true)));
+    component.code = 'ABC123';
+    component.refresh();
+    request.mockReturnValue(of(snapshot()));
+    component.readyUp();
+    expect(request).toHaveBeenLastCalledWith('ABC123', { match_id: 'match-1' }, 'ready');
+    expect(component.transition?.phase).toBe('start');
+    expect(component.notice).toBe('');
+  });
+
+  // CATATAN: panel catatan pertandingan dihapus; hasil Tribunal (publik) tampil di tirai pagi.
+  it('drops the match notes panel and shows the Tribunal verdict on the morning curtain', () => {
+    const state = snapshot();
+    state.game.phase = 'tribunal';
+    state.game.events = ['Permainan dimulai.', 'Malam selesai.'];
+    const request = vi.spyOn(TestBed.inject(GameService), 'request').mockReturnValue(of(state));
+    component.code = 'ABC123';
+    component.refresh();
+    const page = render();
+    expect(page.textContent).not.toContain('Catatan pertandingan');
+    expect(page.textContent).not.toContain('Malam selesai.');
+    expect(page.querySelector('.events')).toBeNull();
+
+    const verdict = 'Tribunal mengeksekusi NOX. Role tetap dirahasiakan sampai permainan selesai.';
+    const next = snapshot();
+    next.game.round = 2;
+    next.game.events = [...state.game.events, verdict, 'Ronde 2: diskusi siang dimulai.'];
+    request.mockReturnValue(of(next));
+    component.refresh();
+    expect(component.transition).toEqual(
+      expect.objectContaining({ phase: 'day', subtitle: verdict }),
+    );
+    expect(render().querySelector('.phase-transition')?.textContent).toContain(verdict);
+  });
+
+  // INTIP: hasil Peek di kartu target (di atas karakter), bertahan lintas ronde; hanya layar Stalker.
+  it('keeps the Peek result on the target card across rounds, only for the Stalker', () => {
+    const game = snapshot().game;
+    game.players = ['alice', 'NOX', 'bob'].map((name) => ({ name, alive: true }));
+    game.phase = 'night';
+    game.me = {
+      ...game.me,
+      role: 'stalker',
+      ability: 'peek',
+      can_act: false,
+      action: { ability: 'peek', target: 'NOX' },
+    };
+    component.game = game;
+    const label = (index: number) =>
+      render().querySelectorAll('.player-card')[index].querySelector('.peek-role');
+    // Baru dikunci: "?" sampai server menyelesaikan malam.
+    expect(label(1)?.textContent).toContain('?');
+    expect(label(2)).toBeNull();
+
+    // Malam selesai: role dari intel privat server menggantikan "?".
+    game.phase = 'tribunal';
+    game.me.action = null;
+    game.me.intel = [{ round: 1, name: 'NOX', role: 'hitman' }];
+    expect(label(1)?.textContent).toContain('Hitman');
+    expect(label(1)?.getAttribute('data-role')).toBe('hitman');
+    expect(fixture.nativeElement.querySelectorAll('.player-card.peeked').length).toBe(1);
+    // Ronde berikutnya (atau setelah refresh) intel dikirim ulang, jadi label tetap ada.
+    game.round = 3;
+    game.phase = 'day';
+    expect(label(1)?.textContent).toContain('Hitman');
+    // Daftar intel di panel kiri sudah diganti label di kartu.
+    expect(render().querySelector('.side-panel')?.textContent).not.toContain('Intel');
+
+    // Role lain tidak menampilkan intel walaupun data salah ikut terkirim.
+    game.me.role = 'civilian';
+    expect(render().querySelector('.peek-role')).toBeNull();
+  });
+
+  // JAGA: aura emas hanya di layar Spy, pada target Guard yang dikunci malam ini.
+  it('shows the guard aura only on the Spy screen during the night', () => {
+    const game = snapshot().game;
+    game.players = ['alice', 'NOX', 'bob'].map((name) => ({ name, alive: true }));
+    game.phase = 'night';
+    game.me = {
+      ...game.me,
+      role: 'spy',
+      ability: 'guard',
+      can_act: false,
+      action: { ability: 'guard', target: 'bob' },
+    };
+    component.game = game;
+    const cards = render().querySelectorAll('.player-card');
+    expect([...cards].map((card) => card.classList.contains('guarded'))).toEqual([
+      false,
+      false,
+      true,
+    ]);
+    expect(cards[2].textContent).toContain('Kamu menjaga pemain ini');
+
+    // Tribunal: perlindungan malam sudah selesai.
+    game.phase = 'tribunal';
+    game.me.action = null;
+    expect(render().querySelector('.guarded')).toBeNull();
+
+    // Aksi malam role lain (Hostage Hitman) tidak pernah menjadi aura.
+    game.phase = 'night';
+    game.me = {
+      ...game.me,
+      role: 'hitman',
+      ability: 'hostage',
+      action: { ability: 'hostage', target: 'bob' },
+    };
+    expect(render().querySelector('.guarded')).toBeNull();
+  });
+
+  // GAG: label di kartu target untuk Syndicate (me.ally_gags dari server) dan di kartu korban sendiri;
+  // pemain lain tidak melihat apa pun.
+  it('shows GAG to the Syndicate and the gagged player only', () => {
+    const state = snapshot();
+    state.game.players = ['alice', 'NOX', 'bob'].map((name) => ({ name, alive: true }));
+    vi.spyOn(TestBed.inject(GameService), 'request').mockReturnValue(of(state));
+    component.code = 'ABC123';
+    component.refresh();
+    expect(render().querySelector('.gag-tag')).toBeNull();
+
+    const gag = (index: number) =>
+      render().querySelectorAll('.player-card')[index].querySelector('.gag-tag');
+    state.game.me = { ...state.game.me, ally_gags: ['NOX'] };
+    expect(gag(1)?.textContent).toContain('GAG');
+    expect(gag(2)).toBeNull();
+    // Server mengosongkan ally_gags saat ronde berganti (Gag berakhir setelah Tribunal).
+    state.game.me = { ...state.game.me, ally_gags: [] };
+    expect(render().querySelector('.gag-tag')).toBeNull();
+
+    // Korban (NOX) melihat GAG hanya di kartunya sendiri lewat me.gagged dari server.
+    state.game.me = {
+      ...state.game.me,
+      name: 'NOX',
+      role: 'civilian',
+      ability: null,
+      gagged: true,
+    };
+    expect(gag(1)?.textContent).toContain('GAG');
+    expect(fixture.nativeElement.querySelectorAll('.gag-tag').length).toBe(1);
+    // Pemain lain yang tidak dibungkam tidak tahu siapa yang kena Gag.
+    state.game.me = { ...state.game.me, name: 'bob', gagged: false };
+    expect(render().querySelector('.gag-tag')).toBeNull();
+  });
+
+  // SANDERA: cap besar dan kartu gelap hanya untuk Hitman (target malam ini) dan korban (kartunya sendiri).
+  it('stamps the hostage only for the Hitman target and on the victim own card', () => {
+    const game = snapshot().game;
+    game.players = ['alice', 'NOX', 'bob'].map((name) => ({ name, alive: true }));
+    game.phase = 'night';
+    game.me = {
+      ...game.me,
+      ability: 'hostage',
+      can_act: false,
+      action: { ability: 'hostage', target: 'bob' },
+    };
+    component.game = game;
+    component.target = 'bob';
+    let cards = render().querySelectorAll('.player-card');
+    expect(cards[2].querySelector('.stamp-sandera')?.textContent).toBe('Disandera');
+    expect(cards[2].querySelector('.player')?.classList).toContain('held');
+    expect(cards[2].querySelector('.stamp-target')).toBeNull(); // tidak bertumpuk dengan cap Target
+    expect(cards[1].querySelector('.stamp-sandera')).toBeNull();
+    // Dua Hitman memilih berbeda: cap mengikuti korban tim dari server, bukan pilihan sendiri.
+    game.me = { ...game.me, syndicate_target: 'NOX' };
+    component.target = '';
+    cards = render().querySelectorAll('.player-card');
+    expect(cards[1].querySelector('.stamp-sandera')).not.toBeNull();
+    expect(cards[2].querySelector('.stamp-sandera')).toBeNull();
+    game.me = { ...game.me, syndicate_target: undefined };
+
+    // Setelah malam, server tidak memberi tahu Hitman apakah Hostage berhasil (bisa digagalkan Guard).
+    game.phase = 'tribunal';
+    game.me.action = null;
+    component.target = '';
+    expect(render().querySelector('.stamp-sandera')).toBeNull();
+
+    // Korban melihat cap hanya di kartunya sendiri; warga lain tidak tahu siapa yang disandera.
+    game.me = { ...game.me, name: 'bob', role: 'civilian', ability: null, hostage: true };
+    cards = render().querySelectorAll('.player-card');
+    expect(cards[2].querySelector('.stamp-sandera')).not.toBeNull();
+    expect(fixture.nativeElement.querySelectorAll('.stamp-sandera').length).toBe(1);
+    game.me = { ...game.me, name: 'NOX', hostage: false };
+    expect(render().querySelector('.stamp-sandera')).toBeNull();
+
+    // Akhir permainan: server membuka status Hostage untuk semua pemain.
+    game.phase = 'finished';
+    game.winner = 'hitman';
+    game.players = game.players.map((player) => ({
+      ...player,
+      role: player.name === 'alice' ? 'hitman' : 'civilian',
+      hostage: player.name === 'bob',
+    }));
+    cards = render().querySelectorAll('.player-card');
+    expect(cards[2].querySelector('.stamp-sandera')).not.toBeNull();
+    expect(fixture.nativeElement.querySelectorAll('.stamp-sandera').length).toBe(1);
   });
 });

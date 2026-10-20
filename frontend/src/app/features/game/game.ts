@@ -58,6 +58,7 @@ const METODE_SINGKAT: Record<string, string> = { bt: 'BT', utility: 'UA', fuzzy:
   styleUrls: [
     './game.css',
     './game-table.css',
+    './game-cards.css',
     './game-screens.css',
     './game-end.css',
     './game-motion.css',
@@ -342,6 +343,45 @@ export class Game implements OnInit, OnDestroy {
     return (game.me.ally_actions ?? [])
       .filter((action) => action.target === name)
       .map((action) => action.name);
+  }
+
+  // INTIP: role hasil Peek dari intel privat Stalker, jadi tetap di kartu lintas ronde dan setelah refresh.
+  // Target yang baru dikunci malam ini bertanda "?" sampai server menyelesaikan malam.
+  peekLabel(name: string): string {
+    const me = this.game?.me;
+    if (!me || me.role !== 'stalker' || this.game?.winner) return '';
+    for (let i = me.intel.length - 1; i >= 0; i--)
+      if (me.intel[i].name === name) return me.intel[i].role;
+    return me.action?.ability === 'peek' && me.action.target === name ? '?' : '';
+  }
+
+  // JAGA: target Guard milik Spy malam ini; server hanya mengirim aksi milik pemain sendiri.
+  get guardTarget(): string {
+    const action = this.game?.phase === 'night' ? this.game.me.action : null;
+    return action?.ability === 'guard' ? action.target : '';
+  }
+
+  // GAG: korban melihatnya di kartunya sendiri (me.gagged); Syndicate melihat target Gag ronde ini
+  // (me.ally_gags, hanya dikirim ke Hitman). Pemain lain tidak pernah tahu siapa yang dibungkam.
+  isGagged(name: string): boolean {
+    const game = this.game;
+    if (!game || game.winner) return false;
+    if (name === game.me.name) return !!game.me.gagged;
+    return !!game.me.ally_gags?.includes(name);
+  }
+
+  // SANDERA: terlihat oleh korban di kartunya sendiri dan oleh Syndicate untuk korban tim malam ini
+  // (satu per malam: pilihan terbanyak); berhasil atau tidaknya (Guard) tidak dikirim server. Di akhir,
+  // status dibuka untuk semua.
+  isHostage(name: string): boolean {
+    const game = this.game;
+    if (!game) return false;
+    if (game.winner) return !!game.players.find((player) => player.name === name)?.hostage;
+    if (name === game.me.name) return !!game.me.hostage;
+    if (game.phase !== 'night' || game.me.role !== 'hitman') return false;
+    // Backend lama tanpa syndicate_target: pakai pilihan sendiri.
+    const action = game.me.action?.ability === 'hostage' ? game.me.action.target : null;
+    return (game.me.syndicate_target ?? action) === name;
   }
 
   // Terjemahkan pemenang tim menjadi hasil pribadi.
@@ -763,21 +803,31 @@ export class Game implements OnInit, OnDestroy {
   }
 
   // TRANSISI FASE: overlay singkat (malam meredup, pagi terang) setiap kali fase berganti. Dari layar
-  // persiapan, tirai gelap menutup splash, lalu terbuka memperlihatkan meja (fade-out → fade-in).
+  // persiapan, tirai tembus pandang menaungi splash yang memudar dan meja yang muncul (cross-fade).
+  // Pagi membawa hasil Tribunal (pengumuman publik server), jadi tampil lebih lama.
   private showTransition(phase: string, fromSplash = false): void {
     const info = this.transitions[phase];
     if (!info) return;
+    const verdict = phase === 'day' && !fromSplash ? this.lastVerdict : '';
     this.transition = fromSplash
       ? { phase: 'start', title: 'Ronde 1 dimulai', subtitle: info.subtitle }
-      : { phase, ...info };
+      : { phase, ...info, subtitle: verdict || info.subtitle };
     if (this.transitionTimer) clearTimeout(this.transitionTimer);
     this.transitionTimer = setTimeout(
       () => {
         this.transition = null;
         this.cdr.markForCheck();
       },
-      fromSplash ? 3000 : 2600,
+      fromSplash ? 3000 : phase === 'day' ? 3400 : 2600,
     );
+  }
+
+  // Pengumuman Tribunal terakhir dari server ("Tribunal mengeksekusi …" atau "… tanpa eksekusi").
+  private get lastVerdict(): string {
+    const events = this.game?.events ?? [];
+    for (let i = events.length - 1; i >= 0; i--)
+      if (events[i].startsWith('Tribunal')) return events[i];
+    return '';
   }
 
   // PERSIAPAN: pemain menandai sudah membaca panduan; ronde 1 tetap menunggu AI siap.
@@ -871,8 +921,9 @@ export class Game implements OnInit, OnDestroy {
             this.loadSurvey();
             this.startEnding();
           }
+          // Siap bukan pilihan: pesannya jangan muncul di meja bila ronde 1 langsung mulai.
           if (body && action !== 'reveal') {
-            this.notice = 'Pilihan dikunci oleh server.';
+            if (action !== 'ready') this.notice = 'Pilihan dikunci oleh server.';
             this.error = '';
           }
         },

@@ -436,13 +436,19 @@
   transition: width 0.6s ease;
 }
 
-/* ---------- Tirai mulai ronde 1: splash memudar, tirai menutup, lalu terbuka ke meja ---------- */
+/* ---------- Tirai mulai ronde 1: tembus pandang, jadi splash yang memudar dan meja yang muncul
+   tetap terlihat di baliknya (tidak ada potongan layar gelap) ---------- */
 .phase-transition[data-phase='start'] {
-  background: radial-gradient(circle at 50% 42%, #4a2e1a, #140c06 72%);
+  background: radial-gradient(circle at 50% 42%, rgb(74 46 26 / 0.5), rgb(20 12 6 / 0.86) 72%);
   animation-duration: 3s;
 }
 .phase-transition[data-phase='start'] .transition-card {
   animation-duration: 3s;
+}
+/* Pagi membawa hasil Tribunal, jadi tampil lebih lama (sama dengan timer di game.ts). */
+.phase-transition[data-phase='day'],
+.phase-transition[data-phase='day'] .transition-card {
+  animation-duration: 3.4s;
 }
 
 /* ---------- Chat: ikut turun bila di dasar; tombol untuk pesan baru saat membaca riwayat ---------- */

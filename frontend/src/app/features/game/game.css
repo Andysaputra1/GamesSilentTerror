@@ -71,7 +71,6 @@
 
 /* ---------- Bahan bersama: kertas, papan kayu, tombol ---------- */
 .paper,
-.note,
 .private-card,
 .action-panel,
 .board-bar {
@@ -81,7 +80,6 @@
   color: var(--ink);
 }
 .paper::before,
-.note::before,
 .private-card::before,
 .action-panel::before,
 .board-bar::before {
@@ -445,44 +443,6 @@ textarea:focus-visible {
 .rules-open {
   display: none;
 }
-.note {
-  flex: none;
-  padding: 14px 16px 12px;
-}
-.note h3 {
-  margin: 0 0 6px;
-  font: 700 15px/1.2 var(--font-display);
-  color: #5b311b;
-}
-.note p {
-  margin: 4px 0;
-  font-size: 13px;
-  line-height: 1.45;
-}
-.events {
-  flex: 1 1 auto;
-  min-height: 140px;
-  display: flex;
-  flex-direction: column;
-}
-.events-list {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-}
-.event {
-  padding: 3px 0 3px 10px;
-  border-left: 2px solid var(--line);
-  color: #6b4b2e;
-  font-family: var(--font-hand);
-  font-size: 15px !important;
-}
-.event.latest {
-  border-left-color: #8c3f2b;
-  color: var(--ink-strong);
-  font-weight: 700;
-}
-
 /* Kartu role: bisa dibalik; bagian depan = kartu role + karakter pemain. */
 .role-flip {
   width: min(100%, 190px);

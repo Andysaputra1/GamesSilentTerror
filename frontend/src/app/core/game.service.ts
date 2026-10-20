@@ -95,6 +95,10 @@ export interface MatchView {
     // Hanya untuk Hitman: rekan Syndicate dan pilihan Hostage mereka malam ini; selain itu kosong.
     allies?: string[];
     ally_actions?: { name: string; target: string }[];
+    // Hanya untuk Hitman (opsional agar cocok dengan backend versi lama): target Gag ronde ini dan
+    // korban Hostage tim malam ini.
+    ally_gags?: string[];
+    syndicate_target?: string | null;
   };
 }
 export interface GameSnapshot {
