@@ -106,6 +106,18 @@ class BrainRuntimeTests(unittest.TestCase):
             [("NOX", "offend", ["cadangan"])],
         )
 
+    # Riwayat panel menyimpan chat yang ikut dibaca sebagai konteks: 12 terakhir, urut kronologis.
+    def test_baca_chat_keeps_at_most_twelve_previous_chats_as_context(self):
+        roster, riwayat = ["human", "NOX", "ECHO", "VEIL"], []
+        for i in range(14):
+            self.runtime.baca_chat(riwayat, "human", f"Chat ke-{i}, aku curiga NOX.", roster)
+        hasil = self.runtime.baca_chat(riwayat, "ECHO", "Aku bukan Hitman.", roster)
+        self.assertEqual([c["teks"] for c in hasil["konteks"]],
+                         [f"Chat ke-{i}, aku curiga NOX." for i in range(2, 14)])  # fmt: skip
+        self.assertEqual(hasil["konteks"][-1]["intent"], "offend")
+        self.assertEqual(hasil["konteks"][-1]["target"], ["NOX: offend"])
+        self.assertEqual(self.runtime.baca_chat([], "human", "Halo.", roster)["konteks"], [])
+
     def test_loaded_runtime_is_not_reloaded_in_background(self):
         # prepare() selalu memanggil mulai_memuat(); NLU yang sedang dipakai tidak boleh tertukar.
         nlu = self.runtime.nlu
@@ -290,7 +302,11 @@ class NPCServiceBrainTests(unittest.IsolatedAsyncioTestCase):
         # Chat manusia sesudah snapshot tidak membatalkan rencana; chat bot lain membatalkannya.
         self.assertTrue(self.service._ambil_lantai(self.match, nox, terlihat))
         self.assertEqual(self.service.lantai, {self.match.id: "NOX"})
+        # Pemain melihat awan berpikir hanya pada bot yang sedang menyusun kalimat.
+        berpikir = [p["name"] for p in self.match.snapshot("human")["players"] if p.get("thinking")]
+        self.assertEqual(berpikir, ["NOX"])
         del self.service.lantai[self.match.id]
+        self.match.bot_berpikir = None
         with self.rooms.lock:
             self.match.add_message("ECHO", "Aku belum yakin.")
         self.assertFalse(self.service._ambil_lantai(self.match, nox, terlihat))
@@ -311,6 +327,7 @@ class NPCServiceBrainTests(unittest.IsolatedAsyncioTestCase):
             pengirim = [m["sender"] for m in self.match.messages[1:]]
             self.assertEqual(len(pengirim), 1, "hanya satu bot yang boleh bicara pada satu waktu")
             self.assertEqual(self.service.lantai, {})
+            self.assertIsNone(self.match.bot_berpikir)  # awan hilang setelah kalimat terkirim
             # Bot yang tertunda bicara di langkah berikutnya, setelah membaca chat bot pertama.
             kedua = echo if pengirim == ["NOX"] else nox
             kedua.sibuk = True

@@ -160,7 +160,8 @@ class Match:
             False  # Diaktifkan RoomService; unit engine tetap dapat diuji tanpa jaringan.
         )
         self.npc_decisions = set()
-        self.ai_grace_phase = None
+        # Bot yang sedang menyusun chat (lantai bicara NPCService); tampil sebagai awan "berpikir".
+        self.bot_berpikir: str | None = None
         self.phase = "day"
         self.durations = phase_durations(len(names), quick)
         now = time.time() if now is None else now
@@ -265,14 +266,6 @@ class Match:
         self.events.append(
             event or "Permainan dimulai. Diskusikan alibi tanpa membocorkan identitasmu."
         )
-
-    def reserve_ai_reply(self, now=None):
-        """At most one bounded extension per phase; manual skip still takes precedence."""
-        now = time.time() if now is None else now
-        phase = (self.round, self.phase)
-        if self.phase in {"day", "tribunal"} and self.ai_grace_phase != phase:
-            self.ai_grace_phase = phase
-            self.deadline = max(self.deadline, now + 35)
 
     # GETTER: ambil skin_id pemain, aman dipanggil dari luar Match.
     def get_skin(self, name: str) -> str:
@@ -703,6 +696,7 @@ class Match:
                     # Keluar sudah diumumkan di catatan, jadi tandanya publik (hanya bila benar).
                     **({"left": True} if p.left else {}),
                     **({"metode": self.bot_methods[p.name]} if p.name in self.bot_methods else {}),
+                    **({"thinking": True} if p.name == self.bot_berpikir else {}),
                     **({"role": p.role, "hostage": p.hostage, "bot": p.bot} if self.winner else {}),
                 }
                 for p in self.players.values()

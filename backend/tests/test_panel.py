@@ -1,4 +1,5 @@
 import base64
+import json
 import unittest
 from datetime import date, datetime
 from unittest.mock import patch, AsyncMock
@@ -10,6 +11,13 @@ from config.settings import Settings, settings
 from controller.api.panel import router, require_panel, history_filter, validate_endpoint
 from services.password_service import hash_password
 from module.openrouter_client import generate_reply
+
+# Bacaan NLU satu pesan seperti yang disimpan pencatat NLU (BrainRuntime.baca_chat), beserta konteksnya.
+NLU_CONTOH = json.dumps({
+    "intent": "offend", "confidence": 0.91,
+    "target": [{"pemain": "NOX", "relasi": "offend", "prob": 0.88, "sumber": ["indobert"]}],
+    "konteks": [{"pengirim": "ECHO", "teks": "Halo semua.", "intent": "neutral", "target": []}],
+})
 
 
 class PanelTests(unittest.TestCase):
@@ -45,7 +53,11 @@ class PanelTests(unittest.TestCase):
         )
 
     def test_documents_are_whitelisted_and_sandboxed(self):
-        for nama, judul in [("erd", "ERD Silent Terror"), ("proses-ai", "Proses AI Silent Terror")]:
+        for nama, judul in [
+            ("erd", "ERD Silent Terror"),
+            ("proses-ai", "Proses AI Silent Terror"),
+            ("arsitektur", "Arsitektur Sistem Silent Terror"),
+        ]:
             page = self.client.get(f"/panel/dokumen/{nama}")
             self.assertEqual(page.status_code, 200)
             self.assertIn(judul, page.text)
@@ -196,7 +208,7 @@ class HistoryFilterTests(unittest.TestCase):
                         "kind": kind,
                         "message": f"message-{i}",
                         "date": f"2026-09-{day} 01:00:00",
-                        "nlu": '{"intent": "offend", "target": []}' if i == 1 else None,
+                        "nlu": NLU_CONTOH if i == 1 else None,
                     },
                 )
         self.app = FastAPI()
@@ -233,11 +245,16 @@ class HistoryFilterTests(unittest.TestCase):
             exported = self.client.get("/api/panel/history.csv", params=query)
             self.assertEqual(exported.status_code, 200)
             rows = list(csv.reader(io.StringIO(exported.content.decode("utf-8-sig"))))
-            self.assertEqual(rows[0], ["chat_id", "isi_chat"])
+            self.assertEqual(
+                rows[0], ["chat_id", "isi_chat", "intent", "confidence", "target", "konteks"]
+            )
             self.assertEqual([int(row[0]) for row in rows[1:]], expected)
+            if kind == "human":  # bacaan NLU dan konteksnya ikut diekspor
+                self.assertEqual(
+                    rows[1][2:], ["offend", "0.91", "NOX: offend", "ECHO: Halo semua. [neutral; -]"]
+                )
         # Bacaan NLU saat game berjalan ikut tampil; pesan tanpa bacaan bernilai null.
         pesan = self.client.get("/api/panel/history", params={"room_code": "ABC123"}).json()
-        self.assertEqual([m["nlu"] for m in pesan["messages"][:2]],
-                         [{"intent": "offend", "target": []}, None])  # fmt: skip
+        self.assertEqual([m["nlu"] for m in pesan["messages"][:2]], [json.loads(NLU_CONTOH), None])
         self.assertEqual(self.client.get("/api/panel/history?sender_kind=bad").status_code, 422)
         self.assertEqual(self.client.get("/api/panel/history.csv?sender_kind=bad").status_code, 422)

@@ -1,4 +1,5 @@
 import { backendUrl } from '../../core/backend-url';
+import { STORAGE } from '../../core/storage';
 import { isPlatformBrowser } from '@angular/common';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import {
@@ -52,14 +53,14 @@ export class Auth implements OnInit, AfterViewInit {
   readonly countdownEnded = signal(false);
   readonly countdownLabels = ['BULAN', 'HARI', 'JAM', 'MENIT', 'DETIK'];
   backendStatus: 'checking' | 'online' | 'offline' = 'checking';
-  
+
   // KONTAK WA: link ke WhatsApp untuk menyalakan server jika halaman login offline.
   readonly serverContactUrlAndy =
     'https://wa.me/6281995247372?text=' +
     encodeURIComponent(
       'Bro Andy, tolong nyalakan server Silent Terror ya. Status di halaman login sedang offline. Terima kasih!',
     );
-    readonly serverContactUrlKimberly =
+  readonly serverContactUrlKimberly =
     'https://wa.me/6281230242435?text=' +
     encodeURIComponent(
       'Hi Kim, offline nih server game Silent Terrornya. Tolong bantu nyalakan dong, thanks!',
@@ -372,18 +373,18 @@ export class Auth implements OnInit, AfterViewInit {
     }
 
     try {
-      localStorage.setItem('shadow_heist_access_token', response.access_token);
-      localStorage.setItem('shadow_heist_access_token_expires_at', response.expires_at);
+      localStorage.setItem(STORAGE.token, response.access_token);
+      localStorage.setItem(STORAGE.tokenExpiresAt, response.expires_at);
       // Simpan dengan camelCase untuk konsistensi TypeScript.
       localStorage.setItem(
-        'shadow_heist_user',
+        STORAGE.user,
         JSON.stringify({
           username: response.user.username,
           displayName: response.user.display_name,
           skinId: response.user.skin_id,
         }),
       );
-      sessionStorage.removeItem('shadow_heist_game_entry');
+      sessionStorage.removeItem(STORAGE.gameEntry);
     } catch {
       this.errorMessage = 'BROWSER MENOLAK PENYIMPANAN SESI. IZINKAN STORAGE LALU COBA LAGI.';
       return;

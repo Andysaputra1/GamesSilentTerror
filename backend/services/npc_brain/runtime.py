@@ -339,8 +339,8 @@ class BrainRuntime:
             logger.warning("Folder IndoBERT tidak ditemukan; memakai NLU cadangan (SVM + nama).")
         return NLUBersama(NLUCadangan(analysis, kata_umum(target_dir)), "cadangan")
 
-    # RANTAI PENULIS sesuai urutan panel. Key Claude dari environment server; key OpenRouter dan link LLM
-    # (Docker/tunnel) dari Konfigurasi AI panel. Jalur tanpa key dilewati; semua gagal → templat.
+    # RANTAI PENULIS sesuai urutan panel: key OpenRouter dan link LLM (Docker/tunnel) dari Konfigurasi AI
+    # panel. Jalur tanpa key/link dilewati; semua gagal → templat.
     def _buat_penulis(self):
         self.keterangan_penulis = {}
         if self.konfigurasi.penulis == "templat":
@@ -638,9 +638,15 @@ class BrainRuntime:
     # PENCATAT NLU: baca satu chat dengan IndoBERT seperti ingatan bot (konteks = `riwayat` milik pemanggil,
     # urut kronologis). Hasil sama dengan bacaan bot dan masuk memo NLU, jadi bot tidak menghitung ulang.
     # Target neutral (pemain yang diajak bicara) ikut dengan asalnya: IndoBERT/cadangan dan/atau aturan nama.
+    # `konteks` = chat sebelumnya yang ikut dibaca Model 2 (maks KONTEKS_MAKS = 12), disimpan untuk riwayat panel.
     def baca_chat(self, riwayat, pengirim, teks, roster):
         mulai = time.perf_counter()
         modul = next(iter(self.modul.values()))  # anotasi_chat sama di semua modul notebook
+        konteks = [
+            {"pengirim": c["pengirim"], "teks": c["teks"], "intent": c.get("intent"),
+             "target": teks_target(c.get("target"))}
+            for c in riwayat[-modul.KONTEKS_MAKS:]
+        ]  # fmt: skip
         chat = modul.anotasi_chat(
             self.nlu, {"pengirim": pengirim, "teks": teks}, riwayat, list(roster)
         )
@@ -651,6 +657,7 @@ class BrainRuntime:
                             "prob": None if t.get("prob") is None else round(t["prob"], 3),
                             "sumber": list(t.get("sumber", []))}
                            for t in chat["target"]],
+                "konteks": konteks,
                 "sumber": self.nlu.sumber, "ms": round((time.perf_counter() - mulai) * 1000, 1)}  # fmt: skip
 
     # Dipanggil setelah pesan benar-benar terkirim.

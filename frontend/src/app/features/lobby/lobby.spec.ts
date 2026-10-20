@@ -70,6 +70,33 @@ describe('Lobby', () => {
     expect(component.durations).toEqual({ day: 14, night: 10, tribunal: 10 });
   });
 
+  // Room penuh manusia: bot yang sudah aktif tetap bisa dimatikan; menambah bot yang terkunci.
+  it('lets the host remove bots from a full room and names the host by display name', () => {
+    const humans = ['host', 'b', 'c', 'd'].map((name) => ({
+      ...member(name),
+      label: `Nama ${name}`,
+    }));
+    component.username = 'host';
+    component.room = {
+      code: 'ABC123',
+      owner: 'host',
+      members: humans,
+      bots: [],
+      bot_enabled: true,
+      phase: 'lobby',
+      capacity: 4,
+    };
+    fixture.componentRef.changeDetectorRef.markForCheck();
+    fixture.detectChanges();
+    const toggle = fixture.nativeElement.querySelector('.room-secondary') as HTMLButtonElement;
+    expect(toggle.disabled).toBe(false);
+    component.room = { ...component.room, bot_enabled: false };
+    fixture.componentRef.changeDetectorRef.markForCheck();
+    fixture.detectChanges();
+    expect(toggle.disabled).toBe(true);
+    expect(component.ownerLabel).toBe('Nama host');
+  });
+
   it('keeps the API create path available for the selected capacity', () => {
     const request = vi.spyOn(TestBed.inject(RoomService), 'request').mockReturnValue(
       of({

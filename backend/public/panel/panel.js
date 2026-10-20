@@ -525,6 +525,26 @@ function nluTeks(nlu) {
   );
   return `${nlu.intent} ${teks(nlu.confidence)}${target.length ? ` · target ${target.join(', ')}` : ''}`;
 }
+// Sel riwayat chat: bacaan IndoBERT (intent · target), lalu chat sebelumnya yang ikut dibaca sebagai konteks
+// (maks 12, tersimpan sejak pencatat NLU menyimpan konteks). Semua isi chat dipasang sebagai teks, bukan HTML.
+function nluSel(nlu) {
+  const td = node('td', nluTeks(nlu));
+  const konteks = nlu?.konteks || [];
+  if (konteks.length) {
+    const rincian = node('details', undefined, 'nlu-konteks');
+    rincian.append(node('summary', `Konteks IndoBERT (${konteks.length} chat sebelumnya)`));
+    const daftar = node('ol');
+    for (const c of konteks) {
+      const target = (c.target || []).join(', ');
+      daftar.append(
+        node('li', `${c.pengirim}: ${c.teks} — ${c.intent || '-'}${target ? ` · ${target}` : ''}`),
+      );
+    }
+    rincian.append(daftar);
+    td.append(rincian);
+  }
+  return td;
+}
 function chatItem(trace, selected, onSelect) {
   if (isSistem(trace)) return node('p', trace.message, 'chat-system');
   const r = trace.ringkas,
@@ -1923,12 +1943,12 @@ Ronde ${row.round_number ?? '-'} | ${row.phase || 'legacy'}`,
       `${row.sender_name}
 ${row.sender_kind}`,
       row.message,
-      nluTeks(row.nlu),
     ]) {
       const td = document.createElement('td');
       td.textContent = value;
       tr.append(td);
     }
+    tr.append(nluSel(row.nlu));
     $('history-rows').append(tr);
   }
   historyAfter = data.next_after_id;

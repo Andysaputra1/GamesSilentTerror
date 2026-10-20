@@ -1,6 +1,7 @@
 import { DOCUMENT } from '@angular/common';
 import { afterNextRender, Component, DestroyRef, inject, signal } from '@angular/core';
 
+// TOMBOL LAYAR PENUH di HUD game (masuk/keluar); pop-up undangan di awal ada di FullscreenInvite.
 @Component({
   selector: 'app-fullscreen-control',
   templateUrl: './fullscreen-prompt.html',

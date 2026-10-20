@@ -223,6 +223,37 @@ describe('Game', () => {
     expect(request.mock.calls[0][1]).toMatchObject({ target: 'NOX' });
   });
 
+  // Awan berpikir hanya di bot yang sedang menyusun chat, dan tidak tampil setelah pertandingan selesai.
+  it('shows a thinking cloud on the bot that is composing a chat', () => {
+    const state = snapshot();
+    state.game.players[1].thinking = true;
+    component.game = state.game;
+    fixture.componentRef.changeDetectorRef.markForCheck();
+    fixture.detectChanges();
+    const clouds = fixture.nativeElement.querySelectorAll('.thought');
+    expect(clouds.length).toBe(1);
+    expect((clouds[0] as HTMLElement).getAttribute('aria-label')).toBe('NOX sedang berpikir');
+    component.game = { ...state.game, winner: 'civilians' };
+    fixture.componentRef.changeDetectorRef.markForCheck();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.thought')).toBeNull();
+  });
+
+  // Tombol aksi menyebut nama tampilan target; username hanya dikirim ke server.
+  it('names the selected target by display name on the vote button', () => {
+    const state = snapshot();
+    state.game.players.push({ name: 'bob123', label: 'Bobby Sapu', bot: false, alive: true });
+    state.game.phase = 'tribunal';
+    state.game.me = { ...state.game.me, role: 'civilian', can_vote: true, can_act: false };
+    component.game = state.game;
+    component.target = 'bob123';
+    fixture.componentRef.changeDetectorRef.markForCheck();
+    fixture.detectChanges();
+    const button = fixture.nativeElement.querySelector('.action-buttons .red') as HTMLElement;
+    expect(button.textContent).toContain('Bobby Sapu');
+    expect(button.textContent).not.toContain('bob123');
+  });
+
   it('only allows self target for Guard and excludes consecutive target', () => {
     component.game = snapshot().game;
     expect(component.canTarget('alice')).toBe(false);

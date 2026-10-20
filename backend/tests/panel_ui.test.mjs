@@ -641,7 +641,7 @@ test('simulation shows chat with NLU, live bot positions on the flowchart, and n
   assert.ok(kode.querySelector('.kode-param') && kode.querySelector('.kode-output'));
 });
 
-test('menu dokumen membuka ERD dan Proses AI di tab baru', async (t) => {
+test('menu dokumen membuka ERD, Proses AI, dan Arsitektur di tab baru', async (t) => {
   const w = setup(t);
   await login(w);
   const doc = w.document;
@@ -651,7 +651,58 @@ test('menu dokumen membuka ERD dan Proses AI di tab baru', async (t) => {
   const links = [...doc.querySelectorAll('#menu-dokumen a')];
   assert.deepEqual(
     links.map((a) => a.getAttribute('href')),
-    ['/panel/dokumen/erd', '/panel/dokumen/proses-ai'],
+    ['/panel/dokumen/erd', '/panel/dokumen/proses-ai', '/panel/dokumen/arsitektur'],
   );
   assert.ok(links.every((a) => a.target === '_blank' && a.rel === 'noopener'));
+});
+
+test('riwayat chat menampilkan intent, target, dan konteks IndoBERT sebagai teks', async (t) => {
+  const evil = '<img src=x onerror=alert(1)>';
+  const w = setup(t, (path) =>
+    path.startsWith('/api/panel/history?')
+      ? response({
+          messages: [
+            {
+              id: 7,
+              created_at: '2026-10-20T05:00:00',
+              room_code: 'ABC123',
+              round_number: 1,
+              phase: 'day',
+              sender_name: 'Andy',
+              sender_kind: 'human',
+              message: 'Aku curiga NOX.',
+              nlu: {
+                intent: 'offend',
+                confidence: 0.91,
+                target: [{ pemain: 'NOX', relasi: 'offend', prob: 0.88 }],
+                konteks: [
+                  { pengirim: 'ECHO', teks: evil, intent: 'neutral', target: [] },
+                  {
+                    pengirim: 'NOX',
+                    teks: 'Aku bukan Hitman.',
+                    intent: 'defend',
+                    target: ['NOX: defend'],
+                  },
+                ],
+              },
+            },
+          ],
+          has_more: false,
+          next_after_id: 7,
+        })
+      : undefined,
+  );
+  await login(w);
+  const doc = w.document;
+  await doc.querySelector('[data-menu=history]').onclick({ preventDefault() {} });
+  await settle();
+  const sel = doc.querySelector('#history-rows tr td:last-child');
+  assert.match(sel.textContent, /offend 0.91 · target NOX \(offend 0.88\)/);
+  assert.match(sel.querySelector('summary').textContent, /Konteks IndoBERT \(2 chat sebelumnya\)/);
+  const konteks = [...sel.querySelectorAll('li')].map((li) => li.textContent);
+  assert.deepEqual(konteks, [
+    `ECHO: ${evil} — neutral`,
+    'NOX: Aku bukan Hitman. — defend · NOX: defend',
+  ]);
+  assert.equal(sel.querySelector('img'), null); // isi chat tidak pernah menjadi HTML
 });

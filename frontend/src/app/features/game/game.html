@@ -111,7 +111,7 @@
                 </p>
                 @if (allies.length) {
                   <p class="role-note allies">
-                    Rekan Syndicate: <b>{{ allies.join(', ') }}</b>
+                    Rekan Syndicate: <b>{{ namaDaftar(allies) }}</b>
                   </p>
                 }
               } @else {
@@ -121,8 +121,25 @@
                 </p>
               }
             </div>
+          </aside>
+          <!-- Meja malam ini: karakter semua peserta (skin masing-masing) dan kesiapan AI. -->
+          <section class="paper splash-table" aria-labelledby="splash-table-title">
+            <div class="splash-cast">
+              <h3 id="splash-table-title">Meja malam ini</h3>
+              <ul>
+                @for (player of state.players; track player.name; let i = $index) {
+                  <li [style.--i]="i" [style.--tag]="colorFor(player.name)">
+                    <span class="cast-portrait"><img [src]="skinFor(player.name)" alt="" /></span>
+                    <b>{{ nama(player.name) }}</b>
+                    @if (player.name === state.me.name) {
+                      <small>Kamu</small>
+                    }
+                  </li>
+                }
+              </ul>
+            </div>
             @if (state.preparation; as prep) {
-              <div class="paper splash-status" aria-live="polite">
+              <div class="splash-status" aria-live="polite">
                 <p class="splash-state">
                   @if (prep.ready && prep.unrevealed) {
                     Menunggu {{ prep.unrevealed }} pemain membuka kartu role · paling lama
@@ -130,7 +147,7 @@
                   } @else if (prep.ready) {
                     {{ prep.starts_in ? 'Ronde 1 dimulai dalam ' + prep.starts_in + ' detik' : 'Memulai ronde 1…' }}
                   } @else {
-                    Menyiapkan AI… ({{ prep.max_wait }} detik lagi paling lama)
+                    Menyiapkan AI…
                   }
                 </p>
                 <div
@@ -154,10 +171,14 @@
                     >{{ prep.consented ? 'Menunggu pertandingan dimulai…' : 'Saya sudah paham, siap!' }}</span
                   >
                 </button>
-                <small>{{ prep.agreed }} / {{ prep.required }} pemain siap</small>
+                <small
+                  >{{ prep.agreed }} / {{ prep.required }} pemain siap{{
+                      prep.ready ? '' : ' · paling lama ' + prep.max_wait + ' detik'
+                  }}</small
+                >
               </div>
             }
-          </aside>
+          </section>
         </div>
       </section>
       @if (revealPrompt) {
@@ -284,7 +305,7 @@
               </p>
               @if (allies.length) {
                 <p class="allies">
-                  Rekan Syndicate: <b>{{ allies.join(', ') }}</b>
+                  Rekan Syndicate: <b>{{ namaDaftar(allies) }}</b>
                 </p>
               }
             }
@@ -357,6 +378,19 @@
                     <span class="portrait">
                       <img class="skin" [src]="skinFor(player.name)" alt="" />
                     </span>
+                    @if (player.thinking && player.alive && !state.winner) {
+                      <!-- Bot sedang menyusun kalimat: awan berpikir sampai chatnya muncul. -->
+                      <span
+                        class="thought"
+                        role="img"
+                        [attr.aria-label]="nama(player.name) + ' sedang berpikir'"
+                      >
+                        <span class="thought__cloud"
+                          ><span class="thought__face" aria-hidden="true">🤔</span></span
+                        >
+                        <i class="thought__bubble"></i><i class="thought__bubble"></i>
+                      </span>
+                    }
                     <b class="name-tag">{{ nama(player.name) }}</b>
                     <!-- prettier-ignore -->
                     <small class="player-sub">{{ state.winner ? (player.bot ? 'BOT' : 'PEMAIN') : '' }}{{ player.name === state.me.name ? (state.winner ? ' · ' : '') + 'KAMU' : '' }}</small>
@@ -481,7 +515,7 @@
                     [disabled]="!target || busy"
                     (click)="act(true)"
                   >
-                    ⚖ Kunci vote: {{ target || 'pilih pemain' }}
+                    ⚖ Kunci vote: {{ nama(target) || 'pilih pemain' }}
                   </button>
                 } @else if (state.me.can_act) {
                   @if (allyTarget && target !== allyTarget && canTarget(allyTarget)) {
@@ -490,7 +524,7 @@
                       class="wood-button plank ally-match"
                       (click)="target = allyTarget"
                     >
-                      ◆ Samakan dengan rekan: {{ allyTarget }}
+                      ◆ Samakan dengan rekan: {{ nama(allyTarget) }}
                     </button>
                   }
                   <button
@@ -500,7 +534,7 @@
                     (click)="act()"
                   >
                     {{ abilityNames[state.me.ability || ''] || state.me.ability }} →
-                    {{ target || 'pilih pemain' }}
+                    {{ nama(target) || 'pilih pemain' }}
                   </button>
                 }
                 @if (state.phase === 'day') {

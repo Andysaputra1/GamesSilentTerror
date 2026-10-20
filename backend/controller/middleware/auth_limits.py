@@ -1,4 +1,9 @@
-"""Batas percobaan in-memory untuk development satu worker. Jangan percaya X-Forwarded-For."""
+"""Batas percobaan in-memory untuk satu worker.
+
+Kunci = IP klien dari uvicorn. Di Azure, uvicorn memakai --proxy-headers sehingga IP ini berasal dari
+X-Forwarded-For yang ditulis Caddy; header itu tidak boleh dibaca langsung di sini karena bisa dipalsukan
+bila backend dibuka tanpa proxy.
+"""
 
 from collections import OrderedDict, deque
 from threading import RLock

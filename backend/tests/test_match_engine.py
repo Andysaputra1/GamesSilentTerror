@@ -46,16 +46,6 @@ class EngineTests(unittest.TestCase):
         self.game.tick(self.game.deadline)
         self.assertEqual(self.game.winner, "civilians")
 
-    def test_ai_grace_is_bounded_and_does_not_extend_night(self):
-        self.game.reserve_ai_reply(now=115)
-        self.assertEqual(self.game.deadline, 150)
-        self.game.reserve_ai_reply(now=149)
-        self.assertEqual(self.game.deadline, 150)
-        self.game.tick(150)
-        deadline = self.game.deadline
-        self.game.reserve_ai_reply(now=179)
-        self.assertEqual(self.game.deadline, deadline)
-
     def test_role_distribution_and_size(self):
         for count in range(4, 11):
             game = Match([str(i) for i in range(count)], [])

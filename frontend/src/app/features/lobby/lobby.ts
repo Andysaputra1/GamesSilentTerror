@@ -16,10 +16,11 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
-import { gameEntryStorageKey } from '../../core/flow.guard';
 import { Room, RoomService } from '../../core/room.service';
 import { ProfileMenu } from '../../core/profile-menu';
 import { skinImageUrl } from '../../core/asset-preloader';
+import { forgetRoom, STORAGE } from '../../core/storage';
+import { saveRoomSession, validateRoomCode } from '../../shared/room-helpers';
 
 // DECORATOR: hubungkan Lobby dengan template, CSS, navigasi, dan binding form.
 @Component({
@@ -68,7 +69,6 @@ export class Lobby implements OnInit, OnDestroy {
   private timer?: ReturnType<typeof setInterval>;
 
   // CONSTRUCTOR: Angular menyediakan service ruangan, router, platform, dan fasilitas lifecycle.
-  // function Object() { [native code] }
   constructor(
     @Inject(PLATFORM_ID) private readonly platformId: object,
     private readonly router: Router,
@@ -82,17 +82,23 @@ export class Lobby implements OnInit, OnDestroy {
     if (!isPlatformBrowser(this.platformId)) return;
     try {
       this.username =
-        JSON.parse(localStorage.getItem('shadow_heist_user') ?? '{}').username || this.username;
+        JSON.parse(localStorage.getItem(STORAGE.user) ?? '{}').username || this.username;
     } catch {}
-    const code = sessionStorage.getItem('shadow_heist_room');
+    const code = sessionStorage.getItem(STORAGE.room);
     // Tampilkan dulu snapshot dari Main (respons create/join barusan) agar layar room tidak
     // menunggu satu round trip; restoreRoom/load tetap menggantinya dengan data server.
     this.room = this.roomSnapshot(code);
-    if (localStorage.getItem('shadow_heist_access_token')) this.restoreRoom();
+    if (localStorage.getItem(STORAGE.token)) this.restoreRoom();
     else if (code) this.load('GET', '/' + encodeURIComponent(code));
     this.timer = setInterval(() => {
       if (this.room && !this.busy) this.load('GET', '/' + this.room.code);
     }, 3000);
+  }
+
+  // Nama tampilan host; username hanya cadangan untuk snapshot lama tanpa label.
+  get ownerLabel(): string {
+    const owner = this.room?.members.find((member) => member.name === this.room?.owner);
+    return owner?.label || this.room?.owner || '';
   }
 
   // Foto skin pemain untuk roster; skin kosong memakai skin bawaan yang sama dengan game.
@@ -104,7 +110,7 @@ export class Lobby implements OnInit, OnDestroy {
   private roomSnapshot(code: string | null): Room | null {
     if (!code) return null;
     try {
-      const room = JSON.parse(sessionStorage.getItem('shadow_heist_room_snapshot') ?? 'null');
+      const room = JSON.parse(sessionStorage.getItem(STORAGE.roomSnapshot) ?? 'null');
       const valid = room?.code === code && Array.isArray(room.members) && Array.isArray(room.bots);
       return valid ? (room as Room) : null;
     } catch {
@@ -183,12 +189,12 @@ export class Lobby implements OnInit, OnDestroy {
   // METHOD EVENT FORM: periksa format kode, lalu minta backend menambahkan keanggotaan.
   joinRoom(): void {
     if (this.busy || this.room) return;
-    const code = this.joinCode.trim().toUpperCase();
-    if (!/^[A-F0-9]{6}$/.test(code)) {
-      this.error = 'Masukkan kode ruangan 6 karakter.';
+    const result = validateRoomCode(this.joinCode);
+    if (!result.valid) {
+      this.error = result.error;
       return;
     }
-    this.load('POST', '/join', { code });
+    this.load('POST', '/join', { code: result.code });
   }
 
   // METHOD EVENT TOMBOL: minta perubahan pilihan NOX; izin pembuat ruangan diperiksa backend.
@@ -221,9 +227,7 @@ export class Lobby implements OnInit, OnDestroy {
           this.room = null;
           this.error = '';
           this.copied = false;
-          sessionStorage.removeItem('shadow_heist_room');
-          sessionStorage.removeItem('shadow_heist_room_snapshot');
-          sessionStorage.removeItem(gameEntryStorageKey);
+          forgetRoom();
         },
         error: (error: HttpErrorResponse) => {
           this.error = error.error?.detail || 'Gagal keluar ruangan.';
@@ -248,12 +252,8 @@ export class Lobby implements OnInit, OnDestroy {
         next: (room) => {
           this.room = room;
           this.error = '';
-          if (room) sessionStorage.setItem('shadow_heist_room', room.code);
-          else {
-            sessionStorage.removeItem('shadow_heist_room');
-            sessionStorage.removeItem('shadow_heist_room_snapshot');
-            sessionStorage.removeItem(gameEntryStorageKey);
-          }
+          if (room) sessionStorage.setItem(STORAGE.room, room.code);
+          else forgetRoom();
         },
         error: (error: HttpErrorResponse) => {
           this.error = 'Ruangan belum bisa dipulihkan. Coba muat ulang.';
@@ -278,9 +278,8 @@ export class Lobby implements OnInit, OnDestroy {
   // Tanda lokal bukan otorisasi backend; koneksi chat tetap memeriksa token dan keanggotaan.
   enterGame(): void {
     if (!this.room || this.busy) return;
-    sessionStorage.setItem('shadow_heist_room', this.room.code);
-    sessionStorage.setItem('shadow_heist_room_snapshot', JSON.stringify(this.room));
-    sessionStorage.setItem(gameEntryStorageKey, 'allowed');
+    saveRoomSession(this.room);
+    sessionStorage.setItem(STORAGE.gameEntry, 'allowed');
     void this.router.navigateByUrl('/game');
   }
 
@@ -303,7 +302,7 @@ export class Lobby implements OnInit, OnDestroy {
           const justStarted = this.room?.phase === 'lobby' && room.phase !== 'lobby';
           this.room = room;
           this.error = '';
-          sessionStorage.setItem('shadow_heist_room', room.code);
+          sessionStorage.setItem(STORAGE.room, room.code);
           // Host maupun anggota lain langsung masuk ke layar persiapan begitu pertandingan dimulai.
           if (path.endsWith('/start') || justStarted) {
             this.busy = false;
@@ -313,12 +312,12 @@ export class Lobby implements OnInit, OnDestroy {
         error: (error: HttpErrorResponse) => {
           this.error = error.error?.detail || 'Server belum bisa dihubungi. Coba lagi.';
           if (error.status === 401) {
-            localStorage.removeItem('shadow_heist_access_token');
+            localStorage.removeItem(STORAGE.token);
             void this.router.navigateByUrl('/login');
           }
           if (method === 'GET' && error.status === 400) {
             this.room = null;
-            sessionStorage.removeItem('shadow_heist_room');
+            sessionStorage.removeItem(STORAGE.room);
           }
         },
       });

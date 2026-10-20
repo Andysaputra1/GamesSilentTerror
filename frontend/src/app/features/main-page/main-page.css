@@ -115,6 +115,18 @@
   object-fit: contain;
 }
 
+/* Keterangan tulisan tangan di bawah gantungan agar tombol ganti skin langsung dikenali. */
+.skin-cycle__label {
+  position: absolute;
+  top: 92%;
+  left: 50%;
+  color: #5a321b;
+  font: 400 clamp(13px, 1.25cqw, 18px) / 1 'Patrick Hand', cursive;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  transform: translateX(-50%) rotate(-3deg);
+}
+
 .skin-cycle:hover {
   filter: brightness(1.08) drop-shadow(0 4px 4px rgba(55, 25, 10, 0.32));
   transform: rotate(-6deg) scale(1.07);

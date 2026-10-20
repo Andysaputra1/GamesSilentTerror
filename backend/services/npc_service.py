@@ -426,6 +426,9 @@ class NPCService:
         finally:
             if bicara and self.lantai.get(match.id) == otak.nama:
                 del self.lantai[match.id]
+            with room_service.lock:
+                if match.bot_berpikir == otak.nama:
+                    match.bot_berpikir = None
             otak.sibuk = False
             otak.langkah_terakhir = time.time()
 
@@ -473,6 +476,8 @@ class NPCService:
         if any(m["sender"] in bots and m["sender"] != otak.nama for m in baru):
             return False
         self.lantai[match.id] = otak.nama
+        with room_service.lock:
+            match.bot_berpikir = otak.nama  # pemain melihat awan berpikir selama kalimat disusun
         return True
 
     # Chat dikirim hanya jika fase masih sama dan bot masih boleh bicara; ingatan dicatat setelah terkirim.
@@ -497,6 +502,7 @@ class NPCService:
                 logger.warning("Chat bot %s tidak tersimpan; tidak disiarkan.", otak.nama)
                 return None
             reply = match.add_message(otak.nama, tulisan["teks"])
+            match.bot_berpikir = None  # kalimat sudah tampil; awan hilang bersama pesan
             self.runtime.catat_chat(otak, view, rencana, tulisan["teks"])
             return reply, message_id
 

@@ -155,10 +155,10 @@ def assets(asset: Literal["panel.js", "panel.css"]):
     return FileResponse(ASSETS / asset, headers={"Cache-Control": "no-store"})
 
 
-# Sajikan dokumen ERD/Proses AI (HTML mandiri berskrip inline). Sandbox memberi origin terpisah sehingga
+# Sajikan dokumen ERD/Proses AI/Arsitektur (HTML mandiri berskrip inline). Sandbox memberi origin terpisah sehingga
 # skrip dokumen tidak bisa membaca data panel di origin yang sama.
 @router.get("/panel/dokumen/{nama}", include_in_schema=False)
-def dokumen(nama: Literal["erd", "proses-ai"]):
+def dokumen(nama: Literal["erd", "proses-ai", "arsitektur"]):
     return FileResponse(
         ASSETS.parent / "dokumen" / f"{nama}.html",
         headers={
@@ -323,6 +323,7 @@ class AIProbe(BaseModel):
     scenario: Literal["discussion", "vote", "night"] = "discussion"
 
 
+# Kirim satu pesan uji ke provider aktif dengan skenario diskusi/vote/malam, lalu kembalikan jawabannya.
 @router.post("/api/panel/test-ai", dependencies=[Depends(limit_auth)])
 async def test_ai(body: AIProbe, token=Depends(require_panel)):
     from services.ai_probe_service import run_probe
@@ -332,6 +333,7 @@ async def test_ai(body: AIProbe, token=Depends(require_panel)):
     return await run_probe(body.message.strip(), body.scenario)
 
 
+# Daftar room yang pernah tercatat (cursor ID), jumlah pesan, dan tanda room yang masih hidup di memori.
 @router.get("/api/panel/rooms")
 def rooms(after_id: int = Query(0, ge=0), token=Depends(require_panel)):
     rows = transaction(
@@ -478,6 +480,23 @@ def history(
     }
 
 
+KOLOM_NLU_CSV = ["intent", "confidence", "target", "konteks"]
+
+
+# Bacaan IndoBERT satu pesan → kolom CSV: intent, confidence, target ("NOX: offend"), dan konteks (≤12 chat
+# sebelumnya, satu per baris "pengirim: teks [intent; target]"). Pesan tanpa bacaan (lama) → kolom kosong.
+def kolom_nlu(nlu):
+    data = json.loads(nlu) if isinstance(nlu, str) else nlu
+    if not data:
+        return ["", "", "", ""]
+    target = "; ".join(f"{t['pemain']}: {t['relasi']}" for t in data.get("target") or [])
+    konteks = "\n".join(
+        f"{c['pengirim']}: {c['teks']} [{c.get('intent') or '-'}; {', '.join(c.get('target') or []) or '-'}]"
+        for c in data.get("konteks") or []
+    )
+    return [data.get("intent", ""), data.get("confidence", ""), target, konteks]
+
+
 # Ekspor snapshot riwayat menjadi CSV dengan pembacaan database per halaman.
 @router.get("/api/panel/history.csv")
 def download(
@@ -499,7 +518,7 @@ def download(
 
     try:
         output.write(b"\xef\xbb\xbf")
-        write_row(["chat_id", "isi_chat"])
+        write_row(["chat_id", "isi_chat", *KOLOM_NLU_CSV])
         maximum = transaction(
             lambda db: db.execute(text("SELECT COALESCE(MAX(id),0) FROM chat_messages")).scalar()
         )
@@ -509,15 +528,15 @@ def download(
             rows = transaction(
                 lambda db: db.execute(
                     text("""
-                SELECT m.id,m.message FROM chat_messages m LEFT JOIN game_sessions s ON s.id=m.game_session_id
+                SELECT m.id,m.message,m.nlu FROM chat_messages m LEFT JOIN game_sessions s ON s.id=m.game_session_id
                 WHERE """ + where + " AND m.id>:after AND m.id<=:maximum ORDER BY m.id LIMIT 1000"),
                     page_params,
                 ).all()
             )
             if not rows:
                 break
-            for chat_id, message in rows:
-                write_row([chat_id, message])
+            for chat_id, message, nlu in rows:
+                write_row([chat_id, message, *kolom_nlu(nlu)])
             after = rows[-1][0]
         output.seek(0)
     except BaseException:

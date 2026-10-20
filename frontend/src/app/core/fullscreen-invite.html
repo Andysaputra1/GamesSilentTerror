@@ -1,0 +1,25 @@
+@if (open()) {
+  <div class="invite-backdrop" (click)="close()">
+    <section
+      class="invite-card"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="fullscreen-invite-title"
+      aria-describedby="fullscreen-invite-text"
+      (click)="$event.stopPropagation()"
+    >
+      <p class="invite-icon" aria-hidden="true">⛶</p>
+      <h2 id="fullscreen-invite-title">Main lebih nyaman di layar penuh</h2>
+      <p id="fullscreen-invite-text">
+        Meja, chat, dan kartu role terlihat lebih lega tanpa bilah browser. Tekan Esc kapan saja
+        untuk keluar.
+      </p>
+      <div class="invite-actions">
+        <button #enterButton type="button" class="invite-enter" (click)="enter()">
+          Layar penuh
+        </button>
+        <button type="button" class="invite-later" (click)="close()">Nanti saja</button>
+      </div>
+    </section>
+  </div>
+}

@@ -104,6 +104,7 @@ def simulasi_mulai(body: SimulasiBaru, token=Depends(require_panel)):
         raise HTTPException(503, f"Otak NPC belum siap: {error} Coba lagi sebentar.") from error
 
 
+# SIMULASI: kirim chat admin, jalankan satu putaran bot, atau lompat ke fase berikutnya.
 @router.post("/api/panel/simulasi/{sim_id}")
 async def simulasi_aksi(sim_id: str, body: SimulasiAksi, token=Depends(require_panel)):
     if body.aksi == "kirim" and not body.teks.strip():

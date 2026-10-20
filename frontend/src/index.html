@@ -9,106 +9,27 @@
     <link rel="icon" type="image/svg+xml" href="icon.svg" />
     <link rel="apple-touch-icon" href="apple-touch-icon.png" />
     <meta name="theme-color" content="#2a170c" />
+    <!-- Gambar layar loading diminta sejak awal; semuanya juga dipakai halaman login/main. -->
+    <link rel="preload" as="image" href="/assets/backgrounds/backwood.jpg" />
+    <link rel="preload" as="image" href="/assets/buttons/btn-wood.png" />
+    <link rel="preload" as="image" href="/assets/characters/loader-cast.webp" type="image/webp" />
   </head>
   <body>
     <!-- Layar loading awal: tampil pada paint pertama (prerender maupun build statis) dan
-         dihapus oleh core/boot-loader.ts setelah halaman pertama, font, dan gambarnya siap. -->
+         dihapus oleh core/boot-loader.ts setelah halaman pertama, font, dan gambarnya siap.
+         Gaya sama dengan halaman login: meja kayu, papan judul berpaku, dan kertas krem. -->
     <div id="boot-loader" class="boot-loader" role="status" aria-live="polite">
-      <div class="boot-loader__emblem">
-        <svg class="boot-loader__ring" viewBox="0 0 200 200" aria-hidden="true">
-          <circle class="boot-loader__track" cx="100" cy="100" r="94" />
-          <circle class="boot-loader__arc" cx="100" cy="100" r="94" />
-        </svg>
-        <svg class="boot-loader__writer" viewBox="0 0 160 160" aria-hidden="true">
-          <circle cx="80" cy="80" r="74" fill="#fff4d9" stroke="#3d2416" stroke-width="3" />
-          <circle cx="80" cy="80" r="67" fill="none" stroke="#c9a676" stroke-dasharray="2 4" />
-          <path
-            d="M44 134c0-31 14-47 36-47s36 16 36 47z"
-            fill="#8d512f"
-            stroke="#3d2416"
-            stroke-width="3"
-            stroke-linejoin="round"
-          />
-          <path
-            d="m70 89 10 16 10-16"
-            fill="#f3e2c4"
-            stroke="#3d2416"
-            stroke-width="2.5"
-            stroke-linejoin="round"
-          />
-          <circle cx="80" cy="65" r="21" fill="#f6d7b8" stroke="#3d2416" stroke-width="3" />
-          <path
-            d="M70 69q3.5 3 7 0m6 0q3.5 3 7 0"
-            fill="none"
-            stroke="#3d2416"
-            stroke-width="2.4"
-            stroke-linecap="round"
-          />
-          <ellipse cx="68" cy="75" rx="3.5" ry="2" fill="#e79a83" opacity=".7" />
-          <ellipse cx="92" cy="75" rx="3.5" ry="2" fill="#e79a83" opacity=".7" />
-          <path
-            d="M61 50c0-16 7-22 19-22s19 6 19 22z"
-            fill="#4a2c1a"
-            stroke="#2b170c"
-            stroke-width="2.5"
-            stroke-linejoin="round"
-          />
-          <rect x="61" y="43" width="38" height="6" fill="#e8c073" />
-          <ellipse cx="80" cy="51" rx="31" ry="6.5" fill="#3d2416" />
-          <path
-            d="m34 121 92-6 6 30-104 6z"
-            fill="#fffaf0"
-            stroke="#3d2416"
-            stroke-width="3"
-            stroke-linejoin="round"
-          />
-          <path class="boot-loader__line" d="m46 129 52-3.4" />
-          <path class="boot-loader__line" d="m47 138 28-1.8" />
-          <path class="boot-loader__line boot-loader__line--live" d="m80 135.9 22-1.4" />
-          <circle cx="52" cy="124" r="6.5" fill="#f6d7b8" stroke="#3d2416" stroke-width="2.5" />
-          <g class="boot-loader__hand">
-            <path
-              d="M109 101c8 10 6 20-2 26"
-              fill="none"
-              stroke="#3d2416"
-              stroke-width="13"
-              stroke-linecap="round"
-            />
-            <path
-              d="M109 101c8 10 6 20-2 26"
-              fill="none"
-              stroke="#8d512f"
-              stroke-width="8"
-              stroke-linecap="round"
-            />
-            <g class="boot-loader__pencil">
-              <g transform="rotate(28 104 128)">
-                <rect
-                  x="100.5"
-                  y="105"
-                  width="7"
-                  height="24"
-                  rx="1.5"
-                  fill="#e8c073"
-                  stroke="#3d2416"
-                  stroke-width="2"
-                />
-                <path d="m100.5 129 3.5 7 3.5-7z" fill="#3d2416" />
-              </g>
-              <circle
-                cx="106"
-                cy="128"
-                r="6.5"
-                fill="#f6d7b8"
-                stroke="#3d2416"
-                stroke-width="2.5"
-              />
-            </g>
-          </g>
-        </svg>
+      <div class="boot-loader__board">
+        <p class="boot-loader__title">Silent <span aria-hidden="true">◆</span> Terror</p>
+        <p class="boot-loader__tagline">Social Deduction Party Game</p>
       </div>
-      <p class="boot-loader__title">Silent <span aria-hidden="true">◆</span> Terror</p>
-      <p class="boot-loader__hint">Menyiapkan meja…</p>
+      <!-- Enam karakter skin game berbaris; kaca pembesar menyisir mencari Hitman. -->
+      <div class="boot-loader__lineup" aria-hidden="true">
+        <span style="--i: 0"></span><span style="--i: 1"></span><span style="--i: 2"></span
+        ><span style="--i: 3"></span><span style="--i: 4"></span><span style="--i: 5"></span>
+        <i class="boot-loader__lens"></i>
+      </div>
+      <p class="boot-loader__hint">Menyiapkan meja<b>.</b><b>.</b><b>.</b></p>
     </div>
     <app-root></app-root>
   </body>

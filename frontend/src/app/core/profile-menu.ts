@@ -18,6 +18,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { finalize } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { SessionService, UserProfile } from './session.service';
+import { STORAGE } from './storage';
 
 @Component({
   selector: 'app-profile-menu',
@@ -177,7 +178,7 @@ export class ProfileMenu implements OnInit {
   readProfile(): void {
     if (!isPlatformBrowser(this.platform)) return;
     try {
-      const profile = JSON.parse(localStorage.getItem('shadow_heist_user') ?? '{}');
+      const profile = JSON.parse(localStorage.getItem(STORAGE.user) ?? '{}');
       this.profileName.set(typeof profile.displayName === 'string' ? profile.displayName : '');
       this.profileUsername.set(typeof profile.username === 'string' ? profile.username : '');
     } catch {
@@ -189,7 +190,7 @@ export class ProfileMenu implements OnInit {
   // Sinkronkan username halaman induk setelah profil diubah dari tab lain.
   @HostListener('window:storage', ['$event'])
   profileStorageChanged(event: StorageEvent): void {
-    if (event.key !== 'shadow_heist_user') return;
+    if (event.key !== STORAGE.user) return;
     this.readProfile();
     if (this.profileUsername())
       this.profileChanged.emit({

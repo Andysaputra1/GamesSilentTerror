@@ -5,6 +5,9 @@ from copy import deepcopy
 from datetime import datetime, timezone
 from uuid import uuid4
 
+# Room terbaru yang jejaknya disimpan di memori. Jejak room lama tetap ada di tabel checker_traces.
+MAKS_ROOM_LIVE = 50
+
 
 # Jejak kosong tanpa didaftarkan ke room (simulasi panel memakai bentuk yang sama).
 def jejak_baru(code, sender, message):
@@ -31,10 +34,14 @@ class CheckerService:
     def __init__(self):
         self.rooms = {}
 
-    # METHOD TRACE: buat jejak pesan baru dan batasi riwayat menjadi 100 pesan terbaru per ruangan.
+    # METHOD TRACE: buat jejak pesan baru; 100 jejak terbaru per ruangan, MAKS_ROOM_LIVE ruangan terbaru.
     def begin(self, code, sender, message):
         trace = jejak_baru(code, sender, message)
-        self.rooms.setdefault(code, deque(maxlen=100)).appendleft(trace)
+        jejak = self.rooms.pop(code, None) or deque(maxlen=100)
+        self.rooms[code] = jejak  # dipindah ke paling baru (dict menjaga urutan masuk)
+        jejak.appendleft(trace)
+        while len(self.rooms) > MAKS_ROOM_LIVE:
+            del self.rooms[next(iter(self.rooms))]
         return trace
 
     # METHOD READ-ONLY: kembalikan salinan mendalam riwayat supaya pemanggil tidak mengubah trace internal.

@@ -1,5 +1,6 @@
 import { Component, Input } from '@angular/core';
 
+// KARTU ROLE PRATINJAU di Main: bingkai kartu role + skin pemain + properti role (mis. kacamata Spy).
 @Component({
   selector: 'app-role-reveal-card',
   templateUrl: './role-reveal-card.html',

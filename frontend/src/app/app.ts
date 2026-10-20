@@ -4,13 +4,15 @@ import { isPlatformBrowser } from '@angular/common';
 import { catchError, exhaustMap, filter, fromEvent, merge, of, Subscription, timer } from 'rxjs';
 import { ActiveMatchService } from './core/active-match.service';
 import { BootLoader } from './core/boot-loader';
+import { FullscreenInvite } from './core/fullscreen-invite';
 import { SessionService } from './core/session.service';
+import { STORAGE } from './core/storage';
 
 // DECORATOR: hubungkan komponen dengan selector HTML, template, dan fitur router.
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet],
+  imports: [RouterOutlet, FullscreenInvite],
   templateUrl: './app.html',
 })
 // CLASS KOMPONEN: wadah utama halaman; router-outlet di app.html menampilkan route aktif.
@@ -36,8 +38,8 @@ export class App implements OnInit, OnDestroy {
         filter(
           (event) =>
             event.storageArea === localStorage &&
-            (event.key === 'shadow_heist_access_token' || event.key === null) &&
-            !localStorage.getItem('shadow_heist_access_token'),
+            (event.key === STORAGE.token || event.key === null) &&
+            !localStorage.getItem(STORAGE.token),
         ),
       )
       .subscribe(() => {

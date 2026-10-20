@@ -128,4 +128,5 @@ Skrip `live_auth_smoke.py`, `live_match_smoke.py`, dan `mysql_smoke.py` adalah a
 manual yang dapat mengakses layanan/database sesuai konfigurasinya; skrip ini
 tidak dijalankan oleh pola `test_*.py` di atas.
 
-Filter riwayat panel dan download CSV memakai tanggal WIB, room, dan sender_kind yang sama (all/human/bot/legacy). Legacy tidak ditebak sebagai manusia atau bot. CSV tetap berisi chat_id dan isi_chat.
+Filter riwayat panel dan download CSV memakai tanggal WIB, room, dan sender_kind yang sama (all/human/bot/legacy). Legacy tidak ditebak sebagai manusia atau bot. CSV berisi chat_id dan isi_chat, lalu bacaan IndoBERT saat game
+berjalan: intent, confidence, target, dan konteks (maks 12 chat sebelumnya yang ikut dibaca; kosong untuk pesan lama).

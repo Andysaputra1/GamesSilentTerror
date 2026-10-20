@@ -1,5 +1,5 @@
 import { DOCUMENT } from '@angular/common';
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
 import { NavigationEnd, NavigationError, Router } from '@angular/router';
 import { filter, first } from 'rxjs';
 import { AssetPreloader, MAIN_CRITICAL_IMAGES } from './asset-preloader';
@@ -21,10 +21,15 @@ export class BootLoader {
   private readonly document = inject(DOCUMENT);
   private readonly router = inject(Router);
   private readonly preloader = inject(AssetPreloader);
+  // true begitu layar loading mulai memudar (atau tidak ada); pop-up lain menunggu sinyal ini.
+  readonly done = signal(false);
 
   start(): void {
     const loader = this.document.getElementById('boot-loader');
-    if (!loader) return;
+    if (!loader) {
+      this.done.set(true);
+      return;
+    }
     const startedAt = Date.now();
     const ready = this.firstPage().then((url) =>
       Promise.all([
@@ -52,6 +57,7 @@ export class BootLoader {
   }
 
   private hide(loader: HTMLElement): void {
+    this.done.set(true);
     loader.classList.add('boot-loader--done');
     loader.setAttribute('aria-hidden', 'true');
     const remove = () => loader.remove();

@@ -1,10 +1,11 @@
 import { backendUrl } from './backend-url';
 import { isPlatformBrowser } from '@angular/common';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { Inject, Injectable, PLATFORM_ID, inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { catchError, map, of, timeout } from 'rxjs';
 import { SessionService } from './session.service';
+import { authHeaders, STORAGE } from './storage';
 
 interface ActiveMatch {
   code: string;
@@ -24,17 +25,17 @@ export class ActiveMatchService {
   // Cari pertandingan aktif; abaikan respons jika token berubah atau logout dimulai.
   lookup() {
     if (!isPlatformBrowser(this.platform)) return of(null);
-    const token = localStorage.getItem('shadow_heist_access_token');
+    const token = localStorage.getItem(STORAGE.token);
     if (!token || this.session.loggingOut()) return of(null);
     const base = `${backendUrl()}/api/rooms/active`;
     return this.http
       .get<{ active: ActiveMatch | null }>(base, {
-        headers: new HttpHeaders({ Authorization: 'Bearer ' + token }),
+        headers: authHeaders(token),
       })
       .pipe(
         timeout(10000),
         map((result) =>
-          !this.session.loggingOut() && localStorage.getItem('shadow_heist_access_token') === token
+          !this.session.loggingOut() && localStorage.getItem(STORAGE.token) === token
             ? result.active
             : null,
         ),
@@ -43,8 +44,8 @@ export class ActiveMatchService {
 
   // Simpan pointer saja; role dan izin tetap diambil melalui API privat.
   remember(active: ActiveMatch): void {
-    sessionStorage.setItem('shadow_heist_room', active.code);
-    sessionStorage.setItem('shadow_heist_game_entry', 'allowed');
+    sessionStorage.setItem(STORAGE.room, active.code);
+    sessionStorage.setItem(STORAGE.gameEntry, 'allowed');
   }
 }
 
@@ -57,21 +58,21 @@ export const activeMatchGuard: CanActivateFn = (_, state) => {
   const isGame = state.url.split('?')[0] === '/game';
   // Masuk dari lobby (tanda 'allowed'): semua cabang di bawah menghasilkan true, jadi jangan
   // menahan layar game satu round trip backend. Polling App tetap memulihkan pointer room.
-  if (isGame && sessionStorage.getItem('shadow_heist_game_entry') === 'allowed') return true;
+  if (isGame && sessionStorage.getItem(STORAGE.gameEntry) === 'allowed') return true;
   return service.lookup().pipe(
     map((active) => {
       if (active) {
         service.remember(active);
         return isGame ? true : router.createUrlTree(['/game']);
       }
-      return isGame && sessionStorage.getItem('shadow_heist_game_entry') !== 'allowed'
+      return isGame && sessionStorage.getItem(STORAGE.gameEntry) !== 'allowed'
         ? router.createUrlTree(['/main'])
         : true;
     }),
     catchError(() =>
       of(
         isGame
-          ? sessionStorage.getItem('shadow_heist_game_entry') === 'allowed' ||
+          ? sessionStorage.getItem(STORAGE.gameEntry) === 'allowed' ||
               router.createUrlTree(['/main'])
           : true,
       ),

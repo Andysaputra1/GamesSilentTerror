@@ -22,13 +22,11 @@ from services.persistence_service import PersistenceError, PersistenceService
 
 logger = logging.getLogger("shadow_heist.socket")
 
-PlayerState = dict[str, int | float | str]
-
 
 class SocketGameController:
     """Chat room-scoped; engine di memori, pesan dicatat ke MySQL."""
 
-    # CONSTRUCTOR: simpan dependensi dan siapkan state socket serta pemain per ruangan.
+    # CONSTRUCTOR: simpan dependensi dan pemetaan socket → akun, ruangan, dan token login.
     def __init__(
         self,
         sio: socketio.AsyncServer,
@@ -36,11 +34,9 @@ class SocketGameController:
     ) -> None:
         self.sio = sio
         self.persistence = persistence
-        self.game_state: dict[str, Any] = {"phase": "day", "players": {}}
         self.socket_players: dict[str, str] = {}
         self.socket_rooms: dict[str, str] = {}
         self.socket_tokens: dict[str, str] = {}
-        self.room_players = {}
 
     async def emit_room(self, event, data, *, to):
         """Cabut penerima lama sebelum broadcast, termasuk socket pasif setelah logout/leave."""
@@ -58,22 +54,8 @@ class SocketGameController:
                 await self.sio.leave_room(sid, code)
         await self.sio.emit(event, data, to=to)
 
-    # HELPER STATE: ambil/buat state pemain dalam satu ruangan setelah memastikan username tidak kosong.
-    def get_player(self, username: str, room_code: str) -> PlayerState:
-        normalized_name = username.strip()
-        if not normalized_name:
-            raise ValueError("Username pemain wajib diisi.")
-
-        players: dict[str, PlayerState] = self.room_players.setdefault(room_code, {})
-        if normalized_name not in players:
-            players[normalized_name] = {
-                "role": "civilian",
-                "status": "active",
-            }
-        return players[normalized_name]
-
-    # METHOD ASYNC: cocokkan identitas sesi, cek keanggotaan, pastikan data pemain, lalu gabungkan socket ke kanal ruangan.
-    async def register_player_socket(self, sid: str, username: str) -> PlayerState:
+    # Cocokkan identitas dengan sesi login socket dan pastikan masih anggota ruangan. Hasil: kode ruangan.
+    def _verify_socket(self, sid: str, username: str) -> str:
         authenticated_username = self.socket_players.get(sid)
         normalized_username = username.strip()
         if authenticated_username is None:
@@ -92,15 +74,17 @@ class SocketGameController:
 
         code = self.socket_rooms[sid]
         room_service.get(code, authenticated_username)
-        player = self.get_player(authenticated_username, code)
-        PersistenceService(code).ensure_player(authenticated_username)
+        return code
+
+    # METHOD ASYNC: verifikasi socket, catat pemain di arsip, gabungkan ke kanal ruangan, lalu siarkan roster.
+    async def register_player_socket(self, sid: str, username: str) -> None:
+        code = self._verify_socket(sid, username)
+        name = username.strip()
+        PersistenceService(code).ensure_player(name)
         await self.sio.enter_room(sid, code)
         await self.emit_room(
-            "room_state",
-            room_service.snapshot(room_service.get(code, authenticated_username)),
-            to=code,
+            "room_state", room_service.snapshot(room_service.get(code, name)), to=code
         )
-        return player
 
     # EVENT CONNECT: periksa token login dan akses ruangan sebelum mencatat identitas socket.
     async def connect(self, sid: str, environ: dict[str, Any], auth: Any = None) -> None:
@@ -172,13 +156,10 @@ class SocketGameController:
             message = str(data.get("message", "")).strip()
             if not message or len(message) > 1000:
                 raise ValueError("Pesan chat harus berisi 1–1000 karakter.")
-            player = await self.register_player_socket(sid, sender)
-        except (ValueError, PersistenceError) as error:
+            # Socket sudah masuk kanal ruangan saat connect; pemain dicatat di transaksi pesan (tahap 3).
+            self._verify_socket(sid, sender)
+        except ValueError as error:
             await self.sio.emit("system_alert", {"msg": str(error)}, to=sid)
-            return
-
-        if player["status"] in {"hostage", "gagged"}:
-            await self.sio.emit("system_alert", {"msg": "Suara Anda hilang..."}, to=sid)
             return
 
         code = self.socket_rooms[sid]
@@ -240,7 +221,7 @@ class SocketGameController:
                 trace["message_id"] = PersistenceService(code).record_player_message(
                     username=sender,
                     message=message,
-                    status=str(player["status"]),
+                    status="active",  # Gag/Hostage ditegakkan Match.can_chat, bukan status arsip
                     context=context,
                 )
                 if match:

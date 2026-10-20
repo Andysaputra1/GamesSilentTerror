@@ -1,16 +1,12 @@
 import { isPlatformBrowser } from '@angular/common';
 import { inject, PLATFORM_ID } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
-
-// CONSTANT: kunci storage untuk sesi login dan izin masuk game dari lobby.
-const TOKEN_KEY = 'shadow_heist_access_token';
-const EXPIRY_KEY = 'shadow_heist_access_token_expires_at';
-const GAME_ENTRY_KEY = 'shadow_heist_game_entry';
+import { STORAGE } from './storage';
 
 // FUNCTION HELPER: periksa keberadaan token dan masa berlaku lokal, bukan validasi API.
-function hasValidSession(): boolean {
-  const token = localStorage.getItem(TOKEN_KEY);
-  const expiresAt = localStorage.getItem(EXPIRY_KEY);
+export function hasValidSession(): boolean {
+  const token = localStorage.getItem(STORAGE.token);
+  const expiresAt = localStorage.getItem(STORAGE.tokenExpiresAt);
   return Boolean(
     token &&
     expiresAt &&
@@ -30,9 +26,6 @@ export const loginRedirectGuard: CanActivateFn = () => {
 export const gameEntryGuard: CanActivateFn = () => {
   const platformId = inject(PLATFORM_ID);
   if (!isPlatformBrowser(platformId)) return true;
-  if (sessionStorage.getItem(GAME_ENTRY_KEY) === 'allowed') return true;
+  if (sessionStorage.getItem(STORAGE.gameEntry) === 'allowed') return true;
   return inject(Router).createUrlTree(['/main']);
 };
-
-// CONSTANT EKSPOR: kunci yang sama dipakai Lobby ketika memberi tanda masuk game.
-export const gameEntryStorageKey = GAME_ENTRY_KEY;

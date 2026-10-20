@@ -369,6 +369,14 @@
   .splash-side {
     order: -1;
   }
+  .splash-table {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .splash-status {
+    padding: 12px 0 0;
+    border-top: 2px dashed rgb(139 90 43 / 0.35);
+    border-left: 0;
+  }
   .guide-grid,
   .brief-steps {
     grid-template-columns: minmax(0, 1fr);
@@ -464,7 +472,12 @@
   }
   .splash-status {
     gap: 5px;
-    padding: 13px 16px 11px;
+  }
+  .splash-table {
+    padding-block: 10px;
+  }
+  .splash-cast li {
+    width: clamp(48px, 5vw, 66px);
   }
 }
 
@@ -494,6 +507,7 @@
   .timer-fill {
     transition: none;
   }
+  .splash-cast li,
   .phase-transition,
   .splash-enter,
   .splash-leave,

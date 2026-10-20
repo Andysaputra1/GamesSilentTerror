@@ -1,8 +1,9 @@
 import { backendUrl } from './backend-url';
 import { Injectable } from '@angular/core';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { timeout } from 'rxjs';
 import { Room } from './room.service';
+import { authHeaders } from './storage';
 
 export interface GameMessage {
   id: string;
@@ -62,6 +63,8 @@ export interface MatchView {
     label?: string;
     /** Metode otak bot (fuzzy, utility, bt, llm); hanya ada untuk bot setelah persiapan AI. */
     metode?: string;
+    /** Bot sedang menyusun chat (lantai bicara); ditampilkan sebagai awan berpikir. */
+    thinking?: boolean;
     bot?: boolean;
     alive: boolean;
     /** Keluar di tengah pertandingan: tidak hidup seperti dieksekusi, tetapi ditampilkan "Keluar". */
@@ -125,15 +128,7 @@ export interface SurveyAnswer {
 // ADAPTER HTTP: backend memutuskan izin, role, dan hasil aksi.
 @Injectable({ providedIn: 'root' })
 export class GameService {
-  // function Object() { [native code] }
   constructor(private readonly http: HttpClient) {}
-
-  // Header sesi pemain untuk semua request pertandingan.
-  private headers() {
-    return new HttpHeaders({
-      Authorization: 'Bearer ' + (localStorage.getItem('shadow_heist_access_token') ?? ''),
-    });
-  }
 
   // Kirim aksi atau ambil snapshot privat pertandingan dengan token sesi dan timeout.
   request(code: string, body?: unknown, action = 'play') {
@@ -141,7 +136,7 @@ export class GameService {
     return this.http
       .request<GameSnapshot>(body ? 'POST' : 'GET', base + (body ? '/' + action : '/game'), {
         body,
-        headers: this.headers(),
+        headers: authHeaders(),
       })
       .pipe(timeout(10000));
   }
@@ -153,7 +148,7 @@ export class GameService {
       .post<{ left: boolean }>(
         `${backendUrl()}/api/rooms/${encodeURIComponent(code)}/leave`,
         null,
-        { headers: this.headers() },
+        { headers: authHeaders() },
       )
       .pipe(timeout(10000));
   }
@@ -162,7 +157,7 @@ export class GameService {
   survey(code: string) {
     return this.http
       .get<SurveyStatus>(`${backendUrl()}/api/rooms/${encodeURIComponent(code)}/survey`, {
-        headers: this.headers(),
+        headers: authHeaders(),
       })
       .pipe(timeout(10000));
   }
@@ -176,7 +171,7 @@ export class GameService {
       }>(
         `${backendUrl()}/api/rooms/${encodeURIComponent(code)}/survey`,
         { match_id: matchId, answers },
-        { headers: this.headers() },
+        { headers: authHeaders() },
       )
       .pipe(timeout(10000));
   }

@@ -23,6 +23,7 @@ import { ProfileMenu } from '../../core/profile-menu';
 import { RoleRevealCard } from '../../core/role-reveal-card/role-reveal-card';
 import { RoomService } from '../../core/room.service';
 import { SessionService } from '../../core/session.service';
+import { STORAGE } from '../../core/storage';
 import { validateRoomCode, saveRoomSession, DEFAULT_CAPACITY } from '../../shared/room-helpers';
 
 type RoleId = 'hitman' | 'spy' | 'stalker' | 'civilian';
@@ -46,6 +47,7 @@ interface CaseFileTabOption {
   label: string;
 }
 
+// HALAMAN UTAMA: pratinjau kartu role dan skin, pilihan skin, serta buat/gabung room.
 @Component({
   selector: 'app-main-page',
   imports: [RouterLink, ProfileMenu, RoleRevealCard, FormsModule],
@@ -134,7 +136,7 @@ export class MainPage implements OnInit, OnDestroy {
   ngOnInit(): void {
     if (!isPlatformBrowser(this.platformId)) return;
     try {
-      const storedUser = localStorage.getItem('shadow_heist_user');
+      const storedUser = localStorage.getItem(STORAGE.user);
       const user = storedUser
         ? (JSON.parse(storedUser) as { username?: string; skinId?: string })
         : null;

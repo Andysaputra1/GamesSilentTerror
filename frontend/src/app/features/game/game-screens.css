@@ -95,15 +95,15 @@
   font-size: 0.35em;
   font-style: normal;
 }
-/* Isi persiapan setinggi kontennya dan berada di tengah sisa layar (tanpa kertas kosong). */
+/* Isi persiapan di tengah sisa layar: panduan dan kartu role sejajar, lalu bilah meja selebar penuh. */
 .splash-body {
   flex: none;
   min-height: 0;
   margin-block: auto;
-  align-items: start;
+  align-items: stretch;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(250px, 300px);
-  gap: clamp(14px, 2vw, 28px);
+  gap: clamp(14px, 2vw, 24px);
   width: min(1180px, 100%);
 }
 .briefing {
@@ -173,6 +173,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 14px;
   min-height: 0;
 }
@@ -305,13 +306,90 @@
   font-size: 14px;
   line-height: 1.45;
 }
+/* Bilah meja: barisan karakter semua peserta di kiri, kesiapan AI dan tombol Siap di kanan. */
+.splash-table {
+  --edge: 18px;
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(250px, 320px);
+  align-items: center;
+  gap: clamp(14px, 2vw, 26px);
+  padding: 16px clamp(18px, 2.4vw, 30px);
+}
+.splash-cast h3 {
+  margin: 0 0 8px;
+  color: #5b311b;
+  font: 800 18px/1.2 var(--font-display);
+}
+.splash-cast ul {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px clamp(8px, 2.4vw, 34px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.splash-cast li {
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  width: clamp(64px, 7.4vw, 100px);
+  animation: cast-bob 2.6s ease-in-out infinite;
+  animation-delay: calc(var(--i) * 0.22s);
+}
+.cast-portrait {
+  width: 100%;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 3px solid var(--tag);
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 35%, #fffaf0, color-mix(in srgb, var(--tag) 30%, #efe1c4));
+  box-shadow: 0 3px 0 rgb(139 90 43 / 0.25);
+}
+.cast-portrait img {
+  display: block;
+  width: 170%;
+  max-width: none;
+  translate: -20.5% -4%;
+}
+/* Nama tampilan boleh dua baris (mis. "Andy Saputra"); lebih panjang lagi dipotong. */
+.splash-cast b {
+  display: -webkit-box;
+  max-width: 100%;
+  overflow: hidden;
+  font: 700 13px/1.2 var(--font-display);
+  text-align: center;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+.splash-cast small {
+  margin-top: -2px;
+  color: var(--tag);
+  font: 800 10px/1 var(--font-display);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+@keyframes cast-bob {
+  0%,
+  28%,
+  100% {
+    translate: 0 0;
+  }
+  12% {
+    translate: 0 -5px;
+  }
+}
 .splash-status {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
   width: 100%;
-  padding: 20px 20px 16px;
+  padding-left: clamp(14px, 2vw, 26px);
+  border-left: 2px dashed rgb(139 90 43 / 0.35);
   text-align: center;
 }
 .splash-status small {

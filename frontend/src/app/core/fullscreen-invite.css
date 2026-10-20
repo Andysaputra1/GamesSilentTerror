@@ -1,0 +1,120 @@
+/* Kartu kertas krem di atas meja kayu yang diredupkan, seperti kertas Register di halaman login. */
+.invite-backdrop {
+  position: fixed;
+  z-index: 900;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgb(20 8 2 / 0.6);
+  animation: invite-fade 220ms ease-out;
+}
+
+.invite-card {
+  width: min(420px, 100%);
+  padding: 26px 26px 22px;
+  border: 1px solid #d9c49b;
+  border-radius: 8px;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 27px, rgb(122 86 50 / 0.08) 27px 28px), #f6e7c8;
+  box-shadow:
+    0 18px 40px rgb(14 6 2 / 0.55),
+    inset 0 0 30px rgb(150 105 55 / 0.22);
+  color: #422719;
+  text-align: center;
+  transform: rotate(-0.5deg);
+  animation: invite-drop 260ms ease-out;
+}
+
+.invite-icon {
+  margin: 0 0 4px;
+  color: #8d512f;
+  font:
+    34px/1 Arial,
+    sans-serif;
+}
+
+h2 {
+  margin: 0 0 10px;
+  font:
+    800 clamp(21px, 5vw, 26px) / 1.15 'Fraunces',
+    Georgia,
+    serif;
+}
+
+p {
+  margin: 0 0 18px;
+  font:
+    18px/1.35 'Patrick Hand',
+    cursive;
+}
+
+.invite-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 10px 18px;
+}
+
+/* Tombol kayu hijau yang sama dengan tombol SIGN IN di halaman login. */
+.invite-enter {
+  min-width: 170px;
+  min-height: 48px;
+  padding: 10px 22px;
+  border: 0;
+  background: url('/assets/buttons/btn-greenwood.png') center / 100% 100% no-repeat;
+  color: #fff7e5;
+  font:
+    800 16px/1 'Fraunces',
+    Georgia,
+    serif;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-shadow: 0 2px 0 rgb(18 40 20 / 0.7);
+  filter: drop-shadow(0 4px 4px rgb(30 14 6 / 0.35));
+  cursor: pointer;
+}
+
+.invite-enter:hover {
+  filter: brightness(1.07) drop-shadow(0 5px 5px rgb(30 14 6 / 0.4));
+}
+
+.invite-later {
+  border: 0;
+  background: none;
+  color: #6b4a33;
+  font:
+    18px/1 'Patrick Hand',
+    cursive;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.invite-enter:focus-visible,
+.invite-later:focus-visible {
+  outline: 2px solid #754122;
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+@keyframes invite-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes invite-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-14px) rotate(-0.5deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .invite-backdrop,
+  .invite-card {
+    animation: none;
+  }
+}

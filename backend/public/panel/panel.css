@@ -710,3 +710,8 @@ body > footer {
 .kode-inti { background: rgba(246, 215, 156, 0.12); border-left-color: #f6d79c; }
 .kode-catatan code, .kode-baris.kode-catatan code { color: #7f91a9; }
 .kode-tanda { padding: 1px 0 3px 4.7em; color: #f6d79c; font-family: Inter, Segoe UI, Arial, sans-serif; font-size: 11px; position: sticky; left: 0; }
+/* Riwayat chat: konteks IndoBERT per pesan (maks 12 chat sebelumnya), terlipat agar tabel tetap ringkas. */
+.nlu-konteks { margin-top: 6px; padding-top: 0; border-top: 0; font-size: 12px; }
+.nlu-konteks summary { cursor: pointer; color: #9fb4cc; }
+.nlu-konteks ol { margin: 6px 0 0; padding-left: 18px; max-height: 220px; overflow-y: auto; }
+.nlu-konteks li { margin: 2px 0; white-space: normal; }

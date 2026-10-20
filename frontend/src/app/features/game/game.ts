@@ -27,10 +27,10 @@ import {
   SurveyQuestion,
   SurveyStatus,
 } from '../../core/game.service';
-import { gameEntryStorageKey } from '../../core/flow.guard';
 import { ProfileMenu } from '../../core/profile-menu';
 import { PhaseDurations } from '../../core/room.service';
 import { FullscreenPrompt } from '../../core/fullscreen-prompt';
+import { forgetRoom, STORAGE } from '../../core/storage';
 
 // Karakter cadangan dan warna label pemain: berdasarkan urutan kursi, bukan role atau status rahasia.
 const SKINS = ['arthur', 'jenny', 'dexter', 'eloise', 'kiera', 'sadie'];
@@ -681,7 +681,7 @@ export class Game implements OnInit, OnDestroy {
   // INIT: polling menjaga snapshot setelah reconnect; Socket.IO membawa pesan/error langsung.
   ngOnInit(): void {
     if (!isPlatformBrowser(this.platform)) return;
-    this.code = sessionStorage.getItem('shadow_heist_room') ?? '';
+    this.code = sessionStorage.getItem(STORAGE.room) ?? '';
     if (!this.code) {
       void this.router.navigateByUrl('/lobby');
       return;
@@ -689,7 +689,7 @@ export class Game implements OnInit, OnDestroy {
     this.refresh();
     this.poll = setInterval(() => this.refresh(), 1000);
     this.socket = io(`${backendUrl()}`, {
-      auth: { token: localStorage.getItem('shadow_heist_access_token'), room_code: this.code },
+      auth: { token: localStorage.getItem(STORAGE.token), room_code: this.code },
       transports: ['websocket', 'polling'],
     });
     this.socket.on('connect', () => {
@@ -712,6 +712,9 @@ export class Game implements OnInit, OnDestroy {
     this.socket.on('receive_chat', (message: GameMessage) => {
       if (this.game && !this.game.messages.some((item) => item.id === message.id))
         this.game.messages = [...this.game.messages, message].slice(-100);
+      // Kalimat bot sudah tiba: awan berpikirnya hilang tanpa menunggu polling berikutnya.
+      const sender = this.game?.players.find((player) => player.name === message.sender);
+      if (sender?.thinking) sender.thinking = false;
       this.afterMessages();
       this.cdr.markForCheck();
     });
@@ -1005,9 +1008,7 @@ export class Game implements OnInit, OnDestroy {
     this.socket?.disconnect();
     this.game = null;
     this.code = '';
-    sessionStorage.removeItem('shadow_heist_room');
-    sessionStorage.removeItem('shadow_heist_room_snapshot');
-    sessionStorage.removeItem(gameEntryStorageKey);
+    forgetRoom();
     void this.router.navigateByUrl(url);
   }
 
@@ -1022,7 +1023,7 @@ export class Game implements OnInit, OnDestroy {
     return name !== me.name;
   }
 
-  // CHAT: hanya echo server ditampilkan supaya pesan yang ditolak tidak tampak terkirim.
+  // TRIBUNAL: pemilih yang sudah mengunci suara ke pemain ini (publik selama Tribunal).
   votersFor(name: string): string[] {
     return this.game?.tribunal_votes.find((item) => item.target === name)?.voters ?? [];
   }
