@@ -563,6 +563,7 @@ function chatItem(trace, selected, onSelect) {
   if (bubble) b.append(node('span', trace.message, 'chat-text'));
   const info = [];
   if (human && trace.nlu) info.push(`NLU: ${nluTeks(trace.nlu)}`);
+  if (r?.nlg === 'ditunda' && r.usulan) info.push(`akan ditulis: “${r.usulan}”`);
   if (r) {
     // Chat sudah tampil sebagai gelembung; sisanya vote/aksi rahasia langkah yang sama.
     const lain = (r.keputusan || []).filter((k) => !bubble || !k.startsWith('chat '));
@@ -889,7 +890,7 @@ function prosesTab(trace, p, lama) {
           ['Aturan + validasi IndoBERT + templat', duration(t.validasi_ms)],
           ['Status percobaan LLM', nlg.percobaan_llm],
         ])
-      : `${nlg.status || 'Tidak ada data NLG'}${nlg.keterangan ? `: ${nlg.keterangan}` : ''}`;
+      : nlgBelum(nlg);
   box.append(
     node(
       'p',
@@ -1068,6 +1069,44 @@ function reasoningTab(p) {
   }
   return box;
 }
+// NLG yang tidak menghasilkan kalimat (ditunda, tidak terkirim, tidak ada chat): status, alasan, dan
+// rencana yang sudah/akan diserahkan ke penulis.
+function nlgBelum(n) {
+  const m = n.masukan;
+  return keyValues([
+    ['Status', n.status || 'Tidak ada data NLG'],
+    ['Keterangan', n.keterangan],
+    ...(m
+      ? [
+          ['Rencana ke NLG', `${m.aksi}${m.target ? ` → ${m.target}` : ''} (${m.intent})`],
+          ['Kalimat templat', m.cadangan],
+        ]
+      : []),
+  ]);
+}
+// Masukan NLG: rencana yang diserahkan otak ke penulis kalimat dan prompt LLM-nya (juga saat ditunda).
+function masukanNlg(m) {
+  const box = node('div');
+  if (!m) return box;
+  box.append(
+    node('h4', 'Masukan ke NLG', 'report-title'),
+    keyValues(
+      [
+        ['Aksi chat', `${m.aksi}${m.target ? ` → ${m.target}` : ''}`],
+        ['Intent', m.intent],
+        ['Mengaku role', m.klaim],
+        ['Alasan yang boleh dipakai', m.bukti],
+        ['Menjawab', m.penanya],
+        ['Kalimat templat (cadangan)', m.cadangan],
+      ].filter(([, v]) => v !== undefined && v !== null),
+    ),
+    node('h4', 'Prompt ke LLM penulis', 'report-title'),
+    m.prompt
+      ? node('pre', m.prompt, 'output')
+      : node('p', 'Penulis LLM tidak aktif: kalimat ditulis dari templat.', 'hint'),
+  );
+  return box;
+}
 function nlgTab(p) {
   const n = p.nlg,
     box = node('div');
@@ -1076,12 +1115,7 @@ function nlgTab(p) {
     return box;
   }
   if (n.status !== 'terkirim') {
-    box.append(
-      keyValues([
-        ['Status', n.status],
-        ['Keterangan', n.keterangan],
-      ]),
-    );
+    box.append(nlgBelum(n), masukanNlg(n.masukan));
     return box;
   }
   box.append(
@@ -1099,6 +1133,7 @@ function nlgTab(p) {
       ['Varian templat dicoba', n.percobaan_templat],
       ['Waktu tulis (dtk)', n.detik],
     ]),
+    masukanNlg(n.masukan),
   );
   return box;
 }
@@ -1642,7 +1677,7 @@ function dataNode(id, trace) {
           ['Cek + validasi', duration(t.validasi_ms)],
           ['Pelanggaran', nlg.pelanggaran],
         ])
-      : `${nlg.status || '—'}${nlg.keterangan ? `: ${nlg.keterangan}` : ''}`;
+      : nlgBelum(nlg);
   if (id === 'kirim') return trace.nlu ? `Kalimat bot dibaca NLU: ${nluTeks(trace.nlu)}` : null;
   if (id === 'output')
     return `${trace.ringkas?.keputusan?.join(' · ') || 'diam'} · total ${duration(trace.duration_ms)}`;

@@ -741,86 +741,13 @@
                     </div>
                   }
                   @default {
-                    <form (ngSubmit)="submitSurvey()">
-                      @for (
-                        question of survey?.questions ?? [];
-                        track question.id;
-                        let n = $index
-                      ) {
-                        <fieldset class="survey-question">
-                          <legend>
-                            <span class="q-number">{{ n + 1 }}</span> {{ question.prompt }}
-                            @if (!question.required) {
-                              <small>(opsional)</small>
-                            }
-                          </legend>
-                          @if (question.kind === 'stars' || question.kind === 'scale') {
-                            <div
-                              class="scale"
-                              [class.stars]="question.kind === 'stars'"
-                              role="radiogroup"
-                              [attr.aria-label]="question.prompt"
-                            >
-                              @for (value of scaleValues(question); track value) {
-                                <button
-                                  type="button"
-                                  role="radio"
-                                  [class.selected]="isSelected(question, value)"
-                                  [attr.aria-checked]="surveyAnswers[question.id]?.value === value"
-                                  [attr.aria-label]="value + ' dari ' + question.scale_max"
-                                  (click)="setAnswer(question, value)"
-                                >
-                                  {{ question.kind === 'stars' ? '★' : value }}
-                                </button>
-                              }
-                            </div>
-                            @if (question.label_min || question.label_max) {
-                              <p class="scale-labels">
-                                <span>{{ question.scale_min }} = {{ question.label_min }}</span>
-                                <span>{{ question.scale_max }} = {{ question.label_max }}</span>
-                              </p>
-                            }
-                          } @else if (question.kind === 'choice') {
-                            <div class="choices">
-                              @for (option of question.options; track option) {
-                                <label>
-                                  <input
-                                    type="radio"
-                                    [name]="'q' + question.id"
-                                    [value]="option"
-                                    [checked]="surveyAnswers[question.id]?.text === option"
-                                    (change)="setText(question, option)"
-                                  />
-                                  <span>{{ option }}</span>
-                                </label>
-                              }
-                            </div>
-                          } @else {
-                            <textarea
-                              [name]="'q' + question.id"
-                              maxlength="1000"
-                              rows="3"
-                              placeholder="Tulis jawabanmu di sini…"
-                              [attr.aria-label]="question.prompt"
-                              [ngModel]="surveyAnswers[question.id]?.text ?? ''"
-                              (ngModelChange)="setText(question, $event)"
-                            ></textarea>
-                            <small class="counter"
-                              >{{ surveyAnswers[question.id]?.text?.length ?? 0 }} / 1000</small
-                            >
-                          }
-                        </fieldset>
-                      }
-                      @if (surveyError) {
-                        <p class="alert" role="alert">{{ surveyError }}</p>
-                      }
-                      <button
-                        class="wood-button green submit-survey"
-                        [disabled]="!surveyComplete || surveyState === 'sending'"
-                      >
-                        {{ surveyState === 'sending' ? 'Mengirim…' : 'Kirim kuesioner' }}
-                      </button>
-                    </form>
+                    @if (survey) {
+                      <app-survey-form
+                        [code]="code"
+                        [survey]="survey"
+                        (submitted)="surveyState = 'done'"
+                      />
+                    }
                   }
                 }
               </div>
@@ -907,6 +834,45 @@
                 dieksekusi tetap rahasia sampai permainan selesai. Ronde berikutnya dimulai jika
                 belum ada pemenang. Tidak ada batas ronde atau hasil seri pertandingan.
               </p>
+            </div>
+          </section>
+        </div>
+      }
+      @if (confirmLeave) {
+        <!-- Konfirmasi keluar: kertas di tengah meja, pilihan aman ("Tetap bermain") difokuskan dulu. -->
+        <div class="modal-backdrop" (click)="confirmLeave = false">
+          <section
+            class="leave-modal paper"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="leave-title"
+            aria-describedby="leave-text"
+            (click)="$event.stopPropagation()"
+            (keydown.escape)="confirmLeave = false"
+          >
+            <span class="leave-icon" aria-hidden="true">🚪</span>
+            <h2 id="leave-title">Keluar dari permainan?</h2>
+            <p id="leave-text">
+              Kamu dianggap tersingkir seperti pemain yang dieksekusi dan tidak bisa kembali ke
+              pertandingan ini. Menang atau kalah tetap mengikuti kubumu.
+            </p>
+            <div class="leave-actions">
+              <button
+                #stayButton
+                type="button"
+                class="wood-button plank"
+                (click)="confirmLeave = false"
+              >
+                Tetap bermain
+              </button>
+              <button
+                type="button"
+                class="wood-button red"
+                (click)="confirmLeaveMatch()"
+                [disabled]="leaving"
+              >
+                Ya, keluar
+              </button>
             </div>
           </section>
         </div>

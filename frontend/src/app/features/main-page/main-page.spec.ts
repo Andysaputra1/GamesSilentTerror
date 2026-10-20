@@ -41,6 +41,8 @@ describe('MainPage', () => {
   });
 
   afterEach(() => {
+    // Pengingat survei diuji di survey-reminder.spec.ts.
+    http.match((r) => r.url.endsWith('/api/survey/pending'));
     http.verify();
     vi.useRealTimers();
     localStorage.clear();

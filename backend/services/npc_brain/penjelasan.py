@@ -23,6 +23,7 @@ MAKS_ATURAN = 5  # aturan fuzzy yang ditampilkan per sistem
 MAKS_JALUR_BT = 30  # node Behavior Tree per keputusan
 MAKS_DAFTAR = 12  # isi daftar (nama, alasan)
 MAKS_TEKS = 240  # karakter per teks
+MAKS_PROMPT = 2500  # karakter prompt LLM di masukan NLG
 
 # Kolom tabel tersangka: bukti bersama semua metode, lalu nilai antara khas tiap metode.
 KOLOM_BUKTI = ["kecurigaan", "tekanan", "dukungan", "inkonsistensi", "pengalihan", "dituduh_korban",
@@ -586,8 +587,27 @@ def jelaskan(bot, modul, view, hasil):
         return _minimal(identitas, [f"Penjelasan gagal dibuat ({type(error).__name__})."])
 
 
-# Ringkasan NLG untuk tab panel: kalimat akhir, asal kalimat, penulis LLM, dan hasil validasi IndoBERT.
-def _nlg(tulisan, rencana, ditunda):
+# Masukan NLG: rencana yang diserahkan otak ke penulis kalimat dan prompt LLM-nya (teks prompt tidak
+# dipotong MAKS_TEKS agar terbaca utuh, cukup dibatasi MAKS_PROMPT).
+def _masukan(masukan):
+    if not masukan or not isinstance(masukan.get("rencana"), dict):
+        return None
+    r = masukan["rencana"]
+    prompt = masukan.get("prompt")
+    return {
+        **{k: _nilai(r.get(k)) for k in ("aksi", "intent", "target", "klaim", "bukti", "penanya",
+                                          "cadangan") if r.get(k) is not None},
+        "prompt": prompt[:MAKS_PROMPT] if isinstance(prompt, str) else None,
+    }  # fmt: skip
+
+
+# Ringkasan NLG untuk tab panel: kalimat akhir, asal kalimat, penulis LLM, dan hasil validasi IndoBERT;
+# selalu disertai masukan NLG bila otak merencanakan chat.
+def _nlg(tulisan, rencana, ditunda, masukan=None):
+    return {**_hasil_nlg(tulisan, rencana, ditunda), "masukan": _masukan(masukan)}
+
+
+def _hasil_nlg(tulisan, rencana, ditunda):
     rencana = rencana or {}
     if tulisan:
         nlu = tulisan.get("nlu") or {}
@@ -610,7 +630,10 @@ def _nlg(tulisan, rencana, ditunda):
     if rencana.get("kirim") and ditunda:
         return {
             "status": "ditunda",
-            "keterangan": "Bot lain sedang bicara (lantai bicara); rencana diputuskan ulang di langkah berikutnya.",
+            "keterangan": (
+                "Lantai bicara penuh atau bot lain sedang menulis rencana yang sama; kalimat belum dikirim ke "
+                "penulis. Rencana diputuskan ulang di langkah berikutnya dengan chat terbaru."
+            ),
         }
     if rencana.get("kirim"):
         return {
@@ -620,7 +643,7 @@ def _nlg(tulisan, rencana, ditunda):
     return {"status": "tidak ada chat", "keterangan": _nilai((rencana.get("alasan") or [None])[0])}
 
 
-def lengkapi(penjelasan, npc, rencana, tulisan, penolakan, ditunda=False):
+def lengkapi(penjelasan, npc, rencana, tulisan, penolakan, ditunda=False, masukan=None):
     """Tambahkan hasil engine dan NLG (setelah kalimat ditulis) ke penjelasan langkah; aman dari error."""
     try:
         if not isinstance(penjelasan, dict):
@@ -628,7 +651,7 @@ def lengkapi(penjelasan, npc, rencana, tulisan, penolakan, ditunda=False):
         hasil = copy.deepcopy(penjelasan)
         hasil["engine"] = {"action": (npc or {}).get("action"), "target": (npc or {}).get("target"),
                            "ditolak": _nilai(penolakan)}  # fmt: skip
-        hasil["nlg"] = _nlg(tulisan, rencana, ditunda)
+        hasil["nlg"] = _nlg(tulisan, rencana, ditunda, masukan)
         return batasi(hasil)
     except Exception as error:
         return _minimal(
@@ -658,5 +681,6 @@ def ringkas(penjelasan):
         },
         "keputusan": baris,
         "nlg": (penjelasan.get("nlg") or {}).get("status"),
+        "usulan": ((penjelasan.get("nlg") or {}).get("masukan") or {}).get("cadangan"),
         "ditolak": (penjelasan.get("engine") or {}).get("ditolak"),
     }

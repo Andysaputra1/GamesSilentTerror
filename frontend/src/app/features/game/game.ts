@@ -24,13 +24,13 @@ import {
   GameService,
   MatchView,
   RoleComposition,
-  SurveyQuestion,
   SurveyStatus,
 } from '../../core/game.service';
 import { ProfileMenu } from '../../core/profile-menu';
 import { PhaseDurations } from '../../core/room.service';
 import { FullscreenPrompt } from '../../core/fullscreen-prompt';
 import { forgetRoom, STORAGE } from '../../core/storage';
+import { SurveyForm } from '../../core/survey-form/survey-form';
 
 // Karakter cadangan dan warna label pemain: berdasarkan urutan kursi, bukan role atau status rahasia.
 const SKINS = ['arthur', 'jenny', 'dexter', 'eloise', 'kiera', 'sadie'];
@@ -53,7 +53,7 @@ const METODE_SINGKAT: Record<string, string> = { bt: 'BT', utility: 'UA', fuzzy:
 // KOMPONEN: render snapshot privat server; tidak mengacak role atau memutuskan hasil aksi di browser.
 @Component({
   selector: 'app-game',
-  imports: [FormsModule, RouterLink, ProfileMenu, FullscreenPrompt, NgTemplateOutlet],
+  imports: [FormsModule, RouterLink, ProfileMenu, FullscreenPrompt, NgTemplateOutlet, SurveyForm],
   templateUrl: './game.html',
   styleUrls: [
     './game.css',
@@ -74,6 +74,12 @@ export class Game implements OnInit, OnDestroy {
   busy = false;
   // Permintaan keluar sedang dikirim; polling ditahan agar tidak berebut dengan pembersihan room.
   leaving = false;
+  // Pop-up konfirmasi keluar sedang terbuka.
+  confirmLeave = false;
+  // Fokus awal pop-up keluar di "Tetap bermain" agar Enter tidak langsung mengeluarkan pemain.
+  @ViewChild('stayButton') set stayButton(button: ElementRef<HTMLButtonElement> | undefined) {
+    if (button) queueMicrotask(() => button.nativeElement.focus());
+  }
   revealRole = false;
   seconds = 0;
   // Tampilan: tab di HP, panel aturan, dan layar akhir (pengumuman → kuesioner → meja akhir).
@@ -119,10 +125,9 @@ export class Game implements OnInit, OnDestroy {
   };
   // Overlay pergantian fase (meredup saat malam, terang saat pagi).
   transition: { phase: string; title: string; subtitle: string } | null = null;
-  // Survei akhir: pertanyaan, jawaban lokal, dan status pengiriman.
+  // Survei akhir: pertanyaan dari server dan status tampilannya (jawaban diurus SurveyForm).
   survey: SurveyStatus | null = null;
-  surveyAnswers: Record<number, { value?: number; text?: string }> = {};
-  surveyState: 'idle' | 'loading' | 'ready' | 'sending' | 'done' | 'unavailable' = 'idle';
+  surveyState: 'idle' | 'loading' | 'ready' | 'done' | 'unavailable' = 'idle';
   surveyError = '';
   readonly confetti = Array.from({ length: 28 }, (_, index) => ({
     x: (index * 37) % 100,
@@ -399,40 +404,6 @@ export class Game implements OnInit, OnDestroy {
     ]
       .filter(Boolean)
       .join(' · ');
-  }
-
-  // Skala 1..N untuk pertanyaan bintang/angka dari backend.
-  scaleValues(question: SurveyQuestion): number[] {
-    return Array.from(
-      { length: question.scale_max - question.scale_min + 1 },
-      (_, index) => question.scale_min + index,
-    );
-  }
-
-  // Bintang menyala sampai nilai terpilih; skala angka hanya menandai nilai terpilih.
-  isSelected(question: SurveyQuestion, value: number): boolean {
-    const chosen = this.surveyAnswers[question.id]?.value;
-    if (chosen === undefined) return false;
-    return question.kind === 'stars' ? value <= chosen : value === chosen;
-  }
-
-  setAnswer(question: SurveyQuestion, value: number): void {
-    this.surveyAnswers = { ...this.surveyAnswers, [question.id]: { value } };
-  }
-
-  setText(question: SurveyQuestion, text: string): void {
-    this.surveyAnswers = { ...this.surveyAnswers, [question.id]: { text } };
-  }
-
-  // Tombol kirim aktif setelah semua pertanyaan wajib dijawab.
-  get surveyComplete(): boolean {
-    return (this.survey?.questions ?? []).every((question) => {
-      const answer = this.surveyAnswers[question.id];
-      if (!question.required) return true;
-      return question.kind === 'stars' || question.kind === 'scale'
-        ? answer?.value !== undefined
-        : !!answer?.text?.trim();
-    });
   }
 
   readonly phaseShort: Record<string, string> = {
@@ -842,35 +813,6 @@ export class Game implements OnInit, OnDestroy {
       });
   }
 
-  // SURVEI: kirim jawaban; skala dan pertanyaan wajib divalidasi ulang di backend.
-  submitSurvey(): void {
-    if (!this.survey || !this.surveyComplete || this.surveyState === 'sending') return;
-    const answers = this.survey.questions
-      .filter((question) => this.surveyAnswers[question.id])
-      .map((question) => ({ question_id: question.id, ...this.surveyAnswers[question.id] }));
-    this.surveyState = 'sending';
-    this.surveyError = '';
-    this.api
-      .submitSurvey(this.code, this.survey.match_id, answers)
-      .pipe(
-        takeUntilDestroyed(this.destroy),
-        finalize(() => this.cdr.markForCheck()),
-      )
-      .subscribe({
-        next: () => (this.surveyState = 'done'),
-        error: (error: HttpErrorResponse) => {
-          // 409 = sudah pernah dikirim dari tab lain; anggap selesai.
-          this.surveyState = error.status === 409 ? 'done' : 'ready';
-          this.surveyError =
-            error.status === 409
-              ? ''
-              : typeof error.error?.detail === 'string'
-                ? error.error.detail
-                : 'Survei gagal dikirim. Coba lagi.';
-        },
-      });
-  }
-
   // SNAPSHOT: polling tidak ditumpuk; pilihan target direset saat ronde/fase berubah. Kartu yang sudah
   // dibuka tetapi belum tercatat dikirim ulang paling cepat tiap 4 detik; di sela itu tetap polling,
   // jadi layar tidak macet bila backend belum mengenal /reveal.
@@ -973,11 +915,16 @@ export class Game implements OnInit, OnDestroy {
     );
   }
 
-  // KELUAR: setelah konfirmasi, server menganggap pemain tereliminasi seperti dieksekusi (status
-  // "Keluar") dan tidak bisa kembali ke pertandingan ini; lalu pemain dibawa ke menu utama.
+  // KELUAR: tombol Keluar membuka pop-up konfirmasi bergaya game (bukan dialog bawaan browser).
   leaveMatch(): void {
+    if (this.code && !this.leaving) this.confirmLeave = true;
+  }
+
+  // Setelah dikonfirmasi, server menganggap pemain tereliminasi seperti dieksekusi (status "Keluar")
+  // dan tidak bisa kembali ke pertandingan ini; lalu pemain dibawa ke menu utama.
+  confirmLeaveMatch(): void {
     if (!this.code || this.leaving) return;
-    if (!window.confirm('Keluar dari permainan? Kamu dianggap tereliminasi.')) return;
+    this.confirmLeave = false;
     this.leaving = true;
     this.api
       .leave(this.code)

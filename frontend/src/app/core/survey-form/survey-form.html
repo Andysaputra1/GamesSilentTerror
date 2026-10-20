@@ -1,0 +1,71 @@
+<form (ngSubmit)="submit()">
+  @for (question of survey.questions; track question.id; let n = $index) {
+    <fieldset class="survey-question">
+      <legend>
+        <span class="q-number">{{ n + 1 }}</span> {{ question.prompt }}
+        @if (!question.required) {
+          <small>(opsional)</small>
+        }
+      </legend>
+      @if (question.kind === 'stars' || question.kind === 'scale') {
+        <div
+          class="scale"
+          [class.stars]="question.kind === 'stars'"
+          role="radiogroup"
+          [attr.aria-label]="question.prompt"
+        >
+          @for (value of scaleValues(question); track value) {
+            <button
+              type="button"
+              role="radio"
+              [class.selected]="isSelected(question, value)"
+              [attr.aria-checked]="answers[question.id]?.value === value"
+              [attr.aria-label]="value + ' dari ' + question.scale_max"
+              (click)="setAnswer(question, value)"
+            >
+              {{ question.kind === 'stars' ? '★' : value }}
+            </button>
+          }
+        </div>
+        @if (question.label_min || question.label_max) {
+          <p class="scale-labels">
+            <span>{{ question.scale_min }} = {{ question.label_min }}</span>
+            <span>{{ question.scale_max }} = {{ question.label_max }}</span>
+          </p>
+        }
+      } @else if (question.kind === 'choice') {
+        <div class="choices">
+          @for (option of question.options; track option) {
+            <label>
+              <input
+                type="radio"
+                [name]="'q' + question.id"
+                [value]="option"
+                [checked]="answers[question.id]?.text === option"
+                (change)="setText(question, option)"
+              />
+              <span>{{ option }}</span>
+            </label>
+          }
+        </div>
+      } @else {
+        <textarea
+          [name]="'q' + question.id"
+          maxlength="1000"
+          rows="3"
+          placeholder="Tulis jawabanmu di sini…"
+          [attr.aria-label]="question.prompt"
+          [ngModel]="answers[question.id]?.text ?? ''"
+          (ngModelChange)="setText(question, $event)"
+        ></textarea>
+        <small class="counter">{{ answers[question.id]?.text?.length ?? 0 }} / 1000</small>
+      }
+    </fieldset>
+  }
+  @if (error) {
+    <p class="alert" role="alert">{{ error }}</p>
+  }
+  <button class="submit-survey" [disabled]="!complete || sending">
+    {{ sending ? 'Mengirim…' : 'Kirim kuesioner' }}
+  </button>
+</form>

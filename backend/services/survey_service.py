@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 import threading
 import time
@@ -11,6 +12,8 @@ from sqlalchemy.exc import IntegrityError
 from models import survey_queries as queries
 from services.persistence_service import PersistenceError, PersistenceService
 from services.room_service import room_service
+
+logger = logging.getLogger("shadow_heist.survey")
 
 JENIS = {"stars", "scale", "choice", "text"}
 NILAI_SKALA_MAKS = 10
@@ -146,18 +149,37 @@ class SurveyService:
         self._selesai: dict[str, dict] = {}
         self._kunci = threading.Lock()
 
-    # Dipanggil saat anggota keluar dari room pertandingan yang sudah selesai: survei tetap bisa dikirim
-    # sesudahnya walau room sudah dibersihkan. Hanya di memori; restart server menghapusnya.
-    def ingat_pertandingan(self, room):
-        match = room.match
-        if not match or not match.winner:
-            return
+    # Role, kubu, dan hasil setiap peserta manusia pertandingan yang sudah selesai.
+    @staticmethod
+    def _peserta(match) -> dict[str, dict]:
         pemain = {}
         for player in match.players.values():
             if not player.bot:
                 hasil = match.result(player.name)
                 pemain[player.name] = {"role": player.role, "team": hasil["team"],
                                        "outcome": hasil["outcome"]}  # fmt: skip
+        return pemain
+
+    # Baris arsip peserta (tabel match_participants) untuk room yang pertandingannya baru selesai.
+    def baris_peserta(self, room) -> list[dict]:
+        return [{"match_id": room.match.id, "room_code": room.code, "username": nama, **data}
+                for nama, data in self._peserta(room.match).items()]  # fmt: skip
+
+    # Simpan peserta ke arsip (dipanggil di thread latar oleh RoomService saat pertandingan selesai).
+    # Gagal simpan (mis. migrasi V10 belum dijalankan) hanya dicatat: survei tetap jalan lewat memori.
+    def catat_peserta(self, rows: list[dict]) -> None:
+        try:
+            PersistenceService._run(lambda database: queries.record_participants(database, rows))
+        except PersistenceError:
+            logger.warning("Peserta pertandingan tidak tersimpan (migrasi V10?).")
+
+    # Dipanggil saat anggota keluar dari room pertandingan yang sudah selesai: survei tetap bisa dikirim
+    # sesudahnya walau room sudah dibersihkan (cadangan memori bila arsip peserta belum tersedia).
+    def ingat_pertandingan(self, room):
+        match = room.match
+        if not match or not match.winner:
+            return
+        pemain = self._peserta(match)
         with self._kunci:
             self._buang_kedaluwarsa()
             self._selesai[match.id] = {"room_code": room.code, "pemain": pemain,
@@ -182,13 +204,25 @@ class SurveyService:
         mid, data = cocok[-1]
         return {"match_id": mid, "room_code": data["room_code"], **data["pemain"][username]}
 
+    # Konteks dari arsip peserta di database: berlaku kapan pun, juga setelah server dinyalakan ulang.
+    @staticmethod
+    def _context_arsip(code, username, match_id):
+        try:
+            return PersistenceService._run(
+                lambda database: queries.participant(database, code, username, match_id)
+            )
+        except PersistenceError:
+            return None
+
     # KONTEKS: survei hanya untuk manusia peserta pertandingan yang sudah selesai.
     def _context(self, code, username, match_id=None):
         with room_service.lock:
             live = room_service.rooms.get(code.strip().upper())
             if live is None or username not in live.members:
-                # Sudah keluar room (mungkin room sudah dibersihkan): pakai registri pertandingan selesai.
+                # Sudah keluar room (mungkin room sudah dibersihkan): registri memori, lalu arsip peserta.
                 context = self._context_selesai(code.strip().upper(), username, match_id)
+                if context is None:
+                    context = self._context_arsip(code.strip().upper(), username, match_id)
                 if context is not None:
                     return context
             room = room_service.get(code, username)  # pesan standar: room hilang atau bukan anggota
@@ -209,9 +243,23 @@ class SurveyService:
                 "outcome": result["outcome"],
             }
 
+    # PENGINGAT MAIN: pertandingan selesai yang surveinya belum dijawab akun ini (terbaru dulu). Kosong bila
+    # tidak ada pertanyaan aktif atau arsip peserta belum tersedia (migrasi V10).
+    def pending(self, username) -> list[dict]:
+        def operation(database):
+            if not queries.list_questions(database):
+                return []
+            return queries.pending_surveys(database, username)
+
+        try:
+            rows = PersistenceService._run(operation)
+        except PersistenceError:
+            return []
+        return [{**row, "finished_at": row["finished_at"].isoformat()} for row in rows]
+
     # STATUS: pertanyaan aktif dan apakah akun sudah mengirim survei pertandingan ini.
-    def status(self, code, username):
-        context = self._context(code, username)
+    def status(self, code, username, match_id=None):
+        context = self._context(code, username, match_id)
 
         def operation(database):
             return (

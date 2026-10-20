@@ -1,0 +1,288 @@
+/* Catatan kertas bergaris yang disematkan paku payung di atas binder; pop-up memakai kertas yang sama
+   dengan layar kuesioner di akhir game. */
+:host {
+  position: relative;
+  z-index: 5;
+  display: block;
+  flex: none;
+}
+
+.reminder {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px 18px;
+  width: min(780px, 100%);
+  margin: 2px auto clamp(8px, 1.4vh, 14px);
+  padding: 12px 44px 12px 18px;
+  border: 1px solid #d9c49b;
+  border-radius: 6px;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 27px, rgb(122 86 50 / 0.08) 27px 28px), #f6e7c8;
+  box-shadow:
+    0 10px 24px rgb(14 6 2 / 0.45),
+    inset 0 0 26px rgb(150 105 55 / 0.2);
+  color: #422719;
+  transform: rotate(-0.4deg);
+  animation: reminder-drop 320ms ease-out;
+}
+
+/* paku payung */
+.reminder::before {
+  position: absolute;
+  top: -7px;
+  left: 50%;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  content: '';
+  background: radial-gradient(circle at 35% 30%, #f4a08f 0 18%, #b3261e 52%, #5a0f0a 100%);
+  box-shadow: 0 3px 3px rgb(0 0 0 / 0.4);
+  transform: translateX(-50%);
+}
+
+.reminder__intro {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.reminder__icon {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.reminder h2 {
+  margin: 0;
+  font: 800 19px/1.1 var(--font-display);
+  color: #5b311b;
+  white-space: nowrap;
+}
+
+.reminder__intro p {
+  margin: 2px 0 0;
+  font: 15px/1.2 var(--font-hand);
+  color: #7a5230;
+}
+
+.reminder__list {
+  max-height: 92px;
+  margin: 0;
+  padding: 0 6px 0 0;
+  overflow-y: auto;
+  list-style: none;
+  scrollbar-color: #b08a5c transparent;
+  scrollbar-width: thin;
+}
+
+.reminder__list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 5px 0;
+  border-bottom: 1px dashed rgb(139 90 43 / 0.4);
+}
+
+.reminder__list li:last-child {
+  border-bottom: 0;
+}
+
+.reminder__list p {
+  min-width: 0;
+  margin: 0;
+  font: 17px/1.2 var(--font-hand);
+}
+
+.reminder__list b {
+  font: 800 15px var(--font-display);
+  letter-spacing: 0.06em;
+  color: #8c3f2b;
+}
+
+.reminder__list small {
+  display: block;
+  font-size: 13px;
+  color: #7a5230;
+}
+
+.reminder__fill {
+  flex: none;
+  padding: 7px 16px 8px;
+  border: 0;
+  background: url('/assets/buttons/btn-leather.png') center / 100% 100% no-repeat;
+  color: #fff0d2;
+  font: 800 13px/1 var(--font-display);
+  letter-spacing: 0.02em;
+  text-shadow: 0 2px 1px #281108;
+  cursor: pointer;
+  filter: drop-shadow(0 2px 3px rgb(39 14 4 / 0.35));
+  transition: transform 160ms ease;
+}
+
+.reminder__fill:hover {
+  transform: translateY(-1px);
+}
+
+.reminder__close {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0 0 2px;
+  border: 1px solid rgb(74 38 17 / 0.45);
+  border-radius: 50%;
+  background: rgb(255 250 234 / 0.7);
+  color: #4b2c18;
+  font: 700 20px/1 var(--font-body);
+  cursor: pointer;
+}
+
+.reminder__close:hover {
+  background: #fffaf0;
+}
+
+.reminder button:focus-visible,
+.survey-dialog__close:focus-visible {
+  outline: 2px solid #754122;
+  outline-offset: 2px;
+}
+
+/* ---------- Pop-up survei ---------- */
+.survey-overlay {
+  position: fixed;
+  z-index: 120;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgb(17 7 2 / 0.72);
+  backdrop-filter: blur(4px);
+}
+
+.survey-dialog {
+  display: flex;
+  flex-direction: column;
+  width: min(760px, 100%);
+  max-height: calc(100dvh - 32px);
+  overflow: hidden;
+  border: 2px solid rgb(75 39 19 / 0.88);
+  color: #422719;
+  background:
+    linear-gradient(rgb(255 248 230 / 0.94), rgb(240 222 186 / 0.94)),
+    url('/assets/backgrounds/backpaper.jpg') center / cover;
+  box-shadow:
+    10px 12px 0 rgb(44 18 7 / 0.63),
+    0 30px 70px rgb(0 0 0 / 0.52);
+  animation: reminder-drop 260ms ease-out;
+}
+
+.survey-dialog__head {
+  display: flex;
+  flex: none;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px clamp(18px, 4vw, 34px) 10px;
+  border-bottom: 1px dashed rgb(139 90 43 / 0.45);
+}
+
+.survey-dialog__head p {
+  margin: 0;
+  font: 17px var(--font-hand);
+  color: #7f5a37;
+}
+
+.survey-dialog__head h2 {
+  margin: 2px 0 0;
+  font: 800 clamp(24px, 3vw, 32px)/1.1 var(--font-display);
+  color: #5b311b;
+}
+
+.survey-dialog__close {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 7px 10px 7px 13px;
+  border: 1px solid rgb(74 38 17 / 0.65);
+  background: rgb(255 250 234 / 0.63);
+  color: #4b2c18;
+  font: 800 11px/1 var(--font-body);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.survey-dialog__close b {
+  font-size: 18px;
+}
+
+.survey-dialog__body {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px clamp(18px, 4vw, 34px) 18px;
+}
+
+.survey-dialog__note {
+  margin: 24px 0;
+  font: 18px var(--font-hand);
+  text-align: center;
+}
+
+.survey-dialog__done {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 26px 0 10px;
+  text-align: center;
+}
+
+.survey-dialog__done span {
+  font-size: 44px;
+}
+
+.survey-dialog__done b {
+  font: 800 22px var(--font-display);
+  color: #3f6b3a;
+}
+
+.survey-dialog__done p {
+  margin: 0;
+  font: 17px var(--font-hand);
+}
+
+@keyframes reminder-drop {
+  from {
+    opacity: 0;
+    translate: 0 -10px;
+  }
+}
+
+@media (max-width: 640px) {
+  .reminder {
+    grid-template-columns: 1fr;
+    margin-bottom: 12px;
+    padding: 12px 14px;
+  }
+
+  .reminder__intro {
+    padding-right: 34px;
+  }
+
+  .reminder__list {
+    max-height: 132px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reminder,
+  .survey-dialog {
+    animation: none;
+  }
+}

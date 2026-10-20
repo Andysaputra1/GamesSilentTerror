@@ -1,0 +1,183 @@
+/* Formulir survei akhir. Warna sama dengan layar akhir game; variabel diulang di :host karena
+   komponen ini juga dipakai di halaman Main (di luar .match-shell). */
+:host {
+  display: block;
+  --ink: #422719;
+  --cream: #fff7e5;
+  --green: #3f6b3a;
+  --line: rgb(139 90 43 / 0.45);
+}
+/* Sama dengan pesan galat di meja permainan. */
+.alert {
+  margin: 12px 0 0;
+  padding: 10px 14px;
+  border: 1px solid #9a6a32;
+  border-radius: 10px;
+  background: #ffebc1;
+  color: #382417;
+}
+.survey-question {
+  margin: 0;
+  padding: 10px 0 14px;
+  border: 0;
+  border-bottom: 1px dashed var(--line);
+}
+.survey-question legend {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 0;
+  font: 700 16px/1.35 var(--font-display);
+  color: var(--ink);
+}
+.survey-question legend small {
+  font: 14px var(--font-hand);
+  color: #7a5230;
+}
+.q-number {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--cream);
+  font-size: 13px;
+}
+.scale {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.scale button {
+  display: grid;
+  place-items: center;
+  min-width: 44px;
+  height: 44px;
+  padding: 0 10px;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  background: #fffaf0;
+  color: var(--ink);
+  font: 800 16px var(--font-display);
+  cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    background 0.15s ease;
+}
+.scale button:hover {
+  transform: translateY(-2px);
+}
+.scale button.selected {
+  border-color: var(--green);
+  background: var(--green);
+  color: var(--cream);
+}
+.scale.stars {
+  gap: 2px;
+}
+.scale.stars button {
+  min-width: 42px;
+  border: 0;
+  background: transparent;
+  color: #cbb28c;
+  font-size: 34px;
+  line-height: 1;
+}
+.scale.stars button:hover {
+  transform: scale(1.18) rotate(-6deg);
+}
+.scale.stars button.selected {
+  color: #e3a43a;
+  background: transparent;
+  text-shadow: 0 2px 0 #8c5a12;
+}
+.scale-labels {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 6px 0 0;
+  font: 15px var(--font-hand);
+  color: #7a5230;
+}
+.choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.choices label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  background: #fffaf0;
+  font: 16px var(--font-hand);
+  cursor: pointer;
+}
+.choices label:has(input:checked) {
+  border-color: var(--green);
+  background: #e3eed6;
+}
+.choices input {
+  accent-color: var(--green);
+}
+textarea {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 2px 10px;
+  resize: vertical;
+  border: 1.5px solid rgb(139 90 43 / 0.5);
+  border-radius: 0.35em;
+  outline: 0;
+  background:
+    repeating-linear-gradient(transparent 0 27px, rgb(139 90 43 / 0.22) 27px 28px), #fffaf0;
+  color: var(--ink);
+  font: 18px/28px var(--font-hand);
+}
+textarea:focus {
+  border-color: #8c3f2b;
+  box-shadow: 0 0 0 0.16em rgb(140 63 43 / 0.22);
+}
+.counter {
+  display: block;
+  margin-top: 2px;
+  text-align: right;
+  font-size: 12px;
+  color: #7a5230;
+}
+/* Papan kayu hijau, sama dengan .wood-button.green di meja permainan (gaya Game tidak menembus
+   komponen ini). */
+.submit-survey {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  margin: 16px auto 6px;
+  padding: 0.65em 1.5em;
+  border: 0;
+  background: url('/assets/buttons/btn-greenwood.png') center / 100% 100% no-repeat;
+  color: var(--cream);
+  font: 800 15px/1.15 var(--font-display);
+  letter-spacing: 0.03em;
+  text-shadow:
+    0 0.08em 0 rgb(30 14 6 / 0.75),
+    0 0.12em 0.2em rgb(0 0 0 / 0.35);
+  filter: drop-shadow(0 0.25em 0.3em rgb(20 9 3 / 0.4));
+  cursor: pointer;
+  transition: transform 0.18s ease;
+}
+.submit-survey:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+.submit-survey:disabled {
+  opacity: 0.55;
+  filter: grayscale(0.35);
+  cursor: not-allowed;
+}

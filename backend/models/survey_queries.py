@@ -146,3 +146,51 @@ def export_rows(database: Session) -> list[dict]:
         ORDER BY r.created_at, r.id
     """))
     return [dict(row._mapping) for row in rows]
+
+
+# QUERY INSERT: peserta manusia pertandingan yang selesai; dicatat sekali (INSERT IGNORE per match + username).
+def record_participants(database: Session, rows: list[dict]) -> None:
+    for row in rows:
+        database.execute(
+            text("""
+            INSERT IGNORE INTO match_participants (match_id, room_code, username, role, team, outcome)
+            VALUES (:match_id, :room_code, :username, :role, :team, :outcome)
+        """),
+            row,
+        )
+
+
+# QUERY SELECT: konteks survei satu akun dari arsip peserta (pertandingan tertentu atau yang terbaru di room).
+def participant(
+    database: Session, room_code: str, username: str, match_id: str | None
+) -> dict | None:
+    row = (
+        database.execute(
+            text("""
+        SELECT match_id, room_code, role, team, outcome FROM match_participants
+        WHERE room_code = :room_code AND username = :username
+          AND (:match_id IS NULL OR match_id = :match_id)
+        ORDER BY finished_at DESC LIMIT 1
+    """),
+            {"room_code": room_code, "username": username, "match_id": match_id},
+        )
+        .mappings()
+        .first()
+    )
+    return dict(row) if row else None
+
+
+# QUERY SELECT: pertandingan selesai yang surveinya belum dijawab akun ini (terbaru dulu).
+def pending_surveys(database: Session, username: str, limit: int = 20) -> list[dict]:
+    rows = database.execute(
+        text("""
+        SELECT p.match_id, p.room_code, p.role, p.team, p.outcome, p.finished_at
+        FROM match_participants p
+        WHERE p.username = :username AND NOT EXISTS (
+            SELECT 1 FROM survey_responses r WHERE r.match_id = p.match_id AND r.username = p.username
+        )
+        ORDER BY p.finished_at DESC LIMIT :limit
+    """),
+        {"username": username, "limit": limit},
+    ).mappings()
+    return [dict(row) for row in rows]

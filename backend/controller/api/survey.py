@@ -5,7 +5,7 @@ import io
 import json
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 
 from controller.api.panel import require_panel
@@ -56,10 +56,21 @@ def survey_call(operation):
         raise HTTPException(503, "Database survei belum siap. Jalankan migrasi V7.") from error
 
 
+# PEMAIN: survei pertandingan selesai yang belum diisi, untuk pengingat di halaman Main.
+@router.get("/api/survey/pending")
+def pending(user=Depends(require_authenticated_user)):
+    return {"surveys": survey_service.pending(user.username)}
+
+
 @router.get("/api/rooms/{code}/survey")
-# PEMAIN: pertanyaan aktif dan status pengiriman untuk pertandingan yang sudah selesai.
-def survey_status(code: str, user=Depends(require_authenticated_user)):
-    return survey_call(lambda: survey_service.status(code, user.username))
+# PEMAIN: pertanyaan aktif dan status pengiriman untuk pertandingan yang sudah selesai. match_id opsional
+# (pengingat di Main): tanpa itu dipakai pertandingan terbaru akun ini di room tersebut.
+def survey_status(
+    code: str,
+    match_id: str | None = Query(default=None, max_length=40),
+    user=Depends(require_authenticated_user),
+):
+    return survey_call(lambda: survey_service.status(code, user.username, match_id))
 
 
 @router.post("/api/rooms/{code}/survey")

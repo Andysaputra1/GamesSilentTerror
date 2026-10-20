@@ -1,7 +1,7 @@
 import { backendUrl } from './backend-url';
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { timeout } from 'rxjs';
+import { map, timeout } from 'rxjs';
 import { Room } from './room.service';
 import { authHeaders } from './storage';
 
@@ -119,6 +119,15 @@ export interface SurveyStatus {
   submitted: boolean;
   questions: SurveyQuestion[];
 }
+// Pertandingan selesai yang surveinya belum diisi akun ini (pengingat di Main).
+export interface PendingSurvey {
+  match_id: string;
+  room_code: string;
+  role: string;
+  team: 'hitman' | 'civilians';
+  outcome: 'won' | 'lost';
+  finished_at: string;
+}
 export interface SurveyAnswer {
   question_id: number;
   value?: number | null;
@@ -154,12 +163,26 @@ export class GameService {
   }
 
   // Survei akhir: pertanyaan aktif dan status pengiriman untuk pertandingan yang sudah selesai.
-  survey(code: string) {
+  // matchId dipakai pengingat di Main agar tepat ke pertandingan yang dimaksud.
+  survey(code: string, matchId?: string) {
     return this.http
       .get<SurveyStatus>(`${backendUrl()}/api/rooms/${encodeURIComponent(code)}/survey`, {
         headers: authHeaders(),
+        params: matchId ? { match_id: matchId } : {},
       })
       .pipe(timeout(10000));
+  }
+
+  // Survei pertandingan selesai yang belum diisi (terbaru dulu), untuk pengingat di Main.
+  pendingSurveys() {
+    return this.http
+      .get<{ surveys: PendingSurvey[] }>(`${backendUrl()}/api/survey/pending`, {
+        headers: authHeaders(),
+      })
+      .pipe(
+        timeout(10000),
+        map((response) => response.surveys),
+      );
   }
 
   // Kirim jawaban survei sekali; validasi skala tetap dilakukan backend.

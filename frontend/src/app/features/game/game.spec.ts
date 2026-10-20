@@ -4,7 +4,9 @@ import { provideRouter, Router } from '@angular/router';
 import { Game } from './game';
 import { HttpErrorResponse, provideHttpClient } from '@angular/common/http';
 import { of, Subject, throwError } from 'rxjs';
+import { By } from '@angular/platform-browser';
 import { GameService, GameSnapshot } from '../../core/game.service';
+import { SurveyForm } from '../../core/survey-form/survey-form';
 
 // TEST SUITE: kelompok pengujian otomatis, bukan logika yang dijalankan halaman production.
 // Callback () => { ... } berisi setup dan skenario yang dipanggil oleh test runner.
@@ -560,35 +562,19 @@ describe('Game', () => {
         ],
       }),
     );
-    const submit = vi
-      .spyOn(api, 'submitSurvey')
-      .mockReturnValue(of({ submitted: true, answers: 1 }));
     component.code = 'ABC123';
     component.refresh();
     component.refresh();
     expect(survey).toHaveBeenCalledTimes(1);
     expect(component.surveyState).toBe('ready');
-    expect(component.surveyComplete).toBe(false);
-    const [stars] = component.survey!.questions;
-    component.setAnswer(stars, 5);
-    expect(component.isSelected(stars, 4)).toBe(true);
-    expect(component.isSelected(stars, 6)).toBe(false);
-    expect(component.surveyComplete).toBe(true);
-    component.submitSurvey();
-    expect(submit).toHaveBeenCalledWith('ABC123', 'match-1', [{ question_id: 1, value: 5 }]);
+    // Formulir ada di SurveyForm (diuji tersendiri); Game hanya menampilkan "terima kasih" setelahnya.
+    component.goToSurvey();
+    render();
+    const form = fixture.debugElement.query(By.directive(SurveyForm));
+    expect(form.nativeElement.textContent).toContain('Seberapa seru?');
+    (form.componentInstance as SurveyForm).submitted.emit();
     expect(component.surveyState).toBe('done');
-  });
-
-  it('treats an already submitted survey as done', () => {
-    component.code = 'ABC123';
-    component.survey = { match_id: 'match-1', submitted: false, questions: [] };
-    component.surveyState = 'ready';
-    vi.spyOn(TestBed.inject(GameService), 'submitSurvey').mockReturnValue(
-      throwError(() => ({ status: 409, error: { detail: 'Sudah dikirim.' } })),
-    );
-    component.submitSurvey();
-    expect(component.surveyState).toBe('done');
-    expect(component.surveyError).toBe('');
+    expect(render().querySelector('.survey-done')?.textContent).toContain('Terima kasih');
   });
 
   function render(): HTMLElement {
@@ -976,12 +962,18 @@ describe('Game', () => {
     component.game = snapshot().game;
     component.code = 'ABC123';
     sessionStorage.setItem('shadow_heist_room', 'ABC123');
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const confirm = vi.spyOn(window, 'confirm');
     const leave = vi
       .spyOn(TestBed.inject(GameService), 'leave')
       .mockReturnValue(of({ left: true }));
-    (render().querySelector('.leave-match') as HTMLButtonElement).click();
-    expect(confirm).toHaveBeenCalledWith('Keluar dari permainan? Kamu dianggap tereliminasi.');
+    const page = render();
+    (page.querySelector('.leave-match') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    const modal = page.querySelector('.leave-modal') as HTMLElement;
+    expect(modal.getAttribute('role')).toBe('alertdialog');
+    expect(leave).not.toHaveBeenCalled(); // belum keluar sebelum dikonfirmasi
+    (modal.querySelector('.wood-button.red') as HTMLButtonElement).click();
+    expect(confirm).not.toHaveBeenCalled(); // tidak memakai dialog bawaan browser
     expect(leave).toHaveBeenCalledWith('ABC123');
     expect(TestBed.inject(Router).navigateByUrl).toHaveBeenCalledWith('/main');
     expect(component.game).toBeNull();
@@ -992,14 +984,16 @@ describe('Game', () => {
   it('stays in the match when leaving is cancelled or the network fails', () => {
     component.game = snapshot().game;
     component.code = 'ABC123';
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
     const leave = vi
       .spyOn(TestBed.inject(GameService), 'leave')
       .mockReturnValue(throwError(() => ({ status: 0, error: null })));
     component.leaveMatch();
+    const page = render();
+    (page.querySelector('.leave-modal .wood-button.plank') as HTMLButtonElement).click();
+    expect(render().querySelector('.leave-modal')).toBeNull();
     expect(leave).not.toHaveBeenCalled();
-    confirm.mockReturnValue(true);
     component.leaveMatch();
+    component.confirmLeaveMatch();
     expect(leave).toHaveBeenCalledTimes(1);
     expect(component.game).not.toBeNull();
     expect(component.error).toContain('Gagal keluar');

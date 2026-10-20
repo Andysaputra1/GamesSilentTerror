@@ -39,6 +39,9 @@ BATAS_TULIS_DETIK = 25
 BATAS_TEMPLAT_DETIK = 10
 # Pemicu cepat: jarak minimal antar-langkah bot yang dipanggil/dituduh (langkah biasa: NPC_STEP_SECONDS).
 JEDA_SEGERA_DETIK = 1.0
+# Lantai bicara: bot per pertandingan yang boleh menyusun chat bersamaan (= thread eksekutor NLG; Ollama
+# mengantrekan permintaan di atas OLLAMA_NUM_PARALLEL).
+LANTAI_MAKS = 3
 
 
 class NPCDecision(BaseModel):
@@ -129,8 +132,9 @@ def waktu_jejak(waktu, tulisan):
 
 # Isi jejak checker satu langkah otak; dipakai room asli (NPCService._trace) dan simulasi panel.
 def isi_jejak(trace, match, otak, npc, rencana, tulisan, penolakan, durasi_ms, ditunda, penjelasan,
-              waktu, nlu_sumber):  # fmt: skip
-    penjelasan = lengkapi_penjelasan(penjelasan, npc, rencana, tulisan, penolakan, ditunda)
+              waktu, nlu_sumber, masukan_nlg=None):  # fmt: skip
+    penjelasan = lengkapi_penjelasan(penjelasan, npc, rencana, tulisan, penolakan, ditunda,
+                                     masukan_nlg)  # fmt: skip
     trace.update(match_id=match.id, stage=(
         "npc_brain_rejected" if penolakan else "npc_brain"
     ), provider=f"otak:{otak.metode}", model=f"persona:{otak.persona}", intent=rencana.get(
@@ -144,7 +148,7 @@ def isi_jejak(trace, match, otak, npc, rencana, tulisan, penolakan, durasi_ms, d
                 "target": rencana["target"],
                 "klaim": rencana.get("klaim", False),
                 "alasan": rencana["alasan"][:2],
-                "ditunda": ditunda,  # lantai bicara dipakai bot lain: diputuskan ulang nanti
+                "ditunda": ditunda,  # lantai bicara penuh/kembar: diputuskan ulang nanti
             },
             "nlg": (
                 None
@@ -252,8 +256,8 @@ class NPCService:
         self.limit = asyncio.Semaphore(3)
         self.runtime = runtime or brain_runtime
         self.analysis = analysis
-        # Lantai bicara: match_id → bot yang sedang menyusun/mengetik chat (satu bot per pertandingan).
-        self.lantai: dict[str, str] = {}
+        # Lantai bicara: match_id → {bot yang sedang menyusun/mengetik chat: (intent, target) rencananya}.
+        self.lantai: dict[str, dict[str, tuple]] = {}
 
     # Jalankan coroutine sebagai task yang dilacak agar bisa dibatalkan saat shutdown.
     def _spawn(self, coroutine):
@@ -393,7 +397,9 @@ class NPCService:
             if not berlaku:
                 return  # fase berganti selama bot berpikir: keputusan basi dibuang
             tulisan = reply = None
-            ditunda = hasil["nlg"] is not None and not self._ambil_lantai(match, otak, terlihat)
+            ditunda = hasil["nlg"] is not None and not self._ambil_lantai(
+                match, otak, terlihat, rencana
+            )
             if hasil["nlg"] is not None and not ditunda:
                 bicara = True
                 tulisan = await tulis_kalimat(self.runtime, otak, hasil["nlg"], konteks)
@@ -405,10 +411,17 @@ class NPCService:
                     code, match, key, otak, view, rencana, tulisan
                 ) or (None, None)
             trace = None
-            if reply or npc["action"] != "wait" or penolakan:
+            if reply or npc["action"] != "wait" or penolakan or ditunda:
+                # Masukan NLG ikut dicatat, juga saat ditunda: panel tetap melihat apa yang akan ditulis.
+                masukan = (
+                    None if hasil["nlg"] is None
+                    else {"rencana": hasil["nlg"],
+                          "prompt": self.runtime.prompt_nlg(otak, hasil["nlg"], konteks)}
+                )  # fmt: skip
                 trace = self._trace(code, match, otak, npc, rencana, tulisan if reply else None,
                                     penolakan, started, ditunda=ditunda,
-                                    penjelasan=hasil.get("penjelasan"), waktu=hasil.get("waktu"))  # fmt: skip
+                                    penjelasan=hasil.get("penjelasan"), waktu=hasil.get("waktu"),
+                                    masukan_nlg=masukan)  # fmt: skip
             if reply:
                 await self.broadcast("receive_chat", reply, to=code)
             if trace is not None:
@@ -424,11 +437,11 @@ class NPCService:
             trace = checker_service.begin(code, otak.nama, "NPC brain")
             trace.update(match_id=match.id, stage="npc_brain_error", error=type(error).__name__)
         finally:
-            if bicara and self.lantai.get(match.id) == otak.nama:
+            penyusun = self.lantai.get(match.id, {})
+            if bicara and penyusun.pop(otak.nama, None) is not None and not penyusun:
                 del self.lantai[match.id]
             with room_service.lock:
-                if match.bot_berpikir == otak.nama:
-                    match.bot_berpikir = None
+                match.bot_berpikir.discard(otak.nama)
             otak.sibuk = False
             otak.langkah_terakhir = time.time()
 
@@ -462,11 +475,14 @@ class NPCService:
                 return True, str(error)
             return True, None
 
-    # LANTAI BICARA: satu bot menyusun/mengetik chat pada satu waktu per pertandingan, dan rencana yang
-    # dibuat sebelum chat bot lain masuk dibatalkan. Bot memutuskan ulang di langkah berikutnya dengan
-    # chat terbaru, sehingga tidak ada pertanyaan serentak atau kalimat kembar antar-bot.
-    def _ambil_lantai(self, match, otak, terlihat):
-        if self.lantai.get(match.id, otak.nama) != otak.nama:
+    # LANTAI BICARA: paling banyak LANTAI_MAKS bot menyusun/mengetik chat bersamaan per pertandingan (LLM
+    # menulis paralel). Ditolak bila lantai penuh, bila bot lain sedang menulis rencana kembar (intent dan
+    # target sama: tidak ada tuduhan atau pertanyaan serentak yang sama), atau bila rencana dibuat sebelum
+    # chat bot lain masuk. Bot yang ditolak memutuskan ulang di langkah berikutnya dengan chat terbaru.
+    def _ambil_lantai(self, match, otak, terlihat, rencana):
+        penyusun = self.lantai.get(match.id, {})
+        niat = (rencana.get("intent"), rencana.get("target"))
+        if len(penyusun) >= LANTAI_MAKS or niat in penyusun.values():
             return False
         with room_service.lock:
             pesan = list(match.messages)
@@ -475,9 +491,9 @@ class NPCService:
         bots = {p.name for p in match.players.values() if p.bot}
         if any(m["sender"] in bots and m["sender"] != otak.nama for m in baru):
             return False
-        self.lantai[match.id] = otak.nama
+        self.lantai.setdefault(match.id, {})[otak.nama] = niat
         with room_service.lock:
-            match.bot_berpikir = otak.nama  # pemain melihat awan berpikir selama kalimat disusun
+            match.bot_berpikir.add(otak.nama)  # pemain melihat awan berpikir selama kalimat disusun
         return True
 
     # Chat dikirim hanya jika fase masih sama dan bot masih boleh bicara; ingatan dicatat setelah terkirim.
@@ -502,20 +518,21 @@ class NPCService:
                 logger.warning("Chat bot %s tidak tersimpan; tidak disiarkan.", otak.nama)
                 return None
             reply = match.add_message(otak.nama, tulisan["teks"])
-            match.bot_berpikir = None  # kalimat sudah tampil; awan hilang bersama pesan
+            match.bot_berpikir.discard(otak.nama)  # kalimat sudah tampil; awan hilang bersama pesan
             self.runtime.catat_chat(otak, view, rencana, tulisan["teks"])
             return reply, message_id
 
     # Jejak untuk panel checker: metode, persona, keputusan, dan asal kalimat (tanpa role pemain lain).
     # `penjelasan` (identitas, parameter, penalaran metode, keputusan, NLG) hanya dibaca panel admin.
     def _trace(self, code, match, otak, npc, rencana, tulisan, penolakan, started, ditunda=False,
-               penjelasan=None, waktu=None):  # fmt: skip
+               penjelasan=None, waktu=None, masukan_nlg=None):  # fmt: skip
         trace = checker_service.begin(
             code, otak.nama, tulisan["teks"] if tulisan else npc["action"]
         )
         return isi_jejak(trace, match, otak, npc, rencana, tulisan, penolakan,
                          round((perf_counter() - started) * 1000, 2), ditunda, penjelasan,
-                         waktu_jejak(waktu, tulisan), getattr(self.runtime.nlu, "sumber", None))  # fmt: skip
+                         waktu_jejak(waktu, tulisan), getattr(self.runtime.nlu, "sumber", None),
+                         masukan_nlg)  # fmt: skip
 
     # Simpan jejak otak ke database di thread latar: tulisan DB (hingga ±12 KB penjelasan per jejak)
     # tidak menahan event loop game. Jejak di memori (checker) sudah tersedia sejak _trace.

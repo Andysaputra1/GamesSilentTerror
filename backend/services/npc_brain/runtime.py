@@ -635,6 +635,14 @@ class BrainRuntime:
         tulisan["llm_detik"] = round(jam.detik, 3) if jam else 0.0
         return tulisan
 
+    # Pesan pengguna yang dikirim ke LLM penulis pada percobaan pertama (panel: masukan NLG, juga saat ditunda).
+    # None bila kalimat ditulis templat saja.
+    def prompt_nlg(self, bot: OtakBot, payload, konteks):
+        with self.lock:
+            if self.penulis is None or self.konfigurasi.penulis == "templat":
+                return None
+        return self.nlg.buat_prompt(payload, konteks, bot.persona)[1]
+
     # PENCATAT NLU: baca satu chat dengan IndoBERT seperti ingatan bot (konteks = `riwayat` milik pemanggil,
     # urut kronologis). Hasil sama dengan bacaan bot dan masuk memo NLU, jadi bot tidak menghitung ulang.
     # Target neutral (pemain yang diajak bicara) ikut dengan asalnya: IndoBERT/cadangan dan/atau aturan nama.

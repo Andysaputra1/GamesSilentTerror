@@ -183,6 +183,23 @@ class PenjelasanToleransiTests(unittest.TestCase):
         self.assertIn("Identitas bot", jelaskan(bot, None, ViewRusak(), {})["catatan"][0])
         self.assertIsNone(lengkapi(None, {}, {}, None, None))
 
+    # Chat yang ditunda lantai bicara tetap memperlihatkan rencana, templat, dan prompt LLM-nya.
+    def test_deferred_chat_keeps_the_nlg_input(self):
+        rencana = {"kirim": True, "aksi": "tuduh", "intent": "offend", "target": "ASH",
+                   "alasan": ["ASH vote aneh."]}  # fmt: skip
+        payload = {"pembicara": "NOX", "aksi": "tuduh", "intent": "offend", "target": "ASH",
+                   "klaim": False, "bukti": ["ASH vote aneh."], "gaya": "santai", "batasan": [],
+                   "cadangan": "Aku makin curiga sama ASH."}  # fmt: skip
+        p = lengkapi({"bot": {"nama": "NOX"}, "catatan": []}, {"action": "wait", "target": None},
+                     rencana, None, None, ditunda=True,
+                     masukan={"rencana": payload, "prompt": "p" * 3000})  # fmt: skip
+        nlg = p["nlg"]
+        self.assertEqual(nlg["status"], "ditunda")
+        self.assertEqual(nlg["masukan"]["target"], "ASH")
+        self.assertEqual(nlg["masukan"]["cadangan"], "Aku makin curiga sama ASH.")
+        self.assertEqual(len(nlg["masukan"]["prompt"]), 2500)
+        self.assertEqual(ringkas(p)["usulan"], "Aku makin curiga sama ASH.")
+
     def test_oversized_explanations_are_trimmed_below_the_limit(self):
         besar = {"kolom": ["pemain", "catatan"], "baris": [[f"P{i}", "x" * 200] for i in range(80)]}
         p = {"versi": 1, "bot": {"nama": "NOX"}, "catatan": [], "tersangka": besar,

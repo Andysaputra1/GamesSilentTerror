@@ -51,9 +51,10 @@ file saja tidak berarti route tersebut dibuka pada aplikasi utama.
    `services/npc_brain` (IndoBERT -> fuzzy/utility/behavior tree hasil ekspor
    notebook -> NLG tervalidasi) -> aksi/vote engine serta chat. Fase diperiksa ulang
    sebelum keputusan diterapkan. Vote/aksi langsung diterapkan; chat bot melewati
-   "lantai bicara" (`NPCService._ambil_lantai`): satu bot menyusun/mengetik per
-   pertandingan, dan rencana yang lebih tua dari chat bot lain dibatalkan lalu
-   diputuskan ulang. Mode `NPC_METHOD=llm` mempertahankan jalur lama
+   "lantai bicara" (`NPCService._ambil_lantai`): paling banyak `LANTAI_MAKS` (3) bot
+   menyusun/mengetik bersamaan per pertandingan tanpa rencana kembar (intent + target
+   sama), dan rencana yang lebih tua dari chat bot lain dibatalkan lalu diputuskan
+   ulang. Mode `NPC_METHOD=llm` mempertahankan jalur lama
    (satu prompt LLM) sebagai pembanding.
    Setelah Mulai, `Match` berada di fase `preparing` sampai otak bot siap.
 6. **Logout:** `ProfileMenu` → `SessionService` → endpoint logout. Setelah token

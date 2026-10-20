@@ -4,6 +4,7 @@ import logging
 from dataclasses import dataclass, field
 from sqlalchemy import text
 import secrets
+import threading
 from threading import RLock
 from module.mysql_connector import SessionLocal
 from services.match_engine import Match, label_unik, phase_durations
@@ -25,6 +26,7 @@ class Room:
     bot_enabled: bool = False
     match: Match | None = None
     capacity: int = 6
+    peserta_tercatat: bool = False  # peserta pertandingan selesai sudah dikirim ke arsip survei
 
 
 class RoomService:
@@ -228,6 +230,18 @@ class RoomService:
         with self.lock:
             return next((room for room in self.rooms.values() if username in room.members), None)
 
+    # Pertandingan yang baru selesai (lewat timer atau pemain keluar): peserta manusianya dicatat sekali ke
+    # arsip survei di thread latar, jadi jam permainan tidak menunggu database.
+    def _catat_selesai(self, room):
+        if room.peserta_tercatat or not room.match or not room.match.winner:
+            return
+        room.peserta_tercatat = True
+        # Impor lambat: survey_service mengimpor modul ini.
+        from services.survey_service import survey_service
+
+        baris = survey_service.baris_peserta(room)
+        threading.Thread(target=survey_service.catat_peserta, args=(baris,), daemon=True).start()
+
     # Room yang pertandingannya sudah selesai tidak menahan pemain: keanggotaannya dilepas sebelum membuat atau
     # bergabung ke room lain (survei pertandingan itu tetap bisa dikirim lewat registri pertandingan selesai).
     def _lepas_room_selesai(self, username, kecuali=None):
@@ -294,6 +308,7 @@ class RoomService:
                     before = (room.match.phase, room.match.round)
                     try:
                         room.match.tick()
+                        self._catat_selesai(room)
                     except Exception:
                         # Satu pertandingan rusak tidak boleh menghentikan timer room lain.
                         logger.exception("Timer room %s gagal.", room.code)
@@ -330,6 +345,9 @@ class RoomService:
                 from services.survey_service import survey_service
 
                 survey_service.ingat_pertandingan(room)
+                self._catat_selesai(
+                    room
+                )  # room bisa dihapus di bawah sebelum timer sempat mencatat
             room.members.remove(username)
             room.members_skin.pop(username, None)
             room.members_label.pop(username, None)

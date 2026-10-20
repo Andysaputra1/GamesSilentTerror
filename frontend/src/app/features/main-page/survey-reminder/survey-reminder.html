@@ -1,0 +1,86 @@
+@if (pending.length && !dismissed) {
+  <section class="reminder" aria-labelledby="survey-reminder-title">
+    <div class="reminder__intro">
+      <span class="reminder__icon" aria-hidden="true">📝</span>
+      <div>
+        <h2 id="survey-reminder-title">Survei menunggu</h2>
+        <p>{{ pending.length }} pertandingan belum dinilai</p>
+      </div>
+    </div>
+    <ul class="reminder__list">
+      @for (item of pending; track item.match_id) {
+        <li>
+          <p>
+            Ayo isi survei untuk game ruangan <b>{{ item.room_code }}</b>
+            <small
+              >{{ roleLabel[item.role] ?? item.role }} ·
+              {{ item.outcome === 'won' ? 'Menang' : 'Kalah' }}</small
+            >
+          </p>
+          <button
+            class="reminder__fill"
+            type="button"
+            aria-haspopup="dialog"
+            [attr.aria-label]="'Isi survei ruangan ' + item.room_code"
+            (click)="open(item)"
+          >
+            Isi survei
+          </button>
+        </li>
+      }
+    </ul>
+    <button
+      class="reminder__close"
+      type="button"
+      aria-label="Tutup pengingat survei"
+      title="Tutup (muncul lagi saat kembali ke halaman ini)"
+      (click)="dismissed = true"
+    >
+      ×
+    </button>
+  </section>
+}
+
+@if (active) {
+  <div class="survey-overlay" (click)="close()">
+    <section
+      class="survey-dialog"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="survey-dialog-title"
+      (click)="$event.stopPropagation()"
+    >
+      <header class="survey-dialog__head">
+        <div>
+          <p>Kuesioner singkat · ruangan {{ active.room_code }}</p>
+          <h2 id="survey-dialog-title">Bagaimana permainanmu?</h2>
+        </div>
+        <button #closeButton class="survey-dialog__close" type="button" (click)="close()">
+          <span>Tutup</span><b aria-hidden="true">×</b>
+        </button>
+      </header>
+      <div class="survey-dialog__body">
+        @switch (state) {
+          @case ('loading') {
+            <p class="survey-dialog__note">Memuat pertanyaan…</p>
+          }
+          @case ('error') {
+            <p class="survey-dialog__note" role="alert">{{ error }}</p>
+          }
+          @case ('done') {
+            <div class="survey-dialog__done" role="status">
+              <span aria-hidden="true">🎉</span>
+              <b>Terima kasih!</b>
+              <p>Jawabanmu membantu penelitian NPC Silent Terror.</p>
+            </div>
+          }
+          @default {
+            @if (survey) {
+              <app-survey-form [code]="active.room_code" [survey]="survey" (submitted)="finish()" />
+            }
+          }
+        }
+      </div>
+    </section>
+  </div>
+}

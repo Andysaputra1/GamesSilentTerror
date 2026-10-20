@@ -25,6 +25,7 @@ import { RoomService } from '../../core/room.service';
 import { SessionService } from '../../core/session.service';
 import { STORAGE } from '../../core/storage';
 import { validateRoomCode, saveRoomSession, DEFAULT_CAPACITY } from '../../shared/room-helpers';
+import { SurveyReminder } from './survey-reminder/survey-reminder';
 
 type RoleId = 'hitman' | 'spy' | 'stalker' | 'civilian';
 
@@ -50,7 +51,7 @@ interface CaseFileTabOption {
 // HALAMAN UTAMA: pratinjau kartu role dan skin, pilihan skin, serta buat/gabung room.
 @Component({
   selector: 'app-main-page',
-  imports: [RouterLink, ProfileMenu, RoleRevealCard, FormsModule],
+  imports: [RouterLink, ProfileMenu, RoleRevealCard, FormsModule, SurveyReminder],
   templateUrl: './main-page.html',
   styleUrls: ['./main-page.css', './main-page-responsive.css', './main-page-case-file.css'],
 })

@@ -161,7 +161,7 @@ class Match:
         )
         self.npc_decisions = set()
         # Bot yang sedang menyusun chat (lantai bicara NPCService); tampil sebagai awan "berpikir".
-        self.bot_berpikir: str | None = None
+        self.bot_berpikir: set[str] = set()
         self.phase = "day"
         self.durations = phase_durations(len(names), quick)
         now = time.time() if now is None else now
@@ -698,7 +698,7 @@ class Match:
                     # Keluar sudah diumumkan di catatan, jadi tandanya publik (hanya bila benar).
                     **({"left": True} if p.left else {}),
                     **({"metode": self.bot_methods[p.name]} if p.name in self.bot_methods else {}),
-                    **({"thinking": True} if p.name == self.bot_berpikir else {}),
+                    **({"thinking": True} if p.name in self.bot_berpikir else {}),
                     **({"role": p.role, "hostage": p.hostage, "bot": p.bot} if self.winner else {}),
                 }
                 for p in self.players.values()

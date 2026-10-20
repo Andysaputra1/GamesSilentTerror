@@ -1,8 +1,8 @@
 """FILE INI DIHASILKAN OTOMATIS oleh scripts/ekspor_otak_npc.py. JANGAN DIEDIT MANUAL.
 
 Sumber : npc_nlg.ipynb
-Sidik  : ac98615a57a0408e
-Dibuat : 2026-10-16 10:59 UTC
+Sidik  : c9cb553af818a278
+Dibuat : 2026-10-20 07:49 UTC
 
 Perubahan logika bot dilakukan di notebook skripsi, dijalankan ulang sampai semua
 skenario/pengujian lulus, lalu diekspor ulang dengan skrip ini.
@@ -92,7 +92,7 @@ N_UJI_LLM = 36
 
 PANJANG_MAKS = 220
 
-KALIMAT_MAKS = 3
+KALIMAT_MAKS = 2
 
 JUMLAH_CHAT_KONTEKS = 6
 
@@ -129,7 +129,7 @@ def ubah_kata_ganti(teks, persona):
 
 VARIASI = {
     "ungkap": [
-        "Aku Stalker. Semalam aku peek {t}, hasilnya Hitman. Ayo vote {t}!",
+        "Aku Stalker, semalam aku peek {t} dan hasilnya Hitman. Ayo vote {t}!",
         "Jujur aku Stalker, dan hasil peek semalam: {t} itu Hitman. Vote {t} sekarang!",
         "Aku buka role: aku Stalker. {t} sudah aku peek dan dia Hitman, jadi vote {t}.",
     ],
@@ -1035,7 +1035,7 @@ Isi pesan sudah diputuskan oleh rencana; tugasmu hanya menuliskannya secara waja
 Ringkas aturan game: Hitman (satu atau lebih, tergantung jumlah pemain) bersembunyi di antara warga (Civilian, Spy, Stalker). Siang semua pemain berdiskusi; malam Hitman bisa menyandera (Hostage), Spy bisa menjaga (Guard), dan Stalker bisa melihat role seseorang (Peek); lalu Tribunal memilih siapa yang dieksekusi.
 
 Aturan menulis:
-1. Tulis 1-2 kalimat pendek, maksimal {PANJANG_MAKS} karakter. Gaya bicara: {PERSONA[persona]['deskripsi']}.
+1. Tulis paling banyak 2 kalimat pendek (lebih baik 1 kalimat), maksimal {PANJANG_MAKS} karakter, seperti chat game yang diketik cepat, bukan paragraf. Gaya bicara: {PERSONA[persona]['deskripsi']}.
 2. Sampaikan persis maksud rencana. Sebut target dengan namanya. Jangan menambah tuduhan, pembelaan, atau nama pemain lain.
 3. Alasan boleh diparafrasekan, tetapi jangan mengarang fakta baru.
 4. {aturan_klaim}

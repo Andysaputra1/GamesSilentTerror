@@ -14,7 +14,7 @@ from unittest.mock import AsyncMock, Mock, patch
 
 from services.match_engine import Match
 from services.npc_brain.runtime import BrainRuntime, NLUBersama, NLUCadangan
-from services.npc_service import NPCService, catat_nlu
+from services.npc_service import LANTAI_MAKS, NPCService, catat_nlu
 from services.room_service import RoomService
 
 AKSI_RAHASIA = {"gag", "hostage", "guard", "peek"}
@@ -289,29 +289,38 @@ class NPCServiceBrainTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((berlaku, penolakan), (False, None))
         self.assertEqual(self.match.votes, {})
 
-    async def test_floor_allows_one_bot_and_drops_plans_older_than_another_bots_chat(self):
+    async def test_floor_lets_bots_write_in_parallel_without_twin_or_stale_plans(self):
         await self.service.prepare(self.room.code, self.match)
         self.match.begin()
         nox = self.runtime.otak_bot(self.match.id, "NOX")
-        self.service.lantai[self.match.id] = "ECHO"
-        self.assertFalse(self.service._ambil_lantai(self.match, nox, None))  # ECHO sedang mengetik
-        del self.service.lantai[self.match.id]
+        tuduh_ash = {"intent": "offend", "target": "ASH"}
+        # Lantai penuh (LANTAI_MAKS bot sedang menulis) dan rencana kembar ditolak.
+        penuh = {f"B{i}": ("neutral", f"P{i}") for i in range(LANTAI_MAKS)}
+        self.service.lantai[self.match.id] = penuh
+        self.assertFalse(self.service._ambil_lantai(self.match, nox, None, tuduh_ash))
+        self.service.lantai[self.match.id] = {"ECHO": ("offend", "ASH")}
+        self.assertFalse(self.service._ambil_lantai(self.match, nox, None, tuduh_ash))
+        # Rencana berbeda boleh ditulis bersamaan; chat manusia sesudah snapshot tidak membatalkannya.
         with self.rooms.lock:
             terlihat = self.match.add_message("human", "Halo semua.")["id"]
             self.match.add_message("human", "Ada yang curiga?")
-        # Chat manusia sesudah snapshot tidak membatalkan rencana; chat bot lain membatalkannya.
-        self.assertTrue(self.service._ambil_lantai(self.match, nox, terlihat))
-        self.assertEqual(self.service.lantai, {self.match.id: "NOX"})
-        # Pemain melihat awan berpikir hanya pada bot yang sedang menyusun kalimat.
+        bela_ash = {"intent": "defend", "target": "ASH"}
+        self.assertTrue(self.service._ambil_lantai(self.match, nox, terlihat, bela_ash))
+        self.assertEqual(
+            self.service.lantai[self.match.id],
+            {"ECHO": ("offend", "ASH"), "NOX": ("defend", "ASH")},
+        )
+        # Pemain melihat awan berpikir pada bot yang sedang menyusun kalimat.
         berpikir = [p["name"] for p in self.match.snapshot("human")["players"] if p.get("thinking")]
         self.assertEqual(berpikir, ["NOX"])
-        del self.service.lantai[self.match.id]
-        self.match.bot_berpikir = None
+        # Chat bot lain yang masuk sesudah snapshot membatalkan rencana lama.
+        self.service.lantai.clear()
+        self.match.bot_berpikir.clear()
         with self.rooms.lock:
             self.match.add_message("ECHO", "Aku belum yakin.")
-        self.assertFalse(self.service._ambil_lantai(self.match, nox, terlihat))
+        self.assertFalse(self.service._ambil_lantai(self.match, nox, terlihat, bela_ash))
 
-    async def test_concurrent_bots_do_not_talk_over_each_other(self):
+    async def test_accused_bots_defend_themselves_in_parallel(self):
         await self.service.prepare(self.room.code, self.match)
         self.match.begin()
         with self.rooms.lock:
@@ -324,15 +333,11 @@ class NPCServiceBrainTests(unittest.IsolatedAsyncioTestCase):
                 self.service.brain_turn(self.room.code, self.match, nox),
                 self.service.brain_turn(self.room.code, self.match, echo),
             )
-            pengirim = [m["sender"] for m in self.match.messages[1:]]
-            self.assertEqual(len(pengirim), 1, "hanya satu bot yang boleh bicara pada satu waktu")
-            self.assertEqual(self.service.lantai, {})
-            self.assertIsNone(self.match.bot_berpikir)  # awan hilang setelah kalimat terkirim
-            # Bot yang tertunda bicara di langkah berikutnya, setelah membaca chat bot pertama.
-            kedua = echo if pengirim == ["NOX"] else nox
-            kedua.sibuk = True
-            await self.service.brain_turn(self.room.code, self.match, kedua)
-        self.assertEqual([m["sender"] for m in self.match.messages[1:]], pengirim + [kedua.nama])
+        # Rencana berbeda (masing-masing membela diri): keduanya menulis bersamaan, tidak ada yang ditunda.
+        pengirim = sorted(m["sender"] for m in self.match.messages[1:])
+        self.assertEqual(pengirim, ["ECHO", "NOX"])
+        self.assertEqual(self.service.lantai, {})
+        self.assertEqual(self.match.bot_berpikir, set())  # awan hilang setelah kalimat terkirim
 
     async def test_scheduler_runs_brain_steps_for_every_live_bot(self):
         await self.service.prepare(self.room.code, self.match)

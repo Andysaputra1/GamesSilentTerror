@@ -2,6 +2,7 @@
 
 import time
 import unittest
+from datetime import datetime
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -41,6 +42,7 @@ class FakeQueries:
                           question(4, "text", required=False)]  # fmt: skip
         self.answers = []
         self.bots = []
+        self.participants = []
 
     def list_questions(self, db, active_only=True):
         return [dict(q) for q in self.questions if q["active"] or not active_only]
@@ -62,6 +64,26 @@ class FakeQueries:
 
     def record_match_bot(self, db, row):
         self.bots.append(row)
+
+    # Tabel match_participants tiruan (arsip peserta pertandingan selesai).
+    def record_participants(self, db, rows):
+        for row in rows:
+            if not any((p["match_id"], p["username"]) == (row["match_id"], row["username"])
+                       for p in self.participants):  # fmt: skip
+                self.participants.append({**row, "finished_at": datetime(2026, 10, 20, 7, 0)})
+
+    def participant(self, db, room_code, username, match_id):
+        cocok = [p for p in self.participants if (p["room_code"], p["username"]) == (room_code, username)
+                 and match_id in (None, p["match_id"])]  # fmt: skip
+        return (
+            {k: cocok[-1][k] for k in ("match_id", "room_code", "role", "team", "outcome")}
+            if cocok
+            else None
+        )
+
+    def pending_surveys(self, db, username, limit=20):
+        return [p for p in self.participants if p["username"] == username
+                and not self.count_answers(db, p["match_id"], username)][:limit]  # fmt: skip
 
 
 class ValidationTests(unittest.TestCase):
@@ -185,10 +207,15 @@ class SurveyServiceTests(unittest.TestCase):
             self.client.post(endpoint, json=bad, headers={"x-user": "bob"}).status_code, 422
         )
 
-    # Pemain yang keluar room setelah pertandingan selesai tetap bisa mengirim survei (registri memori).
-    def test_player_who_left_the_room_can_still_submit_until_the_window_ends(self):
+    # Pemain yang keluar room setelah pertandingan selesai tetap bisa mengirim survei: registri memori selama
+    # jendelanya, lalu arsip peserta (dicatat saat pemain terakhir keluar dan room dibersihkan).
+    def test_player_who_left_the_room_can_still_submit_after_the_room_is_gone(self):
         self.finish()
         self.enterContext(patch("services.survey_service.survey_service", self.service))
+        langsung = lambda target, args, daemon: SimpleNamespace(
+            start=lambda: target(*args)
+        )  # noqa: E731
+        self.enterContext(patch("services.room_service.threading.Thread", side_effect=langsung))
         self.rooms.leave(self.room.code, "alice")
         self.rooms.leave(self.room.code, "bob")
         self.assertNotIn(self.room.code, self.rooms.rooms)  # room sudah dibersihkan
@@ -201,10 +228,42 @@ class SurveyServiceTests(unittest.TestCase):
             self.service.status(self.room.code, "mallory")  # bukan peserta
         with self.assertRaises(ValueError):
             self.service.submit(self.room.code, "bob", "match-lain", self.answers())
+        self.assertEqual({row["username"] for row in self.fake.participants}, {"alice", "bob"})
         nanti = time.monotonic() + BERLAKU_SELESAI_DETIK + 1
         with patch("services.survey_service.time.monotonic", return_value=nanti):
+            self.assertEqual(self.service.status(self.room.code, "bob")["match_id"], self.match.id)
             with self.assertRaises(ValueError):
-                self.service.status(self.room.code, "bob")
+                self.service.status(self.room.code, "mallory")
+
+    # Pertandingan selesai: peserta manusia dicatat sekali ke arsip, survei tetap bisa diisi setelah server
+    # dinyalakan ulang, dan pengingat Main hilang begitu survei terkirim.
+    def test_finished_match_is_archived_for_later_surveys_and_reminders(self):
+        self.enterContext(patch("services.survey_service.survey_service", self.service))
+        langsung = lambda target, args, daemon: SimpleNamespace(
+            start=lambda: target(*args)
+        )  # noqa: E731
+        self.enterContext(patch("services.room_service.threading.Thread", side_effect=langsung))
+        self.rooms.tick_all()
+        self.assertEqual(self.fake.participants, [])  # belum selesai: belum dicatat
+        self.finish()
+        self.rooms.tick_all()
+        self.rooms.tick_all()  # dicatat sekali saja
+        self.assertEqual(sorted(p["username"] for p in self.fake.participants), ["alice", "bob"])
+        # "Restart": room di memori hilang dan registri kosong; konteks diambil dari arsip.
+        self.enterContext(patch("services.survey_service.room_service", RoomService()))
+        baru = SurveyService()
+        self.assertEqual(baru.status(self.room.code, "alice")["match_id"], self.match.id)
+        self.assertEqual([s["room_code"] for s in baru.pending("alice")], [self.room.code])
+        self.assertEqual(baru.pending("alice")[0]["finished_at"], "2026-10-20T07:00:00")
+        baru.submit(self.room.code, "alice", self.match.id, self.answers())
+        self.assertEqual(baru.pending("alice"), [])
+        self.assertEqual(len(baru.pending("bob")), 1)
+        for q in self.fake.questions:
+            q["active"] = False
+        self.assertEqual(baru.pending("bob"), [])  # tanpa pertanyaan aktif tidak ada pengingat
+        with self.assertRaises(ValueError):
+            baru.status(self.room.code, "mallory")
+        self.assertEqual(self.client.get("/api/survey/pending").json(), {"surveys": []})
 
     # Dua kiriman bersamaan: yang kedua melanggar UNIQUE → "sudah dikirim" (409), bukan 503.
     def test_concurrent_duplicate_submit_is_reported_as_already_submitted(self):
