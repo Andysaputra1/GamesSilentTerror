@@ -66,6 +66,7 @@ class RoomService:
         with self.lock:
             if self.active(username):
                 raise ValueError("Selesaikan pertandingan aktif sebelum membuat ruangan lain.")
+            self._lepas_room_selesai(username)
             if self.current(username):
                 raise ValueError("Keluar dari ruangan sebelumnya sebelum membuat ruangan baru.")
             if len(self.rooms) >= 500:
@@ -97,6 +98,7 @@ class RoomService:
             active = self.active(username)
             if active and active["code"] != code.strip().upper():
                 raise ValueError("Kembali ke pertandingan aktifmu terlebih dahulu.")
+            self._lepas_room_selesai(username, kecuali=code.strip().upper())
             current = self.current(username)
             if current and current.code != code.strip().upper():
                 raise ValueError(
@@ -225,6 +227,14 @@ class RoomService:
         """Pulihkan lobby/hasil setelah login ulang, tanpa data role privat."""
         with self.lock:
             return next((room for room in self.rooms.values() if username in room.members), None)
+
+    # Room yang pertandingannya sudah selesai tidak menahan pemain: keanggotaannya dilepas sebelum membuat atau
+    # bergabung ke room lain (survei pertandingan itu tetap bisa dikirim lewat registri pertandingan selesai).
+    def _lepas_room_selesai(self, username, kecuali=None):
+        with self.lock:
+            room = self.current(username)
+            if room and room.code != kecuali and room.match and room.match.winner:
+                self.leave(room.code, username)
 
     # Cari pertandingan yang belum selesai untuk mencegah pengguna bermain di dua ruangan.
     def active(self, username):

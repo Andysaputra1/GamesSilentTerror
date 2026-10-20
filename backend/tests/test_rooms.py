@@ -36,6 +36,22 @@ class RoomTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.rooms.join(room.code, "overflow")
 
+    # Setelah pertandingan selesai, pemain langsung boleh membuat atau bergabung ke room baru;
+    # lobby yang belum mulai tetap menahan pemain di satu room.
+    def test_finished_match_releases_members_for_a_new_room(self):
+        lama = self.rooms.create("alice", capacity=4)
+        self.rooms.join(lama.code, "bob")
+        self.rooms.set_bot(lama.code, "alice", True)
+        self.rooms.start(lama.code, "alice")
+        lama.match.finish("civilians", "hitman_executed", "Hitman dieksekusi.")
+        baru = self.rooms.create("alice")
+        self.assertIs(self.rooms.current("alice"), baru)
+        self.rooms.join(baru.code, "bob")
+        self.assertEqual(baru.members, ["alice", "bob"])
+        self.assertNotIn(lama.code, self.rooms.rooms)  # room lama yang kosong dibersihkan
+        with self.assertRaises(ValueError):
+            self.rooms.create("bob")  # masih anggota lobby baru yang belum mulai
+
 
 class SocketRoomTests(unittest.IsolatedAsyncioTestCase):
     async def test_passive_socket_loses_broadcast_access_after_leave_or_logout(self):

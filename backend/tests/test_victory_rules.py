@@ -167,7 +167,7 @@ class SingleRoomTests(unittest.TestCase):
         self.assertIs(self.rooms.join(self.other.code, "alice"), self.other)
         self.assertNotIn(self.first.code, self.rooms.rooms)
 
-    def test_finished_room_is_recoverable_until_player_leaves(self):
+    def test_finished_room_is_recoverable_until_player_moves_on(self):
         self.rooms.set_bot(self.first.code, "alice", True)
         self.rooms.start(self.first.code, "alice")
         hitman = next(p for p in self.first.match.players.values() if p.role == "hitman")
@@ -175,11 +175,10 @@ class SingleRoomTests(unittest.TestCase):
         self.first.match.check_winner()
         self.assertIsNone(self.rooms.active("alice"))
         self.assertEqual(self.rooms.snapshot(self.rooms.current("alice"))["phase"], "finished")
-        with self.assertRaises(ValueError):
-            self.rooms.join(self.other.code, "alice")
-        self.rooms.leave(self.first.code, "alice")
-        self.assertIsNone(self.rooms.current("alice"))
-        self.rooms.create("alice")
+        # Pertandingan selesai tidak menahan pemain: bergabung ke room lain melepas room lama otomatis.
+        self.rooms.join(self.other.code, "alice")
+        self.assertIs(self.rooms.current("alice"), self.other)
+        self.assertNotIn("alice", self.first.members)
 
 
 if __name__ == "__main__":
