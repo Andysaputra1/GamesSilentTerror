@@ -18,10 +18,10 @@ export class RoleRevealCard {
 
   /** Mapping from role to prop asset filename (without extension). */
   private readonly roleToProp: Record<string, string | null> = {
-    'spy': 'spy-shades',
-    'hitman': 'hitman-pistol',
-    'stalker': 'stalker-nerd-eyes',
-    'civilian': null,  // Civilian has no prop
+    spy: 'spy-shades',
+    hitman: 'hitman-pistol',
+    stalker: 'stalker-nerd-eyes',
+    civilian: null, // Civilian has no prop
   };
 
   private getSafeSkinId(): string {

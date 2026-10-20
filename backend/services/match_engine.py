@@ -607,7 +607,9 @@ class Match:
         unrevealed = self.unrevealed()
         starts_at = self._start_at()
         if starts_at is not None and unrevealed:
-            starts_at += REVEAL_WAIT_SECONDS  # batas atas; mulai lebih cepat begitu semua kartu dibuka
+            starts_at += (
+                REVEAL_WAIT_SECONDS  # batas atas; mulai lebih cepat begitu semua kartu dibuka
+            )
         return {
             "ready": prep["ready"],
             "detail": prep["detail"],

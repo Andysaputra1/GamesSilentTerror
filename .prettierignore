@@ -7,3 +7,5 @@
 tmp/**
 communicationfolder/**
 frontend/src/environments/environment.vercel.ts
+# Dokumen hasil build (sumber di communicationfolder); jangan diformat ulang.
+backend/public/dokumen/**

@@ -300,7 +300,9 @@ class WriterSettingsTests(unittest.TestCase):
                 Settings(**salah)
         # .env lama dengan jalur Claude tetap bisa start; jalur itu diabaikan.
         self.assertEqual(
-            Settings(npc_writer_order="claude_bedrock,claude_api,openrouter,tautan").npc_writer_order,
+            Settings(
+                npc_writer_order="claude_bedrock,claude_api,openrouter,tautan"
+            ).npc_writer_order,
             "openrouter,tautan",
         )
 

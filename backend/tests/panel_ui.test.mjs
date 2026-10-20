@@ -706,3 +706,38 @@ test('riwayat chat menampilkan intent, target, dan konteks IndoBERT sebagai teks
   ]);
   assert.equal(sel.querySelector('img'), null); // isi chat tidak pernah menjadi HTML
 });
+
+test('dropdown bawaan diganti pilihan kustom yang tetap mengisi select asli', async (t) => {
+  const w = setup(t);
+  const doc = w.document;
+  const asli = doc.querySelector('#history-sender');
+  const wadah = asli.closest('.pilih');
+  const tombol = wadah.querySelector('.pilih-tombol');
+  assert.ok(asli.classList.contains('pilih-asli'));
+  assert.equal(tombol.textContent, 'Semua (manusia + bot + arsip lama)');
+  let berubah = 0;
+  asli.addEventListener('change', () => berubah++);
+  tombol.click();
+  const daftar = wadah.querySelector('.pilih-daftar');
+  assert.equal(daftar.hidden, false);
+  assert.equal(tombol.getAttribute('aria-expanded'), 'true');
+  [...daftar.children].find((li) => li.dataset.value === 'bot').click();
+  assert.equal(asli.value, 'bot');
+  assert.equal(berubah, 1);
+  assert.equal(daftar.hidden, true);
+  assert.match(tombol.textContent, /bot/i);
+  // Keyboard: panah membuka dan memindah fokus, Enter memilih.
+  tombol.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+  daftar.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+  daftar.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  assert.equal(asli.value, [...asli.options][asli.selectedIndex].value);
+  assert.notEqual(asli.value, 'bot');
+  assert.equal(berubah, 2);
+  // Nilai dari kode dan opsi yang ditambahkan belakangan ikut tampil.
+  asli.value = 'human';
+  assert.equal(tombol.textContent, 'Manusia saja');
+  const ruang = doc.querySelector('#history-room');
+  ruang.add(new w.Option('ABC123', 'ABC123'));
+  await settle();
+  assert.equal(ruang.closest('.pilih').querySelectorAll('.pilih-opsi').length, 2);
+});

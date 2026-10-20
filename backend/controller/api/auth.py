@@ -5,7 +5,12 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from controller.middleware.auth import require_authenticated_user
 from schemas.auth import AuthenticatedUserResponse, LoginRequest, LoginResponse
-from schemas.auth import RegisterRequest, GoogleLoginRequest, UpdateProfileRequest, UpdateSkinRequest
+from schemas.auth import (
+    RegisterRequest,
+    GoogleLoginRequest,
+    UpdateProfileRequest,
+    UpdateSkinRequest,
+)
 from config.settings import settings
 from controller.middleware.auth_limits import limit_auth
 from services.account_service import register_account, google_account, AccountConflict

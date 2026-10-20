@@ -10,7 +10,10 @@
       [title]="active() ? 'Keluar layar penuh' : 'Layar penuh'"
     >
       <span aria-hidden="true">{{ active() ? '⤢' : '⛶' }}</span>
-      <span class="fullscreen-label">{{ pending() ? '…' : active() ? 'Keluar' : 'Layar penuh' }}</span>
+      <span
+        class="fullscreen-label"
+        >{{ pending() ? '…' : active() ? 'Keluar' : 'Layar penuh' }}</span
+      >
     </button>
     @if (error()) {
       <span class="fullscreen-error" role="status">{{ error() }}</span>

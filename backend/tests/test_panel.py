@@ -13,11 +13,14 @@ from services.password_service import hash_password
 from module.openrouter_client import generate_reply
 
 # Bacaan NLU satu pesan seperti yang disimpan pencatat NLU (BrainRuntime.baca_chat), beserta konteksnya.
-NLU_CONTOH = json.dumps({
-    "intent": "offend", "confidence": 0.91,
-    "target": [{"pemain": "NOX", "relasi": "offend", "prob": 0.88, "sumber": ["indobert"]}],
-    "konteks": [{"pengirim": "ECHO", "teks": "Halo semua.", "intent": "neutral", "target": []}],
-})
+NLU_CONTOH = json.dumps(
+    {
+        "intent": "offend",
+        "confidence": 0.91,
+        "target": [{"pemain": "NOX", "relasi": "offend", "prob": 0.88, "sumber": ["indobert"]}],
+        "konteks": [{"pengirim": "ECHO", "teks": "Halo semua.", "intent": "neutral", "target": []}],
+    }
+)
 
 
 class PanelTests(unittest.TestCase):
@@ -62,7 +65,9 @@ class PanelTests(unittest.TestCase):
             self.assertEqual(page.status_code, 200)
             self.assertIn(judul, page.text)
             self.assertTrue(page.headers["content-type"].startswith("text/html"))
-            self.assertTrue(page.headers["content-security-policy"].startswith("sandbox allow-scripts;"))
+            self.assertTrue(
+                page.headers["content-security-policy"].startswith("sandbox allow-scripts;")
+            )
         self.assertEqual(self.client.get("/panel/dokumen/..%2Fpanel%2Fpanel.js").status_code, 404)
         self.assertEqual(self.client.get("/panel/dokumen/lain").status_code, 422)
 

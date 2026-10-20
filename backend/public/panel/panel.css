@@ -715,3 +715,35 @@ body > footer {
 .nlu-konteks summary { cursor: pointer; color: #9fb4cc; }
 .nlu-konteks ol { margin: 6px 0 0; padding-left: 18px; max-height: 220px; overflow-y: auto; }
 .nlu-konteks li { margin: 2px 0; white-space: normal; }
+/* PILIHAN KUSTOM (pengganti dropdown bawaan): tombol berpanah dan daftar mengambang bergaya panel. */
+.pilih { position: relative; min-width: 0; }
+.pilih-asli { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; pointer-events: none; }
+.pilih-tombol {
+  width: 100%; display: block;
+  padding: 13px 40px 13px 14px; background: #0d141e; border: 1px solid #334055; border-radius: 8px;
+  color: #e5ecf5; font-size: 14px; font-weight: 500; text-align: left; position: relative;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pilih-tombol::after {
+  content: ''; position: absolute; right: 16px; top: 50%; width: 8px; height: 8px; margin-top: -6px;
+  border-right: 2px solid #baf578; border-bottom: 2px solid #baf578; transform: rotate(45deg);
+  transition: transform 0.15s ease;
+}
+.pilih-tombol[aria-expanded='true'] { border-color: #baf578; }
+.pilih-tombol[aria-expanded='true']::after { transform: rotate(-135deg); margin-top: -2px; }
+.pilih-tombol:hover { filter: none; border-color: #4d5f78; }
+.pilih-daftar {
+  position: absolute; z-index: 30; top: calc(100% + 6px); left: 0; right: 0; margin: 0; padding: 6px;
+  list-style: none; max-height: 280px; overflow-y: auto; background: #111a26; border: 1px solid #3a4a61;
+  border-radius: 10px; box-shadow: 0 14px 32px rgb(0 0 0 / 0.55);
+}
+.pilih-opsi {
+  padding: 10px 12px 10px 30px; border-radius: 7px; color: #dce4ef; font-size: 13.5px; cursor: pointer;
+  position: relative; outline: none;
+}
+.pilih-opsi:hover, .pilih-opsi:focus { background: #1d2a3b; }
+.pilih-opsi[aria-selected='true'] { color: #baf578; font-weight: 650; }
+.pilih-opsi[aria-selected='true']::before {
+  content: '✓'; position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
+}
+.pilih-opsi[aria-disabled='true'] { opacity: 0.45; cursor: not-allowed; }

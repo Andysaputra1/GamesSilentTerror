@@ -2784,3 +2784,140 @@ setInterval(() => {
   if (token && menu === 'checker' && $('auto-checker').checked && !document.hidden)
     checker().catch((error) => notice(error.message));
 }, 5000);
+
+// PILIHAN KUSTOM: dropdown bawaan browser diganti tombol + daftar bergaya panel. <select> asli tetap ada dan
+// disembunyikan, jadi nilai form, event change, dan kode lain yang membaca/menyetel .value tidak berubah.
+// Daftar dibangun ulang saat opsi, nilai, atau status nonaktif berubah; keyboard: panah, Enter/Spasi, Esc, Tab.
+const PILIH_PROTO = Object.getOwnPropertyDescriptors(HTMLSelectElement.prototype);
+function pilihanKustom(select) {
+  if (select.dataset.kustom) return;
+  select.dataset.kustom = '1';
+  const wadah = node('div', undefined, 'pilih');
+  const tombol = node('button', undefined, 'pilih-tombol');
+  const daftar = node('ul', undefined, 'pilih-daftar');
+  tombol.type = 'button';
+  tombol.setAttribute('aria-haspopup', 'listbox');
+  tombol.setAttribute('aria-expanded', 'false');
+  daftar.setAttribute('role', 'listbox');
+  daftar.hidden = true;
+  const label = select.closest('label');
+  const judul = label
+    ? [...label.childNodes]
+        .filter((n) => n.nodeType === 3)
+        .map((n) => n.textContent)
+        .join(' ')
+        .trim()
+    : '';
+  if (judul) daftar.setAttribute('aria-label', judul);
+  select.replaceWith(wadah);
+  wadah.append(select, tombol, daftar);
+  select.classList.add('pilih-asli');
+  select.tabIndex = -1;
+  select.setAttribute('aria-hidden', 'true');
+  select.addEventListener('focus', () => tombol.focus());
+
+  const sinkron = () => {
+    const pilihan = select.options[select.selectedIndex];
+    tombol.textContent = pilihan ? pilihan.text : '—';
+    tombol.setAttribute('aria-label', `${judul ? `${judul}: ` : ''}${tombol.textContent}`);
+    tombol.disabled = select.disabled;
+    daftar.replaceChildren(
+      ...[...select.options].map((o) => {
+        const li = node('li', o.text, 'pilih-opsi');
+        li.setAttribute('role', 'option');
+        li.setAttribute('aria-selected', String(o.selected));
+        if (o.disabled) li.setAttribute('aria-disabled', 'true');
+        li.tabIndex = -1;
+        li.dataset.value = o.value;
+        return li;
+      }),
+    );
+  };
+  const tutup = (fokus = true) => {
+    if (daftar.hidden) return;
+    daftar.hidden = true;
+    tombol.setAttribute('aria-expanded', 'false');
+    if (fokus) tombol.focus();
+  };
+  const buka = () => {
+    if (select.disabled) return;
+    for (const lain of document.querySelectorAll('.pilih-daftar:not([hidden])')) lain.hidden = true;
+    daftar.hidden = false;
+    tombol.setAttribute('aria-expanded', 'true');
+    (daftar.querySelector('[aria-selected="true"]') || daftar.firstElementChild)?.focus();
+  };
+  const pilih = (li) => {
+    if (!li || li.getAttribute('aria-disabled')) return;
+    const berubah = select.value !== li.dataset.value;
+    select.value = li.dataset.value;
+    tutup();
+    if (berubah) {
+      select.dispatchEvent(new Event('input', { bubbles: true }));
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  };
+  tombol.onclick = () => (daftar.hidden ? buka() : tutup());
+  tombol.onkeydown = (event) => {
+    if (['ArrowDown', 'ArrowUp'].includes(event.key)) {
+      event.preventDefault();
+      buka();
+    }
+  };
+  daftar.onclick = (event) => pilih(event.target.closest('.pilih-opsi'));
+  daftar.onkeydown = (event) => {
+    const opsi = [...daftar.children];
+    const i = opsi.indexOf(document.activeElement);
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      opsi[
+        Math.max(0, Math.min(opsi.length - 1, i + (event.key === 'ArrowDown' ? 1 : -1)))
+      ]?.focus();
+    } else if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      pilih(opsi[i]);
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      tutup();
+    } else if (event.key === 'Tab') {
+      tutup(false);
+    }
+  };
+  wadah.addEventListener('focusout', (event) => {
+    if (!wadah.contains(event.relatedTarget)) tutup(false);
+  });
+  // Nilai yang disetel lewat kode (select.value = …) juga memperbarui tombol.
+  for (const nama of ['value', 'selectedIndex']) {
+    Object.defineProperty(select, nama, {
+      configurable: true,
+      get: () => PILIH_PROTO[nama].get.call(select),
+      set: (v) => {
+        PILIH_PROTO[nama].set.call(select, v);
+        sinkron();
+      },
+    });
+  }
+  select.addEventListener('change', sinkron);
+  new MutationObserver(sinkron).observe(select, {
+    childList: true,
+    subtree: true,
+    characterData: true,
+    attributes: true,
+    attributeFilter: ['disabled'],
+  });
+  sinkron();
+}
+document.querySelectorAll('select').forEach(pilihanKustom);
+// <select> yang dibuat belakangan (mis. pilihan metode bot di Simulasi) ikut diganti.
+new MutationObserver((perubahan) => {
+  for (const p of perubahan)
+    for (const n of p.addedNodes)
+      if (n.nodeType === 1)
+        (n.matches('select') ? [n] : n.querySelectorAll('select')).forEach(pilihanKustom);
+}).observe(document.body, { childList: true, subtree: true });
+document.addEventListener('click', (event) => {
+  for (const daftar of document.querySelectorAll('.pilih-daftar:not([hidden])'))
+    if (!daftar.parentElement.contains(event.target)) {
+      daftar.hidden = true;
+      daftar.previousElementSibling.setAttribute('aria-expanded', 'false');
+    }
+});
