@@ -527,24 +527,29 @@ function nluTeks(nlu) {
   );
   return `${nlu.intent} ${teks(nlu.confidence)}${target.length ? ` · target ${target.join(', ')}` : ''}`;
 }
-// Sel riwayat chat: bacaan IndoBERT (intent · target), lalu chat sebelumnya yang ikut dibaca sebagai konteks
-// (maks 12, tersimpan sejak pencatat NLU menyimpan konteks). Semua isi chat dipasang sebagai teks, bukan HTML.
-function nluSel(nlu) {
-  const td = node('td', nluTeks(nlu));
+// Sel riwayat chat: chat sebelumnya yang ikut dibaca IndoBERT sebagai konteks (maks 12, tersimpan sejak pencatat
+// NLU menyimpan konteks). Target baru berbentuk {pemain, relasi}, yang lama berupa teks. Isi chat dipasang sebagai
+// teks, bukan HTML.
+function konteksSel(nlu) {
+  const td = node('td');
   const konteks = nlu?.konteks || [];
-  if (konteks.length) {
-    const rincian = node('details', undefined, 'nlu-konteks');
-    rincian.append(node('summary', `Konteks IndoBERT (${konteks.length} chat sebelumnya)`));
-    const daftar = node('ol');
-    for (const c of konteks) {
-      const target = (c.target || []).join(', ');
-      daftar.append(
-        node('li', `${c.pengirim}: ${c.teks} — ${c.intent || '-'}${target ? ` · ${target}` : ''}`),
-      );
-    }
-    rincian.append(daftar);
-    td.append(rincian);
+  if (!konteks.length) {
+    td.textContent = nlu ? 'Tidak ada chat sebelumnya.' : '—';
+    return td;
   }
+  const rincian = node('details', undefined, 'nlu-konteks');
+  rincian.append(node('summary', `${konteks.length} chat sebelumnya`));
+  const daftar = node('ol');
+  for (const c of konteks) {
+    const target = (c.target || [])
+      .map((t) => (typeof t === 'string' ? t : `${t.pemain}: ${t.relasi}`))
+      .join(', ');
+    daftar.append(
+      node('li', `${c.pengirim}: ${c.teks} — ${c.intent || '-'}${target ? ` · ${target}` : ''}`),
+    );
+  }
+  rincian.append(daftar);
+  td.append(rincian);
   return td;
 }
 function chatItem(trace, selected, onSelect) {
@@ -1954,6 +1959,7 @@ function historyQuery() {
   if (to) q.set('date_to', to);
   if ($('history-room').value) q.set('room_code', $('history-room').value);
   q.set('sender_kind', $('history-sender').value);
+  q.set('urut', $('history-order').value);
   return q;
 }
 // Muat halaman riwayat dan abaikan respons dari sesi atau filter yang sudah berubah.
@@ -1966,7 +1972,10 @@ async function history(reset = true) {
     $('history-rows').replaceChildren();
   }
   const version = historyVersion;
-  q.set('after_id', String(historyAfter));
+  // historyAfter = id terakhir halaman sebelumnya; urut "baru" melanjutkan ke pesan yang lebih lama.
+  if (q.get('urut') === 'baru') {
+    if (historyAfter) q.set('before_id', String(historyAfter));
+  } else q.set('after_id', String(historyAfter));
   const data = await request(`/api/panel/history?${q}`);
   if (epoch !== generation || !token || version !== historyVersion) return;
   for (const row of data.messages) {
@@ -1985,7 +1994,7 @@ ${row.sender_kind}`,
       td.textContent = value;
       tr.append(td);
     }
-    tr.append(nluSel(row.nlu));
+    tr.append(node('td', nluTeks(row.nlu)), konteksSel(row.nlu));
     $('history-rows').append(tr);
   }
   historyAfter = data.next_after_id;

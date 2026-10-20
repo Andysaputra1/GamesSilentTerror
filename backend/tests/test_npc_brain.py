@@ -115,7 +115,8 @@ class BrainRuntimeTests(unittest.TestCase):
         self.assertEqual([c["teks"] for c in hasil["konteks"]],
                          [f"Chat ke-{i}, aku curiga NOX." for i in range(2, 14)])  # fmt: skip
         self.assertEqual(hasil["konteks"][-1]["intent"], "offend")
-        self.assertEqual(hasil["konteks"][-1]["target"], ["NOX: offend"])
+        self.assertEqual(hasil["konteks"][-1]["target"], [{"pemain": "NOX", "relasi": "offend"}])
+        self.assertEqual(hasil["daftar_pemain"], roster)
         self.assertEqual(self.runtime.baca_chat([], "human", "Halo.", roster)["konteks"], [])
 
     def test_loaded_runtime_is_not_reloaded_in_background(self):

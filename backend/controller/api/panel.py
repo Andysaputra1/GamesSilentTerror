@@ -6,6 +6,7 @@ import hashlib
 import hmac
 import io
 import json
+import re
 import secrets
 import socket
 import ipaddress
@@ -453,11 +454,22 @@ def history(
     date_from: date | None = None,
     date_to: date | None = None,
     after_id: int = Query(0, ge=0),
+    before_id: int | None = Query(None, ge=1),
+    urut: Literal["lama", "baru"] = "lama",
     sender_kind: Literal["all", "human", "bot", "legacy"] = "all",
     token=Depends(require_panel),
 ):
     where, params = history_filter(room_code, date_from, date_to, sender_kind)
-    params["after"] = after_id
+    # Halaman berikutnya: "lama" melanjutkan sesudah after_id, "baru" (terbaru dulu) sebelum before_id.
+    if urut == "baru":
+        arah = "DESC"
+        if before_id:
+            where += " AND m.id<:before"
+            params["before"] = before_id
+    else:
+        arah = "ASC"
+        where += " AND m.id>:after"
+        params["after"] = after_id
     rows = transaction(
         lambda db: [
             dict(row)
@@ -465,7 +477,7 @@ def history(
                 text("""
         SELECT m.id,m.sender_name,m.sender_kind,m.message,m.nlu,m.created_at,m.match_id,m.round_number,m.phase,s.room_code
         FROM chat_messages m LEFT JOIN game_sessions s ON s.id=m.game_session_id
-        WHERE """ + where + " AND m.id>:after ORDER BY m.id LIMIT 201"),
+        WHERE """ + where + f" ORDER BY m.id {arah} LIMIT 201"),
                 params,
             ).mappings()
         ]
@@ -473,28 +485,48 @@ def history(
     for row in rows:  # bacaan IndoBERT saat game berjalan (JSON; kosong untuk pesan lama)
         if isinstance(row["nlu"], str):
             row["nlu"] = json.loads(row["nlu"])
+    terakhir = rows[min(len(rows), 200) - 1]["id"] if rows else None
     return {
         "messages": rows[:200],
         "has_more": len(rows) > 200,
-        "next_after_id": rows[min(len(rows), 200) - 1]["id"] if rows else after_id,
+        # id pesan terakhir di halaman ini: lanjutkan dengan after_id (urut lama) atau before_id (urut baru).
+        "next_after_id": terakhir if terakhir is not None else after_id,
     }
 
 
-KOLOM_NLU_CSV = ["intent", "confidence", "target", "konteks"]
+# Kolom CSV riwayat = format dataset NLU (sama dengan dataset latih IndoBERT), lalu info pesan. label_intent dan
+# target adalah bacaan IndoBERT saat game berjalan, jadi perlu dicek manusia sebelum dipakai sebagai label.
+KOLOM_CSV = ["pengirim", "teks_chat", "label_intent", "chat_sebelumnya", "daftar_pemain", "target",
+             "session_id", "chat_id", "room_code", "confidence", "sender_kind", "waktu_utc"]  # fmt: skip
 
 
-# Bacaan IndoBERT satu pesan → kolom CSV: intent, confidence, target ("NOX: offend"), dan konteks (≤12 chat
-# sebelumnya, satu per baris "pengirim: teks [intent; target]"). Pesan tanpa bacaan (lama) → kolom kosong.
-def kolom_nlu(nlu):
-    data = json.loads(nlu) if isinstance(nlu, str) else nlu
-    if not data:
-        return ["", "", "", ""]
-    target = "; ".join(f"{t['pemain']}: {t['relasi']}" for t in data.get("target") or [])
-    konteks = "\n".join(
-        f"{c['pengirim']}: {c['teks']} [{c.get('intent') or '-'}; {', '.join(c.get('target') or []) or '-'}]"
+# Target bacaan → [{pemain, relasi}]. Bacaan baru menyimpan dict; konteks lama menyimpan teks "NOX: offend (0.88)".
+def target_dataset(daftar):
+    hasil = []
+    for t in daftar or []:
+        if isinstance(t, dict):
+            hasil.append({"pemain": t["pemain"], "relasi": t["relasi"]})
+        elif cocok := re.match(r"(.+): (offend|defend|neutral)\b", str(t)):
+            hasil.append({"pemain": cocok[1], "relasi": cocok[2]})
+    return hasil
+
+
+# Satu pesan → satu baris dataset. Pesan tanpa bacaan IndoBERT (arsip lama) → kolom bacaan kosong.
+def baris_dataset(chat_id, pengirim, jenis, teks, nlu, match_id, room_code, waktu):
+    data = (json.loads(nlu) if isinstance(nlu, str) else nlu) or {}
+    teks_json = lambda x: json.dumps(x, ensure_ascii=False)  # noqa: E731
+    sebelum = [
+        {"pengirim": c["pengirim"], "teks_chat": c["teks"], "label_intent": c.get("intent"),
+         "target": target_dataset(c.get("target"))}
         for c in data.get("konteks") or []
-    )
-    return [data.get("intent", ""), data.get("confidence", ""), target, konteks]
+    ]  # fmt: skip
+    return [
+        pengirim, teks, data.get("intent", ""),
+        teks_json(sebelum) if data else "", teks_json(data.get("daftar_pemain") or []) if data else "",
+        teks_json(target_dataset(data.get("target"))) if data else "",
+        match_id or room_code or "", chat_id, room_code or "", data.get("confidence", ""), jenis,
+        waktu.isoformat(sep=" ") if hasattr(waktu, "isoformat") else (waktu or ""),
+    ]  # fmt: skip
 
 
 # Ekspor snapshot riwayat menjadi CSV dengan pembacaan database per halaman.
@@ -504,6 +536,7 @@ def download(
     date_to: date | None = None,
     room_code: str | None = Query(None, max_length=36),
     sender_kind: Literal["all", "human", "bot", "legacy"] = "all",
+    urut: Literal["lama", "baru"] = "lama",
     token=Depends(require_panel),
 ):
     where, params = history_filter(room_code, date_from, date_to, sender_kind)
@@ -518,26 +551,35 @@ def download(
 
     try:
         output.write(b"\xef\xbb\xbf")
-        write_row(["chat_id", "isi_chat", *KOLOM_NLU_CSV])
+        write_row(KOLOM_CSV)
         maximum = transaction(
             lambda db: db.execute(text("SELECT COALESCE(MAX(id),0) FROM chat_messages")).scalar()
         )
-        after = 0
+        # Snapshot sampai id maksimum saat ekspor dimulai; halaman berjalan naik ("lama") atau turun ("baru").
+        baru = urut == "baru"
+        batas = maximum + 1 if baru else 0
+        syarat = " AND m.id<:batas" if baru else " AND m.id>:batas AND m.id<=:maximum"
         while True:
-            page_params = {**params, "after": after, "maximum": maximum}
+            page_params = {**params, "batas": batas, "maximum": maximum}
             rows = transaction(
                 lambda db: db.execute(
-                    text("""
-                SELECT m.id,m.message,m.nlu FROM chat_messages m LEFT JOIN game_sessions s ON s.id=m.game_session_id
-                WHERE """ + where + " AND m.id>:after AND m.id<=:maximum ORDER BY m.id LIMIT 1000"),
+                    text(
+                        """
+                SELECT m.id,m.sender_name,m.sender_kind,m.message,m.nlu,m.match_id,s.room_code,m.created_at
+                FROM chat_messages m LEFT JOIN game_sessions s ON s.id=m.game_session_id
+                WHERE """
+                        + where
+                        + syarat
+                        + f" ORDER BY m.id {'DESC' if baru else 'ASC'} LIMIT 1000"
+                    ),
                     page_params,
                 ).all()
             )
             if not rows:
                 break
-            for chat_id, message, nlu in rows:
-                write_row([chat_id, message, *kolom_nlu(nlu)])
-            after = rows[-1][0]
+            for row in rows:
+                write_row(baris_dataset(*row))
+            batas = rows[-1][0]
         output.seek(0)
     except BaseException:
         output.close()

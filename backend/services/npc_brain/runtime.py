@@ -646,13 +646,14 @@ class BrainRuntime:
     # PENCATAT NLU: baca satu chat dengan IndoBERT seperti ingatan bot (konteks = `riwayat` milik pemanggil,
     # urut kronologis). Hasil sama dengan bacaan bot dan masuk memo NLU, jadi bot tidak menghitung ulang.
     # Target neutral (pemain yang diajak bicara) ikut dengan asalnya: IndoBERT/cadangan dan/atau aturan nama.
-    # `konteks` = chat sebelumnya yang ikut dibaca Model 2 (maks KONTEKS_MAKS = 12), disimpan untuk riwayat panel.
+    # `konteks` = chat sebelumnya yang ikut dibaca Model 2 (maks KONTEKS_MAKS = 12) dan `daftar_pemain` = roster saat
+    # itu; keduanya disimpan untuk riwayat panel dan ekspor format dataset (target sebagai {pemain, relasi}).
     def baca_chat(self, riwayat, pengirim, teks, roster):
         mulai = time.perf_counter()
         modul = next(iter(self.modul.values()))  # anotasi_chat sama di semua modul notebook
         konteks = [
             {"pengirim": c["pengirim"], "teks": c["teks"], "intent": c.get("intent"),
-             "target": teks_target(c.get("target"))}
+             "target": [{"pemain": t["pemain"], "relasi": t["relasi"]} for t in c.get("target", [])]}
             for c in riwayat[-modul.KONTEKS_MAKS:]
         ]  # fmt: skip
         chat = modul.anotasi_chat(
@@ -665,7 +666,7 @@ class BrainRuntime:
                             "prob": None if t.get("prob") is None else round(t["prob"], 3),
                             "sumber": list(t.get("sumber", []))}
                            for t in chat["target"]],
-                "konteks": konteks,
+                "konteks": konteks, "daftar_pemain": list(roster),
                 "sumber": self.nlu.sumber, "ms": round((time.perf_counter() - mulai) * 1000, 1)}  # fmt: skip
 
     # Dipanggil setelah pesan benar-benar terkirim.

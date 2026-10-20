@@ -550,13 +550,21 @@ Aku melihat Pemain_B menghindari pertanyaan. Apa alibimu?</textarea>
                 <option value="bot">Bot saja</option>
                 <option value="legacy">Arsip lama (belum terklasifikasi)</option>
               </select></label
+            ><label
+              >Urutan<select id="history-order">
+                <option value="baru">Terbaru dulu</option>
+                <option value="lama">Terlama dulu</option>
+              </select></label
             ><button class="secondary">Terapkan filter</button>
           </form>
           <p class="hint">
             Tanggal opsional, zona waktu WIB. Tampilan dan download memakai filter tanggal, ruangan,
-            dan pengirim yang sama. Kolom CSV: chat_id, isi_chat, intent, confidence, target,
-            konteks (maks 12 chat sebelumnya yang ikut dibaca IndoBERT). Arsip lama belum dapat
-            dibedakan manusia/bot.
+            pengirim, dan urutan yang sama. CSV berformat dataset NLU: pengirim, teks_chat,
+            label_intent, chat_sebelumnya (maks 12 chat sebelumnya, JSON {pengirim, teks_chat,
+            label_intent, target}), daftar_pemain, target (JSON {pemain, relasi}), session_id, lalu
+            chat_id, room_code, confidence, sender_kind, waktu_utc. Label dan target adalah bacaan
+            IndoBERT saat game berjalan, jadi cek dulu sebelum dijadikan label dataset. Arsip lama
+            belum dapat dibedakan manusia/bot.
           </p>
           <div class="table-scroll">
             <table>
@@ -566,7 +574,8 @@ Aku melihat Pemain_B menghindari pertanyaan. Apa alibimu?</textarea>
                   <th>Room / ronde</th>
                   <th>Pengirim</th>
                   <th>Isi chat</th>
-                  <th>NLU saat itu (intent · target · konteks)</th>
+                  <th>NLU saat itu (intent · target)</th>
+                  <th>12 chat sebelumnya (konteks IndoBERT)</th>
                 </tr>
               </thead>
               <tbody id="history-rows"></tbody>

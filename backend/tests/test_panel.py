@@ -18,7 +18,17 @@ NLU_CONTOH = json.dumps(
         "intent": "offend",
         "confidence": 0.91,
         "target": [{"pemain": "NOX", "relasi": "offend", "prob": 0.88, "sumber": ["indobert"]}],
-        "konteks": [{"pengirim": "ECHO", "teks": "Halo semua.", "intent": "neutral", "target": []}],
+        "konteks": [
+            {"pengirim": "ECHO", "teks": "Halo semua.", "intent": "neutral", "target": []},
+            # Konteks lama menyimpan target sebagai teks; ekspor tetap menghasilkan {pemain, relasi}.
+            {
+                "pengirim": "NOX",
+                "teks": "Aku bukan Hitman.",
+                "intent": "defend",
+                "target": ["NOX: defend (0.77)"],
+            },
+        ],
+        "daftar_pemain": ["sender", "NOX", "ECHO"],
     }
 )
 
@@ -250,14 +260,36 @@ class HistoryFilterTests(unittest.TestCase):
             exported = self.client.get("/api/panel/history.csv", params=query)
             self.assertEqual(exported.status_code, 200)
             rows = list(csv.reader(io.StringIO(exported.content.decode("utf-8-sig"))))
-            self.assertEqual(
-                rows[0], ["chat_id", "isi_chat", "intent", "confidence", "target", "konteks"]
-            )
-            self.assertEqual([int(row[0]) for row in rows[1:]], expected)
-            if kind == "human":  # bacaan NLU dan konteksnya ikut diekspor
-                self.assertEqual(
-                    rows[1][2:], ["offend", "0.91", "NOX: offend", "ECHO: Halo semua. [neutral; -]"]
-                )
+            kolom = rows[0]
+            self.assertEqual(kolom[:7], ["pengirim", "teks_chat", "label_intent", "chat_sebelumnya",
+                                         "daftar_pemain", "target", "session_id"])  # fmt: skip
+            baris = [dict(zip(kolom, row)) for row in rows[1:]]
+            self.assertEqual([int(b["chat_id"]) for b in baris], expected)
+            if kind == "human":  # format dataset: konteks, roster, dan target sebagai JSON
+                b = baris[0]
+                self.assertEqual((b["pengirim"], b["teks_chat"], b["label_intent"]),
+                                 ("sender", "message-1", "offend"))  # fmt: skip
+                self.assertEqual(json.loads(b["target"]), [{"pemain": "NOX", "relasi": "offend"}])
+                self.assertEqual(json.loads(b["daftar_pemain"]), ["sender", "NOX", "ECHO"])
+                self.assertEqual(json.loads(b["chat_sebelumnya"]), [
+                    {"pengirim": "ECHO", "teks_chat": "Halo semua.", "label_intent": "neutral", "target": []},
+                    {"pengirim": "NOX", "teks_chat": "Aku bukan Hitman.", "label_intent": "defend",
+                     "target": [{"pemain": "NOX", "relasi": "defend"}]},
+                ])  # fmt: skip
+                self.assertEqual((b["session_id"], b["room_code"]), ("match", "ABC123"))
+            if kind == "legacy":  # arsip lama tanpa bacaan: kolom bacaan kosong
+                self.assertEqual((baris[0]["label_intent"], baris[0]["chat_sebelumnya"]), ("", ""))
+        # Urutan terbaru dulu, untuk tampilan (halaman lewat before_id) dan ekspor.
+        query = {"room_code": "ABC123", "urut": "baru"}
+        halaman = self.client.get("/api/panel/history", params=query).json()
+        self.assertEqual([m["id"] for m in halaman["messages"]][:3], sorted(
+            [m["id"] for m in halaman["messages"]], reverse=True)[:3])  # fmt: skip
+        sebelum = self.client.get("/api/panel/history", params={**query, "before_id": 3}).json()
+        self.assertTrue(all(m["id"] < 3 for m in sebelum["messages"]))
+        ekspor = list(csv.reader(io.StringIO(
+            self.client.get("/api/panel/history.csv", params=query).content.decode("utf-8-sig"))))  # fmt: skip
+        ids = [int(dict(zip(ekspor[0], r))["chat_id"]) for r in ekspor[1:]]
+        self.assertEqual(ids, sorted(ids, reverse=True))
         # Bacaan NLU saat game berjalan ikut tampil; pesan tanpa bacaan bernilai null.
         pesan = self.client.get("/api/panel/history", params={"room_code": "ABC123"}).json()
         self.assertEqual([m["nlu"] for m in pesan["messages"][:2]], [json.loads(NLU_CONTOH), None])

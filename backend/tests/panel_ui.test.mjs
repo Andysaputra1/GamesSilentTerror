@@ -683,6 +683,12 @@ test('riwayat chat menampilkan intent, target, dan konteks IndoBERT sebagai teks
                     intent: 'defend',
                     target: ['NOX: defend'],
                   },
+                  {
+                    pengirim: 'Andy',
+                    teks: 'Vote NOX.',
+                    intent: 'offend',
+                    target: [{ pemain: 'NOX', relasi: 'offend' }],
+                  },
                 ],
               },
             },
@@ -696,13 +702,15 @@ test('riwayat chat menampilkan intent, target, dan konteks IndoBERT sebagai teks
   const doc = w.document;
   await doc.querySelector('[data-menu=history]').onclick({ preventDefault() {} });
   await settle();
+  const nlu = doc.querySelector('#history-rows tr td:nth-last-child(2)');
+  assert.match(nlu.textContent, /offend 0.91 · target NOX \(offend 0.88\)/);
   const sel = doc.querySelector('#history-rows tr td:last-child');
-  assert.match(sel.textContent, /offend 0.91 · target NOX \(offend 0.88\)/);
-  assert.match(sel.querySelector('summary').textContent, /Konteks IndoBERT \(2 chat sebelumnya\)/);
+  assert.match(sel.querySelector('summary').textContent, /3 chat sebelumnya/);
   const konteks = [...sel.querySelectorAll('li')].map((li) => li.textContent);
   assert.deepEqual(konteks, [
     `ECHO: ${evil} — neutral`,
     'NOX: Aku bukan Hitman. — defend · NOX: defend',
+    'Andy: Vote NOX. — offend · NOX: offend',
   ]);
   assert.equal(sel.querySelector('img'), null); // isi chat tidak pernah menjadi HTML
 });
