@@ -4,7 +4,7 @@ import { provideRouter, Router } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AssetPreloader, MAIN_CRITICAL_IMAGES } from './asset-preloader';
-import { BOOT_LOADER_MAX_WAIT_MS, BootLoader } from './boot-loader';
+import { BOOT_LOADER_MAX_WAIT_MS, BOOT_LOADER_SCAN_MS, BootLoader } from './boot-loader';
 
 @Component({ template: '' })
 class Blank {}
@@ -39,6 +39,9 @@ describe('BootLoader', () => {
     await TestBed.inject(Router).navigateByUrl('/main');
     await vi.advanceTimersByTimeAsync(500);
     expect(preload).toHaveBeenCalledWith(MAIN_CRITICAL_IMAGES);
+    // Halaman sudah siap, tetapi layar loading menunggu kaca pembesar selesai menyisir semua karakter.
+    expect(loader.classList).not.toContain('boot-loader--done');
+    await vi.advanceTimersByTimeAsync(BOOT_LOADER_SCAN_MS - 500);
     expect(loader.classList).toContain('boot-loader--done');
     await vi.advanceTimersByTimeAsync(800);
     expect(loader.isConnected).toBe(false);

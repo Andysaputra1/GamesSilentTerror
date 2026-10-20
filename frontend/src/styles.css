@@ -554,8 +554,9 @@ a {
   background: url('/assets/characters/loader-cast.webp') 0 0 / 600% 100% no-repeat;
   background-position-x: calc(var(--i) * 20%);
   transform-origin: 50% 100%;
-  animation: boot-hop 2.4s ease-in-out infinite;
-  animation-delay: calc(var(--i) * 0.2s);
+  /* Satu siklus = sapuan pergi-pulang kaca pembesar (2 × 2,4 dtk); karakter melompat saat lensa lewat. */
+  animation: boot-hop 4.8s ease-in-out infinite;
+  animation-delay: calc(var(--i) * 0.48s - 0.25s);
 }
 .boot-loader__lens {
   position: absolute;
@@ -569,7 +570,7 @@ a {
   box-shadow:
     0 4px 10px rgb(14 6 2 / 0.35),
     inset 0 0 0 2px rgb(232 192 115 / 0.7);
-  animation: boot-sweep 2.4s ease-in-out infinite alternate;
+  animation: boot-sweep 2.4s linear infinite alternate; /* = BOOT_LOADER_SCAN_MS di boot-loader.ts */
 }
 .boot-loader__lens::after {
   content: '';
@@ -601,12 +602,12 @@ a {
 }
 @keyframes boot-hop {
   0%,
-  30%,
+  12%,
   100% {
     transform: translateY(0) scale(1);
   }
-  12% {
-    transform: translateY(-9%) scale(1.04);
+  5% {
+    transform: translateY(-10%) scale(1.05);
   }
 }
 @keyframes boot-sweep {

@@ -6,7 +6,10 @@ import { AssetPreloader, MAIN_CRITICAL_IMAGES } from './asset-preloader';
 
 // Batas tunggu layar loading: jaringan lambat/offline tetap masuk ke aplikasi setelah ini.
 export const BOOT_LOADER_MAX_WAIT_MS = 4000;
-// Waktu tampil minimum agar layar tidak berkedip pada cache hangat.
+// Satu sapuan kaca pembesar melewati keenam karakter (boot-sweep di styles.css). Layar loading baru
+// ditutup setelah sapuan itu selesai, walau halaman sudah siap lebih dulu.
+export const BOOT_LOADER_SCAN_MS = 2400;
+// Gerak minimal (tanpa animasi): cukup tampil sebentar agar layar tidak berkedip pada cache hangat.
 const MIN_VISIBLE_MS = 450;
 const FONTS = ['700 1em Fraunces', '400 1em "Patrick Hand"'];
 const FALLBACK_IMAGES = ['/assets/backgrounds/backwood.jpg'];
@@ -38,8 +41,12 @@ export class BootLoader {
       ]),
     );
     const cap = new Promise((resolve) => setTimeout(resolve, BOOT_LOADER_MAX_WAIT_MS));
+    const reduced = this.document.defaultView?.matchMedia?.(
+      '(prefers-reduced-motion: reduce)',
+    ).matches;
+    const minimum = reduced ? MIN_VISIBLE_MS : BOOT_LOADER_SCAN_MS;
     void Promise.race([ready, cap]).then(() => {
-      setTimeout(() => this.hide(loader), Math.max(0, MIN_VISIBLE_MS - (Date.now() - startedAt)));
+      setTimeout(() => this.hide(loader), Math.max(0, minimum - (Date.now() - startedAt)));
     });
   }
 
