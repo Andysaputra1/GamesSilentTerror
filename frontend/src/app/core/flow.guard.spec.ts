@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router, UrlTree } from '@angular/router';
 
-import { gameEntryGuard, loginRedirectGuard } from './flow.guard';
+import { loginRedirectGuard } from './flow.guard';
 
 // TEST SUITE: kelompok pengujian otomatis, bukan logika yang dijalankan halaman production.
 // Callback () => { ... } berisi setup dan skenario yang dipanggil oleh test runner.
@@ -27,13 +27,6 @@ describe('navigation flow guards', () => {
     const result = TestBed.runInInjectionContext(() =>
       loginRedirectGuard({} as never, {} as never),
     );
-
-    expect(router.serializeUrl(result as UrlTree)).toBe('/main');
-  });
-
-  // TES: akses langsung ke game tanpa tanda dari lobby diarahkan ke main.
-  it('blocks a direct Game URL until Lobby grants access', () => {
-    const result = TestBed.runInInjectionContext(() => gameEntryGuard({} as never, {} as never));
 
     expect(router.serializeUrl(result as UrlTree)).toBe('/main');
   });

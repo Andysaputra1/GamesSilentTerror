@@ -21,11 +21,3 @@ export const loginRedirectGuard: CanActivateFn = () => {
   if (!isPlatformBrowser(platformId) || !hasValidSession()) return true;
   return inject(Router).createUrlTree(['/main']);
 };
-
-// FUNCTION GUARD: periksa tanda masuk dari lobby pada tab ini sebelum membuka game.
-export const gameEntryGuard: CanActivateFn = () => {
-  const platformId = inject(PLATFORM_ID);
-  if (!isPlatformBrowser(platformId)) return true;
-  if (sessionStorage.getItem(STORAGE.gameEntry) === 'allowed') return true;
-  return inject(Router).createUrlTree(['/main']);
-};
