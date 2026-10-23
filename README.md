@@ -210,7 +210,7 @@ Alur mencoba: **Login → Main page → Enter Tribunal → Buat Ruangan / Gabung
 
 Di game, buka role privatmu. Saat Day, diskusikan alibi; Hitman dapat memilih target Gag. Saat Night, pilih kartu target lalu kunci Hostage/Guard/Peek jika tersedia. Saat Tribunal, pilih kartu tersangka lalu kunci vote. Pemain yang tidak bisa bertindak tetap dapat menonton. Setelah selesai, isi survei, lalu kembali ke lobby → Keluar ruangan → Buat ruangan baru (satu ruangan hanya untuk satu pertandingan).
 
-Timer mengikuti jumlah peserta awal. Contoh enam pemain: standar 120/30/45 detik; mode cepat 20/15/15 detik. Empat pemain: standar 80/20/30 detik. Durasi tetap selama pertandingan; rincian ada di GAME_CONCEPT.md. Keputusan atau balasan bot yang baru selesai setelah fase berubah **dibuang, tidak ditampilkan**, agar tidak menerobos malam atau efek bungkam; gunakan durasi standar untuk mencoba chat AI.
+Timer mengikuti jumlah peserta awal. Contoh enam pemain: standar 120/30/75 detik; mode cepat 20/15/15 detik. Empat pemain: standar 80/20/60 detik. Durasi tetap selama pertandingan; rincian ada di GAME_CONCEPT.md. Keputusan atau balasan bot yang baru selesai setelah fase berubah **dibuang, tidak ditampilkan**, agar tidak menerobos malam atau efek bungkam; gunakan durasi standar untuk mencoba chat AI.
 
 Saat Day, tombol **Setuju skip diskusi** mempercepat ke Night setelah seluruh manusia yang masih hidup setuju. Bot tidak dihitung. Pemain dibungkam/disandera tetap boleh menyetujui karena ini bukan chat atau vote Tribunal; status mereka tetap tidak dipublikasikan. Persetujuan tidak bisa ditarik pada ronde itu. Pemain offline belum dianggap setuju; timer normal tetap berjalan.
 

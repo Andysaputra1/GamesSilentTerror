@@ -65,6 +65,8 @@ export interface MatchView {
     metode?: string;
     /** Bot sedang menyusun chat (lantai bicara); ditampilkan sebagai awan berpikir. */
     thinking?: boolean;
+    /** Tahap langkah terakhir bot: I input diterima, L logika berjalan, O output/aksi selesai. */
+    tahap?: 'I' | 'L' | 'O';
     bot?: boolean;
     alive: boolean;
     /** Keluar di tengah pertandingan: tidak hidup seperti dieksekusi, tetapi ditampilkan "Keluar". */

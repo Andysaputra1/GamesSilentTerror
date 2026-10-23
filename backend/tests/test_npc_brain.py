@@ -349,6 +349,9 @@ class NPCServiceBrainTests(unittest.IsolatedAsyncioTestCase):
             await asyncio.gather(*list(self.service.tasks))
         langkah = {nama: o.langkah for nama, o in self.runtime.pertandingan[self.match.id].items()}
         self.assertEqual(langkah, {nama: 1 for nama in langkah})
+        # Langkah selesai → tahap O di kartu setiap bot (I dan L sudah dilewati).
+        tahap = {p["name"]: p.get("tahap") for p in self.match.snapshot("human")["players"]}
+        self.assertEqual({nama: tahap[nama] for nama in langkah}, {nama: "O" for nama in langkah})
 
     async def test_called_or_accused_bot_steps_promptly_and_answers_once(self):
         await self.service.prepare(self.room.code, self.match)

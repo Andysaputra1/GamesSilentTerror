@@ -366,7 +366,7 @@ class NPCService:
     # LANGKAH OTAK: snapshot privat → putuskan() → vote/aksi langsung → kalimat lewat lantai bicara.
     async def brain_turn(self, code, match, otak):
         started = perf_counter()
-        bicara = False
+        bicara = gagal = False
         try:
             with room_service.lock:
                 room = room_service.rooms.get(code)
@@ -382,13 +382,19 @@ class NPCService:
                 otak.segera = False  # snapshot ini sudah memuat chat pemicunya
                 snapshot = snapshot_berlabel(match.snapshot(otak.nama), match.labels)
                 terlihat = match.messages[-1]["id"] if match.messages else None
+                match.bot_tahap[otak.nama] = "I"
             now = time.time()
             otak.langkah += 1
             loop = asyncio.get_running_loop()
+
+            # Tahap L baru saat thread keputusan benar-benar mulai (bisa antre di belakang bot lain).
+            def langkah():
+                with room_service.lock:
+                    match.bot_tahap[otak.nama] = "L"
+                return self.runtime.langkah(otak, snapshot, now)
+
             view, hasil, konteks = await asyncio.wait_for(
-                loop.run_in_executor(
-                    self.runtime.eksekutor_keputusan, self.runtime.langkah, otak, snapshot, now
-                ),
+                loop.run_in_executor(self.runtime.eksekutor_keputusan, langkah),
                 timeout=BATAS_LANGKAH_DETIK,
             )
             npc, rencana = hasil["npc_decision"], hasil["rencana_chat"]
@@ -433,6 +439,7 @@ class NPCService:
         except asyncio.CancelledError:
             raise
         except Exception as error:
+            gagal = True
             logger.exception("Langkah otak %s gagal.", otak.nama)
             trace = checker_service.begin(code, otak.nama, "NPC brain")
             trace.update(match_id=match.id, stage="npc_brain_error", error=type(error).__name__)
@@ -442,6 +449,9 @@ class NPCService:
                 del self.lantai[match.id]
             with room_service.lock:
                 match.bot_berpikir.discard(otak.nama)
+                # Langkah gagal/timeout tetap di L agar terlihat macet sampai langkah berikutnya.
+                if not gagal and match.bot_tahap.get(otak.nama) == "L":
+                    match.bot_tahap[otak.nama] = "O"
             otak.sibuk = False
             otak.langkah_terakhir = time.time()
 

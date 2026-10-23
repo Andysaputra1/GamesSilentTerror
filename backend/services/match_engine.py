@@ -61,7 +61,8 @@ def phase_durations(count, quick=False):
             "night": ceil(count * 2.5),
             "tribunal": ceil(count * 2.5),
         }
-    return {"day": count * 20, "night": count * 5, "tribunal": ceil(count * 7.5)}
+    # Tribunal +30 dtk: datang langsung setelah malam, jadi pemain butuh waktu membahas hasil malam sebelum vote.
+    return {"day": count * 20, "night": count * 5, "tribunal": ceil(count * 7.5) + 30}
 
 
 # Nama yang tampil di game = nama tampilan akun; username tetap ID engine. Nama yang bentrok (sesama
@@ -162,6 +163,8 @@ class Match:
         self.npc_decisions = set()
         # Bot yang sedang menyusun chat (lantai bicara NPCService); tampil sebagai awan "berpikir".
         self.bot_berpikir: set[str] = set()
+        # Tahap langkah terakhir tiap bot (NPCService): I input diterima, L logika berjalan, O output selesai.
+        self.bot_tahap: dict[str, str] = {}
         self.phase = "day"
         self.durations = phase_durations(len(names), quick)
         now = time.time() if now is None else now
@@ -699,6 +702,7 @@ class Match:
                     **({"left": True} if p.left else {}),
                     **({"metode": self.bot_methods[p.name]} if p.name in self.bot_methods else {}),
                     **({"thinking": True} if p.name in self.bot_berpikir else {}),
+                    **({"tahap": self.bot_tahap[p.name]} if p.name in self.bot_tahap else {}),
                     **({"role": p.role, "hostage": p.hostage, "bot": p.bot} if self.winner else {}),
                 }
                 for p in self.players.values()

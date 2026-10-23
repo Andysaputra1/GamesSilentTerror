@@ -400,6 +400,15 @@
                         <i class="thought__bubble"></i><i class="thought__bubble"></i>
                       </span>
                     }
+                    @if (player.tahap && player.alive && !state.winner) {
+                      <span
+                        class="bot-stage"
+                        [attr.data-tahap]="player.tahap"
+                        [attr.title]="tahapBot[player.tahap]"
+                        ><span aria-hidden="true">{{ player.tahap }}</span
+                        ><span class="sr-only">{{ tahapBot[player.tahap] }}</span></span
+                      >
+                    }
                     <b class="name-tag">{{ nama(player.name) }}</b>
                     <!-- prettier-ignore -->
                     <small class="player-sub">{{ state.winner ? (player.bot ? 'BOT' : 'PEMAIN') : '' }}{{ player.name === state.me.name ? (state.winner ? ' · ' : '') + 'KAMU' : '' }}</small>

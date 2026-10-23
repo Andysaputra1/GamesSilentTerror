@@ -63,7 +63,7 @@ export class Lobby implements OnInit, OnDestroy {
           night: Math.ceil(count * 2.5),
           tribunal: Math.ceil(count * 2.5),
         }
-      : { day: count * 20, night: count * 5, tribunal: Math.ceil(count * 7.5) };
+      : { day: count * 20, night: count * 5, tribunal: Math.ceil(count * 7.5) + 30 };
   }
   // PRIVATE PROPERTY: simpan timer polling agar dapat dihentikan ketika meninggalkan lobby.
   private timer?: ReturnType<typeof setInterval>;

@@ -65,7 +65,7 @@ describe('Lobby', () => {
     expect(fixture.nativeElement.querySelector('.room-primary').disabled).toBe(false);
     expect(fixture.nativeElement.querySelector('.room-roster')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('.room-controls')).toBeTruthy();
-    expect(component.durations).toEqual({ day: 80, night: 20, tribunal: 30 });
+    expect(component.durations).toEqual({ day: 80, night: 20, tribunal: 60 });
     component.quick = true;
     expect(component.durations).toEqual({ day: 14, night: 10, tribunal: 10 });
   });

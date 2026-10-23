@@ -105,6 +105,12 @@ export class Game implements OnInit, OnDestroy {
     { key: 'night', label: 'Malam', icon: '☾' },
     { key: 'tribunal', label: 'Tribunal', icon: '⚖' },
   ];
+  // Huruf tahap langkah bot di kiri bawah kartu, untuk memantau bot benar-benar menerima dan mengolah input.
+  readonly tahapBot: Record<string, string> = {
+    I: 'Input diterima',
+    L: 'Logika berjalan',
+    O: 'Output/aksi selesai',
+  };
   readonly roleNames: Record<string, string> = {
     hitman: 'Hitman',
     spy: 'Spy',
