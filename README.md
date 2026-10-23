@@ -15,11 +15,11 @@ Sudah dapat dimainkan dari awal sampai akhir:
 
 - Login username/email + password, daftar akun, login Google, dan pilihan avatar (6 skin karakter, tersimpan per akun).
 - Main page, buat/gabung ruangan, 4–10 peserta, bot opsional untuk mengisi kursi kosong. Hanya pembuat ruangan yang mengatur bot dan memulai game.
-- Role acak dari server, layar persiapan, timer Day → Night → Tribunal tanpa batas ronde (berakhir hanya saat salah satu kubu menang), skill/cooldown, voting, eksekusi, dan kondisi kemenangan.
+- Role acak dari server, layar persiapan, timer Day → Tribunal → Night (ronde 1 tanpa Tribunal) tanpa batas ronde (berakhir hanya saat salah satu kubu menang), skill/cooldown, voting, eksekusi, dan kondisi kemenangan.
 - Survei singkat setelah pertandingan; jawabannya dipakai untuk menilai bot per metode penalaran.
 - Panel administrator terpadu di `/panel`: Konfigurasi AI, Checker, Riwayat chat, Manajemen user, Otak NPC, Survei, Simulasi, dan Dokumen (ERD dan Proses AI).
 
-Role: **Hitman** (Hostage/Gag Order), **Spy** (Guard), **Stalker** (Peek), dan **Civilian** (observasi). Korban Hostage tetap hidup dan kehilangan chat serta voting permanen, tetapi skill malam tetap tersedia sesuai role/cooldown; identitas target tidak diumumkan.
+Role: **Hitman** (Hostage/Gag Order), **Spy** (Guard), **Stalker** (Peek), dan **Civilian** (observasi). Korban Hostage tetap hidup tetapi kehilangan semua aksi permanen (chat, voting, dan skill malam); identitas target tidak diumumkan.
 
 Engine backend menjadi sumber kebenaran, bukan browser atau AI. Engine memvalidasi setiap aksi/vote/chat bot; fallback aturan mengisi aksi yang kosong jika otak bot gagal. Baca [aturan, alur kode, dan batas implementasi](GAME_CONCEPT.md) serta [panduan membaca kode](CODE_GUIDE.md).
 
@@ -208,11 +208,11 @@ Akun demo tambahan: **`janice` / `user132`** dan **`kimberly` / `user132`** mela
 
 Alur mencoba: **Login → Main page → Enter Tribunal → Buat Ruangan / Gabung → + Bot → Mulai Permainan**. Bot mengisi semua kursi kosong sampai kapasitas pilihan host sehingga bisa dicoba sendiri. Tanpa bot, siapkan minimal 4 akun berbeda. Pemilik ruangan menekan Mulai; anggota lain menekan Masuk Permainan ketika game sudah dimulai.
 
-Di game, buka role privatmu. Saat Day, diskusikan alibi; Hitman dapat memilih target Gag. Saat Night, pilih kartu target lalu kunci Hostage/Guard/Peek jika tersedia. Saat Tribunal, pilih kartu tersangka lalu kunci vote. Pemain yang tidak bisa bertindak tetap dapat menonton. Setelah selesai, isi survei, lalu kembali ke lobby → Keluar ruangan → Buat ruangan baru (satu ruangan hanya untuk satu pertandingan).
+Di game, buka role privatmu. Saat Day, diskusikan alibi; Hitman dapat memilih target Gag. Mulai ronde 2, Tribunal datang setelah Day: pilih kartu tersangka lalu kunci vote. Saat Night, pilih kartu target lalu kunci Hostage/Guard/Peek jika tersedia. Pemain yang tidak bisa bertindak tetap dapat menonton. Setelah selesai, isi survei, lalu kembali ke lobby → Keluar ruangan → Buat ruangan baru (satu ruangan hanya untuk satu pertandingan).
 
 Timer mengikuti jumlah peserta awal. Contoh enam pemain: standar 120/30/75 detik; mode cepat 20/15/15 detik. Empat pemain: standar 80/20/60 detik. Durasi tetap selama pertandingan; rincian ada di GAME_CONCEPT.md. Keputusan atau balasan bot yang baru selesai setelah fase berubah **dibuang, tidak ditampilkan**, agar tidak menerobos malam atau efek bungkam; gunakan durasi standar untuk mencoba chat AI.
 
-Saat Day, tombol **Setuju skip diskusi** mempercepat ke Night setelah seluruh manusia yang masih hidup setuju. Bot tidak dihitung. Pemain dibungkam/disandera tetap boleh menyetujui karena ini bukan chat atau vote Tribunal; status mereka tetap tidak dipublikasikan. Persetujuan tidak bisa ditarik pada ronde itu. Pemain offline belum dianggap setuju; timer normal tetap berjalan.
+Saat Day, tombol **Setuju skip diskusi** mempercepat ke fase berikutnya (Night di ronde 1, Tribunal di ronde berikutnya) setelah seluruh manusia yang masih hidup setuju. Bot tidak dihitung. Pemain dibungkam/disandera tetap boleh menyetujui karena ini bukan chat atau vote Tribunal; status mereka tetap tidak dipublikasikan. Persetujuan tidak bisa ditarik pada ronde itu. Pemain offline belum dianggap setuju; timer normal tetap berjalan.
 
 Selama pertandingan aktif, membuka halaman aplikasi lain/tab baru atau login ulang akan mengembalikan akun ke `/game` berdasarkan data backend, bukan hanya storage tab. Akun tidak bisa membuat/gabung pertandingan lain sebelum match selesai. Ini berlaku dalam aplikasi ini, bukan memaksa browser meninggalkan situs eksternal.
 

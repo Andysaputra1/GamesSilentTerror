@@ -98,7 +98,7 @@ class LeaveEngineTests(unittest.TestCase):
         self.assertFalse(self.game.players["civilian"].hostage)
         # Peek ke pemain yang keluar dibuang: role-nya tidak bocor ke Stalker.
         self.assertEqual(self.game.players["stalker"].intel, [])
-        self.assertEqual(self.game.phase, "tribunal")
+        self.assertEqual((self.game.phase, self.game.round), ("day", 2))
 
     def test_leaver_own_night_action_is_discarded(self):
         self.night()
@@ -123,8 +123,8 @@ class LeaveEngineTests(unittest.TestCase):
         tally = {row["target"]: row["voters"] for row in view["tribunal_votes"]}
         self.assertEqual((tally["civilian"], tally["hitman"]), ([], ["stalker"]))
         self.game.vote("spy", "civilian2")
-        self.game.tick(self.game.deadline)  # seri: tanpa eksekusi, ronde berikutnya
-        self.assertEqual((self.game.round, self.game.phase, self.game.winner), (2, "day", None))
+        self.game.tick(self.game.deadline)  # seri: tanpa eksekusi, lanjut ke malam
+        self.assertEqual((self.game.round, self.game.phase, self.game.winner), (1, "night", None))
 
     def test_last_hitman_leaving_ends_the_game_for_the_civilians(self):
         self.game.leave("hitman")

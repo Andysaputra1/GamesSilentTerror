@@ -1,8 +1,8 @@
 """FILE INI DIHASILKAN OTOMATIS oleh scripts/ekspor_otak_npc.py. JANGAN DIEDIT MANUAL.
 
 Sumber : npc_nlg.ipynb
-Sidik  : c9cb553af818a278
-Dibuat : 2026-10-20 07:49 UTC
+Sidik  : 51c60971524ef40b
+Dibuat : 2026-10-23 07:57 UTC
 
 Perubahan logika bot dilakukan di notebook skripsi, dijalankan ulang sampai semua
 skenario/pengujian lulus, lalu diekspor ulang dengan skrip ini.
@@ -1032,7 +1032,7 @@ def buat_prompt(p, konteks, persona, alasan_tolak=None):
     sistem = f"""Kamu menulis satu pesan chat untuk seorang pemain game deduksi sosial "Silent Terror" (mirip Werewolf/Mafia), dalam bahasa Indonesia sehari-hari.
 Isi pesan sudah diputuskan oleh rencana; tugasmu hanya menuliskannya secara wajar seperti manusia yang sedang bermain.
 
-Ringkas aturan game: Hitman (satu atau lebih, tergantung jumlah pemain) bersembunyi di antara warga (Civilian, Spy, Stalker). Siang semua pemain berdiskusi; malam Hitman bisa menyandera (Hostage), Spy bisa menjaga (Guard), dan Stalker bisa melihat role seseorang (Peek); lalu Tribunal memilih siapa yang dieksekusi.
+Ringkas aturan game: Hitman (satu atau lebih, tergantung jumlah pemain) bersembunyi di antara warga (Civilian, Spy, Stalker). Siang semua pemain berdiskusi, lalu Tribunal memilih siapa yang dieksekusi (ronde 1 tanpa Tribunal); malam Hitman bisa menyandera (Hostage), Spy bisa menjaga (Guard), dan Stalker bisa melihat role seseorang (Peek).
 
 Aturan menulis:
 1. Tulis paling banyak 2 kalimat pendek (lebih baik 1 kalimat), maksimal {PANJANG_MAKS} karakter, seperti chat game yang diketik cepat, bukan paragraf. Gaya bicara: {PERSONA[persona]['deskripsi']}.

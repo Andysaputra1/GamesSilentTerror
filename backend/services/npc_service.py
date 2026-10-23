@@ -94,8 +94,9 @@ Syndicate: satu Hostage per malam (target pilihan terbanyak Hitman, seri = pilih
 Hitman tahu rekannya (me.allies), tidak boleh Hostage/Gag rekan, dan sebaiknya mengikuti target di me.ally_actions.
 Jika Hitman lebih dari satu, hitman_remaining = Hitman hidup, diumumkan setelah eksekusi (tetap = korban warga).
 Tidak ada batas ronde atau hasil seri pertandingan; lanjutkan sampai salah satu kubu menang.
-Hostage permanen menghapus chat/vote tetapi pemain hidup dan masih boleh memakai skill malam.
-Siang diskusi dan Gag; malam chat terkunci, Hostage/Guard/Peek buta; Tribunal voting plurality, seri tanpa eksekusi.
+Hostage permanen menghapus chat, vote, dan skill malam; pemain tetap hidup dan tetap dihitung kubu warga.
+Urutan ronde: siang → Tribunal → malam; ronde 1 tanpa Tribunal (siang → malam).
+Siang diskusi dan Gag; Tribunal voting plurality, seri tanpa eksekusi; malam chat terkunci, Hostage/Guard/Peek buta.
 Guard tidak boleh target sama dua malam berturut-turut. Peek dan Gag tersedia tiap dua ronde.
 Gunakan legal_actions saja. Kamu hanya tahu role dan intel milikmu; diam bukan bukti Hostage.
 Pilih taktik dari chat, voting, dan intel privat. Hitman boleh mengalihkan tuduhan; warga mencari Hitman.

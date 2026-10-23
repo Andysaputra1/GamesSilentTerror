@@ -2,7 +2,7 @@
 
 Silent Terror adalah multiplayer social deduction berbasis web, dengan hidden role asimetris dan NPC yang memakai LLM. Fokus permainan adalah deduksi dari percakapan, alibi, dan voting. Tidak ada ekonomi, pembelian item, atau tebusan.
 
-Tambahan atas GDD awal: mode kecil 4/5 pemain dan durasi fase mengikuti jumlah peserta, sesuai permintaan terbaru.
+Tambahan atas GDD awal: mode kecil 4/5 pemain dan durasi fase mengikuti jumlah peserta, sesuai permintaan terbaru. Sejak 23 Oktober 2026 urutan ronde menjadi siang → Tribunal → malam (ronde 1 tanpa Tribunal) dan Hostage kehilangan semua aksi, termasuk skill malam.
 
 ## Ruangan dan role
 
@@ -10,15 +10,17 @@ Tambahan atas GDD awal: mode kecil 4/5 pemain dan durasi fase mengikuti jumlah p
 - **Tanpa batas ronde**. Host hanya memilih kapasitas; permainan berlanjut sampai salah satu kubu menang.
 - Komposisi role mengikuti jumlah peserta (`KOMPOSISI_PERAN` di `match_engine.py`); Hitman dan Spy bisa lebih dari satu, Stalker selalu satu, sisanya Civilian. Role diacak server untuk manusia maupun NPC. Jumlah tiap role diketahui semua pemain (`composition` di snapshot); siapa pemegangnya tetap rahasia.
 
-| Peserta | Hitman | Spy | Stalker | Civilian | Warga menang (simulasi bot, 2 / 6 langkah per fase) |
+| Peserta | Hitman | Spy | Stalker | Civilian | Warga menang, aturan baru (simulasi bot, 3 / 6 langkah per fase) |
 | --- | --- | --- | --- | --- | --- |
-| 4 | 1 | 1 | 1 | 1 | 43,0% ± 6,9 / — |
-| 5 | 1 | 1 | 1 | 2 | 46,5% ± 6,9 / — |
-| 6 | 1 | 1 | 1 | 3 | 56,5% ± 6,9 / — |
-| 7 | 1 | 1 | 1 | 4 | 73,0% ± 6,2 / 71,0% ± 6,3 |
-| 8 | 2 | 2 | 1 | 3 | 47,0% ± 6,9 / 53,5% ± 6,9 |
-| 9 | 2 | 2 | 1 | 4 | 54,0% ± 6,9 / 52,0% ± 6,9 |
-| 10 | 2 | 2 | 1 | 5 | 57,0% ± 6,9 / 64,5% ± 6,6 |
+| 4 | 1 | 1 | 1 | 1 | 48,5% ± 6,9 / 49,0% ± 6,9 |
+| 5 | 1 | 1 | 1 | 2 | 64,5% ± 6,6 / 67,5% ± 6,5 |
+| 6 | 1 | 1 | 1 | 3 | 67,0% ± 6,5 / 69,5% ± 6,4 |
+| 7 | 1 | 1 | 1 | 4 | 79,5% ± 5,6 / 75,0% ± 6,0 |
+| 8 | 2 | 2 | 1 | 3 | 44,5% ± 6,9 / 48,5% ± 6,9 |
+| 9 | 2 | 2 | 1 | 4 | 67,5% ± 6,5 / 64,5% ± 6,6 |
+| 10 | 2 | 2 | 1 | 5 | 74,5% ± 6,0 / 67,0% ± 6,5 |
+
+Angka di tabel diukur ulang pada 23 Oktober 2026 dengan aturan baru (siang → Tribunal → malam, ronde 1 tanpa Tribunal, Hostage tanpa aksi, Tribunal +30 detik), memakai cara yang sama di bawah. Komposisinya **belum** diubah: dengan aturan baru, 9 dan 10 pemain keluar dari rentang 40–60%, jadi pemilihan ulang komposisi menunggu keputusan. Angka pembanding pada paragraf berikut berasal dari seleksi lama dengan urutan siang → malam → Tribunal.
 
 Cara memilih: 200 pertandingan per sel, semua kursi bot otak notebook (metode campuran seperti `NPC_METHOD=campuran`) melawan engine ini, label NLU sempurna, dengan pengumuman jumlah Hitman tersisa (lihat Kemenangan). Aturan: jika ada komposisi dengan ≥ 2 Hitman yang win rate warganya 40–60%, dipilih yang paling dekat 50%; jika tidak ada, ukuran itu tetap satu Hitman. Jumlah Hitman dan Spy tidak boleh turun saat peserta bertambah; 4–6 pemain tetap satu Hitman. Pembanding yang ditolak: di 7 pemain dua Hitman + satu Spy 26,0% dan dua Hitman + dua Spy 37,5% (keduanya di bawah 40%, jadi tetap satu Hitman); dua Hitman + satu Spy di 8 dan 9 pemain 37,5% dan 39,0%; tiga Hitman di 9 dan 10 pemain 4–16%; di 10 pemain dua Hitman + satu Spy 46,5% lebih dekat 50%, tetapi Spy tidak boleh turun dari dua (9 pemain), jadi dipilih dua Spy (57,0%). Tanpa pengumuman jumlah Hitman, dua Hitman terlalu kuat: warga hanya menang 21–32% di 8–10 pemain. Seleksi diulang dengan 6 langkah keputusan per fase (lebih dekat ke runtime; bot melangkah tiap `NPC_STEP_SECONDS`), karena hasil 9–10 pemain sensitif terhadap jumlah langkah. Tabel tetap: 8 dan 9 pemain seimbang (53,5% dan 52,0%). Di 10 pemain tidak ada kandidat di 40–60% (2/2/1: 64,5%; 2/1/1: 61,5% dan Spy tidak boleh turun; 3/2/1: 29,0%; 3/1/1: 15,5%), jadi dipilih yang paling dekat 50% dan sesuai aturan monoton: 2/2/1, condong ke warga. 7 pemain sengaja tetap satu Hitman walau condong ke warga (71%), karena dua Hitman hanya 32–37,5%. Angka ini dari bot melawan bot, belum dari manusia, jadi tabel bersifat **sementara**; cukup diubah di satu tempat bila data pertandingan manusia menunjukkan hal lain.
 - NPC mengisi kursi kosong sampai kapasitas. Manusia yang bergabung sebelum mulai menggantikan kursi NPC. Roster terkunci setelah mulai; anggota lama dapat reconnect. Pemain yang keluar di tengah pertandingan tidak bisa bergabung lagi ke pertandingan itu.
@@ -26,13 +28,15 @@ Cara memilih: 200 pertandingan per sel, semua kursi bot otak notebook (metode ca
 
 ## Fase setiap ronde
 
+Urutan ronde: **siang → Tribunal → malam**. Ronde 1 tanpa Tribunal (siang langsung ke malam), karena belum ada kejadian malam yang bisa dibahas sebelum voting. Jadi Tribunal pertama ada di ronde 2 dan selalu datang tepat setelah diskusi siang.
+
 | Fase | Interaksi dan resolusi |
 | --- | --- |
 | Siang | Diskusi publik. Hitman dapat menggunakan Gag Order secara instan. |
-| Malam | Layar meredup, chat terkunci. Hostage, Guard, dan Peek dipilih privat, diselesaikan bersama saat timer habis. Guard diproses sebelum Hostage. |
-| Tribunal | Rekap tanpa nama target atau hasil individual. Pemain yang punya hak suara memilih tersangka. Suara terbanyak tunggal dieksekusi. Di room dengan ≥ 2 Hitman, jumlah Hitman yang masih hidup diumumkan setelah eksekusi. |
+| Tribunal | Mulai ronde 2, setelah siang. Pemain yang punya hak suara memilih tersangka. Suara terbanyak tunggal dieksekusi. Di room dengan ≥ 2 Hitman, jumlah Hitman yang masih hidup diumumkan setelah eksekusi. |
+| Malam | Layar meredup, chat terkunci. Hostage, Guard, dan Peek dipilih privat, diselesaikan bersama saat timer habis, lalu rekap tanpa nama target atau hasil individual. Guard diproses sebelum Hostage. Hasil malam terlihat mulai siang ronde berikutnya. |
 
-Durasi ditetapkan dari jumlah peserta awal N (manusia + NPC), tetap selama pertandingan. Standar: siang 20N detik, malam 5N detik, Tribunal 7,5N detik dibulatkan ke atas lalu ditambah 30 detik (Tribunal datang langsung setelah malam, jadi pemain butuh waktu membahas hasil malam sebelum vote). Mode cepat: siang dibulatkan ke atas dari 10N/3 detik, malam dan Tribunal masing-masing dari 2,5N detik (tanpa tambahan). Contoh standar: 4 pemain 80/20/60 detik; 6 pemain 120/30/75; 10 pemain 200/50/105. Timer server tetap berjalan walaupun tab ditutup. Chat kembali tersedia saat Tribunal bagi pemain yang masih boleh berbicara.
+Durasi ditetapkan dari jumlah peserta awal N (manusia + NPC), tetap selama pertandingan. Standar: siang 20N detik, malam 5N detik, Tribunal 7,5N detik dibulatkan ke atas lalu ditambah 30 detik (waktu tambahan untuk menimbang dan mengunci vote setelah diskusi siang). Mode cepat: siang dibulatkan ke atas dari 10N/3 detik, malam dan Tribunal masing-masing dari 2,5N detik (tanpa tambahan). Contoh standar: 4 pemain 80/20/60 detik; 6 pemain 120/30/75; 10 pemain 200/50/105. Timer server tetap berjalan walaupun tab ditutup. Chat tersedia saat siang dan Tribunal bagi pemain yang masih boleh berbicara.
 
 Semua manusia hidup dapat menyetujui skip siang. Hostage/Gag tetap boleh menyetujui karena ini bukan chat atau voting Tribunal. Hanya jumlah persetujuan dipublikasikan; jika belum lengkap, timer normal berlaku.
 
@@ -45,9 +49,9 @@ Semua manusia hidup dapat menyetujui skip siang. Hostage/Gag tetap boleh menyetu
 | Stalker | Warga | Peek role asli satu pemain setelah malam selesai. Hasil privat; sekali setiap dua ronde: ronde 1 lalu ronde 3. |
 | Civilian | Warga | Tidak punya skill malam; mengamati, berdebat, dan voting. |
 
-**Hostage:** tetap hidup di roster, kehilangan chat dan voting permanen. Sesuai pembatasan tertulis di GDD, skill malam tetap tersedia mengikuti role/cooldown. Korban tetap faksi warga.
+**Hostage:** tetap hidup di roster, tetapi kehilangan **semua aksi** secara permanen: chat, voting, dan skill malam (Guard/Peek). Ini lebih ketat dari GDD awal yang mempertahankan skill malam. Engine menolak aksinya dan `can_act` di snapshot selalu `false`; bot yang disandera juga tidak beraksi. Korban tetap faksi warga.
 
-**Gag Order:** hanya membatasi chat sampai akhir ronde penggunaan. Voting dan skill malam tetap tersedia. Gag tidak mengurangi suara warga dalam kondisi kemenangan.
+**Gag Order:** hanya membatasi chat sampai siang berikutnya (melewati Tribunal ronde itu bila ada). Voting dan skill malam tetap tersedia. Gag tidak mengurangi suara warga dalam kondisi kemenangan.
 
 **Dieksekusi:** tidak bisa chat, aksi, atau voting; menjadi penonton. Menang/kalah mengikuti faksi, termasuk bagi yang dieksekusi atau Hostage.
 
@@ -84,7 +88,7 @@ Bot sengaja diberi label metode otaknya di pertandingan aktif (mis. "NOX · FL":
 
 ## Persiapan pertandingan
 
-Setelah host menekan Mulai, semua peserta masuk ke **layar persiapan** berisi panduan singkat (tujuan, siang, malam, Tribunal), kartu role, barisan karakter semua peserta ("Meja malam ini"), dan progres pemuatan AI. Ronde 1 **belum berjalan** selama persiapan. Ronde 1 dimulai ketika otak bot siap, waktu baca minimal 10 detik lewat, **dan** semua pemain manusia sudah membuka kartu role-nya. Pemain yang belum membuka kartu ditunggu paling lama 15 detik setelah syarat lain terpenuhi (`REVEAL_WAIT_SECONDS`); setelah itu ronde 1 tetap dimulai. Pemain yang belum membuka kartu setelah 10 detik melihat layar meredup dengan kartu besar yang minta diketuk, dan pemain lain melihat "Menunggu n pemain membuka kartu role". Tombol "Siap" mencatat kesiapan pemain tetapi tidak melewati waktu minimum. Jika AI gagal atau belum siap dalam 90 detik, permainan tetap dimulai dengan aksi cadangan engine. Room tanpa bot langsung siap, tetapi tetap menunggu waktu minimum. Saat ronde 1 dimulai, tirai tembus pandang "Ronde 1 dimulai" menaungi splash yang memudar dan meja yang muncul (cross-fade), lalu panel dan kartu pemain memudar masuk satu per satu; pengaturan reduced motion menonaktifkan animasi tersebut.
+Setelah host menekan Mulai, semua peserta masuk ke **layar persiapan** berisi panduan singkat (tujuan, siang, Tribunal, malam), kartu role, barisan karakter semua peserta ("Meja malam ini"), dan progres pemuatan AI. Ronde 1 **belum berjalan** selama persiapan. Ronde 1 dimulai ketika otak bot siap, waktu baca minimal 10 detik lewat, **dan** semua pemain manusia sudah membuka kartu role-nya. Pemain yang belum membuka kartu ditunggu paling lama 15 detik setelah syarat lain terpenuhi (`REVEAL_WAIT_SECONDS`); setelah itu ronde 1 tetap dimulai. Pemain yang belum membuka kartu setelah 10 detik melihat layar meredup dengan kartu besar yang minta diketuk, dan pemain lain melihat "Menunggu n pemain membuka kartu role". Tombol "Siap" mencatat kesiapan pemain tetapi tidak melewati waktu minimum. Jika AI gagal atau belum siap dalam 90 detik, permainan tetap dimulai dengan aksi cadangan engine. Room tanpa bot langsung siap, tetapi tetap menunggu waktu minimum. Saat ronde 1 dimulai, tirai tembus pandang "Ronde 1 dimulai" menaungi splash yang memudar dan meja yang muncul (cross-fade), lalu panel dan kartu pemain memudar masuk satu per satu; pengaturan reduced motion menonaktifkan animasi tersebut.
 
 Selama pertandingan, chat ikut turun ke pesan terbaru bila pemain sedang di dasar daftar atau baru mengirim pesan. Pemain yang sedang menggulir riwayat tidak ditarik turun; tombol "↓ n pesan baru" muncul sebagai gantinya. Pada 5 detik terakhir siang, malam, dan Tribunal, angka hitung mundur besar muncul di tengah layar tanpa menangkap klik, jadi chat, vote, dan aksi tetap bisa dipakai.
 

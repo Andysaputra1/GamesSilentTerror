@@ -1051,8 +1051,10 @@ describe('Game', () => {
   });
 
   // CATATAN: panel catatan pertandingan dihapus; hasil Tribunal (publik) tampil di tirai pagi.
-  it('drops the match notes panel and shows the Tribunal verdict on the morning curtain', () => {
+  // Tribunal (mulai ronde 2) berlanjut ke malam: hasil vote tampil di tirai malam.
+  it('drops the match notes panel and shows the Tribunal verdict on the night curtain', () => {
     const state = snapshot();
+    state.game.round = 2;
     state.game.phase = 'tribunal';
     state.game.events = ['Permainan dimulai.', 'Malam selesai.'];
     const request = vi.spyOn(TestBed.inject(GameService), 'request').mockReturnValue(of(state));
@@ -1066,11 +1068,16 @@ describe('Game', () => {
     const verdict = 'Tribunal mengeksekusi NOX. Role tetap dirahasiakan sampai permainan selesai.';
     const next = snapshot();
     next.game.round = 2;
-    next.game.events = [...state.game.events, verdict, 'Ronde 2: diskusi siang dimulai.'];
+    next.game.phase = 'night';
+    next.game.events = [
+      ...state.game.events,
+      verdict,
+      'Malam tiba. Chat dikunci; lakukan aksi secara rahasia.',
+    ];
     request.mockReturnValue(of(next));
     component.refresh();
     expect(component.transition).toEqual(
-      expect.objectContaining({ phase: 'day', subtitle: verdict }),
+      expect.objectContaining({ phase: 'night', subtitle: verdict }),
     );
     expect(render().querySelector('.phase-transition')?.textContent).toContain(verdict);
   });

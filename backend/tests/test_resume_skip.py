@@ -56,8 +56,9 @@ class SkipTests(unittest.TestCase):
         self.game.phase = "tribunal"
         # Fokus pada reset consent tanpa eksekusi. Vote bot acak dapat membunuh
         # Hitman dan mengakhiri match secara sah sebelum ronde berikutnya.
-        self.game.bot_vote_done = True
-        self.game.tick(120)
+        self.game.bot_vote_done = self.game.bot_night_done = True
+        self.game.tick(120)  # Tribunal → malam
+        self.game.tick(self.game.deadline)  # malam → siang ronde 2
         self.assertEqual(self.game.round, 2)
         self.assertEqual(self.game.skip_consents, set())
 

@@ -32,7 +32,8 @@ class EngineTests(unittest.TestCase):
         self.game.actions.clear()
 
     def test_idle_match_keeps_running_without_a_round_limit(self):
-        for _ in range(60):
+        # Ronde 1: siang → malam (2 tick sampai siang ronde 2); ronde berikutnya siang → Tribunal → malam (3 tick).
+        for _ in range(2 + 3 * 19):
             self.game.tick(self.game.deadline)
         self.assertEqual((self.game.round, self.game.phase, self.game.winner), (21, "day", None))
         self.assertTrue(all("role" not in p for p in self.game.snapshot("spy")["players"]))
@@ -113,11 +114,16 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(room.match.durations, preview)
 
     def test_tied_votes_continue_into_next_round_without_a_winner(self):
-        for round_number in range(1, 26):
+        self.game.tick(self.game.deadline)
+        self.assertEqual((self.game.phase, self.game.round), ("night", 1))  # ronde 1 tanpa Tribunal
+        self.game.tick(self.game.deadline)
+        for round_number in range(2, 27):
             self.game.tick(self.game.deadline)
-            self.game.tick(self.game.deadline)
+            self.assertEqual((self.game.phase, self.game.round), ("tribunal", round_number))
             self.game.vote("spy", "hitman")
             self.game.vote("hitman", "spy")
+            self.game.tick(self.game.deadline)
+            self.assertEqual((self.game.phase, self.game.round), ("night", round_number))
             self.game.tick(self.game.deadline)
             self.assertEqual((self.game.phase, self.game.round), ("day", round_number + 1))
             self.assertIsNone(self.game.winner)
@@ -169,7 +175,8 @@ class EngineTests(unittest.TestCase):
         self.game.phase = "tribunal"
         self.game.vote("civilian", "spy")
         self.game.vote("hitman", "civilian")
-        self.game.tick(self.game.deadline)
+        self.game.tick(self.game.deadline)  # Tribunal → malam
+        self.game.tick(self.game.deadline)  # malam → siang ronde 2: Gag berakhir
         self.assertEqual(self.game.round, 2)
         self.assertTrue(self.game.can_chat("civilian"))
         with self.assertRaises(ValueError):
@@ -195,6 +202,17 @@ class EngineTests(unittest.TestCase):
             self.assertNotIn("civilian", " ".join(snapshot["events"]))
             self.assertNotIn("actions", snapshot)
             self.assertNotIn("votes", snapshot)
+
+    def test_hostage_loses_every_action(self):
+        self.night()
+        self.game.act("hitman", "hostage", "spy")
+        self.game.resolve_night()
+        self.game.round = 2
+        self.night()
+        me = self.game.snapshot("spy")["me"]
+        self.assertEqual((me["ability"], me["can_act"], me["can_chat"]), ("guard", False, False))
+        with self.assertRaises(ValueError):
+            self.game.act("spy", "guard", "civilian")
 
     def test_wrong_role_phase_target_and_duplicate_rejected(self):
         for name, ability, target in [

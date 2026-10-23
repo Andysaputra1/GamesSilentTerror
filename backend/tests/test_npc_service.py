@@ -59,17 +59,20 @@ class NPCTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(context["me"]["role"], "hitman")
         self.assertIn("human", context["legal_actions"]["gag"])
 
-    def test_hostage_can_guard_but_cannot_chat_or_vote(self):
+    def test_hostage_cannot_chat_vote_or_use_night_skill(self):
         self.match.phase = "night"
         spy = self.match.players["ECHO"]
-        spy.hostage = True
         spy.last_guard, spy.last_guard_round = "human", 1
         self.match.round = 2
+        guard = npc_context(self.match, "ECHO")["legal_actions"]["guard"]
+        self.assertNotIn("human", guard)  # tidak boleh target sama dua malam berturut-turut
+        self.assertIn("ECHO", guard)
+        spy.hostage = True
         context = npc_context(self.match, "ECHO")
         self.assertFalse(context["me"]["can_chat"])
-        self.assertNotIn("human", context["legal_actions"]["guard"])
-        self.assertIn("ECHO", context["legal_actions"]["guard"])
-        self.match.act("ECHO", "guard", "ECHO")
+        self.assertNotIn("guard", context["legal_actions"])
+        with self.assertRaises(ValueError):
+            self.match.act("ECHO", "guard", "ECHO")
         self.match.phase = "tribunal"
         self.assertNotIn("vote", npc_context(self.match, "ECHO")["legal_actions"])
 
@@ -145,7 +148,7 @@ class NPCTests(unittest.IsolatedAsyncioTestCase):
         trace = self.persistence.record_trace.call_args.args[0]
         self.assertEqual(trace["stage"], "npc_fallback")
         self.match.tick(self.match.deadline)
-        self.assertEqual(self.match.phase, "tribunal")
+        self.assertEqual((self.match.phase, self.match.round), ("day", 2))
 
     def test_invalid_model_json_is_rejected(self):
         for value in ['{"action":"kill"}', '{"action":"wait","role":"hitman"}', "not json"]:

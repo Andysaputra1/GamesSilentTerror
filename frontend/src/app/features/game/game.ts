@@ -102,8 +102,8 @@ export class Game implements OnInit, OnDestroy {
   private endTimer?: ReturnType<typeof setTimeout>;
   readonly phaseSteps = [
     { key: 'day', label: 'Diskusi', icon: '☀' },
-    { key: 'night', label: 'Malam', icon: '☾' },
     { key: 'tribunal', label: 'Tribunal', icon: '⚖' },
+    { key: 'night', label: 'Malam', icon: '☾' },
   ];
   // Huruf tahap langkah bot di kiri bawah kartu, untuk memantau bot benar-benar menerima dan mengolah input.
   readonly tahapBot: Record<string, string> = {
@@ -186,8 +186,12 @@ export class Game implements OnInit, OnDestroy {
       text: 'Warga menang jika semua Hitman dieksekusi; Hitman menang jika menguasai suara.',
     },
     { icon: '☀', title: 'Siang', text: 'Diskusikan alibi dan cari kejanggalan.' },
+    {
+      icon: '⚖',
+      title: 'Tribunal',
+      text: 'Mulai ronde 2, setelah siang: pilih tersangka. Suara terbanyak tunggal dieksekusi.',
+    },
     { icon: '☾', title: 'Malam', text: 'Chat terkunci; role khusus beraksi diam-diam.' },
-    { icon: '⚖', title: 'Tribunal', text: 'Pilih tersangka. Suara terbanyak tunggal dieksekusi.' },
   ];
 
   // Panduan lengkap untuk modal aturan "?" di HUD.
@@ -207,16 +211,16 @@ export class Game implements OnInit, OnDestroy {
           : 'Diskusi bebas. Tanyakan alibi, tuduh dengan alasan, dan bela pemain yang kamu percaya. Hitman bisa membungkam satu pemain (Gag).',
       },
       {
+        icon: '⚖',
+        title: 'Tribunal',
+        text: 'Mulai ronde 2, Tribunal datang setelah diskusi siang (ronde 1 langsung ke malam). Pemain yang masih punya suara memilih tersangka. Suara terbanyak tunggal dieksekusi; seri berarti tidak ada eksekusi.',
+      },
+      {
         icon: '☾',
         title: 'Malam',
         text: banyak
           ? 'Layar meredup dan chat dikunci. Para Hitman menyandera satu pemain (pilihan terbanyak mereka), setiap Spy menjaga satu pemain, Stalker mengintip role seseorang.'
           : 'Layar meredup dan chat dikunci. Hitman menyandera satu pemain, Spy menjaga satu pemain, Stalker mengintip role seseorang.',
-      },
-      {
-        icon: '⚖',
-        title: 'Tribunal',
-        text: 'Pemain yang masih punya suara memilih tersangka. Suara terbanyak tunggal dieksekusi; seri berarti tidak ada eksekusi.',
       },
       {
         icon: '◆',
@@ -680,7 +684,7 @@ export class Game implements OnInit, OnDestroy {
     if (me.hostage)
       return 'Hostage: kamu masih hidup, tetapi chat dan voting terkunci sampai pertandingan berakhir. Skill malam tetap tersedia sesuai role dan cooldown. Kamu tetap bagian dari kubu warga.';
     if (me.gagged)
-      return 'Gag Order: chat terkunci sampai akhir Tribunal ronde ini. Voting dan aksi malam tetap boleh dilakukan.';
+      return 'Gag Order: chat terkunci sampai siang berikutnya. Voting dan aksi malam tetap boleh dilakukan.';
     if (me.muted) return 'Chat dan voting terkunci untukmu.';
     return 'Kamu masih hidup dan bebas. Hak chat, aksi, dan voting mengikuti fase permainan.';
   }
@@ -810,11 +814,12 @@ export class Game implements OnInit, OnDestroy {
 
   // TRANSISI FASE: overlay singkat (malam meredup, pagi terang) setiap kali fase berganti. Dari layar
   // persiapan, tirai tembus pandang menaungi splash yang memudar dan meja yang muncul (cross-fade).
-  // Pagi membawa hasil Tribunal (pengumuman publik server), jadi tampil lebih lama.
+  // Malam sesudah Tribunal membawa hasil vote (pengumuman publik server), jadi tampil lebih lama.
+  // Malam ronde 1 belum punya hasil Tribunal, jadi lastVerdict kosong dan subjudul biasa yang tampil.
   private showTransition(phase: string, fromSplash = false): void {
     const info = this.transitions[phase];
     if (!info) return;
-    const verdict = phase === 'day' && !fromSplash ? this.lastVerdict : '';
+    const verdict = phase === 'night' && !fromSplash ? this.lastVerdict : '';
     this.transition = fromSplash
       ? { phase: 'start', title: 'Ronde 1 dimulai', subtitle: info.subtitle }
       : { phase, ...info, subtitle: verdict || info.subtitle };
@@ -824,7 +829,7 @@ export class Game implements OnInit, OnDestroy {
         this.transition = null;
         this.cdr.markForCheck();
       },
-      fromSplash ? 3000 : phase === 'day' ? 3400 : 2600,
+      fromSplash ? 3000 : verdict ? 3400 : 2600,
     );
   }
 

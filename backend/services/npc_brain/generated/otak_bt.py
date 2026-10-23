@@ -1,8 +1,8 @@
 """FILE INI DIHASILKAN OTOMATIS oleh scripts/ekspor_otak_npc.py. JANGAN DIEDIT MANUAL.
 
 Sumber : npc_behavior_tree.ipynb
-Sidik  : f5f92b23cb499e2d
-Dibuat : 2026-10-16 11:35 UTC
+Sidik  : 5138b1cf8c8c8e7d
+Dibuat : 2026-10-23 07:57 UTC
 
 Perubahan logika bot dilakukan di notebook skripsi, dijalankan ulang sampai semua
 skenario/pengujian lulus, lalu diekspor ulang dengan skrip ini.
@@ -103,23 +103,29 @@ BATAS_SANDERA_AKSI = 0.60
 
 BATAS_TERSANGKA_JAGA = 0.60
 
-URUTAN_FASE = {"day": 0, "night": 1, "tribunal": 2}
+URUTAN_FASE = {"day": 0, "tribunal": 1, "night": 2}
 
-FASE_BERIKUT = {"day": "night", "night": "tribunal"}
+# Fase sesudah (ronde, fase) menurut engine: siang ronde 1 langsung malam; malam → siang ronde berikutnya.
+def fase_berikut(ronde, fase):
+    if fase == "day":
+        return ronde, "night" if ronde == 1 else "tribunal"
+    if fase == "tribunal":
+        return ronde, "night"
+    return ronde + 1, "day"
 
 # Durasi fase sama persis dengan match_engine.phase_durations di backend.
 def durasi_fase(jumlah_peserta, cepat=False):
     if cepat:
         return {"day": math.ceil(jumlah_peserta * 10 / 3), "night": math.ceil(jumlah_peserta * 2.5),
                 "tribunal": math.ceil(jumlah_peserta * 2.5)}
-    return {"day": jumlah_peserta * 20, "night": jumlah_peserta * 5, "tribunal": math.ceil(jumlah_peserta * 7.5)}
+    return {"day": jumlah_peserta * 20, "night": jumlah_peserta * 5, "tribunal": math.ceil(jumlah_peserta * 7.5) + 30}
 
 # Waktu mulai dan selesai sebuah fase menurut catatan bot; None jika fase belum pernah terlihat.
 def jendela_fase(ingatan, view, ronde, fase):
     mulai = ingatan.mulai_fase.get((ronde, fase))
     if mulai is None:
         return None, None
-    berikut = (ronde, FASE_BERIKUT[fase]) if fase in FASE_BERIKUT else (ronde + 1, "day")
+    berikut = fase_berikut(ronde, fase)
     return mulai, ingatan.mulai_fase.get(berikut, mulai + view["durasi"][fase])
 
 # Porsi fase sekarang yang sudah berjalan (0–1).
@@ -544,9 +550,9 @@ class Ingatan:
                 self.sinkron_pilihan_syndicate(ronde, milik_bot + [(a["pemain"], a["target"]) for a in aksi_rekan])
 
         # Server tidak mengirim waktu chat; bot memakai waktu terima dan fase saat itu. Chat yang baru terlihat saat
-        # malam/selesai dikirim di akhir fase sebelumnya.
+        # malam/selesai dikirim di akhir fase publik sebelumnya: siang di ronde 1, Tribunal di ronde berikutnya.
         daftar_pemain = [p["nama"] for p in pemain]
-        fase_chat = {"night": "day", "finished": "tribunal"}.get(fase, fase)
+        fase_chat = fase if fase in ("day", "tribunal") else ("day" if ronde == 1 else "tribunal")
         for pesan in snapshot["messages"]:
             if pesan["id"] in self._id_chat:
                 continue
@@ -586,9 +592,9 @@ def tanda_aktivitas(ingatan, view):
     for c in ingatan.chat:
         tanda[c["pengirim"]].append((c["ronde"], URUTAN_FASE[c["fase"]]))
     for v in ingatan.vote:
-        tanda[v["pemilih"]].append((v["ronde"], 2))
+        tanda[v["pemilih"]].append((v["ronde"], URUTAN_FASE["tribunal"]))
     for pemilih in view["suara_tribunal"]:
-        tanda[pemilih].append((view["ronde"], 2))
+        tanda[pemilih].append((view["ronde"], URUTAN_FASE["tribunal"]))
     return tanda
 
 # Dugaan status tersembunyi: siapa yang kemungkinan disandera (Hostage) atau di-Gag, dari jejak publik saja.
@@ -606,24 +612,24 @@ def dugaan_status(ingatan, view, pengamat):
     else:
         porsi_hari = 0.0 if mulai_hari is None else min(1.0, (view["waktu"] - mulai_hari) / view["durasi"]["day"])
 
-    # Hostage: sejak malam m tidak pernah chat/vote lagi, padahal Tribunal ronde m..R-1 sudah selesai.
+    # Hostage: sejak malam m tidak pernah chat/vote lagi, padahal siang (dan Tribunal) sesudahnya sudah berjalan.
     calon = {}
     for q in hidup:
         if q == pengamat:
             continue
-        # Malam pertama sesudah aktivitas terakhir: aktif siang r → malam r; aktif saat Tribunal r → malam r + 1.
-        terakhir = max(tanda[q], default=(0, 2))
-        malam = terakhir[0] if terakhir[1] == 0 else terakhir[0] + 1
-        terlewat = R - malam
-        if terlewat <= 0:
-            continue
-        hari_diam = max(0, R - 1 - malam) + (1 if porsi_hari >= 0.5 else 0)
-        if terlewat >= 2:
-            peluang = P_SANDERA_MAKS
-        elif hari_diam >= 1:
-            peluang = P_SANDERA_DIAM_LANJUT
+        # Malam pertama sesudah aktivitas terakhir: siang dan Tribunal ronde r selalu sebelum malam r.
+        terakhir = max(tanda[q], default=(0, 0))
+        malam = max(1, terakhir[0])
+        if R <= malam:
+            continue  # malam itu belum lewat: belum ada fase publik yang terlewat
+        if R - malam >= 2 or fase in ("night", "finished"):
+            peluang = P_SANDERA_MAKS  # siang dan Tribunal sesudah malam itu lewat tanpa suara
+        elif fase == "tribunal":
+            peluang = P_SANDERA_DIAM_LANJUT  # sepanjang siang sesudah malam itu diam
+        elif porsi_hari >= 0.5:
+            peluang = P_SANDERA_DASAR  # separuh siang lewat tanpa suara
         else:
-            peluang = P_SANDERA_DASAR
+            continue
         if not tanda[q]:
             peluang = min(peluang, BATAS_TIDAK_PERNAH_AKTIF)  # tidak pernah aktif: AFK atau Hitman pura-pura diam
         calon[q] = (malam, peluang)
@@ -920,7 +926,9 @@ def hitung_bukti(ingatan, view, publik=False):
                         bobot = max(bobot, 1.0)
                     elif chat["ronde"] == n - 1:
                         bobot = max(bobot, 0.6)
-                if any(x["pemilih"] == v and x["target"] == p and x["ronde"] == n - 1 for x in ingatan.vote):
+                # Vote terakhir korban sebelum dibungkam: Tribunal ronde n (sebelum malam Hostage n) atau n − 1 (Gag).
+                ronde_vote = n if k["jenis"] == "sandera" else n - 1
+                if any(x["pemilih"] == v and x["target"] == p and x["ronde"] == ronde_vote for x in ingatan.vote):
                     bobot = max(bobot, 0.6)
             nilai = k["p"] * bobot * _luruh(n, R, PELURUHAN_KERAS)
             if nilai > nilai_korban:
@@ -1133,11 +1141,11 @@ def pengetahuan_peran(ingatan, view):
         tanda = tanda_aktivitas(ingatan, view)
         for n in sorted(ingatan.pilihan_syndicate):
             x = ingatan.target_syndicate(n)
-            if any(t >= (n, 2) for t in tanda[x]):
+            if any(t[0] > n for t in tanda[x]):
                 dijaga[x] = n  # target tetap aktif sesudah malam n: Spy menjaganya malam itu
-            elif n < R:
-                korban_saya.add(x)  # Tribunal ronde n selesai tanpa suara target: sandera berhasil
-            elif n == R and view["fase"] in ("tribunal", "finished"):
+            elif R > n + 1 or (R == n + 1 and view["fase"] in ("night", "finished")):
+                korban_saya.add(x)  # siang dan Tribunal ronde n + 1 selesai tanpa suara target: sandera berhasil
+            elif R == n + 1:
                 korban_baru.add(x)  # target semalam belum aktif lagi: kemungkinan besar sudah disandera
     # Spy yang menjaga target yang sama semalam tidak boleh menjaganya lagi; dengan dua Spy, Spy lain masih bisa.
     tidak_dijaga = set()

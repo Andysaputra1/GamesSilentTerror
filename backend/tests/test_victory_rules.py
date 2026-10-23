@@ -62,7 +62,7 @@ class VictoryRulesTests(unittest.TestCase):
         self.game.act("spy", "guard", "spy")
         self.game.tick(self.game.deadline)
         self.assertIsNone(self.game.winner)
-        self.assertEqual(self.game.phase, "tribunal")
+        self.assertEqual(self.game.phase, "day")
 
     def test_hostage_and_execution_reach_vote_control_from_two_free_citizens(self):
         for name in ["stalker", "civilian", "civilian2"]:
@@ -135,7 +135,7 @@ class VictoryRulesTests(unittest.TestCase):
             self.assertIsNone(view["result"])
             self.assertTrue(all("role" not in p for p in view["players"]))
         self.assertIsNone(self.game.winner)
-        self.assertEqual((self.game.round, self.game.phase), (26, "day"))
+        self.assertEqual((self.game.round, self.game.phase), (25, "night"))
 
     def test_active_snapshot_keeps_other_hostages_private(self):
         self.game.players["spy"].hostage = True

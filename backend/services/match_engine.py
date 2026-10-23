@@ -61,7 +61,7 @@ def phase_durations(count, quick=False):
             "night": ceil(count * 2.5),
             "tribunal": ceil(count * 2.5),
         }
-    # Tribunal +30 dtk: datang langsung setelah malam, jadi pemain butuh waktu membahas hasil malam sebelum vote.
+    # Tribunal +30 dtk: waktu tambahan untuk menimbang dan mengunci vote setelah diskusi siang.
     return {"day": count * 20, "night": count * 5, "tribunal": ceil(count * 7.5) + 30}
 
 
@@ -309,6 +309,9 @@ class Match:
     # AKSI PRIVAT: pilihan malam disimpan, belum diresolusikan sebelum deadline.
     def act(self, name, ability, target_name):
         player = self.actor(name)
+        # Hostage kehilangan semua aksi: chat, vote, dan skill malam.
+        if player.hostage:
+            raise ValueError("Pemain yang disandera tidak dapat melakukan aksi.")
         if ability == "gag":
             if self.phase != "day" or player.role != "hitman" or self.round < self.next_gag:
                 raise ValueError("Gag Order belum tersedia.")
@@ -496,7 +499,7 @@ class Match:
             return
         setattr(self, flag, True)
         for player in self.players.values():
-            if not player.bot or not player.alive or (player.hostage and self.phase != "night"):
+            if not player.bot or not player.alive or player.hostage:
                 continue
             if (self.round, self.phase, player.name) in self.npc_decisions:
                 continue
@@ -566,17 +569,20 @@ class Match:
             self.run_bots()
         if self.phase == "finished" or now < self.deadline:
             return
-        if self.phase == "day":
-            self.phase = "night"
-            self.actions = {}
-            self.events.append("Malam tiba. Chat dikunci; lakukan aksi secara rahasia.")
-        elif self.phase == "night":
-            self.resolve_night()
+        # URUTAN: ronde 1 siang → malam (belum ada bahan untuk vote); ronde berikutnya siang → Tribunal → malam.
+        if self.phase == "day" and self.round > 1:
+            self.phase = "tribunal"
+            self.votes = {}
+            self.events.append("Diskusi selesai. Tribunal dimulai: pilih tersangka.")
+        elif self.phase in {"day", "tribunal"}:
+            if self.phase == "tribunal":
+                self.resolve_votes()
             if not self.winner:
-                self.phase = "tribunal"
-                self.votes = {}
+                self.phase = "night"
+                self.actions = {}
+                self.events.append("Malam tiba. Chat dikunci; lakukan aksi secara rahasia.")
         else:
-            self.resolve_votes()
+            self.resolve_night()
             if not self.winner:
                 self.round += 1
                 self.phase = "day"
@@ -652,7 +658,7 @@ class Match:
             ability = "gag"
         elif self.phase == "night":
             ability = NIGHT_ABILITY.get(player.role)
-        can_act = bool(ability and player.alive and not self.winner)
+        can_act = bool(ability and player.alive and not player.hostage and not self.winner)
         if ability == "gag":
             can_act &= self.round >= self.next_gag
         elif ability:

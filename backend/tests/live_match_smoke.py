@@ -93,23 +93,24 @@ def main():
         play("spy", "civilian", "guard")
         play("stalker", "hitman", "peek")
         assert state(roles["stalker"])["me"]["intel"] == []
-        wait_phase("tribunal", 1)
+        # Ronde 1 tanpa Tribunal: malam langsung ke siang ronde 2. Guard harus tetap melindungi korban.
+        wait_phase("day", 2)
         assert state(roles["stalker"])["me"]["intel"][0]["role"] == "hitman"
         for name in accounts:
             view = state(name)
             assert all(set(p) == {"name", "label", "alive", "skin_id"} for p in view["players"])
-        assert state(roles["civilian"])["me"]["can_vote"]
-        # Tanpa vote ronde 1: tidak ada eksekusi. Guard harus tetap melindungi korban.
-        wait_phase("day", 2)
         assert state(roles["civilian"])["me"]["can_chat"]
         play("hitman", "civilian", "gag", expected=400)
-        print("PASS Gag/Guard/Peek, resolusi buta, cooldown, no-vote, ronde kedua", flush=True)
+        wait_phase("tribunal", 2)
+        assert state(roles["civilian"])["me"]["can_vote"]
+        # Tanpa vote: tidak ada eksekusi, lanjut ke malam.
+        print("PASS Gag/Guard/Peek, resolusi buta, cooldown, no-vote, Tribunal ronde kedua", flush=True)
         wait_phase("night", 2)
         play("spy", "civilian", "guard", expected=400)
         play("stalker", "hitman", "peek", expected=400)
         play("spy", "spy", "guard")
         play("hitman", "civilian", "hostage")
-        wait_phase("tribunal", 2)
+        wait_phase("tribunal", 3)
         victim = state(roles["civilian"])
         assert (
             victim["me"]["alive"] and not victim["me"]["can_vote"] and not victim["me"]["can_chat"]
@@ -119,7 +120,7 @@ def main():
         play("spy", "stalker", expected=400)
         play("stalker", "hitman")
         play("hitman", "spy")
-        result = wait_phase("finished", 2)
+        result = wait_phase("finished", 3)
         assert result["winner"] == "civilians"
         assert all("role" in p for p in result["players"])
         # Checker lama tetap ditutup setelah selesai; hasil dibaca dari snapshot game.

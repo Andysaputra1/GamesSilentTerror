@@ -215,9 +215,12 @@
           @if (!state.winner) {
             <ol class="round-flow" aria-label="Urutan fase">
               @for (step of phaseSteps; track step.key) {
-                <li [class.current]="state.phase === step.key">
-                  <span aria-hidden="true">{{ step.icon }}</span> {{ step.label }}
-                </li>
+                <!-- Ronde 1 tanpa Tribunal: siang langsung ke malam. -->
+                @if (step.key !== 'tribunal' || state.round > 1) {
+                  <li [class.current]="state.phase === step.key">
+                    <span aria-hidden="true">{{ step.icon }}</span> {{ step.label }}
+                  </li>
+                }
               }
             </ol>
           }
@@ -428,7 +431,7 @@
                     @if (player.alive && isGagged(player.name)) {
                       <span class="gag-tag"
                         >GAG<span class="sr-only">
-                          Order: chat terkunci sampai akhir Tribunal</span
+                          Order: chat terkunci sampai siang berikutnya</span
                         ></span
                       >
                     }

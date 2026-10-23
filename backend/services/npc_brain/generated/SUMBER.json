@@ -4,27 +4,27 @@
     "notebook": "npc_fuzzy.ipynb",
     "sel": 20,
     "blok": 156,
-    "sidik": "2c17195dd3d325cb"
+    "sidik": "2ab36b68e33c57b0"
   },
   {
     "modul": "otak_utility",
     "notebook": "npc_utility_ai.ipynb",
     "sel": 18,
     "blok": 144,
-    "sidik": "0947334304b37856"
+    "sidik": "ef7f32543a6daa4c"
   },
   {
     "modul": "otak_bt",
     "notebook": "npc_behavior_tree.ipynb",
     "sel": 20,
     "blok": 169,
-    "sidik": "f5f92b23cb499e2d"
+    "sidik": "5138b1cf8c8c8e7d"
   },
   {
     "modul": "nlg",
     "notebook": "npc_nlg.ipynb",
     "sel": 11,
     "blok": 97,
-    "sidik": "c9cb553af818a278"
+    "sidik": "51c60971524ef40b"
   }
 ]
