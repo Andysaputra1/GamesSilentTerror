@@ -204,7 +204,7 @@ class KonfigurasiNPC:
     validasi: bool = True
     # Prioritas rantai penulis; jalur yang tidak tercantum dinonaktifkan.
     urutan_penulis: list = field(default_factory=lambda: list(JALUR_PENULIS))
-    model_openrouter: str = ""  # kosong = model OpenRouter dari notebook
+    model_openrouter: str = ""  # kosong = model OpenRouter dari Konfigurasi AI/.env (qwen/qwen3-14b)
     model_tautan: str = ""  # kosong = model Ollama dari Konfigurasi AI/.env (OLLAMA_MODEL)
 
 
@@ -357,7 +357,7 @@ class BrainRuntime:
             "tautan": link,
         }
         model = {
-            "openrouter": self.konfigurasi.model_openrouter or None,
+            "openrouter": self.konfigurasi.model_openrouter or config.openrouter_model,
             "tautan": self.konfigurasi.model_tautan or config.ollama_model,
         }
         try:

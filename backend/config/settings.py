@@ -19,7 +19,7 @@ PROJECT_DIR = BACKEND_DIR.parent
 JALUR_PENULIS_NPC = ("openrouter", "tautan")
 # Jalur Claude yang sudah dihapus: diabaikan bila masih ada di .env atau konfigurasi tersimpan.
 JALUR_PENULIS_LAMA = ("claude_bedrock", "claude_api")
-# penyedia/model (mis. anthropic/claude-opus-5.5); segmen tidak boleh diawali titik agar path URL tetap lurus.
+# penyedia/model (mis. qwen/qwen3-14b); segmen tidak boleh diawali titik agar path URL tetap lurus.
 POLA_MODEL_OPENROUTER = re.compile(r"[a-z0-9][a-z0-9._-]*/[A-Za-z0-9_:-][A-Za-z0-9._:-]*")
 
 
@@ -85,7 +85,7 @@ class Settings(MySQLSettings):
     npc_writer: Literal["otomatis", "claude", "templat"] = "otomatis"
     # Prioritas awal rantai penulis: OpenRouter → LLM sendiri lewat link (Docker/tunnel).
     npc_writer_order: str = ",".join(JALUR_PENULIS_NPC)
-    # Model OpenRouter penulis kalimat; kosong = Claude Opus yang sama dengan notebook.
+    # Model OpenRouter penulis kalimat; kosong = openrouter_model (qwen/qwen3-14b).
     npc_openrouter_model: str = ""
     npc_validate_nlg: bool = True
     npc_intent_model_dir: Path | None = None
@@ -111,7 +111,7 @@ class Settings(MySQLSettings):
 
     @field_validator("npc_openrouter_model", mode="before")
     @classmethod
-    # VALIDATOR: model OpenRouter berbentuk penyedia/model, mis. anthropic/claude-opus-5.5.
+    # VALIDATOR: model OpenRouter berbentuk penyedia/model, mis. qwen/qwen3-14b.
     def validate_openrouter_model(cls, value: object) -> str:
         model = str(value or "").strip()
         if model and not POLA_MODEL_OPENROUTER.fullmatch(model):

@@ -45,6 +45,7 @@ def tunggu(kondisi, batas=2.0):
 def konfigurasi_ai(link="https://llm-uji.example"):
     return SimpleNamespace(
         openrouter_api_key_value=RAHASIA["openrouter"],
+        openrouter_model="qwen/qwen3-14b",
         ollama_base_url=link,
         ollama_model="qwen3:14b",
         ollama_tunnel_token=SecretStr(RAHASIA["token"]),
@@ -88,12 +89,12 @@ class WriterChainTests(unittest.TestCase):
         status = self.runtime.atur(
             penulis="otomatis",
             urutan_penulis=["tautan", "openrouter"],
-            model_openrouter="anthropic/claude-sonnet-5.5",
+            model_openrouter="qwen/qwen3-32b",
         )
         self.assertTrue(tunggu(lambda: self.cek.called))  # rantai berubah → cek di latar
         penulis = self.runtime.penulis
         self.assertEqual([p.jalur for p in penulis.daftar], ["tautan", "openrouter"])
-        self.assertEqual(penulis.daftar[1].model, "anthropic/claude-sonnet-5.5")
+        self.assertEqual(penulis.daftar[1].model, "qwen/qwen3-32b")
         self.assertEqual(penulis.daftar[0].url, "https://llm-uji.example")
         baris = {b["jalur"]: b for b in status["rantai_penulis"]}
         self.assertEqual([b["jalur"] for b in status["rantai_penulis"]], ["tautan", "openrouter"])
@@ -113,6 +114,11 @@ class WriterChainTests(unittest.TestCase):
             (status["model_tautan"], status["model_tautan_bawaan"]),
             ("qwen3:4b-instruct", "qwen3:14b"),
         )
+
+    # Model OpenRouter kosong = model Konfigurasi AI (qwen/qwen3-14b), bukan bawaan notebook.
+    def test_openrouter_model_defaults_to_qwen(self):
+        self.runtime.atur(penulis="otomatis", urutan_penulis=["openrouter"], model_openrouter="")
+        self.assertEqual(self.runtime.penulis.daftar[0].model, "qwen/qwen3-14b")
 
     def test_status_never_contains_secret_values(self):
         status = self.runtime.atur(penulis="otomatis", urutan_penulis=list(JALUR_PENULIS))
