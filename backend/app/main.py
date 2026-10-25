@@ -18,7 +18,7 @@ from fastapi import FastAPI
 
 from app.controller.controller_main import api_router
 from app.controller.middleware.cors import configure_cors
-from app.module.mysql_connector import engine, database_is_ready
+from app.services.mysql_connector import engine, database_is_ready
 from app.config.settings import settings
 from app.realtime.socket_handlers import register_socket_handlers
 from app.services.analysis_service import analysis_service

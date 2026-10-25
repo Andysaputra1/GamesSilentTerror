@@ -10,7 +10,7 @@ import httpx
 from app.config.settings import Settings, settings
 from app.controller.api.panel import router, require_panel, history_filter, validate_endpoint
 from app.services.password_service import hash_password
-from app.module.openrouter_client import generate_reply
+from app.services.openrouter_client import generate_reply
 
 # Bacaan NLU satu pesan seperti yang disimpan pencatat NLU (BrainRuntime.baca_chat), beserta konteksnya.
 NLU_CONTOH = json.dumps(
@@ -177,7 +177,7 @@ class OpenRouterTests(unittest.IsolatedAsyncioTestCase):
             request=httpx.Request("POST", "https://openrouter.ai"),
             json={"choices": [{"message": {"content": "OK"}}]},
         )
-        with patch("app.module.openrouter_client.httpx.AsyncClient") as factory:
+        with patch("app.services.openrouter_client.httpx.AsyncClient") as factory:
             factory.return_value.__aenter__.return_value = client
             result = await generate_reply(
                 "hello", config=Settings(_env_file=None, openrouter_api_key="fixture-key")

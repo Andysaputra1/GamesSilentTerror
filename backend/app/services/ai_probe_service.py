@@ -9,7 +9,7 @@ from app.services.ai_runtime_service import ai_runtime
 from app.services.ai_diagnostics import capture_exchange, measure
 from app.services.match_engine import Match
 from app.services.npc_service import npc_context, decision_prompt, request_decision
-from app.module.openrouter_client import failure_message
+from app.services.openrouter_client import failure_message
 
 
 async def run_probe(message, scenario):

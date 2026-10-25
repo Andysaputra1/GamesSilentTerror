@@ -6,7 +6,7 @@ from sqlalchemy import text
 import secrets
 import threading
 from threading import RLock
-from app.module.mysql_connector import SessionLocal
+from app.services.mysql_connector import SessionLocal
 from app.services.match_engine import Match, label_unik, phase_durations
 from app.services.activity_service import activity, traced
 

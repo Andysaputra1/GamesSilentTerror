@@ -11,7 +11,7 @@ import secrets
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.module.mysql_connector import SessionLocal
+from app.services.mysql_connector import SessionLocal
 from app.config.settings import settings
 from app.models import auth_queries
 from app.services.password_service import verify_password

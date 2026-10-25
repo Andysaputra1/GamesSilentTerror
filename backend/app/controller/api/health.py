@@ -4,10 +4,10 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter
 
-from app.module.mysql_connector import database_is_ready
+from app.services.mysql_connector import database_is_ready
 from app.config.settings import settings
 from app.services.analysis_service import analysis_service
-from app.module.ollama_client import model_available
+from app.services.ollama_client import model_available
 from app.services.ai_runtime_service import ai_runtime
 
 router = APIRouter(tags=["system"])

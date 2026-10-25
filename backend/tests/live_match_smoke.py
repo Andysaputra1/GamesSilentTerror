@@ -11,7 +11,7 @@ import time
 import httpx
 from sqlalchemy import text
 from app.models.auth_queries import create_account
-from app.module.mysql_connector import SessionLocal
+from app.services.mysql_connector import SessionLocal
 from app.services.password_service import hash_password
 
 

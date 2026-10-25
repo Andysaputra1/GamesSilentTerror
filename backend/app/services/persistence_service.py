@@ -5,7 +5,7 @@ import logging
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.config.settings import settings
-from app.module.mysql_connector import SessionLocal
+from app.services.mysql_connector import SessionLocal
 from app.models import game_queries as queries
 
 logger = logging.getLogger("shadow_heist.persistence")

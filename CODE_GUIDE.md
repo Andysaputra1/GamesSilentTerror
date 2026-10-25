@@ -16,12 +16,11 @@ permintaan pengguna.
 | `backend/app/main.py` | Startup FastAPI, Socket.IO, model analisis, dan lifecycle server |
 | `backend/app/controller/controller_main.py` | Daftar router HTTP yang aktif |
 | `backend/app/controller/api/` | Validasi request, autentikasi route, dan respons HTTP |
-| `backend/app/services/` | Aturan aplikasi, pertandingan, analisis, dan transaksi |
+| `backend/app/services/` | Aturan aplikasi, pertandingan, analisis, dan transaksi; termasuk koneksi database, klien AI (OpenRouter/Ollama), dan CLI akun |
 | `backend/app/models/` | Kueri SQL berparameter |
 | `backend/app/realtime/socket_handlers.py` | Autentikasi socket, otorisasi, penyimpanan, dan siaran chat |
 | `backend/app/config/` | Konfigurasi environment dan database |
 | `backend/app/controller/middleware/` | Autentikasi request, batas percobaan login, dan CORS |
-| `backend/app/module/` | Koneksi database, klien AI, dan CLI akun |
 | `backend/public/panel/` | Halaman administrasi yang disajikan backend |
 | `backend/scripts/` | Penyiapan environment deployment dan kredensial panel |
 | `backend/app/services/npc_brain/` | Runtime otak NPC; `generated/` adalah ekspor notebook (jangan diedit manual) |

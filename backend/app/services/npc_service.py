@@ -14,8 +14,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.module.ollama_client import generate_reply as ollama_reply
-from app.module.openrouter_client import generate_reply as openrouter_reply
+from app.services.ollama_client import generate_reply as ollama_reply
+from app.services.openrouter_client import generate_reply as openrouter_reply
 from app.services.ai_runtime_service import ai_runtime
 from app.services.checker_service import checker_service
 from app.services.npc_brain.penjelasan import lengkapi as lengkapi_penjelasan

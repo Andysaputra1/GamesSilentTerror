@@ -1,11 +1,11 @@
-"""CLI admin lokal: python -m app.module.create_user username --name 'Nama pemain'."""
+"""CLI admin lokal: python -m app.services.create_user username --name 'Nama pemain'."""
 
 import argparse
 from getpass import getpass
 import re
 from sqlalchemy.exc import IntegrityError
 from app.models.auth_queries import create_account
-from app.module.mysql_connector import SessionLocal
+from app.services.mysql_connector import SessionLocal
 from app.services.password_service import hash_password
 
 

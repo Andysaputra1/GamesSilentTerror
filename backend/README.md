@@ -23,10 +23,11 @@ backend/
     models/
       auth_queries.py           # SELECT/INSERT/DELETE akun dan sesi
       game_queries.py           # SELECT/INSERT/UPDATE pemain dan chat
-    module/
-      mysql_connector.py        # Engine, connection pool, session, health probe
-      create_user.py            # CLI akun tambahan untuk multiplayer lokal
     services/                   # Logika password, sesi login, AI, dan game
+      mysql_connector.py        # Engine, connection pool, session, health probe
+      ollama_client.py          # Klien HTTP Ollama
+      openrouter_client.py      # Klien HTTP OpenRouter
+      create_user.py            # CLI akun tambahan untuk multiplayer lokal
     schemas/                    # Validasi request/response API
     realtime/                   # Controller event Socket.IO
   artifacts/
@@ -39,7 +40,8 @@ backend/
   tests/
 ```
 
-Alur: HTTP/Socket.IO -> controller -> service -> models (SQL) -> module (MySQL).
+Alur: HTTP/Socket.IO -> controller -> service -> models (SQL) -> MySQL.
+Koneksi dan pool MySQL disediakan oleh `app/services/mysql_connector.py`.
 Model tidak menyimpan aturan HTTP atau menulis respons API. Services mengatur
 transaksi agar beberapa query bisa commit/rollback bersama.
 
@@ -71,7 +73,7 @@ def account_by_username(database, username):
 Pemakaian dari service:
 
 ```python
-from app.module.mysql_connector import SessionLocal
+from app.services.mysql_connector import SessionLocal
 from app.models.auth_queries import account_by_username
 
 with SessionLocal.begin() as database:

@@ -12,7 +12,7 @@ from app.controller.api.users import router as users_router
 from app.config.settings import Settings
 from app.services.ai_diagnostics import capture_exchange, record_request, record_response
 from app.services.ai_probe_service import run_probe
-from app.module.openrouter_client import generate_reply
+from app.services.openrouter_client import generate_reply
 
 
 class DiagnosticsTests(unittest.IsolatedAsyncioTestCase):
@@ -29,7 +29,7 @@ class DiagnosticsTests(unittest.IsolatedAsyncioTestCase):
         client = AsyncMock()
         client.post.return_value = response
         trace = {}
-        with patch("app.module.openrouter_client.httpx.AsyncClient") as factory:
+        with patch("app.services.openrouter_client.httpx.AsyncClient") as factory:
             factory.return_value.__aenter__.return_value = client
             with capture_exchange(trace):
                 await generate_reply(
@@ -81,7 +81,7 @@ class DiagnosticsTests(unittest.IsolatedAsyncioTestCase):
         )
         with (
             patch("app.services.ai_probe_service.ai_runtime.current", return_value=config),
-            patch("app.module.openrouter_client.httpx.AsyncClient") as factory,
+            patch("app.services.openrouter_client.httpx.AsyncClient") as factory,
         ):
             factory.return_value.__aenter__.return_value = client
             result = await run_probe("Apa alibimu?", "night")

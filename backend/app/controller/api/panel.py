@@ -29,8 +29,8 @@ from app.services.npc_brain.runtime import POLA_MODEL_TAUTAN, brain_runtime
 from app.services.activity_service import activity
 from app.services.room_service import room_service
 from app.controller.middleware.auth_limits import limit_auth
-from app.module.ollama_client import generate_reply as local_reply
-from app.module.openrouter_client import generate_reply as api_reply, failure_message
+from app.services.ollama_client import generate_reply as local_reply
+from app.services.openrouter_client import generate_reply as api_reply, failure_message
 from app.controller.middleware.safe_validation import SafeValidationRoute
 
 router = APIRouter(tags=["panel"], route_class=SafeValidationRoute)
