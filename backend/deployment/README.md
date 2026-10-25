@@ -10,12 +10,12 @@ buat migrasi inkremental baru dan backup database terlebih dahulu.
 
 | Tabel | Pemakaian backend |
 | --- | --- |
-| user_accounts | Login dan pendaftaran (`models/auth_queries.py`) |
-| auth_sessions | Validasi token dan logout (`models/auth_queries.py`) |
-| account_identities | Email dan identitas Google (`models/auth_queries.py`) |
-| game_sessions | Identitas room dan fase dalam persistence (`models/game_queries.py`) |
-| players | Peserta room, status, dan skor (`models/game_queries.py`) |
-| chat_messages | Pesan chat yang disimpan (`models/game_queries.py`) |
+| user_accounts | Login dan pendaftaran (`app/models/auth_queries.py`) |
+| auth_sessions | Validasi token dan logout (`app/models/auth_queries.py`) |
+| account_identities | Email dan identitas Google (`app/models/auth_queries.py`) |
+| game_sessions | Identitas room dan fase dalam persistence (`app/models/game_queries.py`) |
+| players | Peserta room, status, dan skor (`app/models/game_queries.py`) |
+| chat_messages | Pesan chat yang disimpan (`app/models/game_queries.py`) |
 | ai_analyses | Arsip hasil SVM/fuzzy dan balasan NOX lama; tidak ditulis lagi sejak analisis lama dihapus |
 | schema_migrations | Catatan versi skema; dipertahankan untuk administrasi migrasi |
 

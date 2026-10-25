@@ -4,8 +4,8 @@ from unittest.mock import patch
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from config.settings import settings
-from controller.middleware.cors import configure_cors
+from app.config.settings import settings
+from app.controller.middleware.cors import configure_cors
 
 FRONTEND = "https://silent-terror.andylabs.site"
 

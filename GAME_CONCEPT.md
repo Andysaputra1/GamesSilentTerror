@@ -94,7 +94,7 @@ Selama pertandingan, chat ikut turun ke pesan terbaru bila pemain sedang di dasa
 
 ## NPC: otak dari notebook skripsi
 
-`services/npc_service.py` menjalankan NPC dari timer tanpa menunggu pesan manusia. Setiap bot punya **ingatan, metode, dan persona sendiri** (multi-bot aman; ingatan tidak dibagi). Logikanya adalah kode notebook skripsi yang diekspor apa adanya ke `services/npc_brain/generated/` oleh `scripts/ekspor_otak_npc.py`:
+`backend/app/services/npc_service.py` menjalankan NPC dari timer tanpa menunggu pesan manusia. Setiap bot punya **ingatan, metode, dan persona sendiri** (multi-bot aman; ingatan tidak dibagi). Logikanya adalah kode notebook skripsi yang diekspor apa adanya ke `backend/app/services/npc_brain/generated/` oleh `scripts/ekspor_otak_npc.py`:
 
 1. **NLU IndoBERT** (satu model untuk semua bot): intent (offend/defend/neutral) dan target per pemain untuk setiap chat publik. Karena nama pengguna bebas (mis. `tester`, `andy123`), nama pemain diganti nama yang dikenal model sebelum intent dibaca; tanpa itu tuduhan singkat seperti "curiga sama tester" terbaca netral. Hasil anotasi disimpan sekali karena identik untuk semua bot. Tanpa folder model, dipakai NLU cadangan (SVM lama + nama yang disebut) dan hal itu dicatat di trace.
 2. **Penalaran**: bukti publik per pemain → Fuzzy Mamdani, Utility AI, atau Behavior Tree → rencana chat, vote, dan aksi rahasia (Gag, Hostage, Guard, Peek). `NPC_METHOD=campuran` membagi bot dalam satu room bergiliran ke tiga metode (urutan diacak per pertandingan); metode dan persona tiap bot dicatat di tabel `match_bots` untuk analisis survei.

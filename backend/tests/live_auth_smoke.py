@@ -4,8 +4,8 @@ import secrets
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import text
-from controller.api.auth import router
-from module.mysql_connector import SessionLocal
+from app.controller.api.auth import router
+from app.module.mysql_connector import SessionLocal
 
 
 def main():

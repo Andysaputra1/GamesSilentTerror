@@ -1,8 +1,8 @@
 import unittest
 from unittest.mock import Mock, AsyncMock, patch
-from services.room_service import RoomService
-from services.persistence_service import PersistenceError
-from realtime.socket_handlers import SocketGameController
+from app.services.room_service import RoomService
+from app.services.persistence_service import PersistenceError
+from app.realtime.socket_handlers import SocketGameController
 
 
 class ChatDurabilityTests(unittest.IsolatedAsyncioTestCase):
@@ -19,8 +19,8 @@ class ChatDurabilityTests(unittest.IsolatedAsyncioTestCase):
         controller.socket_players["sid"] = "alice"
         controller.socket_rooms["sid"] = room.code
         with (
-            patch("realtime.socket_handlers.room_service", rooms),
-            patch("realtime.socket_handlers.PersistenceService", return_value=persistence),
+            patch("app.realtime.socket_handlers.room_service", rooms),
+            patch("app.realtime.socket_handlers.PersistenceService", return_value=persistence),
         ):
             await controller.send_chat("sid", {"username": "alice", "message": "Halo bot"})
         chats = [c.args[1] for c in sio.emit.call_args_list if c.args[0] == "receive_chat"]

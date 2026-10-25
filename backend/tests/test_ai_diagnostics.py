@@ -7,12 +7,12 @@ import httpx
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from controller.api.panel import router, require_panel
-from controller.api.users import router as users_router
-from config.settings import Settings
-from services.ai_diagnostics import capture_exchange, record_request, record_response
-from services.ai_probe_service import run_probe
-from module.openrouter_client import generate_reply
+from app.controller.api.panel import router, require_panel
+from app.controller.api.users import router as users_router
+from app.config.settings import Settings
+from app.services.ai_diagnostics import capture_exchange, record_request, record_response
+from app.services.ai_probe_service import run_probe
+from app.module.openrouter_client import generate_reply
 
 
 class DiagnosticsTests(unittest.IsolatedAsyncioTestCase):
@@ -29,7 +29,7 @@ class DiagnosticsTests(unittest.IsolatedAsyncioTestCase):
         client = AsyncMock()
         client.post.return_value = response
         trace = {}
-        with patch("module.openrouter_client.httpx.AsyncClient") as factory:
+        with patch("app.module.openrouter_client.httpx.AsyncClient") as factory:
             factory.return_value.__aenter__.return_value = client
             with capture_exchange(trace):
                 await generate_reply(
@@ -80,8 +80,8 @@ class DiagnosticsTests(unittest.IsolatedAsyncioTestCase):
             openrouter_default=None,
         )
         with (
-            patch("services.ai_probe_service.ai_runtime.current", return_value=config),
-            patch("module.openrouter_client.httpx.AsyncClient") as factory,
+            patch("app.services.ai_probe_service.ai_runtime.current", return_value=config),
+            patch("app.module.openrouter_client.httpx.AsyncClient") as factory,
         ):
             factory.return_value.__aenter__.return_value = client
             result = await run_probe("Apa alibimu?", "night")
@@ -96,12 +96,12 @@ class DiagnosticsTests(unittest.IsolatedAsyncioTestCase):
             record_response(200, {"output": "Not JSON"})
             raise ValueError("sensitive provider body")
 
-        with patch("services.ai_probe_service.request_decision", side_effect=reply):
+        with patch("app.services.ai_probe_service.request_decision", side_effect=reply):
             result = await run_probe("Halo", "discussion")
         self.assertTrue(result["active"])
         self.assertFalse(result["valid_decision"])
         self.assertNotIn("sensitive provider body", json.dumps(result))
-        with patch("services.ai_probe_service.request_decision", side_effect=TimeoutError):
+        with patch("app.services.ai_probe_service.request_decision", side_effect=TimeoutError):
             result = await run_probe("Halo", "discussion")
         self.assertFalse(result["active"])
         self.assertEqual(result["response"]["error_type"], "TimeoutError")

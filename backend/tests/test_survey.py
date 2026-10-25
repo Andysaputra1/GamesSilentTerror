@@ -12,13 +12,13 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from controller.api.panel import require_panel
-from controller.api.survey import router
-from controller.middleware.auth import require_authenticated_user
-from models import survey_queries
-from services.persistence_service import PersistenceError
-from services.room_service import RoomService
-from services.survey_service import (
+from app.controller.api.panel import require_panel
+from app.controller.api.survey import router
+from app.controller.middleware.auth import require_authenticated_user
+from app.models import survey_queries
+from app.services.persistence_service import PersistenceError
+from app.services.room_service import RoomService
+from app.services.survey_service import (
     BERLAKU_SELESAI_DETIK,
     SurveyAlreadySubmitted,
     SurveyService,
@@ -143,9 +143,9 @@ class SurveyServiceTests(unittest.TestCase):
         self.match = self.room.match
         self.match.begin()
         self.fake = FakeQueries()
-        self.enterContext(patch("services.survey_service.room_service", self.rooms))
-        self.enterContext(patch("services.survey_service.queries", self.fake))
-        self.enterContext(patch("services.survey_service.PersistenceService._run",
+        self.enterContext(patch("app.services.survey_service.room_service", self.rooms))
+        self.enterContext(patch("app.services.survey_service.queries", self.fake))
+        self.enterContext(patch("app.services.survey_service.PersistenceService._run",
                                 side_effect=lambda operation: operation(None)))  # fmt: skip
         self.service = SurveyService()
         app = FastAPI()
@@ -211,11 +211,11 @@ class SurveyServiceTests(unittest.TestCase):
     # jendelanya, lalu arsip peserta (dicatat saat pemain terakhir keluar dan room dibersihkan).
     def test_player_who_left_the_room_can_still_submit_after_the_room_is_gone(self):
         self.finish()
-        self.enterContext(patch("services.survey_service.survey_service", self.service))
+        self.enterContext(patch("app.services.survey_service.survey_service", self.service))
         langsung = lambda target, args, daemon: SimpleNamespace(
             start=lambda: target(*args)
         )  # noqa: E731
-        self.enterContext(patch("services.room_service.threading.Thread", side_effect=langsung))
+        self.enterContext(patch("app.services.room_service.threading.Thread", side_effect=langsung))
         self.rooms.leave(self.room.code, "alice")
         self.rooms.leave(self.room.code, "bob")
         self.assertNotIn(self.room.code, self.rooms.rooms)  # room sudah dibersihkan
@@ -230,7 +230,7 @@ class SurveyServiceTests(unittest.TestCase):
             self.service.submit(self.room.code, "bob", "match-lain", self.answers())
         self.assertEqual({row["username"] for row in self.fake.participants}, {"alice", "bob"})
         nanti = time.monotonic() + BERLAKU_SELESAI_DETIK + 1
-        with patch("services.survey_service.time.monotonic", return_value=nanti):
+        with patch("app.services.survey_service.time.monotonic", return_value=nanti):
             self.assertEqual(self.service.status(self.room.code, "bob")["match_id"], self.match.id)
             with self.assertRaises(ValueError):
                 self.service.status(self.room.code, "mallory")
@@ -238,11 +238,11 @@ class SurveyServiceTests(unittest.TestCase):
     # Pertandingan selesai: peserta manusia dicatat sekali ke arsip, survei tetap bisa diisi setelah server
     # dinyalakan ulang, dan pengingat Main hilang begitu survei terkirim.
     def test_finished_match_is_archived_for_later_surveys_and_reminders(self):
-        self.enterContext(patch("services.survey_service.survey_service", self.service))
+        self.enterContext(patch("app.services.survey_service.survey_service", self.service))
         langsung = lambda target, args, daemon: SimpleNamespace(
             start=lambda: target(*args)
         )  # noqa: E731
-        self.enterContext(patch("services.room_service.threading.Thread", side_effect=langsung))
+        self.enterContext(patch("app.services.room_service.threading.Thread", side_effect=langsung))
         self.rooms.tick_all()
         self.assertEqual(self.fake.participants, [])  # belum selesai: belum dicatat
         self.finish()
@@ -250,7 +250,7 @@ class SurveyServiceTests(unittest.TestCase):
         self.rooms.tick_all()  # dicatat sekali saja
         self.assertEqual(sorted(p["username"] for p in self.fake.participants), ["alice", "bob"])
         # "Restart": room di memori hilang dan registri kosong; konteks diambil dari arsip.
-        self.enterContext(patch("services.survey_service.room_service", RoomService()))
+        self.enterContext(patch("app.services.survey_service.room_service", RoomService()))
         baru = SurveyService()
         self.assertEqual(baru.status(self.room.code, "alice")["match_id"], self.match.id)
         self.assertEqual([s["room_code"] for s in baru.pending("alice")], [self.room.code])
@@ -274,14 +274,14 @@ class SurveyServiceTests(unittest.TestCase):
                 "INSERT", {}, Exception(kode, "fixture")
             )
 
-        with patch("services.survey_service.PersistenceService._run",
+        with patch("app.services.survey_service.PersistenceService._run",
                    side_effect=lambda operation: gagal(1062)):  # fmt: skip
             with self.assertRaises(SurveyAlreadySubmitted):
                 self.service.submit(self.room.code, "alice", self.match.id, self.answers())
             body = {"match_id": self.match.id, "answers": self.answers()}
             response = self.client.post(f"/api/rooms/{self.room.code}/survey", json=body)
             self.assertEqual(response.status_code, 409)
-        with patch("services.survey_service.PersistenceService._run",
+        with patch("app.services.survey_service.PersistenceService._run",
                    side_effect=lambda operation: gagal(1452)):  # fmt: skip
             with self.assertRaises(PersistenceError):  # pelanggaran lain tetap error database
                 self.service.submit(self.room.code, "alice", self.match.id, self.answers())
@@ -318,7 +318,7 @@ class SurveyExportTests(unittest.TestCase):
                  "code": "saran", "question_snapshot": '{"prompt": "Saran untuk game?"}',
                  "value_number": None, "value_text": "=1+1 seru banget 👍",
                  "bots": "NOX:fuzzy:santai"}]  # fmt: skip
-        with patch("controller.api.survey.survey_service.export_rows", return_value=rows):
+        with patch("app.controller.api.survey.survey_service.export_rows", return_value=rows):
             response = self.client.get("/api/panel/survey/responses.csv")
         self.assertEqual(response.status_code, 200)
         body = response.content.decode("utf-8")

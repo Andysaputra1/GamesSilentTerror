@@ -7,12 +7,12 @@ from unittest.mock import AsyncMock, Mock, patch
 
 from fastapi import FastAPI, Header
 from fastapi.testclient import TestClient
-from controller.api.rooms import router
-from controller.middleware.auth import require_authenticated_user
-from realtime.socket_handlers import SocketGameController
-from services.match_engine import KOMPOSISI_PERAN, Match, label_unik, snapshot_berlabel
-from services.skin_constants import ALL_SKINS
-from services.room_service import RoomService
+from app.controller.api.rooms import router
+from app.controller.middleware.auth import require_authenticated_user
+from app.realtime.socket_handlers import SocketGameController
+from app.services.match_engine import KOMPOSISI_PERAN, Match, label_unik, snapshot_berlabel
+from app.services.skin_constants import ALL_SKINS
+from app.services.room_service import RoomService
 
 
 class EngineTests(unittest.TestCase):
@@ -516,8 +516,8 @@ class RoomGameTests(unittest.TestCase):
             username="host"
         )
         with (
-            patch("controller.api.rooms.room_service", self.rooms),
-            patch("controller.api.rooms.PersistenceService"),
+            patch("app.controller.api.rooms.room_service", self.rooms),
+            patch("app.controller.api.rooms.PersistenceService"),
             TestClient(app) as client,
         ):
             for body in [{"capacity": 3}, {"capacity": 11}]:
@@ -578,7 +578,7 @@ class RoomGameTests(unittest.TestCase):
         app.dependency_overrides[require_authenticated_user] = lambda x_user=Header(
             "alice"
         ): SimpleNamespace(username=x_user)
-        with patch("controller.api.rooms.room_service", self.rooms), TestClient(app) as client:
+        with patch("app.controller.api.rooms.room_service", self.rooms), TestClient(app) as client:
             base = "/api/rooms/" + self.room.code
             self.assertEqual(
                 client.post(
@@ -605,14 +605,14 @@ class RoomGameTests(unittest.TestCase):
 
 class SocketGameTests(unittest.IsolatedAsyncioTestCase):
     async def test_revoked_socket_token_cannot_send(self):
-        from services.auth_service import SessionValidationError
+        from app.services.auth_service import SessionValidationError
 
         sio = Mock(emit=AsyncMock())
         controller = SocketGameController(sio, Mock())
         controller.socket_players["sid"] = "alice"
         controller.socket_tokens["sid"] = "revoked-test-token"
         with patch(
-            "realtime.socket_handlers.auth_service.user_for_token",
+            "app.realtime.socket_handlers.auth_service.user_for_token",
             side_effect=SessionValidationError(),
         ):
             await controller.send_chat("sid", {"username": "alice", "message": "halo"})
@@ -629,8 +629,8 @@ class SocketGameTests(unittest.IsolatedAsyncioTestCase):
         controller.socket_players["sid"] = "alice"
         controller.socket_rooms["sid"] = room.code
         with (
-            patch("realtime.socket_handlers.room_service", rooms),
-            patch("realtime.socket_handlers.PersistenceService"),
+            patch("app.realtime.socket_handlers.room_service", rooms),
+            patch("app.realtime.socket_handlers.PersistenceService"),
         ):
             for data in [
                 None,
@@ -654,7 +654,7 @@ class SocketGameTests(unittest.IsolatedAsyncioTestCase):
 class ChatOrderTests(unittest.TestCase):
     # Chat yang terbaca bot dalam satu langkah harus tetap kronologis (audit AI 1 Okt: ID UUID mengacak urutan).
     def test_bot_memory_keeps_chat_order_within_one_snapshot(self):
-        from services.npc_brain.generated import otak_fuzzy
+        from app.services.npc_brain.generated import otak_fuzzy
 
         class NLUTiruan:
             ambang = 0.0

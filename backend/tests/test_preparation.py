@@ -3,7 +3,7 @@
 import unittest
 import unittest.mock
 
-from services.match_engine import (
+from app.services.match_engine import (
     PREPARATION_MAX_SECONDS,
     PREPARATION_MIN_SECONDS,
     REVEAL_WAIT_SECONDS,
@@ -97,7 +97,7 @@ class PreparationTests(unittest.TestCase):
         self.match.mark_ai_ready(now=2.0)
         self.match.tick(PREPARATION_MIN_SECONDS)
         self.assertEqual(self.match.phase, "preparing")  # belum ada yang membuka kartu
-        with unittest.mock.patch("services.match_engine.time.time", return_value=12.0):
+        with unittest.mock.patch("app.services.match_engine.time.time", return_value=12.0):
             view = self.match.snapshot("alice")["preparation"]
         self.assertEqual((view["unrevealed"], view["revealed"], view["elapsed"]), (2, False, 12))
         self.assertEqual(view["starts_in"], PREPARATION_MIN_SECONDS + REVEAL_WAIT_SECONDS - 12)

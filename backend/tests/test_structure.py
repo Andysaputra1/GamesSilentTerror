@@ -6,8 +6,8 @@ import unittest
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session
 
-from config.mysql import MySQLSettings
-from models import auth_queries
+from app.config.mysql import MySQLSettings
+from app.models import auth_queries
 
 
 class ConfigurationTests(unittest.TestCase):

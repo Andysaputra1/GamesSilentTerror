@@ -4,42 +4,48 @@ Struktur API menggunakan controller, services, dan model berisi SQL langsung.
 
 ```text
 backend/
+  app/
+    __init__.py
+    main.py                     # Entry point ASGI
+    config/
+      settings.py               # Pengaturan aplikasi/AI dan pembaca environment
+      mysql.py                  # Host, port, database, kredensial, pool
+    controller/
+      controller_main.py        # Menggabungkan router HTTP
+      api/
+        auth.py
+        health.py
+        panel.py                # Panel administrator (/panel)
+        rooms.py                # Lobby, start, snapshot privat, aksi/vote, checker
+      middleware/
+        auth.py                 # Validasi bearer token sebelum controller
+        cors.py                 # Kebijakan cross-origin
+    models/
+      auth_queries.py           # SELECT/INSERT/DELETE akun dan sesi
+      game_queries.py           # SELECT/INSERT/UPDATE pemain dan chat
+    module/
+      mysql_connector.py        # Engine, connection pool, session, health probe
+      create_user.py            # CLI akun tambahan untuk multiplayer lokal
+    services/                   # Logika password, sesi login, AI, dan game
+    schemas/                    # Validasi request/response API
+    realtime/                   # Controller event Socket.IO
   artifacts/
     svm/intent_classifier.pkl   # Model ML privat, terpisah dari model database
-  config/
-    settings.py                 # Pengaturan aplikasi/AI dan pembaca environment
-    mysql.py                    # Host, port, database, kredensial, pool
-  controller/
-    controller_main.py          # Menggabungkan router HTTP
-    api/
-      auth.py
-      health.py
-      panel.py                  # Panel administrator (/panel)
-      rooms.py                  # Lobby, start, snapshot privat, aksi/vote, checker
-    middleware/
-      auth.py                   # Validasi bearer token sebelum controller
-      cors.py                   # Kebijakan cross-origin
+    indobert/                   # Model NLU intent dan target
+  deployment/                   # Dockerfile Azure, proxy, dan baseline SQL
   migrations/                   # SQL untuk membuat/mengubah struktur tabel
-  models/
-    auth_queries.py             # SELECT/INSERT/DELETE akun dan sesi
-    game_queries.py             # SELECT/INSERT/UPDATE pemain dan chat
-  module/
-    mysql_connector.py          # Engine, connection pool, session, health probe
-    create_user.py              # CLI akun tambahan untuk multiplayer lokal
-  services/                     # Logika password, sesi login, AI, dan game
-  schemas/                      # Validasi request/response API
-  realtime/                     # Controller event Socket.IO
+  public/                       # Panel administrator dan dokumen
+  scripts/                      # Penyiapan deployment, ekspor, dan simulasi
   tests/
-  main.py                       # Entry point ASGI
 ```
 
 Alur: HTTP/Socket.IO -> controller -> service -> models (SQL) -> module (MySQL).
 Model tidak menyimpan aturan HTTP atau menulis respons API. Services mengatur
 transaksi agar beberapa query bisa commit/rollback bersama.
 
-Engine murni ada di `services/match_engine.py`: role, fase, skill, cooldown,
-voting, kemenangan, serta snapshot privat. `services/room_service.py` membatasi
-akses anggota/host dan memegang lock. `main.py` menjalankan clock pertandingan;
+Engine murni ada di `app/services/match_engine.py`: role, fase, skill, cooldown,
+voting, kemenangan, serta snapshot privat. `app/services/room_service.py` membatasi
+akses anggota/host dan memegang lock. `app/main.py` menjalankan clock pertandingan;
 frontend hanya menampilkan keputusan server. Lihat [alur dan aturan game](../GAME_CONCEPT.md).
 
 State pertandingan masih di memori satu proses, bukan snapshot MySQL. Reconnect
@@ -51,7 +57,7 @@ akun milik tes. Jangan menjalankannya pada deployment publik.
 ## SQL langsung di model
 
 ```python
-# models/auth_queries.py
+# app/models/auth_queries.py
 from sqlalchemy import text
 
 def account_by_username(database, username):
@@ -65,8 +71,8 @@ def account_by_username(database, username):
 Pemakaian dari service:
 
 ```python
-from module.mysql_connector import SessionLocal
-from models.auth_queries import account_by_username
+from app.module.mysql_connector import SessionLocal
+from app.models.auth_queries import account_by_username
 
 with SessionLocal.begin() as database:
     account = account_by_username(database, "user1")
@@ -82,8 +88,8 @@ bukan setiap query. Semua perubahan tabel tetap melalui migrations.
 
 ## Config
 
-Environment Docker atau file `.env` di root dibaca oleh `config/settings.py`.
-Pengaturan MySQL didefinisikan di `config/mysql.py`:
+Environment Docker atau file `.env` di root dibaca oleh `app/config/settings.py`.
+Pengaturan MySQL didefinisikan di `app/config/mysql.py`:
 `MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_DATABASE`, `MYSQL_USER`, `MYSQL_PASSWORD`.
 Alias `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` juga diterima;
 jika keduanya diberikan, nama MYSQL_* diprioritaskan. Nilai DB_* harus diteruskan
@@ -98,8 +104,10 @@ setelah mengubah .env; lihat ../OLLAMA.md untuk perintah dan pemeriksaan status.
 
 ## Menjalankan dan menguji
 
-Entry point tetap `uvicorn main:asgi_app --host 0.0.0.0 --port 8000` dari backend.
+Jalankan `uvicorn app.main:asgi_app --host 0.0.0.0 --port 8000` dari backend.
 URL HTTP dan event Socket.IO tidak berubah karena refactor ini.
+Setelah memperbarui kode, jalankan `docker compose up -d --build` dari root repo
+agar image menggunakan entry point `app.main:asgi_app` yang baru.
 
 ```sh
 python -m unittest discover -s tests -v

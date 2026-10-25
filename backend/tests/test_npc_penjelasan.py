@@ -16,11 +16,11 @@ import pandas as pd
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from services.checker_service import CheckerService, checker_service
-from services.match_engine import Match
-from services.npc_brain.penjelasan import BATAS_BYTE, batasi, jelaskan, lengkapi, ringkas, ukuran
-from services.npc_service import NPCService
-from services.room_service import RoomService
+from app.services.checker_service import CheckerService, checker_service
+from app.services.match_engine import Match
+from app.services.npc_brain.penjelasan import BATAS_BYTE, batasi, jelaskan, lengkapi, ringkas, ukuran
+from app.services.npc_service import NPCService
+from app.services.room_service import RoomService
 from tests.test_npc_brain import AKSI_RAHASIA, runtime_siap
 
 
@@ -231,14 +231,14 @@ class CheckerPenjelasanTests(unittest.TestCase):
         rooms.start(room.code, "human")
         runtime.siapkan_pertandingan(room.match, room.code)
         with (
-            patch("services.room_service.room_service", rooms),
-            patch("services.npc_brain.runtime.brain_runtime", runtime),
+            patch("app.services.room_service.room_service", rooms),
+            patch("app.services.npc_brain.runtime.brain_runtime", runtime),
         ):
             live = CheckerService().ringkasan_room(room.code)
             jejak = [{"sender": "NOX", "provider": "otak:bt", "model": "persona:gaul"},
                      {"ringkas": {"bot": {"nama": "ECHO", "role": "spy", "metode": "fuzzy",
                                           "persona": "kalem"}}}]  # fmt: skip
-            with patch("services.checker_service._bot_arsip", return_value=[]) as arsip:
+            with patch("app.services.checker_service._bot_arsip", return_value=[]) as arsip:
                 dari_jejak = CheckerService().ringkasan_room("ARSIP1", jejak)
                 kosong = CheckerService().ringkasan_room("ARSIP2", [])
         runtime.tutup()
@@ -264,11 +264,11 @@ class NPCServicePenjelasanTests(unittest.IsolatedAsyncioTestCase):
         self.rooms.start(self.room.code, "human")
         self.match = self.room.match
         self.service = NPCService(Mock(emit=AsyncMock()), runtime=self.runtime)
-        self.enterContext(patch("services.npc_service.room_service", self.rooms))
+        self.enterContext(patch("app.services.npc_service.room_service", self.rooms))
         self.persistence = self.enterContext(
-            patch("services.npc_service.PersistenceService")
+            patch("app.services.npc_service.PersistenceService")
         ).return_value
-        self.enterContext(patch("services.npc_service.survey_service"))
+        self.enterContext(patch("app.services.npc_service.survey_service"))
 
     async def asyncTearDown(self):
         await self.service.close()
@@ -281,7 +281,7 @@ class NPCServicePenjelasanTests(unittest.IsolatedAsyncioTestCase):
         with self.rooms.lock:
             self.match.add_message("human", "Aku curiga NOX, dia Hitman. Ayo vote NOX!")
         self.match.deadline = time.time() + 60
-        with patch("services.npc_service.asyncio.sleep", AsyncMock()):
+        with patch("app.services.npc_service.asyncio.sleep", AsyncMock()):
             otak.sibuk = True
             await self.service.brain_turn(self.room.code, self.match, otak)
         trace = checker_service.list(self.room.code, penjelasan=True)[0]
@@ -298,7 +298,7 @@ class NPCServicePenjelasanTests(unittest.IsolatedAsyncioTestCase):
 
 class PanelCheckerEndpointTests(unittest.TestCase):
     def setUp(self):
-        from controller.api.panel import require_panel, router
+        from app.controller.api.panel import require_panel, router
 
         self.app = FastAPI()
         self.app.include_router(router)
@@ -318,7 +318,7 @@ class PanelCheckerEndpointTests(unittest.TestCase):
 
     def test_list_has_room_summary_without_explanations_and_detail_has_them(self):
         self.app.dependency_overrides[self.require_panel] = lambda: "fixture-token"
-        with patch("controller.api.panel.transaction", return_value=[]):
+        with patch("app.controller.api.panel.transaction", return_value=[]):
             data = self.client.get(f"/api/panel/checker/{self.code}").json()
         self.assertNotIn("penjelasan", data["traces"][0])
         self.assertEqual(data["room"]["bot"][0]["nama"], "NOX")
@@ -326,10 +326,10 @@ class PanelCheckerEndpointTests(unittest.TestCase):
         detail = self.client.get(f"/api/panel/checker/{self.code}/jejak/{self.trace['id']}").json()
         self.assertEqual(detail["penjelasan"]["bot"]["role"], "hitman")
         stored = json.dumps({"id": "a" * 32, "penjelasan": {"bot": {"nama": "ECHO"}}})
-        with patch("controller.api.panel.transaction", return_value=stored):
+        with patch("app.controller.api.panel.transaction", return_value=stored):
             arsip = self.client.get(f"/api/panel/checker/{self.code}/jejak/{'a' * 32}")
         self.assertEqual(arsip.json()["penjelasan"]["bot"]["nama"], "ECHO")
-        with patch("controller.api.panel.transaction", return_value=None):
+        with patch("app.controller.api.panel.transaction", return_value=None):
             self.assertEqual(
                 self.client.get(f"/api/panel/checker/{self.code}/jejak/{'b' * 32}").status_code, 404
             )

@@ -3,8 +3,8 @@
 import random
 import unittest
 
-from services.match_engine import Match
-from services.room_service import RoomService
+from app.services.match_engine import Match
+from app.services.room_service import RoomService
 
 
 class VictoryRulesTests(unittest.TestCase):

@@ -3,7 +3,7 @@
 import random
 import unittest
 
-from services.match_engine import Match
+from app.services.match_engine import Match
 
 
 class MatchSimulationTests(unittest.TestCase):

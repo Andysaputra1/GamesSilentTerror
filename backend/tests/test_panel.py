@@ -7,10 +7,10 @@ from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 import httpx
-from config.settings import Settings, settings
-from controller.api.panel import router, require_panel, history_filter, validate_endpoint
-from services.password_service import hash_password
-from module.openrouter_client import generate_reply
+from app.config.settings import Settings, settings
+from app.controller.api.panel import router, require_panel, history_filter, validate_endpoint
+from app.services.password_service import hash_password
+from app.module.openrouter_client import generate_reply
 
 # Bacaan NLU satu pesan seperti yang disimpan pencatat NLU (BrainRuntime.baca_chat), beserta konteksnya.
 NLU_CONTOH = json.dumps(
@@ -85,7 +85,7 @@ class PanelTests(unittest.TestCase):
         hashed = base64.b64encode(hash_password("fixture-password").encode()).decode()
         with (
             patch.object(settings, "panel_password_hash", SecretStr(hashed)),
-            patch("controller.api.panel.transaction") as db,
+            patch("app.controller.api.panel.transaction") as db,
         ):
             self.assertEqual(
                 self.client.post(
@@ -111,7 +111,7 @@ class PanelTests(unittest.TestCase):
             with self.assertRaises(HTTPException):
                 validate_endpoint(url)
         with patch(
-            "controller.api.panel.socket.getaddrinfo",
+            "app.controller.api.panel.socket.getaddrinfo",
             return_value=[(2, 1, 6, "", ("169.254.169.254", 443))],
         ):
             with self.assertRaises(HTTPException):
@@ -120,7 +120,7 @@ class PanelTests(unittest.TestCase):
     def test_check_ai_error_is_not_reported_active(self):
         self.app.dependency_overrides[require_panel] = lambda: "fixture-token"
         with patch(
-            "controller.api.panel.api_reply",
+            "app.controller.api.panel.api_reply",
             AsyncMock(side_effect=ValueError("secret must not leak")),
         ):
             result = self.client.post("/api/panel/check-ai")
@@ -133,7 +133,7 @@ class PanelTests(unittest.TestCase):
             402, request=httpx.Request("POST", "https://openrouter.ai"), text="secret"
         )
         error = httpx.HTTPStatusError("secret", request=response.request, response=response)
-        with patch("controller.api.panel.api_reply", AsyncMock(side_effect=error)):
+        with patch("app.controller.api.panel.api_reply", AsyncMock(side_effect=error)):
             result = self.client.post("/api/panel/check-ai")
         self.assertFalse(result.json()["active"])
         self.assertIn("kredit", result.json()["message"])
@@ -141,10 +141,10 @@ class PanelTests(unittest.TestCase):
 
     def test_empty_room_is_archived_and_db_failure_removes_live_room(self):
         from types import SimpleNamespace
-        from controller.api.rooms import router as room_router
-        from controller.middleware.auth import require_authenticated_user
-        from services.room_service import RoomService
-        from services.persistence_service import PersistenceError
+        from app.controller.api.rooms import router as room_router
+        from app.controller.middleware.auth import require_authenticated_user
+        from app.services.room_service import RoomService
+        from app.services.persistence_service import PersistenceError
 
         self.app.include_router(room_router)
         self.app.dependency_overrides[require_authenticated_user] = lambda: SimpleNamespace(
@@ -152,8 +152,8 @@ class PanelTests(unittest.TestCase):
         )
         rooms = RoomService()
         with (
-            patch("controller.api.rooms.room_service", rooms),
-            patch("controller.api.rooms.PersistenceService") as factory,
+            patch("app.controller.api.rooms.room_service", rooms),
+            patch("app.controller.api.rooms.PersistenceService") as factory,
         ):
             factory.return_value.archive_new_room.return_value = True
             response = self.client.post("/api/rooms")
@@ -177,7 +177,7 @@ class OpenRouterTests(unittest.IsolatedAsyncioTestCase):
             request=httpx.Request("POST", "https://openrouter.ai"),
             json={"choices": [{"message": {"content": "OK"}}]},
         )
-        with patch("module.openrouter_client.httpx.AsyncClient") as factory:
+        with patch("app.module.openrouter_client.httpx.AsyncClient") as factory:
             factory.return_value.__aenter__.return_value = client
             result = await generate_reply(
                 "hello", config=Settings(_env_file=None, openrouter_api_key="fixture-key")
@@ -235,7 +235,7 @@ class HistoryFilterTests(unittest.TestCase):
             with self.engine.begin() as db:
                 return operation(db)
 
-        self.db_patch = patch("controller.api.panel.transaction", side_effect=transaction)
+        self.db_patch = patch("app.controller.api.panel.transaction", side_effect=transaction)
         self.db_patch.start()
 
     def tearDown(self):

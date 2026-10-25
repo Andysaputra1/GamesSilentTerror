@@ -5,14 +5,14 @@ from cryptography.fernet import Fernet
 from pydantic import SecretStr
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from config.settings import settings
-from services.ai_runtime_service import (
+from app.config.settings import settings
+from app.services.ai_runtime_service import (
     ai_runtime,
     save_panel_configuration,
     load_panel_configuration,
 )
-from services.persistence_service import PersistenceError
-from controller.api.panel import router, require_panel
+from app.services.persistence_service import PersistenceError
+from app.controller.api.panel import router, require_panel
 
 
 class PanelSecretsTests(unittest.TestCase):
@@ -28,7 +28,7 @@ class PanelSecretsTests(unittest.TestCase):
 
         self.db.execute.side_effect = execute
         self.run = patch(
-            "services.persistence_service.PersistenceService._run",
+            "app.services.persistence_service.PersistenceService._run",
             side_effect=lambda fn: fn(self.db),
         )
         self.run.start()
@@ -82,7 +82,7 @@ class PanelSecretsTests(unittest.TestCase):
     def test_tunnel_token_from_panel_is_encrypted_kept_and_clearable(self):
         with patch.object(settings, "ollama_tunnel_token", SecretStr("env-token")):
             body = {"provider": "docker", "endpoint": "https://example.com"}
-            with patch("controller.api.panel.validate_endpoint", side_effect=lambda e: e):
+            with patch("app.controller.api.panel.validate_endpoint", side_effect=lambda e: e):
                 self.assertEqual(self.client.get("/api/panel/config").json()["token_source"], "env")
                 result = self.client.put(
                     "/api/panel/config", json={**body, "tunnel_token": "panel-token-123"}
@@ -108,7 +108,7 @@ class PanelSecretsTests(unittest.TestCase):
     # MODEL LOKAL: dipilih di panel (4B/14B), dipertahankan bila kosong, dan dipakai tes koneksi.
     def test_local_model_is_selectable_kept_and_used_by_check(self):
         body = {"provider": "docker", "endpoint": "https://example.com"}
-        with patch("controller.api.panel.validate_endpoint", side_effect=lambda e: e):
+        with patch("app.controller.api.panel.validate_endpoint", side_effect=lambda e: e):
             view = self.client.put("/api/panel/config", json=body).json()
             self.assertEqual(view["local_model"], "qwen3:14b")  # bawaan pertama kali
             self.assertIn("qwen3:4b-instruct", view["local_models"])
@@ -123,7 +123,7 @@ class PanelSecretsTests(unittest.TestCase):
             bad = self.client.put("/api/panel/config", json={**body, "model": "qwen3 4b; rm"})
             self.assertEqual(bad.status_code, 400)
             reply = AsyncMock(return_value="OK")
-            with patch("controller.api.panel.local_reply", reply):
+            with patch("app.controller.api.panel.local_reply", reply):
                 self.assertTrue(self.client.post("/api/panel/check-ai").json()["active"])
             self.assertEqual(reply.call_args.kwargs["config"].ollama_model, "qwen3:4b-instruct")
 
@@ -191,7 +191,7 @@ class PanelSecretsTests(unittest.TestCase):
             self.assertIsNone(self.stored)
 
     def test_lowercase_environment_alias(self):
-        from config.settings import Settings
+        from app.config.settings import Settings
 
         with patch.dict("os.environ", {"openrouter_default": "alias-fixture"}):
             config = Settings(_env_file=None)

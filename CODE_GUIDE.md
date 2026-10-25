@@ -12,18 +12,19 @@ permintaan pengguna.
 | `frontend/src/app/core/` | Request API, sesi, guard navigasi, dan komponen profil |
 | `frontend/src/app/app.routes.ts` | Route frontend dan guard yang harus dilalui |
 | `frontend/docker/start.mjs` | Menjalankan frontend lokal menggunakan konfigurasi publik |
-| `backend/main.py` | Startup FastAPI, Socket.IO, model analisis, dan lifecycle server |
-| `backend/controller/controller_main.py` | Daftar router HTTP yang aktif |
-| `backend/controller/api/` | Validasi request, autentikasi route, dan respons HTTP |
-| `backend/services/` | Aturan aplikasi, pertandingan, analisis, dan transaksi |
-| `backend/models/` | Kueri SQL berparameter |
-| `backend/realtime/socket_handlers.py` | Autentikasi socket, otorisasi, penyimpanan, dan siaran chat |
-| `backend/config/` | Konfigurasi environment dan database |
-| `backend/controller/middleware/` | Autentikasi request, batas percobaan login, dan CORS |
-| `backend/module/` | Koneksi database, klien AI, dan CLI akun |
+| `backend/app/` | Semua kode aplikasi: entry point, controller, service, model, konfigurasi |
+| `backend/app/main.py` | Startup FastAPI, Socket.IO, model analisis, dan lifecycle server |
+| `backend/app/controller/controller_main.py` | Daftar router HTTP yang aktif |
+| `backend/app/controller/api/` | Validasi request, autentikasi route, dan respons HTTP |
+| `backend/app/services/` | Aturan aplikasi, pertandingan, analisis, dan transaksi |
+| `backend/app/models/` | Kueri SQL berparameter |
+| `backend/app/realtime/socket_handlers.py` | Autentikasi socket, otorisasi, penyimpanan, dan siaran chat |
+| `backend/app/config/` | Konfigurasi environment dan database |
+| `backend/app/controller/middleware/` | Autentikasi request, batas percobaan login, dan CORS |
+| `backend/app/module/` | Koneksi database, klien AI, dan CLI akun |
 | `backend/public/panel/` | Halaman administrasi yang disajikan backend |
 | `backend/scripts/` | Penyiapan environment deployment dan kredensial panel |
-| `backend/services/npc_brain/` | Runtime otak NPC; `generated/` adalah ekspor notebook (jangan diedit manual) |
+| `backend/app/services/npc_brain/` | Runtime otak NPC; `generated/` adalah ekspor notebook (jangan diedit manual) |
 | `backend/tests/` | Unit/integration test serta skrip smoke test manual |
 
 Daftar router di `controller_main.py` adalah acuan endpoint aktif. Modul admin,
@@ -48,7 +49,7 @@ file saja tidak berarti route tersebut dibuka pada aplikasi utama.
 5. **Chat dan AI:** handler socket memeriksa sesi/hak chat, lalu menyimpan dan
    menyiarkan pesan tanpa menganalisisnya. Pada pertandingan, `NPCService`
    mengambil langkah mandiri dari timer untuk setiap bot: snapshot privat ->
-   `services/npc_brain` (IndoBERT -> fuzzy/utility/behavior tree hasil ekspor
+   `backend/app/services/npc_brain` (IndoBERT -> fuzzy/utility/behavior tree hasil ekspor
    notebook -> NLG tervalidasi) -> aksi/vote engine serta chat. Fase diperiksa ulang
    sebelum keputusan diterapkan. Vote/aksi langsung diterapkan; chat bot melewati
    "lantai bicara" (`NPCService._ambil_lantai`): paling banyak `LANTAI_MAKS` (3) bot
@@ -63,7 +64,7 @@ file saja tidak berarti route tersebut dibuka pada aplikasi utama.
 7. **Panel:** sesi administrator terpisah dari pemain. Panel membaca arsip dan
    menyimpan konfigurasi AI; nilai API key tidak dikirim kembali ke browser.
    Checker per room menampilkan penjelasan setiap langkah bot yang dibuat
-   `services/npc_brain/penjelasan.py` di `BrainRuntime.langkah` (identitas, parameter,
+   `backend/app/services/npc_brain/penjelasan.py` di `BrainRuntime.langkah` (identitas, parameter,
    penalaran fuzzy/utility/BT, keputusan) dan dilengkapi hasil engine/NLG di
    `NPCService._trace`. Daftar jejak hanya membawa `ringkas`; penjelasan lengkap
    diambil per jejak lewat `GET /api/panel/checker/{code}/jejak/{id}`.

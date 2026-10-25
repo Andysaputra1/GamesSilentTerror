@@ -85,7 +85,7 @@ Tanpa model SVM, pesan pemain masih bisa diteruskan dan bot tetap bermain, tetap
 
 ### 4. Siapkan otak NPC (IndoBERT + fuzzy/utility/behavior tree + NLG)
 
-Bot memakai logika notebook skripsi (`training/prethesis/ai_2_dataset_baru`). Kode logikanya sudah ada di `backend/services/npc_brain/generated/` (hasil ekspor, jangan diedit manual). Yang perlu disalin hanyalah dua folder model IndoBERT (±440 MB masing-masing, diabaikan Git):
+Bot memakai logika notebook skripsi (`training/prethesis/ai_2_dataset_baru`). Kode logikanya sudah ada di `backend/app/services/npc_brain/generated/` (hasil ekspor, jangan diedit manual). Yang perlu disalin hanyalah dua folder model IndoBERT (±440 MB masing-masing, diabaikan Git):
 
 ```text
 backend/artifacts/indobert/intent/   ← models/notebook_standalone/intent_classifier_transformer
@@ -221,7 +221,7 @@ Selama pertandingan aktif, membuka halaman aplikasi lain/tab baru atau login ula
 Akun yang sama di beberapa tab tetap satu pemain. Teman bisa mendaftar sendiri lewat halaman login, ditambahkan dari panel **Manajemen user**, atau dibuat lewat CLI lokal (password diminta tersembunyi dan disimpan sebagai hash; akun lama tidak ditimpa):
 
 ```sh
-docker compose exec ai-engine python -m module.create_user teman1 --name "Teman Satu"
+docker compose exec ai-engine python -m app.module.create_user teman1 --name "Teman Satu"
 ```
 
 Gunakan `-f docker-compose.gpu.yml` jika memakai stack NVIDIA. Setiap teman login dengan akun sendiri, lalu gabung memakai kode room yang sama. Pengujian lintas perangkat/LAN memerlukan konfigurasi CORS/host yang sesuai.
@@ -330,13 +330,17 @@ Jika mengubah daftar model lokal yang harus diunduh, jalankan pula `docker compo
 ```text
 frontend/             Angular: login, main page, lobby, game/chat, survei
 backend/              Python FastAPI + Socket.IO
-  config/             Konfigurasi aplikasi, AI, MySQL
-  controller/         Endpoint API dan middleware
-  services/           Logika autentikasi, ruangan, engine pertandingan, analisis AI
-    npc_brain/        Runtime otak NPC; generated/ = ekspor notebook skripsi
-  models/             Query SQL terparameterisasi
-  module/             Konektor MySQL, klien Ollama/OpenRouter, CLI akun
-  realtime/           Event Socket.IO
+  app/                Semua kode aplikasi Python
+    __init__.py       Paket aplikasi
+    main.py           Entry point ASGI (app.main:asgi_app)
+    config/           Konfigurasi aplikasi, AI, MySQL
+    controller/       Endpoint API dan middleware
+    services/         Logika autentikasi, ruangan, engine pertandingan, analisis AI
+      npc_brain/      Runtime otak NPC; generated/ = ekspor notebook skripsi
+    models/           Query SQL terparameterisasi
+    module/           Konektor MySQL, klien Ollama/OpenRouter, CLI akun
+    realtime/         Event Socket.IO
+    schemas/          Validasi request/response API
   public/panel/       Halaman panel administrator
   artifacts/svm/      Model intent SVM privat, disediakan terpisah
   artifacts/indobert/ Model IndoBERT intent + target untuk otak NPC (disalin manual)

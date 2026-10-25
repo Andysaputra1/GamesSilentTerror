@@ -16,7 +16,7 @@ from pathlib import Path
 
 BACKEND = Path(sys.argv[1]).resolve()
 sys.path.insert(0, str(BACKEND))
-from services import match_engine  # noqa: E402
+from app.services import match_engine  # noqa: E402
 
 NAMA = ["NOX", "ECHO", "VEIL", "RAVEN", "ASH", "DUSK", "IRIS", "SAGE", "ONYX", "LARK"]
 URUTAN_CAMPURAN = ("fuzzy", "utility", "bt")
@@ -24,7 +24,7 @@ RONDE_MAKS = 30
 
 
 def muat(nama):
-    berkas = BACKEND / "services" / "npc_brain" / "generated" / f"{nama}.py"
+    berkas = BACKEND / "app" / "services" / "npc_brain" / "generated" / f"{nama}.py"
     spec = importlib.util.spec_from_file_location(f"sim_{nama}", berkas)
     modul = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(modul)

@@ -7,10 +7,10 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
-from controller.api.auth import router
-from controller.middleware.auth_limits import _attempts
-from config.settings import settings
-from services.google_identity_service import nonces
+from app.controller.api.auth import router
+from app.controller.middleware.auth_limits import _attempts
+from app.config.settings import settings
+from app.services.google_identity_service import nonces
 
 
 class AccountTests(unittest.TestCase):
@@ -36,7 +36,7 @@ class AccountTests(unittest.TestCase):
                 )
             )
         self.session_patch = patch(
-            "services.auth_service.SessionLocal", sessionmaker(bind=self.engine)
+            "app.services.auth_service.SessionLocal", sessionmaker(bind=self.engine)
         )
         self.session_patch.start()
         app = FastAPI()
@@ -128,7 +128,7 @@ class AccountTests(unittest.TestCase):
         token = self.register().json()["access_token"]
         headers = {"Authorization": "Bearer " + token}
         with patch(
-            "models.auth_queries.update_display_name", side_effect=SQLAlchemyError("test failure")
+            "app.models.auth_queries.update_display_name", side_effect=SQLAlchemyError("test failure")
         ):
             response = self.client.post(
                 "/api/auth/me", headers=headers, json={"display_name": "New Name"}
@@ -200,7 +200,7 @@ class AccountTests(unittest.TestCase):
         with (
             patch.object(settings, "google_client_id", "test-client"),
             patch(
-                "services.google_identity_service.id_token.verify_oauth2_token", return_value=claims
+                "app.services.google_identity_service.id_token.verify_oauth2_token", return_value=claims
             ) as verify,
         ):
             response = self.client.post(
@@ -261,7 +261,7 @@ class AccountTests(unittest.TestCase):
         )
 
     def test_username_change_conflicts_rooms_and_google_identity(self):
-        from services.room_service import room_service
+        from app.services.room_service import room_service
 
         first, _ = self.google(name="Google Name")
         original = first.json()["user"]["username"]
@@ -315,7 +315,7 @@ class AccountTests(unittest.TestCase):
         with (
             patch.object(settings, "google_client_id", "test-client"),
             patch(
-                "services.google_identity_service.id_token.verify_oauth2_token",
+                "app.services.google_identity_service.id_token.verify_oauth2_token",
                 side_effect=ValueError("bad token"),
             ),
         ):

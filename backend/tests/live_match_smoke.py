@@ -10,9 +10,9 @@ import secrets
 import time
 import httpx
 from sqlalchemy import text
-from models.auth_queries import create_account
-from module.mysql_connector import SessionLocal
-from services.password_service import hash_password
+from app.models.auth_queries import create_account
+from app.module.mysql_connector import SessionLocal
+from app.services.password_service import hash_password
 
 
 # TEST LIVE: enam sesi terpisah bermain 2 ronde, menguji skill/privasi dan kemenangan.

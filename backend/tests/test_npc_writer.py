@@ -14,9 +14,9 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
-from config.settings import Settings
-from controller.api.panel import require_panel
-from services.npc_brain.runtime import (
+from app.config.settings import Settings
+from app.controller.api.panel import require_panel
+from app.services.npc_brain.runtime import (
     JALUR_PENULIS, BrainRuntime, NLUBersama, NLUCadangan, OtakBot,
 )  # fmt: skip
 
@@ -67,7 +67,7 @@ class WriterChainTests(unittest.TestCase):
         self.awal = (k.penulis, list(k.urutan_penulis), k.model_openrouter, k.model_tautan)
         # Tanpa jaringan: cek jalur (Claude 8 token, endpoint OpenRouter/link) diganti mock.
         self.cek = self.enterContext(patch.object(type(self.runtime), "_cek_penulis"))
-        self.enterContext(patch("services.npc_brain.runtime.ai_runtime.current", konfigurasi_ai))
+        self.enterContext(patch("app.services.npc_brain.runtime.ai_runtime.current", konfigurasi_ai))
 
     def tearDown(self):
         penulis, urutan, model, model_tautan = self.awal
@@ -193,9 +193,9 @@ class WriterCheckTests(unittest.TestCase):
         self.runtime = runtime_siap()
         self.addCleanup(self.runtime.tutup)
         self.runtime.konfigurasi.penulis = "otomatis"
-        self.enterContext(patch("services.npc_brain.runtime.ai_runtime.current", konfigurasi_ai))
+        self.enterContext(patch("app.services.npc_brain.runtime.ai_runtime.current", konfigurasi_ai))
         self.enterContext(
-            patch("services.npc_brain.runtime.ai_runtime.diatur_panel", return_value=True)
+            patch("app.services.npc_brain.runtime.ai_runtime.diatur_panel", return_value=True)
         )
         # Tanpa jaringan: cek tiap jalur menunggu aba-aba lalu melapor sesuai kelasnya.
         self.lepas = threading.Event()
@@ -254,7 +254,7 @@ class NpcConfigStoreTests(unittest.TestCase):
     """Baris konfigurasi NPC di DB: baris lama/tidak valid aman, simpan gagal dikembalikan utuh."""
 
     def test_old_and_invalid_rows_keep_env_values(self):
-        from services import npc_config_service as layanan
+        from app.services import npc_config_service as layanan
 
         with (
             patch.object(layanan, "brain_runtime") as runtime,
@@ -272,8 +272,8 @@ class NpcConfigStoreTests(unittest.TestCase):
                 layanan.load_npc_configuration()  # tidak melempar error saat startup
 
     def test_failed_save_restores_every_field(self):
-        from services import npc_config_service as layanan
-        from services.persistence_service import PersistenceError
+        from app.services import npc_config_service as layanan
+        from app.services.persistence_service import PersistenceError
 
         sebelum = {"metode": "campuran", "penulis_diminta": "otomatis", "validasi": True,
                    "urutan_penulis": ["openrouter", "tautan"], "model_openrouter": "",
@@ -315,7 +315,7 @@ class WriterSettingsTests(unittest.TestCase):
 
 class PanelWriterApiTests(unittest.TestCase):
     def setUp(self):
-        from controller.api import panel, panel_npc
+        from app.controller.api import panel, panel_npc
 
         self.app = FastAPI()
         self.app.include_router(panel_npc.router)
@@ -329,8 +329,8 @@ class PanelWriterApiTests(unittest.TestCase):
                      "urutan_penulis": ["openrouter", "tautan"], "model_openrouter": "",
                      "model_tautan": "qwen3:4b-instruct"}  # fmt: skip
         with (
-            patch("services.npc_config_service.brain_runtime") as runtime,
-            patch("services.npc_config_service.PersistenceService._run") as simpan,
+            patch("app.services.npc_config_service.brain_runtime") as runtime,
+            patch("app.services.npc_config_service.PersistenceService._run") as simpan,
         ):
             runtime.atur.return_value = ringkasan
             response = self.client.put(
@@ -353,7 +353,7 @@ class PanelWriterApiTests(unittest.TestCase):
         self.assertEqual(bad.status_code, 422)
 
     def test_check_endpoint_rebuilds_and_checks_in_background(self):
-        with patch("controller.api.panel_npc.brain_runtime") as runtime:
+        with patch("app.controller.api.panel_npc.brain_runtime") as runtime:
             runtime.segarkan_penulis.return_value = {"penulis": "openrouter"}
             response = self.client.post("/api/panel/npc/cek-penulis")
         self.assertEqual(response.status_code, 200)

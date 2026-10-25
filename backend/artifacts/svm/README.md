@@ -1,7 +1,7 @@
 # Model klasifikasi intent
 
 Letakkan model terlatih di `intent_classifier.pkl` dalam folder ini.
-Backend memuatnya sekali saat startup melalui `config/settings.py`.
+Backend memuatnya sekali saat startup melalui `app/config/settings.py`.
 Lokasi dapat diganti dengan environment `INTENT_MODEL_PATH`.
 
 Folder ini bukan aset publik dan tidak dipasang sebagai static URL.

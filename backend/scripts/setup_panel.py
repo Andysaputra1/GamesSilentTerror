@@ -7,7 +7,7 @@ import secrets
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from services.password_service import hash_password
+from app.services.password_service import hash_password
 
 
 # Buat kunci enkripsi panel hanya jika environment belum memilikinya.

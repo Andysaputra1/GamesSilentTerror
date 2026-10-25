@@ -4,7 +4,7 @@ import asyncio
 import unittest
 from unittest.mock import patch
 
-from services import simulasi_service as modul
+from app.services import simulasi_service as modul
 from tests.test_npc_brain import runtime_siap
 
 

@@ -3,8 +3,8 @@
 import unittest
 from unittest.mock import AsyncMock, patch
 import httpx
-from config.settings import Settings
-from module import ollama_client
+from app.config.settings import Settings
+from app.module import ollama_client
 
 
 class ProviderTests(unittest.IsolatedAsyncioTestCase):
@@ -16,8 +16,8 @@ class ProviderTests(unittest.IsolatedAsyncioTestCase):
             200, request=request, json={"message": {"content": " Reply "}}
         )
         with (
-            patch("module.ollama_client.settings", Settings(_env_file=None, OLLAMA_MODEL="8")),
-            patch("module.ollama_client.httpx.AsyncClient") as factory,
+            patch("app.module.ollama_client.settings", Settings(_env_file=None, OLLAMA_MODEL="8")),
+            patch("app.module.ollama_client.httpx.AsyncClient") as factory,
         ):
             factory.return_value.__aenter__.return_value = mock_client
             self.assertEqual(await ollama_client.generate_reply("hello"), "Reply")

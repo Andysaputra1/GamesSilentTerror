@@ -13,4 +13,4 @@ EXPOSE 8000
 # Proxy headers: IP pemain berasal dari X-Forwarded-For yang ditulis Caddy (Caddy membuang header kiriman
 # klien). Aman karena port backend tidak dibuka ke luar; tanpa ini semua pemain terlihat sebagai IP Caddy
 # dan berbagi satu batas percobaan login.
-CMD ["uvicorn", "main:asgi_app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--proxy-headers", "--forwarded-allow-ips", "*"]
+CMD ["uvicorn", "app.main:asgi_app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--proxy-headers", "--forwarded-allow-ips", "*"]

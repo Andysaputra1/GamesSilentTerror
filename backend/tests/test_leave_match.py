@@ -9,11 +9,11 @@ from unittest.mock import patch
 from fastapi import FastAPI, Header
 from fastapi.testclient import TestClient
 
-from controller.api.rooms import router
-from controller.middleware.auth import require_authenticated_user
-from services.match_engine import Match, snapshot_berlabel
-from services.npc_service import npc_context
-from services.room_service import RoomService
+from app.controller.api.rooms import router
+from app.controller.middleware.auth import require_authenticated_user
+from app.services.match_engine import Match, snapshot_berlabel
+from app.services.npc_service import npc_context
+from app.services.room_service import RoomService
 
 RAHASIA = " Role tetap dirahasiakan sampai permainan selesai."
 KUNCI_PUBLIK = {"name", "label", "alive", "skin_id"}
@@ -276,7 +276,7 @@ class LeaveRoomTests(unittest.TestCase):
         self.assertNotIn(self.room.code, self.rooms.rooms)
 
     def test_npc_views_show_the_left_player_as_not_alive(self):
-        from services.npc_brain.generated import otak_bt, otak_fuzzy, otak_utility
+        from app.services.npc_brain.generated import otak_bt, otak_fuzzy, otak_utility
 
         self.rooms.leave(self.room.code, "alice")
         context = npc_context(self.match, "NOX")
@@ -291,7 +291,7 @@ class LeaveRoomTests(unittest.TestCase):
                 self.assertIn({"nama": "alice", "hidup": False}, view["pemain"])
 
     def test_bot_memory_records_leaver_without_tribunal_blame(self):
-        from services.npc_brain.generated import otak_bt, otak_fuzzy, otak_utility
+        from app.services.npc_brain.generated import otak_bt, otak_fuzzy, otak_utility
 
         sebelum = snapshot_berlabel(self.match.snapshot("ECHO"), self.match.labels)
         self.rooms.leave(self.room.code, "alice")
@@ -316,7 +316,7 @@ class LeaveRoomTests(unittest.TestCase):
             "alice"
         ): SimpleNamespace(username=x_user)
         base = f"/api/rooms/{self.room.code}"
-        with patch("controller.api.rooms.room_service", self.rooms), TestClient(app) as client:
+        with patch("app.controller.api.rooms.room_service", self.rooms), TestClient(app) as client:
             for _ in range(2):
                 response = client.post(base + "/leave", headers={"x-user": "alice"})
                 self.assertEqual((response.status_code, response.json()), (200, {"left": True}))
