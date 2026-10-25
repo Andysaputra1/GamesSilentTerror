@@ -41,6 +41,8 @@ backend/public/uploads/
 
 # Private design references and conversation material (local only).
 /communicationfolder/
+# Rencana kerja untuk dibagikan ke coder lain (local only).
+/plan/
 
 # ==========================================
 # 3. IDEs, EDITORS & SYSTEM
