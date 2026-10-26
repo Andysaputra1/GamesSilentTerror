@@ -70,6 +70,8 @@ class PanelTests(unittest.TestCase):
             ("erd", "ERD Silent Terror"),
             ("proses-ai", "Proses AI Silent Terror"),
             ("arsitektur", "Arsitektur Sistem Silent Terror"),
+            ("kode-ai", "Kode AI Bot"),
+            ("diagram-alir-ai", "Diagram Alir AI Bot"),
         ]:
             page = self.client.get(f"/panel/dokumen/{nama}")
             self.assertEqual(page.status_code, 200)
