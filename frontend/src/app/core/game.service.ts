@@ -101,6 +101,8 @@ export interface MatchView {
     // korban Hostage tim malam ini.
     ally_gags?: string[];
     syndicate_target?: string | null;
+    // Hanya untuk Hitman: hasil Hostage tim tiap malam (gagal = target dijaga Guard).
+    syndicate_hostages?: { round: number; name: string; success: boolean }[];
   };
 }
 export interface GameSnapshot {

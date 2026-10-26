@@ -112,11 +112,44 @@
   rotate: -18deg;
   animation: cap 0.45s cubic-bezier(0.2, 1.6, 0.4, 1) both;
 }
+/* GAGAL SANDERA: cap kelabu muncul, bertahan sebentar, lalu memudar (target dijaga Guard). */
+.stamp-sandera.stamp-gagal {
+  color: #4a4038;
+  animation: cap-gagal 3.2s ease-out forwards;
+}
+@keyframes cap-gagal {
+  0% {
+    opacity: 0;
+    transform: scale(2.2);
+  }
+  12%,
+  70% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+@keyframes cap-pudar {
+  0%,
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .peek-role,
   .stamp-sandera,
   .player-card.guarded::after {
     animation: none;
+  }
+  /* Tanpa gerak, cap gagal tetap harus hilang: cukup memudar. */
+  .stamp-sandera.stamp-gagal {
+    animation: cap-pudar 3.2s linear forwards;
   }
 }

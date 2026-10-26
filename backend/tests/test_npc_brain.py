@@ -389,6 +389,34 @@ class NPCServiceBrainTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([a["aksi"] for a in otak["NOX"].ingatan.aksi_bot].count("jawab"), 1)
 
 
+class HostageResultTests(unittest.TestCase):
+    # Bot Hitman memakai hasil Hostage pasti dari server (me.syndicate_hostages), bukan dugaan dari aktivitas
+    # target: ingatan yang baru melihat snapshot siang tetap tahu korban berhasil dan target yang dijaga.
+    def test_hitman_brains_use_certain_hostage_results(self):
+        import importlib
+
+        names = ["hitman", "spy", "stalker", "civilian", "civilian2", "civilian3"]
+        game = Match(names, [], now=0, rng=random.Random(1))
+        for name, player in game.players.items():
+            player.role = name.rstrip("23")
+        game.phase = "night"
+        game.act("hitman", "hostage", "civilian")
+        game.act("spy", "guard", "civilian")
+        game.resolve_night()
+        game.round, game.phase = 2, "night"
+        game.actions.clear()
+        game.act("hitman", "hostage", "civilian2")
+        game.resolve_night()
+        game.round, game.phase = 3, "day"
+        for modul in ("otak_fuzzy", "otak_utility", "otak_bt"):
+            M = importlib.import_module(f"app.module.npc_brain.generated.{modul}")
+            ingatan = M.Ingatan("hitman")
+            view = ingatan.sinkron_snapshot(game.snapshot("hitman"), time.time())
+            tahu = M.pengetahuan_peran(ingatan, view)
+            self.assertEqual(tahu["korban_saya"], {"civilian2"}, modul)
+            self.assertEqual(tahu["dijaga"], {"civilian": 1}, modul)
+
+
 class ExportFreshnessTests(unittest.TestCase):
     def test_generated_modules_match_notebooks_when_available(self):
         from pathlib import Path

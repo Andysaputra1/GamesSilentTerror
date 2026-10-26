@@ -365,18 +365,30 @@ export class Game implements OnInit, OnDestroy {
     return !!game.me.ally_gags?.includes(name);
   }
 
-  // SANDERA: terlihat oleh korban di kartunya sendiri dan oleh Syndicate untuk korban tim malam ini
-  // (satu per malam: pilihan terbanyak); berhasil atau tidaknya (Guard) tidak dikirim server. Di akhir,
-  // status dibuka untuk semua.
+  // SANDERA: terlihat oleh korban di kartunya sendiri dan oleh Syndicate: korban tim malam ini (satu per
+  // malam: pilihan terbanyak), lalu korban yang berhasil disandera tetap bercap sampai akhir
+  // (me.syndicate_hostages). Di akhir, status dibuka untuk semua.
   isHostage(name: string): boolean {
     const game = this.game;
     if (!game) return false;
     if (game.winner) return !!game.players.find((player) => player.name === name)?.hostage;
     if (name === game.me.name) return !!game.me.hostage;
-    if (game.phase !== 'night' || game.me.role !== 'hitman') return false;
+    if (game.me.role !== 'hitman') return false;
+    if (game.me.syndicate_hostages?.some((h) => h.success && h.name === name)) return true;
+    if (game.phase !== 'night') return false;
     // Backend lama tanpa syndicate_target: pakai pilihan sendiri.
     const action = game.me.action?.ability === 'hostage' ? game.me.action.target : null;
     return (game.me.syndicate_target ?? action) === name;
+  }
+
+  // GAGAL SANDERA: pada siang sesudah malamnya, Syndicate melihat cap "Gagal disandera" yang memudar di
+  // kartu target yang dijaga Guard.
+  failedHostage(name: string): boolean {
+    const game = this.game;
+    if (!game || game.winner || game.phase !== 'day' || game.me.role !== 'hitman') return false;
+    return !!game.me.syndicate_hostages?.some(
+      (h) => !h.success && h.name === name && h.round === game.round - 1,
+    );
   }
 
   // Terjemahkan pemenang tim menjadi hasil pribadi.

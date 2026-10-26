@@ -105,6 +105,7 @@ def snapshot_berlabel(snapshot, labels):
     if me.get("action"):
         me["action"] = {**me["action"], "target": nama(me["action"]["target"])}
     me["intel"] = [{**x, "name": nama(x["name"])} for x in me["intel"]]
+    me["syndicate_hostages"] = [{**x, "name": nama(x["name"])} for x in me["syndicate_hostages"]]
     return s
 
 
@@ -173,6 +174,8 @@ class Match:
         self.votes = {}
         # Gag Order milik Syndicate: satu Gag per siang untuk seluruh tim, cooldown satu ronde penuh.
         self.next_gag = 1
+        # Hasil Hostage Syndicate per malam (berhasil = target tidak dijaga Guard); hanya dikirim ke Hitman.
+        self.syndicate_log = []
         self.skip_consents = set()
         self.ready_consents = set()
         self.revealed = set()
@@ -371,8 +374,12 @@ class Match:
                 )
                 player.next_peek = self.round + 2
         target = self.syndicate_target()
-        if target is not None and target not in guards:
-            self.players[target].hostage = True
+        if target is not None:
+            self.syndicate_log.append(
+                {"round": self.round, "name": target, "success": target not in guards}
+            )
+            if target not in guards:
+                self.players[target].hostage = True
         # Rekap identik untuk semua hasil, termasuk kegagalan atau target yang sudah Hostage.
         self.events.append(
             "Malam selesai. Semua aksi telah diselesaikan; identitas dan target tidak diumumkan."
@@ -738,6 +745,8 @@ class Match:
                 "syndicate_target": (
                     self.syndicate_target() if hitman and self.phase == "night" else None
                 ),
+                # Hasil Hostage tim tiap malam (gagal = dijaga Guard), hanya untuk Syndicate.
+                "syndicate_hostages": list(self.syndicate_log) if hitman else [],
                 # Target Gag ronde ini (Gag dipakai bersama Syndicate); warga hanya tahu status dirinya sendiri.
                 "ally_gags": [p.name for p in self.players.values() if p.gagged] if hitman else [],
                 # Pilihan Hostage rekan malam ini agar Syndicate bisa sepakat satu target.

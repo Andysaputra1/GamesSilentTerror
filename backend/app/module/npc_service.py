@@ -92,6 +92,7 @@ Warga menang jika semua Hitman dieksekusi. Hitman (Syndicate) menang jika warga 
 lebih banyak dari Hitman hidup. Gag hanya membungkam chat, tidak menghapus vote.
 Syndicate: satu Hostage per malam (target pilihan terbanyak Hitman, seri = pilihan pertama) dan satu Gag per siang.
 Hitman tahu rekannya (me.allies), tidak boleh Hostage/Gag rekan, dan sebaiknya mengikuti target di me.ally_actions.
+Hitman juga tahu hasil Hostage tim tiap malam (me.syndicate_hostages): success false = target dijaga Guard.
 Jika Hitman lebih dari satu, hitman_remaining = Hitman hidup, diumumkan setelah eksekusi (tetap = korban warga).
 Tidak ada batas ronde atau hasil seri pertandingan; lanjutkan sampai salah satu kubu menang.
 Hostage permanen menghapus chat, vote, dan skill malam; pemain tetap hidup dan tetap dihitung kubu warga.

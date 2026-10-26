@@ -1,8 +1,8 @@
 """FILE INI DIHASILKAN OTOMATIS oleh scripts/ekspor_otak_npc.py. JANGAN DIEDIT MANUAL.
 
 Sumber : npc_fuzzy.ipynb
-Sidik  : 5592ceef3d470dcf
-Dibuat : 2026-10-26 00:47 UTC
+Sidik  : cea4cc07ef17c58d
+Dibuat : 2026-10-26 01:08 UTC
 
 Perubahan logika bot dilakukan di notebook skripsi, dijalankan ulang sampai semua
 skenario/pengujian lulus, lalu diekspor ulang dengan skrip ini.
@@ -573,7 +573,10 @@ class Ingatan:
                      "vote": me["vote"], "ability": me.get("ability"), "can_act": bool(me.get("can_act")),
                      "next_gag": me.get("next_gag", 1), "next_peek": me.get("next_peek", 1),
                      "last_guard": me.get("last_guard"), "action": me.get("action"),
-                     "rekan": list(me.get("allies", [])), "aksi_rekan": aksi_rekan},
+                     "rekan": list(me.get("allies", [])), "aksi_rekan": aksi_rekan,
+                     # Hasil Hostage tim tiap malam dari server (hanya Hitman): berhasil, atau gagal karena Guard.
+                     "hasil_sandera": [{"ronde": h["round"], "pemain": h["name"], "berhasil": h["success"]}
+                                       for h in me.get("syndicate_hostages", [])]},
         }
 
 POLA_GAG = r"\b(?:di-?gag|kena\s+gag|dibungkam|di-?mute|kena\s+mute)\b"
@@ -1109,7 +1112,8 @@ def _konteks_permainan(ingatan, view, publik, chats, relasi, klaim, p_sandera):
 
 # Pengetahuan pasti: fakta yang hanya diketahui bot dari role-nya sendiri (hasil Peek, rekan, korban Hostage, ...).
 # Hasilnya dibaca terapkan_pengetahuan, fitur Hitman/Spy, kandidat tindakan, serta chat_pasti/vote_pasti lewat ctx.
-# Masukan : ingatan (intel, eksekusi, keluar, pilihan_syndicate, chat/vote), view (role, rekan, komposisi, fase).
+# Masukan : ingatan (intel, eksekusi, keluar, pilihan_syndicate, chat/vote), view (role, rekan, hasil_sandera,
+#           komposisi, fase).
 # Keluaran: dict {peran, pasti_hitman, hitman_diketahui, bersih, rekan, korban_saya, korban_baru, dijaga, tidak_dijaga}.
 # Dipakai oleh: putuskan.
 def pengetahuan_peran(ingatan, view):
@@ -1141,7 +1145,14 @@ def pengetahuan_peran(ingatan, view):
     korban_saya, korban_baru, dijaga = set(), set(), {}
     if peran == "hitman":
         tanda = tanda_aktivitas(ingatan, view)
-        for n in sorted(ingatan.pilihan_syndicate):
+        # Hasil pasti dari server (me.syndicate_hostages) menggantikan dugaan dari aktivitas target.
+        pasti = {h["ronde"]: h for h in view["saya"].get("hasil_sandera", [])}
+        for n, h in pasti.items():
+            if h["berhasil"]:
+                korban_saya.add(h["pemain"])
+            else:
+                dijaga[h["pemain"]] = n
+        for n in sorted(set(ingatan.pilihan_syndicate) - set(pasti)):
             x = ingatan.target_syndicate(n)
             if any(t[0] > n for t in tanda[x]):
                 dijaga[x] = n  # target tetap aktif sesudah malam n: Spy menjaganya malam itu

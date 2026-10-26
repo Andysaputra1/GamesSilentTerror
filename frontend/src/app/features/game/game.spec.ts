@@ -1216,7 +1216,7 @@ describe('Game', () => {
     expect(cards[2].querySelector('.stamp-sandera')).toBeNull();
     game.me = { ...game.me, syndicate_target: undefined };
 
-    // Setelah malam, server tidak memberi tahu Hitman apakah Hostage berhasil (bisa digagalkan Guard).
+    // Setelah malam tanpa hasil dari server (backend lama tanpa syndicate_hostages): cap hilang.
     game.phase = 'tribunal';
     game.me.action = null;
     component.target = '';
@@ -1241,5 +1241,39 @@ describe('Game', () => {
     cards = render().querySelectorAll('.player-card');
     expect(cards[2].querySelector('.stamp-sandera')).not.toBeNull();
     expect(fixture.nativeElement.querySelectorAll('.stamp-sandera').length).toBe(1);
+  });
+
+  // HASIL SANDERA (hanya Hitman): berhasil → cap tetap sampai akhir; gagal (dijaga Guard) → cap
+  // "Gagal disandera" pada siang sesudah malamnya, lalu memudar lewat CSS.
+  it('keeps a successful hostage stamp and shows a fading failed stamp for the Syndicate', () => {
+    const game = snapshot().game;
+    game.players = ['alice', 'NOX', 'bob'].map((name) => ({ name, alive: true }));
+    game.phase = 'day';
+    game.round = 3;
+    game.me = {
+      ...game.me,
+      role: 'hitman',
+      action: null,
+      syndicate_hostages: [
+        { round: 1, name: 'bob', success: true },
+        { round: 2, name: 'NOX', success: false },
+      ],
+    };
+    component.game = game;
+    component.target = '';
+    let cards = render().querySelectorAll('.player-card');
+    expect(cards[2].querySelector('.stamp-sandera')?.textContent).toBe('Disandera');
+    expect(cards[2].querySelector('.player')?.classList).toContain('held');
+    expect(cards[1].querySelector('.stamp-gagal')?.textContent).toBe('Gagal disandera');
+    expect(cards[1].querySelector('.player')?.classList).not.toContain('held');
+    // Cap gagal hanya pada siang sesudah malamnya; cap berhasil tetap di fase lain.
+    game.phase = 'tribunal';
+    cards = render().querySelectorAll('.player-card');
+    expect(cards[1].querySelector('.stamp-gagal')).toBeNull();
+    expect(cards[2].querySelector('.stamp-sandera')).not.toBeNull();
+    // Warga tidak pernah menerima data ini, jadi tidak melihat cap apa pun.
+    game.phase = 'day';
+    game.me = { ...game.me, name: 'alice', role: 'civilian', syndicate_hostages: [] };
+    expect(render().querySelector('.stamp-sandera')).toBeNull();
   });
 });

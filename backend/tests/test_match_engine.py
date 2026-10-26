@@ -319,6 +319,30 @@ class SyndicateTests(unittest.TestCase):
         self.game.resolve_night()
         self.assertFalse(self.game.players["civilian4"].hostage)
 
+    def test_hostage_results_per_night_are_private_to_the_syndicate(self):
+        self.night()
+        self.game.act("hitman", "hostage", "civilian")
+        self.game.resolve_night()
+        self.game.round = 2
+        self.night()
+        self.game.act("hitman2", "hostage", "civilian4")
+        self.game.act("spy", "guard", "civilian4")
+        self.game.resolve_night()
+        hasil = [
+            {"round": 1, "name": "civilian", "success": True},
+            {"round": 2, "name": "civilian4", "success": False},
+        ]
+        self.game.phase = "day"
+        for hitman in ("hitman", "hitman2", "hitman3"):
+            self.assertEqual(self.game.snapshot(hitman)["me"]["syndicate_hostages"], hasil)
+        for viewer in ("spy", "stalker", "civilian", "civilian4"):
+            self.assertEqual(self.game.snapshot(viewer)["me"]["syndicate_hostages"], [])
+        # Malam tanpa pilihan Hostage tidak menambah catatan.
+        self.game.round = 3
+        self.night()
+        self.game.resolve_night()
+        self.assertEqual(len(self.game.syndicate_log), 2)
+
     def test_syndicate_cannot_hostage_or_gag_allies_but_may_vote_them(self):
         for phase, ability in (("day", "gag"), ("night", "hostage")):
             self.game.phase = phase
