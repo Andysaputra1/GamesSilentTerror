@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
-import { of, throwError } from 'rxjs';
+import { of } from 'rxjs';
 import { RoomService } from '../../core/room.service';
 
 import { Lobby } from './lobby';
@@ -97,8 +97,8 @@ describe('Lobby', () => {
     expect(component.ownerLabel).toBe('Nama host');
   });
 
-  it('keeps the API create path available for the selected capacity', () => {
-    const request = vi.spyOn(TestBed.inject(RoomService), 'request').mockReturnValue(
+  it('renders the capacity of the restored room', () => {
+    vi.spyOn(TestBed.inject(RoomService), 'current').mockReturnValue(
       of({
         code: 'ABC123',
         owner: 'alice',
@@ -109,47 +109,15 @@ describe('Lobby', () => {
         capacity: 10,
       }),
     );
-    component.capacity = 10;
-    component.createRoom();
-    expect(request).toHaveBeenCalledWith('POST', '', { capacity: 10 });
+    component.restoreRoom();
     fixture.componentRef.changeDetectorRef.markForCheck();
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('1 / 10');
     expect(fixture.nativeElement.querySelector('.room-code-block')).toBeTruthy();
   });
 
-  it('normalizes a room code before submitting the legacy join action', () => {
-    const request = vi.spyOn(TestBed.inject(RoomService), 'request').mockReturnValue(
-      of({
-        code: 'ABC123',
-        owner: 'alice',
-        members: [member('alice')],
-        bots: [],
-        bot_enabled: false,
-        phase: 'lobby',
-      }),
-    );
-    component.joinCode = 'abc123';
-    component.joinRoom();
-    expect(request).toHaveBeenCalledWith('POST', '/join', { code: 'ABC123' });
-    expect(component.busy).toBe(false);
-    sessionStorage.clear();
-  });
-
-  it('rejects invalid codes before HTTP and unlocks after server failure', () => {
-    const request = vi
-      .spyOn(TestBed.inject(RoomService), 'request')
-      .mockReturnValue(throwError(() => ({ status: 503 })));
-    component.joinCode = 'xx';
-    component.joinRoom();
-    expect(request).not.toHaveBeenCalled();
-    component.joinCode = 'ABC123';
-    component.joinRoom();
-    expect(component.busy).toBe(false);
-    expect(component.error).toContain('Server');
-  });
-
-  it('restores the server room in a new tab and prevents joining another lobby', () => {
+  it('restores the server room in a new tab', () => {
+    sessionStorage.setItem('shadow_heist_game_entry', 'allowed');
     const room = {
       code: 'ABC123',
       owner: 'alice',
@@ -159,15 +127,9 @@ describe('Lobby', () => {
       phase: 'lobby',
     };
     vi.spyOn(TestBed.inject(RoomService), 'current').mockReturnValue(of(room));
-    const request = vi.spyOn(TestBed.inject(RoomService), 'request');
     component.restoreRoom();
-    component.joinCode = 'DEF456';
-    component.joinRoom();
-    component.createRoom();
-    expect(request).not.toHaveBeenCalled();
     expect(sessionStorage.getItem('shadow_heist_room')).toBe('ABC123');
-    fixture.componentRef.changeDetectorRef.markForCheck();
-    fixture.detectChanges();
+    expect(sessionStorage.getItem('shadow_heist_game_entry')).toBeNull();
     fixture.componentRef.changeDetectorRef.markForCheck();
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('.room-code-block')).toBeTruthy();

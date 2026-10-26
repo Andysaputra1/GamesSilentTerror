@@ -618,7 +618,6 @@ describe('Game', () => {
     const felt = render().querySelector('.table-felt') as HTMLElement;
     expect(felt.classList).toContain('has-composition');
     expect(felt.querySelector('.felt-composition')?.textContent).toContain('Hitman');
-    expect(component.objective).toContain('semua 2 Hitman');
     const hitmanChip = () =>
       render().querySelector('.felt-composition [data-role="hitman"]') as HTMLElement;
     expect(hitmanChip().textContent?.trim()).toMatch(/^\S*\s*2\s+Hitman$/); // belum diumumkan

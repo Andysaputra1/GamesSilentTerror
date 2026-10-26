@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpRequest } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
@@ -20,6 +20,7 @@ describe('MainPage', () => {
 
   // SETUP CALLBACK: siapkan lingkungan/instance baru sebelum setiap skenario tes.
   beforeEach(async () => {
+    sessionStorage.clear();
     localStorage.setItem('shadow_heist_access_token', 'token-a');
     localStorage.setItem(
       'shadow_heist_user',
@@ -46,6 +47,94 @@ describe('MainPage', () => {
     http.verify();
     vi.useRealTimers();
     localStorage.clear();
+    sessionStorage.clear();
+  });
+
+  it('creates a room with the capacity selected on the main page', () => {
+    sessionStorage.setItem('shadow_heist_game_entry', 'allowed');
+    http.expectOne(me).flush({ username: 'andy', display_name: 'Andy', skin_id: 'kiera' });
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+    fixture.nativeElement.querySelector('.room-entry > .leather-button').click();
+    fixture.detectChanges();
+    const slider = fixture.nativeElement.querySelector('#room-capacity-slider') as HTMLInputElement;
+    slider.value = '10';
+    slider.dispatchEvent(new Event('input', { bubbles: true }));
+    fixture.nativeElement.querySelector('.capacity-picker .leather-button').click();
+
+    const request = http.expectOne((r) => r.url.endsWith('/api/rooms'));
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual({ capacity: 10 });
+    const room = {
+      code: 'ABC123',
+      owner: 'andy',
+      members: [{ name: 'andy', skin_id: 'kiera' }],
+      bots: [],
+      bot_enabled: false,
+      phase: 'lobby',
+      capacity: 10,
+    };
+    request.flush(room);
+    expect(sessionStorage.getItem('shadow_heist_room')).toBe('ABC123');
+    expect(JSON.parse(sessionStorage.getItem('shadow_heist_room_snapshot')!)).toEqual(room);
+    expect(navigate).toHaveBeenCalledWith('/lobby');
+    expect(sessionStorage.getItem('shadow_heist_game_entry')).toBeNull();
+    expect(component.busy).toBe(false);
+  });
+
+  it('normalizes the room code submitted from the main page', () => {
+    sessionStorage.setItem('shadow_heist_game_entry', 'allowed');
+    http.expectOne(me).flush({ username: 'andy', display_name: 'Andy', skin_id: 'kiera' });
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+    const input = fixture.nativeElement.querySelector('.join-input') as HTMLInputElement;
+    input.value = 'abc123';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    fixture.nativeElement
+      .querySelector('.join-form')
+      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+
+    const request = http.expectOne((r) => r.url.endsWith('/api/rooms/join'));
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual({ code: 'ABC123' });
+    request.flush({
+      code: 'ABC123',
+      owner: 'alice',
+      members: [{ name: 'andy', skin_id: 'kiera' }],
+      bots: [],
+      bot_enabled: false,
+      phase: 'lobby',
+    });
+    expect(sessionStorage.getItem('shadow_heist_room')).toBe('ABC123');
+    expect(navigate).toHaveBeenCalledWith('/lobby');
+    expect(sessionStorage.getItem('shadow_heist_game_entry')).toBeNull();
+    expect(component.busy).toBe(false);
+  });
+
+  it('rejects invalid join codes before HTTP and unlocks the form after server failure', () => {
+    http.expectOne(me).flush({ username: 'andy', display_name: 'Andy', skin_id: 'kiera' });
+    const input = fixture.nativeElement.querySelector('.join-input') as HTMLInputElement;
+    const form = fixture.nativeElement.querySelector('.join-form') as HTMLFormElement;
+    input.value = 'xx';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    http.expectNone((r) => r.url.endsWith('/api/rooms/join'));
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[role="alert"]').textContent).toContain(
+      '6 karakter',
+    );
+
+    input.value = 'ABC123';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    http
+      .expectOne((r) => r.url.endsWith('/api/rooms/join'))
+      .flush(
+        { detail: 'Server belum bisa dihubungi.' },
+        { status: 503, statusText: 'Service Unavailable' },
+      );
+    fixture.detectChanges();
+    expect((form.querySelector('button') as HTMLButtonElement).disabled).toBe(false);
+    expect(fixture.nativeElement.querySelector('[role="alert"]').textContent).toContain('Server');
+    expect(sessionStorage.getItem('shadow_heist_room')).toBeNull();
   });
 
   // SKIN: tampilan awal memakai skin akun, lalu disamakan dengan server.

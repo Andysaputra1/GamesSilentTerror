@@ -16,6 +16,9 @@
               >{{ roleLabel[item.role] ?? item.role }} ·
               {{ item.outcome === 'won' ? 'Menang' : 'Kalah' }}</small
             >
+            <small>
+              Selesai <time [attr.datetime]="item.finished_at">{{ item.finishedLabel }}</time>
+            </small>
           </p>
           <button
             class="reminder__fill"
@@ -54,6 +57,9 @@
         <div>
           <p>Kuesioner singkat · ruangan {{ active.room_code }}</p>
           <h2 id="survey-dialog-title">Bagaimana permainanmu?</h2>
+          <p>
+            Selesai <time [attr.datetime]="active.finished_at">{{ active.finishedLabel }}</time>
+          </p>
         </div>
         <button #closeButton class="survey-dialog__close" type="button" (click)="close()">
           <span>Tutup</span><b aria-hidden="true">×</b>

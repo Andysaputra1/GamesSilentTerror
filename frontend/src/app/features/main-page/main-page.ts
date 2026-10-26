@@ -63,7 +63,6 @@ export class MainPage implements OnInit, OnDestroy {
   // Room action state
   capacity = DEFAULT_CAPACITY;
   createSetupOpen = false;
-  joinMode = false;
   joinCode = '';
   error = '';
   busy = false;
@@ -431,14 +430,5 @@ export class MainPage implements OnInit, OnDestroy {
           this.error = err.error?.detail || 'Gagal bergabung ke ruangan.';
         },
       });
-  }
-
-  // Toggle join mode
-  toggleJoinMode(): void {
-    this.joinMode = !this.joinMode;
-    if (!this.joinMode) {
-      this.joinCode = '';
-      this.error = '';
-    }
   }
 }

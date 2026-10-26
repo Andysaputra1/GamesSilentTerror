@@ -2,7 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { of, throwError } from 'rxjs';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GameService, PendingSurvey, SurveyStatus } from '../../../core/game.service';
 import { SurveyForm } from '../../../core/survey-form/survey-form';
 import { SurveyReminder } from './survey-reminder';
@@ -46,6 +46,15 @@ const status: SurveyStatus = {
 };
 
 describe('SurveyReminder', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-21T00:00:00Z'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   function create(list = pending): {
     fixture: ComponentFixture<SurveyReminder>;
     api: GameService;
@@ -72,6 +81,10 @@ describe('SurveyReminder', () => {
     expect(items[0].textContent).toContain('Ayo isi survei untuk game ruangan QWE456');
     expect(items[0].textContent).toContain('Hitman · Menang');
     expect(items[1].textContent).toContain('Spy · Kalah');
+    expect(items[0].querySelector('time')?.textContent).toBe('20 Okt 2026, 17.00 WIB');
+    expect(items[0].querySelector('time')?.getAttribute('datetime')).toBe(
+      '2026-10-20T10:00:00.000Z',
+    );
     (page().querySelector('.reminder__close') as HTMLButtonElement).click();
     expect(page().querySelector('.reminder')).toBeNull();
   });
@@ -81,13 +94,74 @@ describe('SurveyReminder', () => {
     expect(page().querySelector('.reminder')).toBeNull();
   });
 
+  it('keeps exactly seven days but hides older reminders', () => {
+    vi.setSystemTime(new Date('2026-10-27T10:00:00Z'));
+    const { page } = create();
+    const items = page().querySelectorAll('.reminder__list li');
+    expect(items.length).toBe(1);
+    expect(items[0].textContent).toContain('QWE456');
+    expect(page().querySelector('.reminder__intro p')?.textContent).toContain('1 pertandingan');
+  });
+
+  it('hides the whole reminder when all matches are older than seven days', () => {
+    vi.setSystemTime(new Date('2026-10-28T00:00:00Z'));
+    const { page } = create();
+    expect(page().querySelector('.reminder')).toBeNull();
+  });
+
+  it('expires reminders and an open survey while the page stays open', () => {
+    vi.setSystemTime(new Date('2026-10-27T09:00:00Z'));
+    const { api, page } = create();
+    vi.spyOn(api, 'survey').mockReturnValue(of({ ...status, match_id: 'm1' }));
+    (page().querySelectorAll('.reminder__fill')[1] as HTMLButtonElement).click();
+    expect(page().querySelector('.survey-dialog')).toBeTruthy();
+
+    vi.advanceTimersByTime(1);
+    expect(page().querySelectorAll('.reminder__list li').length).toBe(1);
+    expect(page().querySelector('.reminder__list')?.textContent).toContain('QWE456');
+    expect(page().querySelector('.survey-dialog')).toBeNull();
+
+    vi.advanceTimersByTime(60 * 60 * 1000);
+    expect(page().querySelector('.reminder')).toBeNull();
+  });
+
+  it('does not open an expired reminder after the browser clock advances', () => {
+    const { api, page } = create();
+    const survey = vi.spyOn(api, 'survey');
+    const button = page().querySelector('.reminder__fill') as HTMLButtonElement;
+    vi.setSystemTime(new Date('2026-10-28T00:00:00Z'));
+    button.click();
+    expect(survey).not.toHaveBeenCalled();
+    expect(page().querySelector('.reminder')).toBeNull();
+    expect(page().querySelector('.survey-dialog')).toBeNull();
+  });
+
+  it.each(['2026-10-20T18:00:00', '2026-10-20T18:00:00Z', '2026-10-21T01:00:00+07:00'])(
+    'displays %s in WIB, including the local date change',
+    (finished_at) => {
+      const { page } = create([{ ...pending[0], finished_at }]);
+      expect(page().querySelector('time')?.textContent).toBe('21 Okt 2026, 01.00 WIB');
+      expect(page().querySelector('time')?.getAttribute('datetime')).toBe(
+        '2026-10-20T18:00:00.000Z',
+      );
+    },
+  );
+
+  it('ignores missing or invalid completion dates', () => {
+    const { page } = create([
+      { ...pending[0], finished_at: '' },
+      { ...pending[1], finished_at: 'invalid' },
+    ]);
+    expect(page().querySelector('.reminder')).toBeNull();
+  });
+
   // Isi survei: pertanyaan dimuat untuk match itu, setelah terkirim baris tersebut hilang.
   it('opens the survey for that match and removes it after submitting', () => {
     const { fixture, api, page } = create();
     const survey = vi.spyOn(api, 'survey').mockReturnValue(of(status));
     (page().querySelector('.reminder__fill') as HTMLButtonElement).click();
     expect(survey).toHaveBeenCalledWith('QWE456', 'm2');
-    page();
+    expect(page().querySelector('.survey-dialog time')?.textContent).toBe('20 Okt 2026, 17.00 WIB');
     const form = fixture.debugElement.query(By.directive(SurveyForm));
     expect(form.nativeElement.textContent).toContain('Seberapa seru?');
     (form.componentInstance as SurveyForm).submitted.emit();

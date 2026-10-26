@@ -251,21 +251,6 @@ export class Game implements OnInit, OnDestroy {
         'Amati percakapan, uji alibi, dan pilih tersangka saat Tribunal. Tidak punya skill malam.',
     };
   }
-  readonly phaseNames: Record<string, string> = {
-    preparing: 'Persiapan',
-    day: 'Siang / diskusi',
-    night: 'Malam / aksi rahasia',
-    tribunal: 'Tribunal / voting',
-    finished: 'Hasil akhir',
-  };
-
-  // Tampilkan tujuan kubu pemain berdasarkan role privat dari server.
-  get objective(): string {
-    if (this.game?.me.role === 'hitman')
-      return `${this.allies.length ? 'Bersama rekan Syndicate, kurangi' : 'Kurangi'} warga hidup yang masih punya suara sampai tidak lebih banyak dari Hitman yang masih hidup. Hindari eksekusi Tribunal.`;
-    const hitmen = this.hitmanCount > 1 ? `semua ${this.hitmanCount} Hitman` : 'Hitman';
-    return `Temukan dan eksekusi ${hitmen} lewat Tribunal. Spy, Stalker, dan Civilian menang sebagai satu kubu.`;
-  }
 
   // KOMPOSISI: jumlah tiap role di room (publik, dari server); urutan chip mengikuti ROLES.
   get composition(): { role: string; count: number }[] {

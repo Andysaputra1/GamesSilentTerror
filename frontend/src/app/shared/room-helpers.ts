@@ -23,4 +23,6 @@ export function validateRoomCode(
 export function saveRoomSession(room: Room): void {
   sessionStorage.setItem(STORAGE.room, room.code);
   sessionStorage.setItem(STORAGE.roomSnapshot, JSON.stringify(room));
+  // Join/create lobby baru tidak boleh mewarisi izin layar game pertandingan sebelumnya.
+  if (room.phase === 'lobby') sessionStorage.removeItem(STORAGE.gameEntry);
 }

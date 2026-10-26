@@ -20,7 +20,7 @@ import { Room, RoomService } from '../../core/room.service';
 import { ProfileMenu } from '../../core/profile-menu';
 import { skinImageUrl } from '../../core/asset-preloader';
 import { forgetRoom, STORAGE } from '../../core/storage';
-import { saveRoomSession, validateRoomCode } from '../../shared/room-helpers';
+import { saveRoomSession } from '../../shared/room-helpers';
 
 // DECORATOR: hubungkan Lobby dengan template, CSS, navigasi, dan binding form.
 @Component({
@@ -29,19 +29,16 @@ import { saveRoomSession, validateRoomCode } from '../../shared/room-helpers';
   templateUrl: './lobby.html',
   styleUrls: ['./lobby.css', './lobby-responsive.css'],
 })
-// CLASS KOMPONEN: mengatur buat/gabung ruangan, roster, pilihan bot, dan masuk chat.
+// CLASS KOMPONEN: mengatur ruangan aktif, roster, pilihan bot, dan masuk chat.
 export class Lobby implements OnInit, OnDestroy {
-  // STATE/PROPERTY: data ruangan, input kode, dan status yang ditampilkan di lobby.html.
+  // STATE/PROPERTY: data ruangan dan status yang ditampilkan di lobby.html.
   username = 'Operative';
   room: Room | null = null;
-  joinCode = '';
   error = '';
   busy = false;
   copied = false;
   quick = false;
   capacity = 6;
-  entryMode: 'create' | 'join' = 'create';
-  activePanel: 'room' | 'players' | 'help' = 'room';
   helpOpen = false;
 
   // Fokus kembali ke tombol yang membuka Case File setelah overlay ditutup.
@@ -123,17 +120,6 @@ export class Lobby implements OnInit, OnDestroy {
     if (this.timer) clearInterval(this.timer);
   }
 
-  // Navigasi panel hanya dipakai pada tablet/mobile; desktop tetap memperlihatkan dua panel utama.
-  selectPanel(panel: 'room' | 'players' | 'help'): void {
-    this.activePanel = panel;
-  }
-
-  // Segmen create/join menjaga kedua alur masuk tersedia tanpa membuat panel menjadi panjang.
-  selectEntryMode(mode: 'create' | 'join'): void {
-    this.entryMode = mode;
-    this.error = '';
-  }
-
   // Case File adalah overlay agar aturan lengkap tidak mengambil tinggi waiting room.
   openHelp(event?: Event): void {
     this.helpReturnFocus =
@@ -181,22 +167,6 @@ export class Lobby implements OnInit, OnDestroy {
     }
   }
 
-  // METHOD EVENT TOMBOL: minta backend membuat ruangan dan kode baru.
-  createRoom(): void {
-    if (!this.busy && !this.room) this.load('POST', '', { capacity: this.capacity });
-  }
-
-  // METHOD EVENT FORM: periksa format kode, lalu minta backend menambahkan keanggotaan.
-  joinRoom(): void {
-    if (this.busy || this.room) return;
-    const result = validateRoomCode(this.joinCode);
-    if (!result.valid) {
-      this.error = result.error;
-      return;
-    }
-    this.load('POST', '/join', { code: result.code });
-  }
-
   // METHOD EVENT TOMBOL: minta perubahan pilihan NOX; izin pembuat ruangan diperiksa backend.
   toggleBot(): void {
     if (this.room && !this.busy)
@@ -228,6 +198,7 @@ export class Lobby implements OnInit, OnDestroy {
           this.error = '';
           this.copied = false;
           forgetRoom();
+          void this.router.navigateByUrl('/main');
         },
         error: (error: HttpErrorResponse) => {
           this.error = error.error?.detail || 'Gagal keluar ruangan.';
@@ -252,7 +223,7 @@ export class Lobby implements OnInit, OnDestroy {
         next: (room) => {
           this.room = room;
           this.error = '';
-          if (room) sessionStorage.setItem(STORAGE.room, room.code);
+          if (room) saveRoomSession(room);
           else forgetRoom();
         },
         error: (error: HttpErrorResponse) => {

@@ -6,7 +6,6 @@
 
 .home-desk {
   --home-ink: #382014;
-  --home-paper: #fff4d9;
   --home-serif: var(--font-display);
 
   position: relative;

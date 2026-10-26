@@ -4,17 +4,19 @@ Tema mengikuti kartu referensi lokal: kertas krem, tinta hitam, bingkai ganda,
 sudut membulat, dan aksen biru/peach lembut. Referensi di communicationfolder
 diabaikan Git dan tidak dijadikan aset publik.
 
-Mulai dari **src/styles.css**, bagian DESIGN TOKENS:
+Mulai dari **src/styles.css**, bagian DESIGN TOKENS dan MEJA KAYU:
 
 | Variabel | Penggunaan |
 |---|---|
-| --page-padding | Jarak konten dari tepi halaman |
-| --panel-padding | Padding kartu/panel |
-| --layout-gap | Jarak antarkolom/panel |
-| --content-width | Lebar maksimal Main dan Lobby |
-| --color-bg / --color-panel | Latar halaman dan panel |
-| --color-gold / --color-paper | Aksen emas dan panel krem |
-| --radius-panel | Lengkungan sudut panel |
+| --color-bg / --color-text | Warna dasar halaman dan teks |
+| --color-gold | Aksen fokus dan seleksi teks |
+| --font-body / --font-display / --font-hand | Font isi, judul, dan tulisan tangan |
+| --desk-text / --desk-muted | Teks di atas meja kayu |
+| --desk-chip-bg / --desk-chip-line | Latar dan bingkai kontrol meja |
+| --paper-ink / --paper-label | Warna teks dan label di atas kertas |
+| --radius-control / --shadow-control | Sudut dan bayangan kontrol bersama |
+
+Padding, jarak antarkolom, dan lebar halaman diatur di stylesheet masing-masing halaman.
 
 Scrollbar semua halaman bergaya papan kayu (`::-webkit-scrollbar` di akhir **src/styles.css**). Chromium mengabaikan gaya itu pada elemen yang memakai `scrollbar-width` atau `scrollbar-color`, jadi jangan pasang kedua properti itu di komponen; Firefox mendapat warna kayu lewat blok `@supports not selector(::-webkit-scrollbar)`.
 

@@ -3,9 +3,11 @@ import { isPlatformBrowser } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Inject, Injectable, PLATFORM_ID, inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
-import { catchError, map, of, timeout } from 'rxjs';
+import { catchError, map, of, switchMap, timeout } from 'rxjs';
+import { saveRoomSession } from '../shared/room-helpers';
+import { RoomService } from './room.service';
 import { SessionService } from './session.service';
-import { authHeaders, STORAGE } from './storage';
+import { authHeaders, forgetRoom, STORAGE } from './storage';
 
 interface ActiveMatch {
   code: string;
@@ -49,33 +51,58 @@ export class ActiveMatchService {
   }
 }
 
-// Berlaku juga pada tab baru / login ulang; pertandingan selesai tidak memaksa redirect.
+// Pulihkan pertandingan atau lobby saat pindah halaman, termasuk tab baru / login ulang.
+// Room yang pertandingannya selesai tidak memaksa redirect, sehingga Main dan survei tetap tersedia.
 export const activeMatchGuard: CanActivateFn = (_, state) => {
   const service = inject(ActiveMatchService);
+  const rooms = inject(RoomService);
+  const session = inject(SessionService);
   const router = inject(Router);
   const platform = inject(PLATFORM_ID);
   if (!isPlatformBrowser(platform)) return true;
-  const isGame = state.url.split('?')[0] === '/game';
-  // Masuk dari lobby (tanda 'allowed'): semua cabang di bawah menghasilkan true, jadi jangan
-  // menahan layar game satu round trip backend. Polling App tetap memulihkan pointer room.
+  const path = state.url.split(/[?#]/)[0];
+  const isGame = path === '/game';
+  const token = localStorage.getItem(STORAGE.token);
+  const fallback = () =>
+    isGame && sessionStorage.getItem(STORAGE.gameEntry) !== 'allowed'
+      ? router.createUrlTree(['/main'])
+      : true;
+  // Masuk dari lobby yang sudah mulai: jangan menahan layar game satu round trip backend.
+  // Masuk lobby baru menghapus tanda 'allowed' milik pertandingan sebelumnya.
   if (isGame && sessionStorage.getItem(STORAGE.gameEntry) === 'allowed') return true;
   return service.lookup().pipe(
-    map((active) => {
+    switchMap((active) => {
       if (active) {
         service.remember(active);
-        return isGame ? true : router.createUrlTree(['/game']);
+        return of(isGame ? true : router.createUrlTree(['/game']));
       }
-      return isGame && sessionStorage.getItem(STORAGE.gameEntry) !== 'allowed'
-        ? router.createUrlTree(['/main'])
-        : true;
+      // Lobby memulihkan room sendiri; jangan menambah request atau membuat redirect berulang.
+      if (
+        path === '/lobby' ||
+        !token ||
+        session.loggingOut() ||
+        localStorage.getItem(STORAGE.token) !== token
+      )
+        return of(fallback());
+
+      return rooms.current().pipe(
+        map((room) => {
+          // Respons akun lama tidak boleh mengembalikan pengguna yang sudah logout/ganti akun.
+          if (session.loggingOut() || localStorage.getItem(STORAGE.token) !== token)
+            return fallback();
+          if (!room) {
+            forgetRoom();
+            return fallback();
+          }
+          if (room.phase === 'finished') return fallback();
+          saveRoomSession(room);
+          if (room.phase === 'lobby') return router.createUrlTree(['/lobby']);
+          // Host bisa mulai di sela lookup /active dan /current; langsung ikuti fase terbaru.
+          sessionStorage.setItem(STORAGE.gameEntry, 'allowed');
+          return isGame ? true : router.createUrlTree(['/game']);
+        }),
+      );
     }),
-    catchError(() =>
-      of(
-        isGame
-          ? sessionStorage.getItem(STORAGE.gameEntry) === 'allowed' ||
-              router.createUrlTree(['/main'])
-          : true,
-      ),
-    ),
+    catchError(() => of(fallback())),
   );
 };
