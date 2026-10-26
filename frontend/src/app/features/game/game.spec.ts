@@ -115,6 +115,34 @@ describe('Game', () => {
     expect(component.busy).toBe(false);
   });
 
+  // POLLING: klik saat polling latar berjalan langsung terkirim (dulu harus ditekan berkali-kali);
+  // snapshot polling yang lebih tua dari klik itu dibuang.
+  it('sends an action clicked while a background poll is pending and drops the stale poll', () => {
+    component.game = snapshot().game;
+    component.code = 'ABC123';
+    const poll = new Subject<GameSnapshot>();
+    const request = vi.spyOn(TestBed.inject(GameService), 'request').mockReturnValue(poll);
+    component.refresh();
+    expect(component.busy).toBe(false);
+    const locked = snapshot();
+    locked.game.me = {
+      ...locked.game.me,
+      can_act: false,
+      action: { ability: 'gag', target: 'NOX' },
+    };
+    request.mockReturnValue(of(locked));
+    component.target = 'NOX';
+    component.act();
+    expect(request).toHaveBeenLastCalledWith(
+      'ABC123',
+      expect.objectContaining({ target: 'NOX' }),
+      'play',
+    );
+    poll.next(snapshot());
+    poll.complete();
+    expect(component.game.me.can_act).toBe(false);
+  });
+
   // BATAL VOTE: sesudah vote, tombol berubah menjadi "Batalkan vote" yang mengirim token Tribunal.
   it('turns the vote button into cancel vote and sends the tribunal token', () => {
     const state = snapshot();
@@ -133,6 +161,30 @@ describe('Game', () => {
       'ABC123',
       { match_id: 'match-1', round_number: 1, phase: 'tribunal' },
       'cancel-vote',
+    );
+  });
+
+  // BATAL AKSI MALAM: sesudah Sandera dikunci, tombol aksi berubah menjadi "Batalkan Sandera".
+  it('turns a locked night action into a cancel button that sends the night token', () => {
+    const state = snapshot();
+    state.game.phase = 'night';
+    state.game.me = {
+      ...state.game.me,
+      ability: 'hostage',
+      can_act: false,
+      action: { ability: 'hostage', target: 'NOX' },
+      can_cancel_action: true,
+    };
+    component.game = state.game;
+    component.code = 'ABC123';
+    const tombol = render().querySelector('.cancel-action') as HTMLButtonElement;
+    expect(tombol.textContent).toContain('Batalkan Sandera: NOX');
+    const request = vi.spyOn(TestBed.inject(GameService), 'request').mockReturnValue(of(state));
+    tombol.click();
+    expect(request).toHaveBeenCalledWith(
+      'ABC123',
+      { match_id: 'match-1', round_number: 1, phase: 'night' },
+      'cancel-action',
     );
   });
 
@@ -1412,7 +1464,7 @@ describe('Game', () => {
   });
 
   // HASIL SANDERA (hanya Hitman): berhasil → cap tetap sampai akhir; gagal (dijaga Guard) → cap
-  // "Gagal disandera" pada siang sesudah malamnya, lalu memudar lewat CSS.
+  // "Disandera" dicap GAGAL pada siang sesudah malamnya (sesudah tirai siang), lalu memudar lewat CSS.
   it('keeps a successful hostage stamp and shows a fading failed stamp for the Syndicate', () => {
     const game = snapshot().game;
     game.players = ['alice', 'NOX', 'bob'].map((name) => ({ name, alive: true }));
@@ -1432,8 +1484,12 @@ describe('Game', () => {
     let cards = render().querySelectorAll('.player-card');
     expect(cards[2].querySelector('.stamp-sandera')?.textContent).toBe('Disandera');
     expect(cards[2].querySelector('.player')?.classList).toContain('held');
-    expect(cards[1].querySelector('.stamp-gagal')?.textContent).toBe('Gagal disandera');
+    expect(cards[1].querySelector('.stamp-gagal b')?.textContent).toBe('Gagal');
     expect(cards[1].querySelector('.player')?.classList).not.toContain('held');
+    // Selama tirai siang menutup meja, cap gagal belum dipasang agar animasinya tidak terlewat.
+    component.transition = { phase: 'day', title: 'Siang', subtitle: '' };
+    expect(render().querySelectorAll('.player-card')[1].querySelector('.stamp-gagal')).toBeNull();
+    component.transition = null;
     // Cap gagal hanya pada siang sesudah malamnya; cap berhasil tetap di fase lain.
     game.phase = 'tribunal';
     cards = render().querySelectorAll('.player-card');

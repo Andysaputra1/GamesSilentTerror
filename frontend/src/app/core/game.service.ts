@@ -91,6 +91,8 @@ export interface MatchView {
     ability: string | null;
     can_act: boolean;
     action: { ability: string; target: string } | null;
+    // Aksi malam (Hostage/Guard/Peek) boleh ditarik selama malam; Gag tidak karena langsung berlaku.
+    can_cancel_action?: boolean;
     // Cooldown Gag bersama Syndicate (sama untuk semua Hitman).
     next_gag: number;
     next_peek: number;

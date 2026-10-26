@@ -360,6 +360,14 @@ class Match:
             raise ValueError("Tidak ada suara yang bisa dibatalkan.")
         del self.votes[name]
 
+    # BATAL AKSI MALAM: Hostage/Guard/Peek boleh ditarik lalu dipilih ulang selama malam; yang diresolusikan
+    # pilihan saat waktu habis. Gag Order tidak ikut: efeknya langsung (target dibungkam, cooldown jalan).
+    def cancel_action(self, name):
+        player = self.actor(name)
+        if self.phase != "night" or player.hostage or name not in self.actions:
+            raise ValueError("Tidak ada aksi malam yang bisa dibatalkan.")
+        del self.actions[name]
+
     # Satu korban per malam untuk Syndicate: pilihan terbanyak, seri → yang dipilih paling awal.
     def syndicate_target(self):
         choices = [
@@ -749,6 +757,10 @@ class Match:
                 "ability": ability,
                 "can_act": bool(can_act),
                 "action": self.actions.get(viewer) if self.phase == "night" else None,
+                "can_cancel_action": self.phase == "night"
+                and player.alive
+                and not player.hostage
+                and viewer in self.actions,
                 # Cooldown Gag bersama hanya untuk Syndicate; warga tidak boleh tahu kapan Gag dipakai.
                 "next_gag": self.next_gag if hitman else 1,
                 "next_peek": player.next_peek,

@@ -288,6 +288,20 @@ class RoomService:
             match.cancel_vote(username)
             return self.state(code, username)
 
+    # BATAL AKSI MALAM: token fase malam yang sama, agar klik basi tidak menarik aksi malam lain.
+    @traced
+    def cancel_action(self, code, username, *, match_id, round_number, phase):
+        with self.lock:
+            room = self.get(code, username)
+            match = room.match
+            if not match:
+                raise ValueError("Pertandingan belum dimulai.")
+            match.tick()
+            if (match.id, match.round, match.phase) != (match_id, round_number, phase):
+                raise ValueError("Fase sudah berubah. Perbarui halaman sebelum membatalkan.")
+            match.cancel_action(username)
+            return self.state(code, username)
+
     # Semua operasi engine memakai lock yang sama agar request bersamaan tidak menggandakan aksi.
     def state(self, code, username):
         with self.lock:

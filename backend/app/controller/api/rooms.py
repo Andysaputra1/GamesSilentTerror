@@ -38,6 +38,12 @@ class CancelVoteOption(BaseModel):
     phase: Literal["tribunal"]
 
 
+class CancelActionOption(BaseModel):
+    match_id: str = Field(min_length=1, max_length=40)
+    round_number: int = Field(ge=1)
+    phase: Literal["night"]
+
+
 class ReadyOption(BaseModel):
     match_id: str = Field(min_length=1, max_length=40)
 
@@ -112,6 +118,12 @@ def play(code: str, body: PlayOption, user=Depends(require_authenticated_user)):
 # BATAL VOTE: tarik suara Tribunal milik sendiri agar bisa memilih ulang sebelum waktu habis.
 def cancel_vote(code: str, body: CancelVoteOption, user=Depends(require_authenticated_user)):
     return game_result(lambda: room_service.cancel_vote(code, user.username, **body.model_dump()))
+
+
+@router.post("/{code}/cancel-action")
+# BATAL AKSI MALAM: tarik Hostage/Guard/Peek milik sendiri agar bisa memilih ulang sebelum malam habis.
+def cancel_action(code: str, body: CancelActionOption, user=Depends(require_authenticated_user)):
+    return game_result(lambda: room_service.cancel_action(code, user.username, **body.model_dump()))
 
 
 @router.post("/{code}/leave")

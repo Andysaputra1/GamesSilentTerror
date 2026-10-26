@@ -49,7 +49,7 @@ Semua manusia hidup dapat menyetujui skip siang. Hostage/Gag tetap boleh menyetu
 | Stalker | Warga | Peek role asli satu pemain setelah malam selesai. Hasil privat; sekali setiap dua ronde: ronde 1 lalu ronde 3. |
 | Civilian | Warga | Tidak punya skill malam; mengamati, berdebat, dan voting. |
 
-**Hostage:** tetap hidup di roster, tetapi kehilangan **semua aksi** secara permanen: chat, voting, dan skill malam (Guard/Peek). Ini lebih ketat dari GDD awal yang mempertahankan skill malam. Engine menolak aksinya dan `can_act` di snapshot selalu `false`; bot yang disandera juga tidak beraksi. Korban tetap faksi warga. Di kartu, Hitman melihat cap *Disandera* pada korban tim malam itu; sesudah malam selesai, korban yang berhasil tetap bercap sampai pertandingan selesai, sedangkan target yang dijaga Guard mendapat cap *Gagal disandera* yang memudar pada siang berikutnya.
+**Hostage:** tetap hidup di roster, tetapi kehilangan **semua aksi** secara permanen: chat, voting, dan skill malam (Guard/Peek). Ini lebih ketat dari GDD awal yang mempertahankan skill malam. Engine menolak aksinya dan `can_act` di snapshot selalu `false`; bot yang disandera juga tidak beraksi. Korban tetap faksi warga. Di kartu, Hitman melihat cap *Disandera* pada korban tim malam itu; sesudah malam selesai, korban yang berhasil tetap bercap sampai pertandingan selesai, sedangkan target yang dijaga Guard mendapat cap *Disandera* yang dicap *GAGAL* di atasnya lalu memudar pada siang berikutnya (dipasang sesudah tirai transisi siang hilang agar tidak terlewat).
 
 **Gag Order:** hanya membatasi chat sampai siang berikutnya (melewati Tribunal ronde itu bila ada). Voting dan skill malam tetap tersedia. Gag tidak mengurangi suara warga dalam kondisi kemenangan.
 
@@ -57,7 +57,7 @@ Semua manusia hidup dapat menyetujui skip siang. Hostage/Gag tetap boleh menyetu
 
 **Keluar di tengah pertandingan** (tombol Keluar, dengan konfirmasi): diperlakukan sama dengan dieksekusi dan kemenangan langsung dicek ulang, tetapi roster menandainya `left` ("Keluar") dan catatan berbunyi "X meninggalkan permainan." dengan akhiran yang sama seperti eksekusi (jumlah Hitman tersisa, role tetap rahasia). Vote dan aksi malam miliknya dibuang; vote/aksi yang menargetkannya juga dibuang sehingga pemilihnya boleh memilih ulang. Fase tidak menunggu dia (skip diskusi dan layar persiapan dihitung ulang). Pemain kembali ke menu utama.
 
-Aksi malam final, satu pilihan per fase. Vote Tribunal boleh dibatalkan (tombol **Batalkan vote**, `POST /api/rooms/{code}/cancel-vote`) lalu dipilih ulang selama Tribunal; yang dihitung suara saat waktu habis. Target harus hidup; hanya Guard boleh memilih diri sendiri. Memilih pemain yang sudah Hostage diperbolehkan karena status lawan rahasia, tetapi tidak menambah korban baru.
+Satu pilihan per fase, dan untuk mengganti pilihan harus dibatalkan dulu. Vote Tribunal boleh dibatalkan (tombol **Batalkan vote**, `POST /api/rooms/{code}/cancel-vote`) lalu dipilih ulang selama Tribunal; yang dihitung suara saat waktu habis. Aksi malam Hostage/Guard/Peek juga boleh dibatalkan (tombol **Batalkan Sandera/Jaga/Intip**, `POST /api/rooms/{code}/cancel-action`) lalu dipilih ulang selama malam; yang diresolusikan pilihan saat malam habis. Gag Order tidak bisa dibatalkan karena langsung berlaku (target dibungkam dan cooldown tim berjalan saat dikirim). Target harus hidup; hanya Guard boleh memilih diri sendiri. Memilih pemain yang sudah Hostage diperbolehkan karena status lawan rahasia, tetapi tidak menambah korban baru.
 
 ## Kemenangan
 

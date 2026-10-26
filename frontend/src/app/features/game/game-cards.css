@@ -112,29 +112,32 @@
   rotate: -18deg;
   animation: cap 0.45s cubic-bezier(0.2, 1.6, 0.4, 1) both;
 }
-/* GAGAL SANDERA: cap kelabu muncul, bertahan sebentar, lalu memudar (target dijaga Guard). */
+/* GAGAL SANDERA (target dijaga Guard): cap "Disandera" malam tadi muncul lagi, cap GAGAL dihantam di
+   atasnya, keduanya bertahan beberapa detik lalu memudar. Baru dipasang sesudah tirai siang hilang. */
 .stamp-sandera.stamp-gagal {
-  color: #4a4038;
-  animation: cap-gagal 3.2s ease-out forwards;
+  animation:
+    cap 0.45s cubic-bezier(0.2, 1.6, 0.4, 1) both,
+    cap-pudar 7s ease-in forwards;
 }
-@keyframes cap-gagal {
-  0% {
-    opacity: 0;
-    transform: scale(2.2);
-  }
-  12%,
-  70% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  100% {
-    opacity: 0;
-    transform: scale(1);
-  }
+.stamp-gagal b {
+  position: absolute;
+  top: 115%;
+  left: 50%;
+  padding: 0 0.3em;
+  border: 0.16em solid currentColor;
+  border-radius: 0.2em;
+  background: rgb(255 247 229 / 0.95);
+  color: #2b2724;
+  font-size: 1.2em;
+  letter-spacing: 0.1em;
+  box-shadow: 0 0.12em 0.3em rgb(0 0 0 / 0.4);
+  translate: -50% -50%;
+  rotate: 14deg;
+  animation: cap 0.4s cubic-bezier(0.2, 1.6, 0.4, 1) 0.7s both;
 }
 @keyframes cap-pudar {
   0%,
-  70% {
+  80% {
     opacity: 1;
   }
   100% {
@@ -145,11 +148,12 @@
 @media (prefers-reduced-motion: reduce) {
   .peek-role,
   .stamp-sandera,
+  .stamp-gagal b,
   .player-card.guarded::after {
     animation: none;
   }
   /* Tanpa gerak, cap gagal tetap harus hilang: cukup memudar. */
   .stamp-sandera.stamp-gagal {
-    animation: cap-pudar 3.2s linear forwards;
+    animation: cap-pudar 7s linear forwards;
   }
 }

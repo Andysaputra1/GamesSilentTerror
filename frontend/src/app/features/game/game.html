@@ -489,7 +489,7 @@
                     } @else if (sandera) {
                       <span class="stamp stamp-sandera">Disandera</span>
                     } @else if (failedHostage(player.name)) {
-                      <span class="stamp stamp-sandera stamp-gagal">Gagal disandera</span>
+                      <span class="stamp stamp-sandera stamp-gagal">Disandera <b>Gagal</b></span>
                     }
                     @if (target === player.name && !sandera) {
                       <span class="stamp stamp-target">Target</span>
@@ -577,6 +577,17 @@
                   >
                     {{ abilityNames[state.me.ability || ''] || state.me.ability }} →
                     {{ nama(target) || 'pilih pemain' }}
+                  </button>
+                } @else if (state.me.can_cancel_action && state.me.action) {
+                  <button
+                    type="button"
+                    class="wood-button plank cancel-action"
+                    [disabled]="busy"
+                    (click)="cancelAction()"
+                  >
+                    ✕ Batalkan
+                    {{ abilityNames[state.me.action.ability] || state.me.action.ability }}:
+                    {{ nama(state.me.action.target) }}
                   </button>
                 }
                 @if (state.phase === 'day') {

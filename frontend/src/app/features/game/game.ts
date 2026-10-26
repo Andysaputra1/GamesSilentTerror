@@ -157,6 +157,11 @@ export class Game implements OnInit, OnDestroy {
   }));
   private socket?: Socket;
   private poll?: ReturnType<typeof setInterval>;
+  // Polling latar tidak memakai `busy`: aplikasi zoneless tidak menggambar ulang tombol saat polling
+  // dimulai, jadi klik yang jatuh di tengah polling (tiap detik) dulu ditolak diam-diam dan tombol
+  // harus ditekan berkali-kali. Nomor aksi membuang respons polling yang lebih tua dari klik terakhir.
+  private polling = false;
+  private aksi = 0;
   private loadedPhase = '';
   private shownPhase = '';
   private surveyMatch = '';
@@ -313,11 +318,13 @@ export class Game implements OnInit, OnDestroy {
     return (game.me.syndicate_target ?? action) === name;
   }
 
-  // GAGAL SANDERA: pada siang sesudah malamnya, Syndicate melihat cap "Gagal disandera" yang memudar di
-  // kartu target yang dijaga Guard.
+  // GAGAL SANDERA: pada siang sesudah malamnya, Syndicate melihat cap "Disandera" dicap GAGAL lalu memudar
+  // di kartu target yang dijaga Guard. Dipasang sesudah tirai siang hilang; kalau ikut muncul bersama
+  // tirai, animasinya sudah memudar sebelum kartu terlihat.
   failedHostage(name: string): boolean {
     const game = this.game;
-    if (!game || game.winner || game.phase !== 'day' || game.me.role !== 'hitman') return false;
+    if (!game || game.winner || this.transition) return false;
+    if (game.phase !== 'day' || game.me.role !== 'hitman') return false;
     return !!game.me.syndicate_hostages?.some(
       (h) => !h.success && h.name === name && h.round === game.round - 1,
     );
@@ -862,28 +869,33 @@ export class Game implements OnInit, OnDestroy {
   // dibuka tetapi belum tercatat dikirim ulang paling cepat tiap 4 detik; di sela itu tetap polling,
   // jadi layar tidak macet bila backend belum mengenal /reveal.
   refresh(): void {
-    if (this.busy || this.leaving || !this.code) return;
+    if (this.busy || this.polling || this.leaving || !this.code) return;
     if (this.revealPending && this.game && Date.now() - this.lastRevealTry >= 4000) {
       this.lastRevealTry = Date.now();
-      this.request({ match_id: this.game.id }, 'reveal');
-    } else this.request();
+      this.request({ match_id: this.game.id }, 'reveal', true);
+    } else this.request(undefined, 'play', true);
   }
 
   // Sinkronkan snapshot/aksi server, reset pilihan fase lama, dan tampilkan kegagalan request.
-  private request(body?: unknown, action = 'play'): void {
-    this.busy = true;
+  private request(body?: unknown, action = 'play', latar = false): void {
+    const nomor = latar ? this.aksi : ++this.aksi;
+    if (latar) this.polling = true;
+    else this.busy = true;
     const messagesAtRequest = new Set(this.game?.messages.map((message) => message.id));
     this.api
       .request(this.code, body, action)
       .pipe(
         takeUntilDestroyed(this.destroy),
         finalize(() => {
-          this.busy = false;
+          if (latar) this.polling = false;
+          else this.busy = false;
           this.cdr.markForCheck();
         }),
       )
       .subscribe({
         next: (snapshot) => {
+          // Pemain menekan tombol saat polling berjalan: snapshot polling sudah basi.
+          if (nomor !== this.aksi) return;
           const missedReveal =
             this.game?.phase === 'preparing' &&
             this.game.id === snapshot.game.id &&
@@ -976,6 +988,15 @@ export class Game implements OnInit, OnDestroy {
     this.request(
       { match_id: this.game.id, round_number: this.game.round, phase: this.game.phase },
       'cancel-vote',
+    );
+  }
+
+  // BATAL AKSI MALAM: tarik Hostage/Guard/Peek sendiri; tombol aksi muncul lagi untuk memilih ulang.
+  cancelAction(): void {
+    if (!this.game?.me.can_cancel_action || this.busy) return;
+    this.request(
+      { match_id: this.game.id, round_number: this.game.round, phase: this.game.phase },
+      'cancel-action',
     );
   }
 

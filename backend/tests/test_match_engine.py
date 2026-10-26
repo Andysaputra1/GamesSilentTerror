@@ -380,6 +380,40 @@ class SyndicateTests(unittest.TestCase):
             self.game.cancel_vote("civilian")
         self.assertFalse(self.game.snapshot("civilian")["me"]["can_cancel_vote"])
 
+    # Aksi malam bisa ditarik lalu dipilih ulang; yang diresolusikan pilihan saat malam habis.
+    def test_night_action_can_be_cancelled_and_rechosen(self):
+        self.night()
+        self.game.act("hitman", "hostage", "civilian")
+        self.game.act("spy", "guard", "civilian")
+        me = self.game.snapshot("hitman")["me"]
+        self.assertEqual((me["can_act"], me["can_cancel_action"]), (False, True))
+        self.assertEqual(me["action"], {"ability": "hostage", "target": "civilian"})
+        with self.assertRaisesRegex(ValueError, "sudah dikunci"):
+            self.game.act("hitman", "hostage", "civilian2")
+        self.game.cancel_action("hitman")
+        me = self.game.snapshot("hitman")["me"]
+        self.assertEqual((me["can_act"], me["can_cancel_action"], me["action"]), (True, False, None))
+        self.assertEqual(self.game.snapshot("hitman2")["me"]["ally_actions"], [])
+        self.game.act("hitman", "hostage", "civilian2")
+        self.game.resolve_night()
+        self.assertTrue(self.game.players["civilian2"].hostage)
+        self.assertFalse(self.game.players["civilian"].hostage)
+
+    def test_cancel_action_needs_own_night_action_and_no_hostage(self):
+        self.night()
+        with self.assertRaisesRegex(ValueError, "Tidak ada aksi malam"):
+            self.game.cancel_action("spy")
+        self.game.act("spy", "guard", "civilian")
+        self.game.players["spy"].hostage = True
+        with self.assertRaisesRegex(ValueError, "Tidak ada aksi malam"):
+            self.game.cancel_action("spy")
+        self.assertFalse(self.game.snapshot("spy")["me"]["can_cancel_action"])
+        # Gag Order langsung berlaku, jadi tidak ada yang bisa dibatalkan di siang hari.
+        self.game.phase = "day"
+        self.game.act("hitman", "gag", "civilian")
+        with self.assertRaisesRegex(ValueError, "Tidak ada aksi malam"):
+            self.game.cancel_action("hitman")
+
     def test_gag_order_is_shared_by_the_syndicate(self):
         self.game.act("hitman", "gag", "civilian")
         with self.assertRaises(ValueError):
@@ -616,6 +650,10 @@ class RoomGameTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Fase sudah berubah"):
             self.rooms.cancel_vote(
                 self.room.code, "alice", match_id="old", round_number=1, phase="tribunal"
+            )
+        with self.assertRaisesRegex(ValueError, "Fase sudah berubah"):
+            self.rooms.cancel_action(
+                self.room.code, "alice", match_id="old", round_number=1, phase="night"
             )
         with self.assertRaises(ValueError):
             self.rooms.state(self.room.code, "outsider")
