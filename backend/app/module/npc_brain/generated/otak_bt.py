@@ -1,8 +1,8 @@
 """FILE INI DIHASILKAN OTOMATIS oleh scripts/ekspor_otak_npc.py. JANGAN DIEDIT MANUAL.
 
 Sumber : npc_behavior_tree.ipynb
-Sidik  : a487b11a2d85552f
-Dibuat : 2026-10-26 01:08 UTC
+Sidik  : 7a1e37f431250643
+Dibuat : 2026-10-26 09:09 UTC
 
 Perubahan logika bot dilakukan di notebook skripsi, dijalankan ulang sampai semua
 skenario/pengujian lulus, lalu diekspor ulang dengan skrip ini.
@@ -1594,7 +1594,9 @@ def vote_pasti(ctx):
     return (rencana_vote("vote", ph, [f"Hasil Peek: {ph} adalah Hitman."], 100.0),
             pd.DataFrame([{"kandidat": ph, "sumber": "fakta hasil Peek"}]))
 
-# Hitman selalu vote warga: kambing hitam terbaik, atau pesaing terkuat saat dirinya/rekannya memimpin suara.
+# Hitman tidak pernah membuka vote: tanpa eksekusi lebih menguntungkan Syndicate (malam terus mengurangi warga bebas),
+# sedangkan suara tunggal Hitman menjadi satu-satunya bukti bagi warga. Saat dirinya/rekannya memimpin suara, Hitman
+# menyamakan suara pesaing terkuat; bila warga sudah vote, Hitman ikut suara terbanyak yang layak (kambing hitam).
 def keputusan_vote_hitman(ctx):
     view, konteks, bot, diri = ctx["view"], ctx["konteks"], ctx["bot"], ctx["diri"]
     boleh, alasan = izin_vote(view)
@@ -1617,6 +1619,13 @@ def keputusan_vote_hitman(ctx):
             target = pesaing[0][0]
             return rencana_vote("vote", target, [f"Menyamakan suara {target} agar tidak ada eksekusi tunggal."],
                                 float(pesaing[0][1])), jejak
+    elif not suara:
+        # Belum ada suara warga: abstain; bila warga vote kemudian, langkah berikutnya memutuskan ulang.
+        return rencana_vote("abstain", alasan=["Belum ada suara warga; tanpa eksekusi lebih menguntungkan Syndicate."]), jejak
+    elif pemimpin in set(layak["pemain"]):
+        alasan_ikut = [f"Ikut suara terbanyak ke {pemimpin}."]
+        return (rencana_vote("vote", pemimpin, alasan_ikut + alasan_curiga(baris_pemain(ctx["publik"], pemimpin), None),
+                             float(suara[pemimpin])), jejak)
     target = layak.iloc[0]["pemain"]
     return (rencana_vote("vote", target, alasan_curiga(baris_pemain(ctx["publik"], target), None),
                          float(layak.iloc[0]["kambing_hitam"])), jejak)

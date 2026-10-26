@@ -135,7 +135,10 @@ class PenjelasanMetodeTests(unittest.TestCase):
         self.assertTrue(all(p["tersangka"]["judul"].startswith("Citra publik") for p in hitman))
 
     def test_summary_for_trace_list(self):
-        otak, npc, tulisan, p = next(x for x in self.langkah["fuzzy"] if x[1]["action"] == "vote")
+        # Langkah vote dari metode mana pun: di pertandingan pendek ini warga Fuzzy bisa abstain semua.
+        otak, npc, tulisan, p = next(
+            x for langkah in self.langkah.values() for x in langkah if x[1]["action"] == "vote"
+        )
         r = ringkas(p)
         self.assertEqual(r["bot"]["nama"], otak.nama)
         self.assertIn(f"vote → {npc['target']}", r["keputusan"])
