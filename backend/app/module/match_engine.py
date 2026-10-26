@@ -345,13 +345,20 @@ class Match:
             raise ValueError("Peek hanya tersedia sekali setiap dua ronde.")
         self.actions[name] = {"ability": ability, "target": target_name}
 
-    # VOTE: satu pilihan final; hanya Hostage/kematian yang mencabut suara, bukan Gag Order.
+    # VOTE: satu pilihan per pemain; hanya Hostage/kematian yang mencabut suara, bukan Gag Order.
     def vote(self, name, target_name):
         player = self.actor(name)
         if self.phase != "tribunal" or player.hostage or name in self.votes:
             raise ValueError("Voting tidak tersedia atau pilihan sudah dikunci.")
         self.target(player, target_name)
         self.votes[name] = target_name
+
+    # BATAL VOTE: selama Tribunal suara boleh ditarik lalu dipilih ulang; yang dihitung suara saat waktu habis.
+    def cancel_vote(self, name):
+        player = self.actor(name)
+        if self.phase != "tribunal" or player.hostage or name not in self.votes:
+            raise ValueError("Tidak ada suara yang bisa dibatalkan.")
+        del self.votes[name]
 
     # Satu korban per malam untuk Syndicate: pilihan terbanyak, seri → yang dipilih paling awal.
     def syndicate_target(self):
@@ -734,6 +741,10 @@ class Match:
                 and player.alive
                 and not player.hostage
                 and viewer not in self.votes,
+                "can_cancel_vote": self.phase == "tribunal"
+                and player.alive
+                and not player.hostage
+                and viewer in self.votes,
                 "vote": self.votes.get(viewer),
                 "ability": ability,
                 "can_act": bool(can_act),

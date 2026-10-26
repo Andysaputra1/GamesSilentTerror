@@ -116,6 +116,28 @@ describe('Game', () => {
     expect(component.busy).toBe(false);
   });
 
+  // BATAL VOTE: sesudah vote, tombol berubah menjadi "Batalkan vote" yang mengirim token Tribunal.
+  it('turns the vote button into cancel vote and sends the tribunal token', () => {
+    const state = snapshot();
+    state.game.phase = 'tribunal';
+    state.game.me = { ...state.game.me, ability: null, can_act: false, can_vote: false };
+    state.game.me.vote = 'NOX';
+    state.game.me.can_cancel_vote = true;
+    component.game = state.game;
+    component.code = 'ABC123';
+    const tombol = render().querySelector('.cancel-vote') as HTMLButtonElement;
+    expect(tombol.textContent).toContain('Batalkan vote: NOX');
+    expect(render().textContent).not.toContain('Kunci vote');
+    const request = vi.spyOn(TestBed.inject(GameService), 'request').mockReturnValue(of(state));
+    tombol.click();
+    expect(request).toHaveBeenCalledWith(
+      'ABC123',
+      { match_id: 'match-1', round_number: 1, phase: 'tribunal' },
+      'cancel-vote',
+    );
+    expect(component.notice).toContain('Suara dibatalkan');
+  });
+
   it('keeps chat received during polling without duplicates or cross-match messages', () => {
     component.game = snapshot().game;
     component.code = 'ABC123';

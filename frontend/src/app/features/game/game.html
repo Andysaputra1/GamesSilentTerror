@@ -546,6 +546,15 @@
                   >
                     ⚖ Kunci vote: {{ nama(target) || 'pilih pemain' }}
                   </button>
+                } @else if (state.me.can_cancel_vote) {
+                  <button
+                    type="button"
+                    class="wood-button plank cancel-vote"
+                    [disabled]="busy"
+                    (click)="cancelVote()"
+                  >
+                    ✕ Batalkan vote: {{ nama(state.me.vote) }}
+                  </button>
                 } @else if (state.me.can_act) {
                   @if (allyTarget && target !== allyTarget && canTarget(allyTarget)) {
                     <button
@@ -587,7 +596,8 @@
                 }
                 @if (state.phase === 'tribunal' && state.me.vote) {
                   <p class="locked">
-                    🔒 Suaramu terkunci: <b>{{ nama(state.me.vote) }}</b>
+                    🗳 Suaramu: <b>{{ nama(state.me.vote) }}</b
+                    >. Bisa dibatalkan sampai Tribunal selesai.
                   </p>
                 }
                 @if (allyPlan.length) {

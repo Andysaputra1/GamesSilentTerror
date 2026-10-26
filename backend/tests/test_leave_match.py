@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 
 from app.controller.api.rooms import router
 from app.controller.middleware.auth import require_authenticated_user
-from app.module.match_engine import Match, snapshot_berlabel
+from app.module.match_engine import PREPARATION_MIN_SECONDS, Match, snapshot_berlabel
 from app.module.npc_service import npc_context
 from app.module.room_service import RoomService
 
@@ -207,7 +207,7 @@ class LeavePreparationAndBotTests(unittest.TestCase):
         match.leave("bob", now=5)
         prep = match.snapshot("alice")["preparation"]
         self.assertEqual((prep["required"], prep["unrevealed"]), (1, 0))
-        match.tick(10)  # waktu baca minimal lewat; tidak menunggu kartu bob
+        match.tick(PREPARATION_MIN_SECONDS)  # waktu baca minimal lewat; tidak menunggu kartu bob
         self.assertEqual(match.phase, "day")
 
     def test_engine_bots_never_target_a_left_player(self):

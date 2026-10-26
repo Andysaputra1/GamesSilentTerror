@@ -352,6 +352,34 @@ class SyndicateTests(unittest.TestCase):
         self.game.vote("hitman", "hitman2")
         self.assertEqual(self.game.votes["hitman"], "hitman2")
 
+    def test_vote_can_be_cancelled_and_recast_during_tribunal(self):
+        self.game.phase = "tribunal"
+        self.game.vote("civilian", "spy")
+        me = self.game.snapshot("civilian")["me"]
+        self.assertEqual((me["can_vote"], me["can_cancel_vote"], me["vote"]), (False, True, "spy"))
+        self.game.cancel_vote("civilian")
+        me = self.game.snapshot("civilian")["me"]
+        self.assertEqual((me["can_vote"], me["can_cancel_vote"], me["vote"]), (True, False, None))
+        self.game.vote("civilian", "hitman")
+        self.game.vote("civilian2", "hitman")
+        self.game.resolve_votes()
+        self.assertFalse(self.game.players["hitman"].alive)
+        self.assertTrue(self.game.players["spy"].alive)
+
+    def test_cancel_vote_needs_own_vote_in_tribunal_and_a_voice(self):
+        self.game.phase = "tribunal"
+        with self.assertRaisesRegex(ValueError, "Tidak ada suara"):
+            self.game.cancel_vote("civilian")
+        self.game.vote("civilian", "spy")
+        self.game.phase = "day"
+        with self.assertRaisesRegex(ValueError, "Tidak ada suara"):
+            self.game.cancel_vote("civilian")
+        self.game.phase = "tribunal"
+        self.game.players["civilian"].hostage = True
+        with self.assertRaisesRegex(ValueError, "Tidak ada suara"):
+            self.game.cancel_vote("civilian")
+        self.assertFalse(self.game.snapshot("civilian")["me"]["can_cancel_vote"])
+
     def test_gag_order_is_shared_by_the_syndicate(self):
         self.game.act("hitman", "gag", "civilian")
         with self.assertRaises(ValueError):
@@ -584,6 +612,10 @@ class RoomGameTests(unittest.TestCase):
                 phase="day",
                 target="NOX",
                 ability="gag",
+            )
+        with self.assertRaisesRegex(ValueError, "Fase sudah berubah"):
+            self.rooms.cancel_vote(
+                self.room.code, "alice", match_id="old", round_number=1, phase="tribunal"
             )
         with self.assertRaises(ValueError):
             self.rooms.state(self.room.code, "outsider")

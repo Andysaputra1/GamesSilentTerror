@@ -954,7 +954,9 @@ export class Game implements OnInit, OnDestroy {
           }
           // Siap bukan pilihan: pesannya jangan muncul di meja bila ronde 1 langsung mulai.
           if (body && action !== 'reveal') {
-            if (action !== 'ready') this.notice = 'Pilihan dikunci oleh server.';
+            if (action === 'cancel-vote')
+              this.notice = 'Suara dibatalkan. Kamu boleh memilih lagi.';
+            else if (action !== 'ready') this.notice = 'Pilihan dikunci oleh server.';
             this.error = '';
           }
         },
@@ -986,6 +988,15 @@ export class Game implements OnInit, OnDestroy {
       target: this.target,
       ability: vote ? null : this.game.me.ability,
     });
+  }
+
+  // BATAL VOTE: tarik suara Tribunal sendiri; tombol Kunci vote muncul lagi untuk memilih ulang.
+  cancelVote(): void {
+    if (!this.game?.me.can_cancel_vote || this.busy) return;
+    this.request(
+      { match_id: this.game.id, round_number: this.game.round, phase: this.game.phase },
+      'cancel-vote',
+    );
   }
 
   // Persetujuan bukan chat/vote: manusia hidup yang dibungkam tetap boleh setuju.

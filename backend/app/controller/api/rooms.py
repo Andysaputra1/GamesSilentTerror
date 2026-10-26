@@ -32,6 +32,12 @@ class SkipOption(BaseModel):
     phase: Literal["day"]
 
 
+class CancelVoteOption(BaseModel):
+    match_id: str = Field(min_length=1, max_length=40)
+    round_number: int = Field(ge=1)
+    phase: Literal["tribunal"]
+
+
 class ReadyOption(BaseModel):
     match_id: str = Field(min_length=1, max_length=40)
 
@@ -100,6 +106,12 @@ def state(code: str, user=Depends(require_authenticated_user)):
 # COMMAND: validasi bentuk payload, lalu service mengunci aksi/vote atomik.
 def play(code: str, body: PlayOption, user=Depends(require_authenticated_user)):
     return game_result(lambda: room_service.play(code, user.username, **body.model_dump()))
+
+
+@router.post("/{code}/cancel-vote")
+# BATAL VOTE: tarik suara Tribunal milik sendiri agar bisa memilih ulang sebelum waktu habis.
+def cancel_vote(code: str, body: CancelVoteOption, user=Depends(require_authenticated_user)):
+    return game_result(lambda: room_service.cancel_vote(code, user.username, **body.model_dump()))
 
 
 @router.post("/{code}/leave")

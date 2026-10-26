@@ -85,6 +85,8 @@ export interface MatchView {
     gagged?: boolean;
     can_chat: boolean;
     can_vote: boolean;
+    // Suara Tribunal boleh ditarik selama Tribunal (opsional agar cocok dengan backend versi lama).
+    can_cancel_vote?: boolean;
     vote: string | null;
     ability: string | null;
     can_act: boolean;
