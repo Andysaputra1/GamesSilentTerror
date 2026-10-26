@@ -64,6 +64,11 @@ export class Lobby implements OnInit, OnDestroy {
   }
   // PRIVATE PROPERTY: simpan timer polling agar dapat dihentikan ketika meninggalkan lobby.
   private timer?: ReturnType<typeof setInterval>;
+  // Polling latar tidak memakai `busy`: aplikasi zoneless tidak menggambar ulang tombol saat polling
+  // dimulai, jadi klik yang jatuh di tengah polling dulu ditolak diam-diam (tombol bot harus ditekan
+  // dua kali). Nomor aksi membuang respons polling yang lebih tua dari klik terakhir.
+  private polling = false;
+  private aksi = 0;
 
   // CONSTRUCTOR: Angular menyediakan service ruangan, router, platform, dan fasilitas lifecycle.
   constructor(
@@ -88,7 +93,8 @@ export class Lobby implements OnInit, OnDestroy {
     if (localStorage.getItem(STORAGE.token)) this.restoreRoom();
     else if (code) this.load('GET', '/' + encodeURIComponent(code));
     this.timer = setInterval(() => {
-      if (this.room && !this.busy) this.load('GET', '/' + this.room.code);
+      if (this.room && !this.busy && !this.polling)
+        this.load('GET', '/' + this.room.code, undefined, true);
     }, 3000);
   }
 
@@ -256,19 +262,24 @@ export class Lobby implements OnInit, OnDestroy {
 
   // PRIVATE METHOD: jalankan Observable dari RoomService, kelola loading dan hasil/error.
   // takeUntilDestroyed membatalkan subscription saat komponen dilepas; finalize membuka UI.
-  private load(method: 'GET' | 'POST', path: string, body?: unknown): void {
-    this.busy = true;
+  private load(method: 'GET' | 'POST', path: string, body?: unknown, latar = false): void {
+    const nomor = latar ? this.aksi : ++this.aksi;
+    if (latar) this.polling = true;
+    else this.busy = true;
     this.rooms
       .request(method, path, body)
       .pipe(
         takeUntilDestroyed(this.destroy),
         finalize(() => {
-          this.busy = false;
+          if (latar) this.polling = false;
+          else this.busy = false;
           this.cdr.markForCheck();
         }),
       )
       .subscribe({
         next: (room) => {
+          // Pengguna menekan tombol saat polling berjalan: snapshot polling sudah basi.
+          if (nomor !== this.aksi) return;
           // Tab di latar bisa melewatkan layar persiapan yang singkat: fase apa pun selain lobby berarti mulai.
           const justStarted = this.room?.phase === 'lobby' && room.phase !== 'lobby';
           this.room = room;

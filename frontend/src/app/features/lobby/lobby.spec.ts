@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
-import { of } from 'rxjs';
+import { of, Subject } from 'rxjs';
 import { RoomService } from '../../core/room.service';
 
 import { Lobby } from './lobby';
@@ -183,5 +183,39 @@ describe('Lobby', () => {
     vi.spyOn(TestBed.inject(RoomService), 'request').mockReturnValue(of({ ...room, phase: 'day' }));
     (component as unknown as { load: (m: string, p: string) => void }).load('GET', '/ABC123');
     expect(navigate).toHaveBeenCalledWith('/game');
+  });
+
+  // Regresi: klik "+ Bots" saat polling latar berjalan dulu ditolak diam-diam (harus klik dua kali).
+  it('adds bots on the first click even while a background poll is pending', () => {
+    const room = {
+      code: 'ABC123',
+      owner: component.username,
+      members: [member(component.username)],
+      bots: [] as string[],
+      bot_enabled: false,
+      phase: 'lobby',
+      capacity: 6,
+    };
+    component.room = room;
+    const polling = new Subject<typeof room>();
+    const request = vi
+      .spyOn(TestBed.inject(RoomService), 'request')
+      .mockImplementation((method: string) =>
+        method === 'GET' ? polling : of({ ...room, bot_enabled: true, bots: ['NOX', 'ECHO'] }),
+      );
+    const load = (
+      component as unknown as {
+        load: (m: string, p: string, b?: unknown, latar?: boolean) => void;
+      }
+    ).load.bind(component);
+    load('GET', '/ABC123', undefined, true);
+
+    component.toggleBot();
+    expect(request).toHaveBeenLastCalledWith('POST', '/ABC123/bot', { enabled: true });
+    expect(component.room?.bots).toEqual(['NOX', 'ECHO']);
+    // Snapshot polling yang dimulai sebelum klik tidak boleh menghapus bot yang baru masuk.
+    polling.next(room);
+    polling.complete();
+    expect(component.room?.bots).toEqual(['NOX', 'ECHO']);
   });
 });
