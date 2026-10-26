@@ -641,7 +641,7 @@ test('simulation shows chat with NLU, live bot positions on the flowchart, and n
   assert.ok(kode.querySelector('.kode-param') && kode.querySelector('.kode-output'));
 });
 
-test('menu dokumen membuka ERD, Proses AI, Arsitektur, Kode AI, dan Diagram Alir AI di tab baru', async (t) => {
+test('menu dokumen membuka semua dokumen sistem, AI, dan NLU di tab baru', async (t) => {
   const w = setup(t);
   await login(w);
   const doc = w.document;
@@ -657,6 +657,9 @@ test('menu dokumen membuka ERD, Proses AI, Arsitektur, Kode AI, dan Diagram Alir
       '/panel/dokumen/arsitektur',
       '/panel/dokumen/kode-ai',
       '/panel/dokumen/diagram-alir-ai',
+      '/panel/dokumen/kode-nlu-intent',
+      '/panel/dokumen/kode-nlu-target',
+      '/panel/dokumen/diagram-alir-nlu',
     ],
   );
   assert.ok(links.every((a) => a.target === '_blank' && a.rel === 'noopener'));

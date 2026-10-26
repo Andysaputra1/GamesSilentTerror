@@ -72,6 +72,9 @@ class PanelTests(unittest.TestCase):
             ("arsitektur", "Arsitektur Sistem Silent Terror"),
             ("kode-ai", "Kode AI Bot"),
             ("diagram-alir-ai", "Diagram Alir AI Bot"),
+            ("kode-nlu-intent", "Kode NLU Intent"),
+            ("kode-nlu-target", "Kode NLU Target"),
+            ("diagram-alir-nlu", "Diagram Alir NLU"),
         ]:
             page = self.client.get(f"/panel/dokumen/{nama}")
             self.assertEqual(page.status_code, 200)
