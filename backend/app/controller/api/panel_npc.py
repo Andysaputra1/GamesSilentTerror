@@ -376,6 +376,7 @@ KODE_ALUR = {
             ("Aturan menulis:", "batasan untuk LLM"),
             ("maksud = MAKSUD_AKSI", "maksud rencana"),
             ('konteks["chat_terbaru"][-JUMLAH_CHAT_KONTEKS:]', "chat terbaru sebagai data"),
+            ("pemicu(p, konteks)", "chat pemicu yang ditanggapi"),
             ("if alasan_tolak:", "tulis ulang: alasan penolakan ikut dikirim"),
         ]),
     ],
@@ -394,6 +395,7 @@ KODE_ALUR = {
         (G + "nlg", "tulis_pesan", [
             ("for ke in range(1, MAKS_PERCOBAAN_LLM + 1)", "maksimal 2 percobaan LLM"),
             ("nilai_kalimat(bersihkan(", "kalimat dibersihkan lalu dinilai"),
+            ("kalimat_mirip(nilai[", "parafrase tipis kalimat yang baru terdengar ditolak"),
             ('alasan_tolak = ", ".join', "alasan ditolak dikirim ke percobaan berikutnya"),
             ("# 2) Templat bervariasi.", "LLM gagal: templat"),
         ]),
@@ -414,7 +416,7 @@ KODE_ALUR = {
     ],
     "nlg_templat": [
         (G + "nlg", "kalimat_templat", [
-            ("dasar_hindari = ", "hindari kalimat yang sudah dipakai"),
+            ("kalimat_mirip(teks, hindari)", "kalimat yang mirip dengan yang baru terdengar dipakai paling akhir"),
             ("urutan_varian(p)", "varian sesuai rencana"),
             ("ubah_kata_ganti(teks, persona)", "gaya bahasa persona"),
         ]),

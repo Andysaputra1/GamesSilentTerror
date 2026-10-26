@@ -119,6 +119,28 @@ class BrainRuntimeTests(unittest.TestCase):
         self.assertEqual(hasil["daftar_pemain"], roster)
         self.assertEqual(self.runtime.baca_chat([], "human", "Halo.", roster)["konteks"], [])
 
+    # Konteks NLG dari langkah: 12 chat terakhir dan suara Tribunal. Prompt menampilkan tuduhan dan suara ke bot
+    # sebagai pemicu, dan tidak lagi memuat contoh kalimat templat.
+    def test_nlg_context_carries_trigger_chat_and_tribunal_votes(self):
+        match = Match(["human"], ["NOX", "ECHO", "VEIL"], rng=random.Random(1), now=0.0)
+        self.runtime.siapkan_pertandingan(match, "ROOM03")
+        match.round, match.phase = 2, "tribunal"
+        match.deadline = 10.0 + match.durations["tribunal"]
+        match.votes = {"human": "NOX"}
+        for i in range(14):
+            match.add_message("ECHO", f"Obrolan ke-{i}.")
+        match.add_message("human", "Aku curiga NOX, vote NOX.")
+        otak = self.runtime.otak_bot(match.id, "NOX")
+        _, _, konteks = self.runtime.langkah(otak, match.snapshot("NOX"), 10.0)
+        self.assertEqual(len(konteks["chat_terbaru"]), 12)
+        self.assertEqual(konteks["suara_tribunal"], {"human": "NOX"})
+        bela = {"pembicara": "NOX", "aksi": "bela_diri", "intent": "defend", "target": "NOX",
+                "klaim": False, "bukti": ["Aku bukan Hitman; tuduhan ke aku belum punya bukti."]}  # fmt: skip
+        _, pesan = self.runtime.nlg.buat_prompt(bela, konteks, "santai")
+        self.assertIn("<pemicu>\nhuman: Aku curiga NOX, vote NOX.", pesan)
+        self.assertIn("Suara Tribunal ke NOX saat ini: human", pesan)
+        self.assertNotIn("Contoh", pesan)
+
     def test_loaded_runtime_is_not_reloaded_in_background(self):
         # prepare() selalu memanggil mulai_memuat(); NLU yang sedang dipakai tidak boleh tertukar.
         nlu = self.runtime.nlu

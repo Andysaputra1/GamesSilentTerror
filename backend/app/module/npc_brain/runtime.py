@@ -609,7 +609,8 @@ class BrainRuntime:
             "logika_ms": round((t_logika - t_nlu) * 1000, 1),
             "penjelasan_ms": round((time.perf_counter() - t_logika) * 1000, 1),
         }
-        chat = sorted(bot.ingatan.chat, key=lambda c: c["waktu"])[-8:]
+        # Konteks NLG: chat terbaru sepanjang konteks prompt, dan suara Tribunal sebagai pemicu bela diri/bela orang.
+        chat = sorted(bot.ingatan.chat, key=lambda c: c["waktu"])[-self.nlg.JUMLAH_CHAT_KONTEKS :]
         konteks = {
             "roster": [p["nama"] for p in view["pemain"]],
             "chat_terbaru": [
@@ -617,6 +618,7 @@ class BrainRuntime:
                  "target": [{"pemain": t["pemain"], "relasi": t["relasi"]} for t in c.get("target", [])]}
                 for c in chat
             ],
+            "suara_tribunal": dict(view["suara_tribunal"]),
         }  # fmt: skip
         return view, hasil, konteks
 
