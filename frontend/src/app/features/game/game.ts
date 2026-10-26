@@ -81,7 +81,6 @@ export class Game implements OnInit, OnDestroy {
   draft = '';
   target = '';
   error = '';
-  notice = '';
   connected = false;
   busy = false;
   // Permintaan keluar sedang dikirim; polling ditahan agar tidak berebut dengan pembersihan room.
@@ -250,19 +249,6 @@ export class Game implements OnInit, OnDestroy {
 
   isAlly(name: string): boolean {
     return this.allies.includes(name);
-  }
-
-  // Pilihan Hostage rekan yang masih hidup malam ini (null = belum memilih).
-  get allyPlan(): { name: string; target: string | null }[] {
-    const game = this.game;
-    if (!game || game.phase !== 'night') return [];
-    const actions = game.me.ally_actions ?? [];
-    return this.allies
-      .filter((name) => game.players.some((player) => player.name === name && player.alive))
-      .map((name) => ({
-        name,
-        target: actions.find((action) => action.name === name)?.target ?? null,
-      }));
   }
 
   // Target terbanyak dari pilihan rekan; seri → pilihan yang masuk lebih dulu (sama dengan engine).
@@ -944,7 +930,6 @@ export class Game implements OnInit, OnDestroy {
           const phase = `${this.game.id}/${this.game.round}/${this.game.phase}`;
           if (phase !== this.loadedPhase) {
             this.target = '';
-            this.notice = '';
             this.loadedPhase = phase;
           }
           this.updatePhaseTransition();
@@ -952,13 +937,8 @@ export class Game implements OnInit, OnDestroy {
             this.loadSurvey();
             this.startEnding();
           }
-          // Siap bukan pilihan: pesannya jangan muncul di meja bila ronde 1 langsung mulai.
-          if (body && action !== 'reveal') {
-            if (action === 'cancel-vote')
-              this.notice = 'Suara dibatalkan. Kamu boleh memilih lagi.';
-            else if (action !== 'ready') this.notice = 'Pilihan dikunci oleh server.';
-            this.error = '';
-          }
+          // Aksi berhasil: hapus pesan error dari percobaan sebelumnya.
+          if (body && action !== 'reveal') this.error = '';
         },
         error: (error: HttpErrorResponse) => {
           // Pembukaan kartu dikirim ulang oleh polling; backend lama belum punya /reveal (404).

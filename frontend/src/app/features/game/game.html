@@ -592,48 +592,6 @@
                   </button>
                 }
               </div>
-              <div class="action-copy">
-                @if (state.me.action) {
-                  <p class="locked">
-                    🔒 Pilihan malammu terkunci: <b>{{ nama(state.me.action.target) }}</b>
-                  </p>
-                }
-                @if (state.phase === 'tribunal' && state.me.vote) {
-                  <p class="locked">
-                    🗳 Suaramu: <b>{{ nama(state.me.vote) }}</b
-                    >. Bisa dibatalkan sampai Tribunal selesai.
-                  </p>
-                }
-                @if (allyPlan.length) {
-                  <p class="ally-plan">
-                    <span aria-hidden="true">◆</span> Pilihan rekan:
-                    @for (ally of allyPlan; track ally.name) {
-                      <span class="ally-choice"
-                        ><b>{{ nama(ally.name) }}</b> →
-                        {{ nama(ally.target) || 'belum memilih' }}</span
-                      >
-                    }
-                  </p>
-                  @if (state.me.action && allyTarget && state.me.action.target !== allyTarget) {
-                    <p class="hint">
-                      Pilihanmu berbeda dengan rekan. Syndicate memakai target terbanyak; seri →
-                      pilihan yang masuk lebih dulu.
-                    </p>
-                  }
-                }
-                @if (state.me.role === 'stalker') {
-                  <p class="hint">Peek tersedia mulai ronde {{ state.me.next_peek }}.</p>
-                }
-                @if (state.me.role === 'hitman') {
-                  <p class="hint">
-                    Gag Order{{ allies.length ? ' (dipakai bersama rekan)' : '' }} tersedia mulai
-                    ronde {{ state.me.next_gag }}.
-                  </p>
-                }
-                @if (notice) {
-                  <p class="notice" role="status">{{ notice }}</p>
-                }
-              </div>
             </section>
           } @else {
             <div class="board-bar">

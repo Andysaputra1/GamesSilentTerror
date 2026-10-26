@@ -112,7 +112,6 @@ describe('Game', () => {
       },
       'play',
     );
-    expect(component.notice).toContain('dikunci');
     expect(component.busy).toBe(false);
   });
 
@@ -135,7 +134,6 @@ describe('Game', () => {
       { match_id: 'match-1', round_number: 1, phase: 'tribunal' },
       'cancel-vote',
     );
-    expect(component.notice).toContain('Suara dibatalkan');
   });
 
   it('keeps chat received during polling without duplicates or cross-match messages', () => {
@@ -677,9 +675,6 @@ describe('Game', () => {
     expect(fixture.nativeElement.querySelector('.private-card .allies')?.textContent).toContain(
       'NOX',
     );
-    expect(fixture.nativeElement.querySelector('.action-panel').textContent).toContain(
-      'dipakai bersama rekan',
-    );
 
     game.phase = 'tribunal';
     game.me = { ...game.me, ability: null, can_act: false, can_vote: true };
@@ -694,7 +689,7 @@ describe('Game', () => {
   });
 
   // MALAM: pilihan Hostage rekan terlihat, dan target terbanyak (seri → pilihan pertama) bisa disamakan.
-  it('lists ally Hostage choices at night and offers to match them', () => {
+  it('marks ally Hostage choices on cards at night and offers to match them', () => {
     const game = snapshot().game;
     game.phase = 'night';
     game.players = ['alice', 'NOX', 'VEIL', 'bob', 'eka'].map((name) => ({ name, alive: true }));
@@ -707,13 +702,10 @@ describe('Game', () => {
     };
     component.game = game;
     const page = render();
-    expect(component.allyPlan).toEqual([
-      { name: 'NOX', target: null },
-      { name: 'VEIL', target: 'bob' },
-    ]);
     expect(component.allyTarget).toBe('bob');
     const panel = page.querySelector('.action-panel') as HTMLElement;
-    expect(panel.textContent).toContain('belum memilih');
+    // Baki aksi hanya berisi tombol; pilihan rekan tampil sebagai label di kartu.
+    expect(panel.querySelector('.action-copy')).toBeNull();
     expect(panel.firstElementChild?.classList).toContain('action-buttons');
     expect(page.querySelectorAll('.player-card')[3].querySelector('.ally-pick')).not.toBeNull();
     (panel.querySelector('.ally-match') as HTMLButtonElement).click();
@@ -811,12 +803,8 @@ describe('Game', () => {
     ];
     game.me.ally_actions = [{ name: 'NOX', target: 'eka' }];
     component.game = game;
-    expect(component.allyPlan).toEqual([{ name: 'NOX', target: 'eka' }]);
-    expect(render().textContent).not.toContain('Pilihanmu berbeda dengan rekan');
-    // Setelah pilihan sendiri dikunci ke target lain, Hitman diberi tahu aturan target terbanyak.
     game.me.can_act = false;
     game.me.action = { ability: 'hostage', target: 'bob' };
-    expect(render().textContent).toContain('Pilihanmu berbeda dengan rekan');
     const pick = render().querySelector('.ally-pick') as HTMLElement;
     expect(pick.textContent).toContain('◆ Incaran');
     expect(pick.querySelector('.sr-only')?.textContent).toContain('Hostage pilihan rekan: NOX');
@@ -865,7 +853,6 @@ describe('Game', () => {
     now += 4000;
     component.refresh(); // sudah tercatat: kembali polling biasa
     expect(request).toHaveBeenLastCalledWith('ABC123', undefined, 'play');
-    expect(component.notice).toBe('');
     expect(render().querySelector('.splash')?.textContent).toContain(
       'Ronde 1 dimulai dalam 37 detik',
     );
@@ -1217,8 +1204,8 @@ describe('Game', () => {
     expect(component.resultExplanation).toContain('Hitman telah tersingkir');
   });
 
-  // SIAP: tombol Siap yang langsung memulai ronde 1 tidak meninggalkan pesan "Pilihan dikunci" di meja.
-  it('does not leave a locked-choice notice when ready starts round 1', () => {
+  // SIAP: tombol Siap yang langsung memulai ronde 1 menampilkan tirai mulai.
+  it('shows the start transition when ready starts round 1', () => {
     const request = vi
       .spyOn(TestBed.inject(GameService), 'request')
       .mockReturnValue(of(preparing(true)));
@@ -1228,7 +1215,6 @@ describe('Game', () => {
     component.readyUp();
     expect(request).toHaveBeenLastCalledWith('ABC123', { match_id: 'match-1' }, 'ready');
     expect(component.transition?.phase).toBe('start');
-    expect(component.notice).toBe('');
   });
 
   // CATATAN: panel catatan pertandingan dihapus; hasil Tribunal (publik) tampil di tirai pagi.
