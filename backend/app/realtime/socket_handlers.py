@@ -7,18 +7,18 @@ from time import perf_counter
 from typing import Any
 
 import socketio
-from app.services.room_service import room_service
-from app.services.checker_service import checker_service
-from app.services.activity_service import activity
-from app.services.ai_diagnostics import measure
-from app.services.npc_service import catat_nlu
+from app.module.room_service import room_service
+from app.module.checker_service import checker_service
+from app.module.activity_service import activity
+from app.module.ai_diagnostics import measure
+from app.module.npc_service import catat_nlu
 
-from app.services.auth_service import (
+from app.module.auth_service import (
     AuthenticationPersistenceError,
     SessionValidationError,
     auth_service,
 )
-from app.services.persistence_service import PersistenceError, PersistenceService
+from app.module.persistence_service import PersistenceError, PersistenceService
 
 logger = logging.getLogger("shadow_heist.socket")
 

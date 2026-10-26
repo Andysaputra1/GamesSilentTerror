@@ -8,13 +8,13 @@ import asyncio
 import time
 from collections import OrderedDict
 
-from app.services.checker_service import jejak_baru
-from app.services.match_engine import Match, label_unik, snapshot_berlabel
-from app.services.npc_brain.runtime import brain_runtime
-from app.services.npc_service import (
+from app.module.checker_service import jejak_baru
+from app.module.match_engine import Match, label_unik, snapshot_berlabel
+from app.module.npc_brain.runtime import brain_runtime
+from app.module.npc_service import (
     AKSI_RAHASIA, BATAS_LANGKAH_DETIK, isi_jejak, roster_label, tulis_kalimat, waktu_jejak,
 )  # fmt: skip
-from app.services.room_service import BOT_NAMES
+from app.module.room_service import BOT_NAMES
 
 KODE = "SIMULASI"
 PEMAIN = "sim_pemain"  # username admin di engine; tampil dengan nama pilihan admin

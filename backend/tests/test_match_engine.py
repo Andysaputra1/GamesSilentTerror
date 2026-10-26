@@ -10,9 +10,9 @@ from fastapi.testclient import TestClient
 from app.controller.api.rooms import router
 from app.controller.middleware.auth import require_authenticated_user
 from app.realtime.socket_handlers import SocketGameController
-from app.services.match_engine import KOMPOSISI_PERAN, Match, label_unik, snapshot_berlabel
-from app.services.skin_constants import ALL_SKINS
-from app.services.room_service import RoomService
+from app.module.match_engine import KOMPOSISI_PERAN, Match, label_unik, snapshot_berlabel
+from app.module.skin_constants import ALL_SKINS
+from app.module.room_service import RoomService
 
 
 class EngineTests(unittest.TestCase):
@@ -605,7 +605,7 @@ class RoomGameTests(unittest.TestCase):
 
 class SocketGameTests(unittest.IsolatedAsyncioTestCase):
     async def test_revoked_socket_token_cannot_send(self):
-        from app.services.auth_service import SessionValidationError
+        from app.module.auth_service import SessionValidationError
 
         sio = Mock(emit=AsyncMock())
         controller = SocketGameController(sio, Mock())
@@ -654,7 +654,7 @@ class SocketGameTests(unittest.IsolatedAsyncioTestCase):
 class ChatOrderTests(unittest.TestCase):
     # Chat yang terbaca bot dalam satu langkah harus tetap kronologis (audit AI 1 Okt: ID UUID mengacak urutan).
     def test_bot_memory_keeps_chat_order_within_one_snapshot(self):
-        from app.services.npc_brain.generated import otak_fuzzy
+        from app.module.npc_brain.generated import otak_fuzzy
 
         class NLUTiruan:
             ambang = 0.0

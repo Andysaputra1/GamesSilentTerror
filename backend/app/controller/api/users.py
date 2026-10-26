@@ -4,8 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.controller.api.panel import require_panel
-from app.services.auth_service import AuthenticationPersistenceError
-from app.services import user_management_service as users
+from app.module.auth_service import AuthenticationPersistenceError
+from app.module import user_management_service as users
 from app.schemas.auth import UpdateProfileRequest
 from app.controller.middleware.safe_validation import SafeValidationRoute
 

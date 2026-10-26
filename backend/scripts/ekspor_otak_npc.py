@@ -3,7 +3,7 @@
 Kode bot di game harus SAMA dengan kode yang diuji di notebook. Skrip ini membaca
 notebook `npc_fuzzy`, `npc_utility_ai`, `npc_behavior_tree`, dan `npc_nlg`, lalu
 menyalin hanya definisi (import, konstanta, fungsi, kelas) ke
-`app/services/npc_brain/generated/`. Demo, print, grafik, skenario, pengujian, dan
+`app/module/npc_brain/generated/`. Demo, print, grafik, skenario, pengujian, dan
 pemuatan model di tingkat modul dibuang.
 
 Pemakaian (dari folder backend):
@@ -21,7 +21,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
-TUJUAN = BACKEND_DIR / "app" / "services" / "npc_brain" / "generated"
+TUJUAN = BACKEND_DIR / "app" / "module" / "npc_brain" / "generated"
 DEFAULT_NOTEBOOK_DIR = BACKEND_DIR.parents[1] / "training" / "prethesis" / "ai_2_dataset_baru"
 
 # Notebook NPC: semua sel kode sebelum bagian skenario adalah persepsi, NLG payload, penalaran, dan inti.

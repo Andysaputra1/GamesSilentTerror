@@ -12,8 +12,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy import text
 
 from app.main import app
-from app.services.mysql_connector import SessionLocal
-from app.services.persistence_service import PersistenceError, persistence_service
+from app.module.mysql_connector import SessionLocal
+from app.module.persistence_service import PersistenceError, persistence_service
 
 
 @unittest.skipUnless(os.getenv("STRUCTURE_TEST_DB") == "1", "requires disposable MySQL")

@@ -5,9 +5,9 @@ from sqlalchemy.exc import IntegrityError
 from app.config.settings import settings
 from app.models import auth_queries
 
-from app.services.auth_service import auth_service
-from app.services.password_service import hash_password
-from app.services.room_service import BOT_NAMES, room_service
+from app.module.auth_service import auth_service
+from app.module.password_service import hash_password
+from app.module.room_service import BOT_NAMES, room_service
 
 
 class UserNotFound(ValueError):

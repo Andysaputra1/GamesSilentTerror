@@ -6,12 +6,12 @@ from pydantic import SecretStr
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from app.config.settings import settings
-from app.services.ai_runtime_service import (
+from app.module.ai_runtime_service import (
     ai_runtime,
     save_panel_configuration,
     load_panel_configuration,
 )
-from app.services.persistence_service import PersistenceError
+from app.module.persistence_service import PersistenceError
 from app.controller.api.panel import router, require_panel
 
 
@@ -28,7 +28,7 @@ class PanelSecretsTests(unittest.TestCase):
 
         self.db.execute.side_effect = execute
         self.run = patch(
-            "app.services.persistence_service.PersistenceService._run",
+            "app.module.persistence_service.PersistenceService._run",
             side_effect=lambda fn: fn(self.db),
         )
         self.run.start()

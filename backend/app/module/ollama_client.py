@@ -2,7 +2,7 @@
 
 import httpx
 from app.config.settings import settings
-from app.services.ai_diagnostics import record_request, record_response
+from app.module.ai_diagnostics import record_request, record_response
 
 
 # Siapkan header akses tunnel Ollama sesuai token yang dikonfigurasi.

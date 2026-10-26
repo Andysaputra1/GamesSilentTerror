@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 
 from app.controller.api.rooms import router
 from app.controller.middleware.auth import require_authenticated_user
-from app.services.room_service import RoomService
+from app.module.room_service import RoomService
 
 
 class GameLifecycleTests(unittest.TestCase):
@@ -23,7 +23,7 @@ class GameLifecycleTests(unittest.TestCase):
         ): SimpleNamespace(username=x_user)
         self.enterContext(patch("app.controller.api.rooms.room_service", self.rooms))
         self.enterContext(patch("app.controller.api.rooms.PersistenceService"))
-        self.enterContext(patch("app.services.match_engine.time.time", side_effect=lambda: self.now))
+        self.enterContext(patch("app.module.match_engine.time.time", side_effect=lambda: self.now))
         self.client = self.enterContext(TestClient(app))
 
     def create_match(self, count):

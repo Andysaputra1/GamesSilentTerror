@@ -7,7 +7,7 @@ import re
 import unittest
 from pathlib import Path
 
-from app.services.kode_alur import KODE_ALUR, kode_node
+from app.module.kode_alur import KODE_ALUR, kode_node
 
 
 class KodeAlurTests(unittest.TestCase):

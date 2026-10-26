@@ -11,10 +11,10 @@ import time
 import unittest
 from unittest.mock import AsyncMock, Mock, patch
 
-from app.services.npc_brain import runtime as runtime_modul
-from app.services.npc_brain.runtime import BrainRuntime, NLUBersama, NLUCadangan, folder_model
-from app.services.npc_service import NPCService
-from app.services.room_service import RoomService
+from app.module.npc_brain import runtime as runtime_modul
+from app.module.npc_brain.runtime import BrainRuntime, NLUBersama, NLUCadangan, folder_model
+from app.module.npc_service import NPCService
+from app.module.room_service import RoomService
 
 
 class KataKunci:
@@ -41,11 +41,11 @@ class BrainTurnKetahananTests(unittest.IsolatedAsyncioTestCase):
         self.rooms.start(self.room.code, "human")
         self.match = self.room.match
         self.service = NPCService(Mock(emit=AsyncMock()), runtime=self.runtime)
-        self.enterContext(patch("app.services.npc_service.room_service", self.rooms))
+        self.enterContext(patch("app.module.npc_service.room_service", self.rooms))
         self.persistence = self.enterContext(
-            patch("app.services.npc_service.PersistenceService")
+            patch("app.module.npc_service.PersistenceService")
         ).return_value
-        self.enterContext(patch("app.services.npc_service.survey_service"))
+        self.enterContext(patch("app.module.npc_service.survey_service"))
         await self.service.prepare(self.room.code, self.match)
         self.match.begin()
         self.match.deadline = time.time() + 60
@@ -56,7 +56,7 @@ class BrainTurnKetahananTests(unittest.IsolatedAsyncioTestCase):
         self.runtime.tutup()
 
     async def langkah(self):
-        with patch("app.services.npc_service.asyncio.sleep", AsyncMock()):
+        with patch("app.module.npc_service.asyncio.sleep", AsyncMock()):
             self.otak.sibuk = True
             await self.service.brain_turn(self.room.code, self.match, self.otak)
 
@@ -72,7 +72,7 @@ class BrainTurnKetahananTests(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch.object(self.runtime, "tulis", tulis),
-            patch("app.services.npc_service.BATAS_TULIS_DETIK", 0.2),
+            patch("app.module.npc_service.BATAS_TULIS_DETIK", 0.2),
         ):
             await self.langkah()
         self.assertEqual(self.match.messages[-1]["sender"], "NOX")

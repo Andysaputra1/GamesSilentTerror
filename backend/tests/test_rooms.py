@@ -1,10 +1,10 @@
 import unittest
 from unittest.mock import AsyncMock, Mock, patch
 
-from app.services.room_service import RoomService
+from app.module.room_service import RoomService
 from app.realtime.socket_handlers import SocketGameController
-from app.services.checker_service import checker_service
-from app.services.auth_service import SessionValidationError
+from app.module.checker_service import checker_service
+from app.module.auth_service import SessionValidationError
 
 
 class RoomTests(unittest.TestCase):

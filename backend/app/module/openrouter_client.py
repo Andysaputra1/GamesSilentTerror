@@ -1,7 +1,7 @@
 """OpenRouter chat completions; never routes through another API on failure."""
 
 import httpx
-from app.services.ai_diagnostics import record_request, record_response
+from app.module.ai_diagnostics import record_request, record_response
 
 
 # Kirim prompt ke Qwen melalui OpenRouter dan tolak respons tanpa teks.

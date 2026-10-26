@@ -29,9 +29,9 @@ from urllib.parse import urlsplit
 from app.config.settings import (
     BACKEND_DIR, JALUR_PENULIS_LAMA, JALUR_PENULIS_NPC, POLA_MODEL_OPENROUTER, PROJECT_DIR, settings,
 )  # fmt: skip
-from app.services.ai_runtime_service import ai_runtime
-from app.services.match_engine import phase_durations
-from app.services.npc_brain.penjelasan import jelaskan
+from app.module.ai_runtime_service import ai_runtime
+from app.module.match_engine import phase_durations
+from app.module.npc_brain.penjelasan import jelaskan
 
 logger = logging.getLogger("shadow_heist.npc_brain")
 
@@ -307,8 +307,8 @@ class BrainRuntime:
         try:
             self._set(detail="Memuat logika fuzzy, utility AI, dan behavior tree…", progres=0.1)
             for metode, nama in METODE_MODUL.items():
-                self.modul[metode] = importlib.import_module(f"app.services.npc_brain.generated.{nama}")
-            self.nlg = importlib.import_module("app.services.npc_brain.generated.nlg")
+                self.modul[metode] = importlib.import_module(f"app.module.npc_brain.generated.{nama}")
+            self.nlg = importlib.import_module("app.module.npc_brain.generated.nlg")
             self._set(detail="Memuat NLU IndoBERT (intent dan target)…", progres=0.35)
             self.nlu = nlu if nlu is not None else self._buat_nlu(analysis)
             self._set(detail="Menyiapkan penulis kalimat…", progres=0.85)

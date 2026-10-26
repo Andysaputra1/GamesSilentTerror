@@ -5,11 +5,11 @@ from time import perf_counter
 from uuid import uuid4
 from datetime import datetime, timezone
 
-from app.services.ai_runtime_service import ai_runtime
-from app.services.ai_diagnostics import capture_exchange, measure
-from app.services.match_engine import Match
-from app.services.npc_service import npc_context, decision_prompt, request_decision
-from app.services.openrouter_client import failure_message
+from app.module.ai_runtime_service import ai_runtime
+from app.module.ai_diagnostics import capture_exchange, measure
+from app.module.match_engine import Match
+from app.module.npc_service import npc_context, decision_prompt, request_decision
+from app.module.openrouter_client import failure_message
 
 
 async def run_probe(message, scenario):

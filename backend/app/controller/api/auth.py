@@ -13,9 +13,9 @@ from app.schemas.auth import (
 )
 from app.config.settings import settings
 from app.controller.middleware.auth_limits import limit_auth
-from app.services.account_service import register_account, google_account, AccountConflict
-from app.services.google_identity_service import verify_google, nonces
-from app.services.auth_service import (
+from app.module.account_service import register_account, google_account, AccountConflict
+from app.module.google_identity_service import verify_google, nonces
+from app.module.auth_service import (
     AuthenticatedUser,
     AuthenticationError,
     AuthenticationPersistenceError,

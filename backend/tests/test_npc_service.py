@@ -5,12 +5,12 @@ import json
 import unittest
 from unittest.mock import AsyncMock, Mock, patch
 
-from app.services.npc_service import NPCDecision, NPCService, npc_context
-from app.services.npc_service import request_decision
+from app.module.npc_service import NPCDecision, NPCService, npc_context
+from app.module.npc_service import request_decision
 from app.config.settings import Settings
-from app.services.npc_brain.runtime import BrainRuntime
-from app.services.persistence_service import PersistenceError
-from app.services.room_service import RoomService
+from app.module.npc_brain.runtime import BrainRuntime
+from app.module.persistence_service import PersistenceError
+from app.module.room_service import RoomService
 
 
 class NPCTests(unittest.IsolatedAsyncioTestCase):
@@ -33,9 +33,9 @@ class NPCTests(unittest.IsolatedAsyncioTestCase):
         self.match.begin()
         self.sio = Mock(emit=AsyncMock())
         self.service = NPCService(self.sio, runtime=self.runtime)
-        self.rooms_patch = patch("app.services.npc_service.room_service", self.rooms)
+        self.rooms_patch = patch("app.module.npc_service.room_service", self.rooms)
         self.rooms_patch.start()
-        self.persistence_patch = patch("app.services.npc_service.PersistenceService")
+        self.persistence_patch = patch("app.module.npc_service.PersistenceService")
         self.persistence = self.persistence_patch.start().return_value
 
     async def asyncTearDown(self):
@@ -47,7 +47,7 @@ class NPCTests(unittest.IsolatedAsyncioTestCase):
     # Jalankan satu keputusan untuk NPC tertentu melalui validasi yang dipakai timer server.
     async def turn(self, name, decision):
         key = (self.match.id, self.match.round, self.match.phase, name)
-        with patch("app.services.npc_service.request_decision", AsyncMock(return_value=decision)):
+        with patch("app.module.npc_service.request_decision", AsyncMock(return_value=decision)):
             await self.service.turn(self.room.code, self.match, key, npc_context(self.match, name))
 
     def test_context_never_contains_opponents_private_state(self):
@@ -115,7 +115,7 @@ class NPCTests(unittest.IsolatedAsyncioTestCase):
             return NPCDecision(action="gag", target="human", message="Terlambat")
 
         key = (self.match.id, 1, "day", "NOX")
-        with patch("app.services.npc_service.request_decision", side_effect=late):
+        with patch("app.module.npc_service.request_decision", side_effect=late):
             await self.service.turn(self.room.code, self.match, key, npc_context(self.match, "NOX"))
         self.assertFalse(self.match.players["human"].gagged)
         self.assertEqual(self.match.messages, [])
@@ -130,7 +130,7 @@ class NPCTests(unittest.IsolatedAsyncioTestCase):
     async def test_scheduler_starts_without_human_chat_and_does_not_duplicate_turns(self):
         self.match.deadline -= 5
         with patch(
-            "app.services.npc_service.request_decision",
+            "app.module.npc_service.request_decision",
             AsyncMock(return_value=NPCDecision(message="Alibimu?")),
         ) as request:
             self.service.schedule()
@@ -143,7 +143,7 @@ class NPCTests(unittest.IsolatedAsyncioTestCase):
     async def test_network_failure_is_recorded_and_timer_still_progresses(self):
         self.match.phase = "night"
         key = (self.match.id, 1, "night", "NOX")
-        with patch("app.services.npc_service.request_decision", AsyncMock(side_effect=TimeoutError)):
+        with patch("app.module.npc_service.request_decision", AsyncMock(side_effect=TimeoutError)):
             await self.service.turn(self.room.code, self.match, key, npc_context(self.match, "NOX"))
         trace = self.persistence.record_trace.call_args.args[0]
         self.assertEqual(trace["stage"], "npc_fallback")
@@ -160,10 +160,10 @@ class NPCTests(unittest.IsolatedAsyncioTestCase):
             config = Settings(ai_provider=provider)
             with (
                 patch(
-                    "app.services.npc_service.ollama_reply", AsyncMock(return_value='{"action":"wait"}')
+                    "app.module.npc_service.ollama_reply", AsyncMock(return_value='{"action":"wait"}')
                 ) as local,
                 patch(
-                    "app.services.npc_service.openrouter_reply",
+                    "app.module.npc_service.openrouter_reply",
                     AsyncMock(return_value='{"action":"vote","target":"NOX"}'),
                 ) as cloud,
             ):

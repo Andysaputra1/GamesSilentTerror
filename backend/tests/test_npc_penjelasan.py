@@ -16,11 +16,11 @@ import pandas as pd
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.services.checker_service import CheckerService, checker_service
-from app.services.match_engine import Match
-from app.services.npc_brain.penjelasan import BATAS_BYTE, batasi, jelaskan, lengkapi, ringkas, ukuran
-from app.services.npc_service import NPCService
-from app.services.room_service import RoomService
+from app.module.checker_service import CheckerService, checker_service
+from app.module.match_engine import Match
+from app.module.npc_brain.penjelasan import BATAS_BYTE, batasi, jelaskan, lengkapi, ringkas, ukuran
+from app.module.npc_service import NPCService
+from app.module.room_service import RoomService
 from tests.test_npc_brain import AKSI_RAHASIA, runtime_siap
 
 
@@ -231,14 +231,14 @@ class CheckerPenjelasanTests(unittest.TestCase):
         rooms.start(room.code, "human")
         runtime.siapkan_pertandingan(room.match, room.code)
         with (
-            patch("app.services.room_service.room_service", rooms),
-            patch("app.services.npc_brain.runtime.brain_runtime", runtime),
+            patch("app.module.room_service.room_service", rooms),
+            patch("app.module.npc_brain.runtime.brain_runtime", runtime),
         ):
             live = CheckerService().ringkasan_room(room.code)
             jejak = [{"sender": "NOX", "provider": "otak:bt", "model": "persona:gaul"},
                      {"ringkas": {"bot": {"nama": "ECHO", "role": "spy", "metode": "fuzzy",
                                           "persona": "kalem"}}}]  # fmt: skip
-            with patch("app.services.checker_service._bot_arsip", return_value=[]) as arsip:
+            with patch("app.module.checker_service._bot_arsip", return_value=[]) as arsip:
                 dari_jejak = CheckerService().ringkasan_room("ARSIP1", jejak)
                 kosong = CheckerService().ringkasan_room("ARSIP2", [])
         runtime.tutup()
@@ -264,11 +264,11 @@ class NPCServicePenjelasanTests(unittest.IsolatedAsyncioTestCase):
         self.rooms.start(self.room.code, "human")
         self.match = self.room.match
         self.service = NPCService(Mock(emit=AsyncMock()), runtime=self.runtime)
-        self.enterContext(patch("app.services.npc_service.room_service", self.rooms))
+        self.enterContext(patch("app.module.npc_service.room_service", self.rooms))
         self.persistence = self.enterContext(
-            patch("app.services.npc_service.PersistenceService")
+            patch("app.module.npc_service.PersistenceService")
         ).return_value
-        self.enterContext(patch("app.services.npc_service.survey_service"))
+        self.enterContext(patch("app.module.npc_service.survey_service"))
 
     async def asyncTearDown(self):
         await self.service.close()
@@ -281,7 +281,7 @@ class NPCServicePenjelasanTests(unittest.IsolatedAsyncioTestCase):
         with self.rooms.lock:
             self.match.add_message("human", "Aku curiga NOX, dia Hitman. Ayo vote NOX!")
         self.match.deadline = time.time() + 60
-        with patch("app.services.npc_service.asyncio.sleep", AsyncMock()):
+        with patch("app.module.npc_service.asyncio.sleep", AsyncMock()):
             otak.sibuk = True
             await self.service.brain_turn(self.room.code, self.match, otak)
         trace = checker_service.list(self.room.code, penjelasan=True)[0]

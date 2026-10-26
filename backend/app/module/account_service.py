@@ -5,7 +5,7 @@ from datetime import timedelta, timezone
 from sqlalchemy.exc import IntegrityError
 from app.config.settings import settings
 from app.models import auth_queries
-from app.services.auth_service import (
+from app.module.auth_service import (
     auth_service,
     AuthenticationError,
     AuthenticatedUser,
@@ -13,7 +13,7 @@ from app.services.auth_service import (
     _utc_now,
     _token_hash,
 )
-from app.services.password_service import hash_password
+from app.module.password_service import hash_password
 
 
 class AccountConflict(ValueError):
@@ -43,7 +43,7 @@ def issue_session(database, account):
 
 def register_account(body):
     """Simpan akun + email dalam satu transaksi dan login setelah pendaftaran."""
-    from app.services.user_management_service import validate_username
+    from app.module.user_management_service import validate_username
 
     try:
         validate_username(body.username)

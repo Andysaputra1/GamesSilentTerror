@@ -553,7 +553,7 @@ test('simulation shows chat with NLU, live bot positions on the flowchart, and n
         kode: [
           {
             nama: 'nlg.PenulisBerantai.tulis',
-            berkas: 'backend/app/services/npc_brain/generated/nlg.py',
+            berkas: 'backend/app/module/npc_brain/generated/nlg.py',
             mulai: 897,
             akhir: 899,
             konstanta: false,

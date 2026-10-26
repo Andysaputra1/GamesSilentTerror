@@ -33,7 +33,7 @@ ai_runtime = AIRuntimeService()
 # Bangun cipher dari kunci server; tolak penyimpanan jika kunci belum valid.
 def _cipher():
     from cryptography.fernet import Fernet
-    from app.services.persistence_service import PersistenceError
+    from app.module.persistence_service import PersistenceError
 
     try:
         if not settings.panel_encryption_key:
@@ -49,7 +49,7 @@ def _cipher():
 def _decode_config(stored):
     from pydantic import SecretStr
     from cryptography.fernet import InvalidToken
-    from app.services.persistence_service import PersistenceError
+    from app.module.persistence_service import PersistenceError
 
     override = dict(stored)
     override.pop("api_backend", None)  # kunci lama; OpenAI langsung sudah dihapus
@@ -83,7 +83,7 @@ def _decode_config(stored):
 def load_panel_configuration():
     import json
     from sqlalchemy import text
-    from app.services.persistence_service import PersistenceService
+    from app.module.persistence_service import PersistenceService
 
     # Baca satu dokumen konfigurasi panel dan normalisasi JSON dari driver database.
     def read(db):
@@ -109,7 +109,7 @@ def save_panel_configuration(
 ):
     import json
     from sqlalchemy import text
-    from app.services.persistence_service import PersistenceService
+    from app.module.persistence_service import PersistenceService
 
     stored = {
         "ai_provider": provider,

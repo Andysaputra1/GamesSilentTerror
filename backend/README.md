@@ -1,6 +1,6 @@
 # Shadow Heist Python Backend
 
-Struktur API menggunakan controller, services, dan model berisi SQL langsung.
+Struktur API menggunakan controller, module, dan model berisi SQL langsung.
 
 ```text
 backend/
@@ -23,7 +23,7 @@ backend/
     models/
       auth_queries.py           # SELECT/INSERT/DELETE akun dan sesi
       game_queries.py           # SELECT/INSERT/UPDATE pemain dan chat
-    services/                   # Logika password, sesi login, AI, dan game
+    module/                     # Logika password, sesi login, AI, dan game
       mysql_connector.py        # Engine, connection pool, session, health probe
       ollama_client.py          # Klien HTTP Ollama
       openrouter_client.py      # Klien HTTP OpenRouter
@@ -40,13 +40,13 @@ backend/
   tests/
 ```
 
-Alur: HTTP/Socket.IO -> controller -> service -> models (SQL) -> MySQL.
-Koneksi dan pool MySQL disediakan oleh `app/services/mysql_connector.py`.
-Model tidak menyimpan aturan HTTP atau menulis respons API. Services mengatur
+Alur: HTTP/Socket.IO -> controller -> module -> models (SQL) -> MySQL.
+Koneksi dan pool MySQL disediakan oleh `app/module/mysql_connector.py`.
+Model tidak menyimpan aturan HTTP atau menulis respons API. Module mengatur
 transaksi agar beberapa query bisa commit/rollback bersama.
 
-Engine murni ada di `app/services/match_engine.py`: role, fase, skill, cooldown,
-voting, kemenangan, serta snapshot privat. `app/services/room_service.py` membatasi
+Engine murni ada di `app/module/match_engine.py`: role, fase, skill, cooldown,
+voting, kemenangan, serta snapshot privat. `app/module/room_service.py` membatasi
 akses anggota/host dan memegang lock. `app/main.py` menjalankan clock pertandingan;
 frontend hanya menampilkan keputusan server. Lihat [alur dan aturan game](../GAME_CONCEPT.md).
 
@@ -70,10 +70,10 @@ def account_by_username(database, username):
     return database.execute(sql, {"username": username}).mappings().one_or_none()
 ```
 
-Pemakaian dari service:
+Pemakaian dari module:
 
 ```python
-from app.services.mysql_connector import SessionLocal
+from app.module.mysql_connector import SessionLocal
 from app.models.auth_queries import account_by_username
 
 with SessionLocal.begin() as database:
@@ -84,7 +84,7 @@ with SessionLocal.begin() as database:
 SQLAlchemy digunakan sebagai konektor/pool dan pengikat parameter SQL; query
 aplikasi ditulis sebagai SQL langsung, bukan query ORM. Jangan interpolasi input
 pengguna ke SQL. Gunakan `:username` dan dictionary parameter, padanan placeholder
-`?` di mysql2. Exception diteruskan ke service untuk rollback dan diterjemahkan
+`?` di mysql2. Exception diteruskan ke module untuk rollback dan diterjemahkan
 controller menjadi respons API. Pool ditutup hanya saat aplikasi berhenti,
 bukan setiap query. Semua perubahan tabel tetap melalui migrations.
 

@@ -1,8 +1,8 @@
 """FILE INI DIHASILKAN OTOMATIS oleh scripts/ekspor_otak_npc.py. JANGAN DIEDIT MANUAL.
 
-Sumber : npc_behavior_tree.ipynb
-Sidik  : 5138b1cf8c8c8e7d
-Dibuat : 2026-10-23 07:57 UTC
+Sumber : npc_utility_ai.ipynb
+Sidik  : e7b903314347ac78
+Dibuat : 2026-10-26 00:47 UTC
 
 Perubahan logika bot dilakukan di notebook skripsi, dijalankan ulang sampai semua
 skenario/pengujian lulus, lalu diekspor ulang dengan skrip ini.
@@ -41,13 +41,11 @@ import numpy as np
 
 import pandas as pd
 
-from enum import Enum
-
 INTENT_MODEL_DIR = Path("models/notebook_standalone/intent_classifier_transformer")
 
 TARGET_MODEL_DIR = Path("models/target_classifier/target_classifier_transformer")
 
-MATCH_ENGINE = Path("../../../Games/backend/services/match_engine.py")
+MATCH_ENGINE = Path("../../../Games/backend/app/module/match_engine.py")
 
 NLU_DEVICE = "cpu"
 
@@ -1778,514 +1776,227 @@ def validasi_pesan(nlu, teks, rencana, ingatan, view):
             "confidence": round(hasil["conf_intent"], 3), "target_prediksi": target_prediksi,
             "target_lain": [t for t in target_prediksi if t != rencana["target"]]}
 
-# Status hasil tick. BERJALAN = keputusan sengaja ditunda; pohon dicoba lagi pada langkah bot berikutnya.
-class Status(Enum):
-    SUKSES = "SUKSES"
-    GAGAL = "GAGAL"
-    BERJALAN = "BERJALAN"
+# Kurva respons linear: garis lurus yang dipotong ke 0–1.
+# Masukan : x = satu input 0–1 dari c["input"] kandidat; kemiringan k; awal a.
+# Keluaran: nilai consideration a + k × x, dipotong ke 0–1 (bawaan k = 1, a = 0: nilai = input).
+# Dipakai oleh: PERTIMBANGAN, nilai_ancaman (kambing hitam), keputusan_vote.
+def kurva_linear(x, kemiringan=1.0, awal=0.0):
+    return float(np.clip(awal + kemiringan * float(x), 0, 1))
 
-# Kelas dasar: nama node (tampil di jejak dan cetak_pohon) dan daftar anak (kosong untuk daun Kondisi/Aksi).
-class Node:
-    def __init__(self, nama, anak=()):
-        self.nama, self.anak = nama, list(anak)
+# Kurva respons logistik (kurva S): input di bawah titik tengah diredam, di atasnya cepat mendekati 1.
+# Masukan : x = satu input 0–1; tengah t = input yang menghasilkan 0,5; curam c = kecuraman lereng.
+# Keluaran: nilai consideration 1 ÷ (1 + e^(−c × (x − t))), selalu di antara 0 dan 1.
+# Dipakai oleh: PERTIMBANGAN, nilai_ancaman (kambing hitam), keputusan_vote.
+def kurva_logistik(x, tengah=0.5, curam=10.0):
+    return float(1 / (1 + math.exp(-curam * (float(x) - tengah))))
 
-# Selector (fallback): men-tick anak dari kiri; anak pertama yang tidak GAGAL menentukan hasil, sisanya dilewati.
-# Masukan : nama, anak = daftar node berurutan prioritas; tick(papan) dengan papan = dict blackboard.
-# Keluaran: Status anak pertama yang SUKSES/BERJALAN, atau GAGAL bila semua anak gagal.
-# Dipakai oleh: akar setiap pohon (POHON_CHAT, POHON_CHAT_HITMAN, POHON_VOTE, POHON_AKSI).
-class Selector(Node):
-    def tick(self, papan):
-        for anak in self.anak:
-            status = anak.tick(papan)
-            if status != Status.GAGAL:
-                return status
-        return Status.GAGAL
+# Gabungan IAUS: consideration dikalikan, dengan faktor kompensasi Dave Mark agar tindakan yang punya banyak
+# consideration tidak kalah hanya karena lebih banyak bilangan < 1 yang dikalikan.
+# Masukan : nilai = daftar k consideration 0–1; bobot = bobot sistem tindakan (PERTIMBANGAN).
+# Keluaran: bobot × Π(n + (1 − n) × m × n) dengan m = 1 − 1/k; satu consideration 0 memveto, semua 1 = bobot.
+# Dipakai oleh: _nilai_calon, keputusan_vote, nilai_ancaman (kambing hitam).
+def skor_iaus(nilai, bobot=1.0):
+    if not nilai:
+        return 0.0
+    modifikasi = 1 - 1 / len(nilai)
+    skor = 1.0
+    for n in nilai:
+        n = float(np.clip(n, 0, 1))
+        skor *= n + (1 - n) * modifikasi * n
+    return bobot * skor
 
-# Sequence: men-tick anak berurutan dan berhenti pada anak pertama yang tidak SUKSES ("jika syarat terpenuhi, lakukan").
-# Masukan : nama, anak (di notebook ini selalu [Kondisi, Aksi]); tick(papan).
-# Keluaran: Status anak yang menghentikannya (kondisi gagal → GAGAL), atau SUKSES bila semua anak sukses.
-# Dipakai oleh: setiap cabang di bawah akar Selector.
-class Sequence(Node):
-    def tick(self, papan):
-        for anak in self.anak:
-            status = anak.tick(papan)
-            if status != Status.SUKSES:
-                return status
-        return Status.SUKSES
+PERTIMBANGAN = {
+    # Chat role warga (_calon_chat_warga); bela_orang, info_sandera, dan tanya_info juga dipakai Hitman.
+    "bela_diri": (1.3, lambda i: {"tekanan ke bot": kurva_logistik(i["tekanan_bot"], 0.15, 15),
+                                  "urgensi": kurva_linear(i["urgensi"], 0.3, 0.7)}),
+    # Dipanggil = pertanyaan langsung ke bot yang belum dijawab. Bobot 1,2 di atas semua tindakan inisiatif (bela orang
+    # 1,1; tuduh dan klaim palsu 1,0) dan di bawah bela diri 1,3: urutan yang sama dengan cabang 4 BT dan fuzzy.
+    "jawab": (1.2, lambda i: {"dipanggil": kurva_linear(i["dipanggil"])}),
+    "tuduh": (1.0, lambda i: {"kecurigaan": kurva_logistik(i["kecurigaan"], 0.45, 12),
+                              "keunggulan": kurva_linear(i["keunggulan"], 0.5, 0.5),
+                              "volume info": kurva_linear(i["volume_info"], 0.4, 0.6)}),
+    "bela_orang": (1.1, lambda i: {"tekanan": kurva_linear(i["tekanan"]),
+                                   "kepercayaan": kurva_logistik(i["kepercayaan"], 0.75, 12)}),
+    "info_sandera": (0.65, lambda i: {"p_sandera": kurva_logistik(i["p_sandera"], 0.6, 12),
+                                      "urgensi": kurva_linear(i["urgensi"], 0.5, 0.5)}),
+    "ajak_bicara": (0.6, lambda i: {"diam": kurva_linear(i["diam"]),
+                                    "kecurigaan": kurva_linear(i["kecurigaan"], 0.6, 0.4)}),
+    "tanya_info": (0.7, lambda i: {"kebutuhan info": max(i["ketidakjelasan"], i["sedikit_info"])}),
+    # Chat Hitman (_calon_chat_hitman): input dari diri (risiko, tekanan_saya, suara_saya) dan kambing hitam terbaik.
+    "h_bela_diri": (1.3, lambda i: {"tekanan ke saya": kurva_logistik(i["tekanan_saya"], 0.15, 15),
+                                    "risiko": kurva_linear(i["risiko"], 0.4, 0.6)}),
+    "h_jawab": (1.2, lambda i: {"dipanggil": kurva_linear(i["dipanggil"])}),
+    "h_tuduh": (0.9, lambda i: {"kambing hitam": kurva_logistik(i["kambing_hitam"], 0.4, 10),
+                                "perlu pengalihan": kurva_linear(i["risiko"], 0.5, 0.5)}),
+    "klaim_palsu": (1.0, lambda i: {"risiko": kurva_logistik(i["risiko"], 0.6, 12),
+                                    "suara ke saya": kurva_logistik(i["suara_saya"], 0.35, 12)}),
+    # Aksi rahasia (calon_aksi): sandera = Hostage, gag = Gag, lindung = Guard, intip = Peek.
+    "sandera": (1.0, lambda i: {"ancaman": kurva_linear(i["ancaman"], 0.8, 0.2),
+                                "tidak dijaga": kurva_linear(i["tidak_dijaga"], 0.8, 0.2)}),
+    "gag": (1.0, lambda i: {"ancaman sekarang": kurva_logistik(i["ancaman_sekarang"], 0.45, 10),
+                            "waktu": kurva_linear(i["porsi_fase"], 0.5, 0.5)}),
+    "lindung": (1.0, lambda i: {"terancam": kurva_linear(i["terancam"], 0.8, 0.2),
+                                "kepercayaan": kurva_logistik(i["kepercayaan"], 0.5, 10)}),
+    "intip": (1.0, lambda i: {"kecurigaan": kurva_linear(i["kecurigaan"], 0.8, 0.2),
+                              "kurang info": kurva_linear(i["kurang_info"], 0.4, 0.6)}),
+}
 
-# Kondisi (daun): memeriksa papan; fungsinya boleh menyimpan pilihan ke papan["target"] untuk Aksi sesudahnya.
-# Fungsi pemeriksanya dibuat _ada, _k_*, atau _ada_aksi, atau berupa lambda di pohon.
-# Masukan : nama, fungsi(papan) → bool. tick(papan) mencatat {node, jenis, status} ke papan["jejak"].
-# Keluaran: Status.SUKSES bila fungsi benar, selain itu Status.GAGAL.
-# Dipakai oleh: POHON_CHAT, POHON_CHAT_HITMAN, POHON_VOTE, dan POHON_AKSI (anak pertama setiap Sequence).
-class Kondisi(Node):
-    def __init__(self, nama, fungsi):
-        super().__init__(nama)
-        self.fungsi = fungsi
+UTILITAS_TUNGGU = 0.35
 
-    def tick(self, papan):
-        status = Status.SUKSES if self.fungsi(papan) else Status.GAGAL
-        papan["jejak"].append({"node": self.nama, "jenis": "kondisi", "status": status.value})
-        return status
+UTILITAS_VOTE_LANGSUNG = 0.85
 
-# Aksi (daun): menjalankan fungsi(papan) dan menulis hasilnya (rencana chat/vote/aksi) ke papan["hasil"].
-# Masukan : nama, fungsi(papan) → rencana, status = Status yang selalu dikembalikan (bawaan SUKSES).
-# Keluaran: status tetap itu. Aksi tidak pernah GAGAL, jadi daun terakhir setiap pohon menjamin ada rencana.
-# Dipakai oleh: anak kedua setiap Sequence dan daun terakhir setiap pohon; BERJALAN hanya untuk tunggu vote.
-class Aksi(Node):
-    def __init__(self, nama, fungsi, status=Status.SUKSES):
-        super().__init__(nama)
-        self.fungsi, self.status = fungsi, status
+AMBANG_GAG_UTILITAS = 0.55
 
-    def tick(self, papan):
-        papan["hasil"] = self.fungsi(papan)
-        papan["jejak"].append({"node": self.nama, "jenis": "aksi", "status": self.status.value})
-        return self.status
+PAKSA_VOTE_BUKTI_LEMAH = False
 
-# Mencetak struktur pohon (indentasi = kedalaman, urutan anak = prioritas) untuk dokumentasi.
-# Masukan : node (biasanya akar), tingkat = kedalaman awal.
-# Keluaran: tidak ada; struktur dicetak.
-# Dipakai oleh: sel demo di akhir bagian pohon aksi rahasia (tidak dipakai saat bermain).
-def cetak_pohon(node, tingkat=0):
-    print("  " * tingkat + f"[{type(node).__name__}] {node.nama}")
-    for anak in node.anak:
-        cetak_pohon(anak, tingkat + 1)
+BOBOT_BUKTI = {"dituduh_korban": 0.75, "dorong_salah_eksekusi": 0.65, "klaim": 0.60, "serang_bersih": 0.50,
+               "tekanan": 0.40, "pengalihan": 0.30, "inkonsistensi": 0.30}
 
-BENDERA = [
-    # 2 poin: bukti keras (jejak korban Hostage/Gag, dorongan eksekusi warga, klaim role bermasalah).
-    ("jejak korban", lambda b: b["dituduh_korban"], 0.5, 2),
-    ("dorong eksekusi warga", lambda b: b["dorong_salah_eksekusi"], 0.5, 2),
-    ("klaim bermasalah", lambda b: b["klaim"], 0.5, 2),
-    # 1 poin: bukti lunak dari pola tuduhan, jawaban, dan vote.
-    ("menyerang pemain bersih", lambda b: b["serang_bersih"], 0.5, 1),
-    ("tekanan tanpa pembela", lambda b: b["tekanan"] * (1 - b["dukungan"]), 0.4, 1),
-    ("pengalihan", lambda b: b["pengalihan"], 0.5, 1),
-    ("inkonsistensi", lambda b: b["inkonsistensi"], 0.5, 1),
-]
+BOBOT_ANCAMAN = {"klaim_peran": 0.80, "menuduh_saya": 0.70, "pengaruh": 0.45}
 
-BENDERA_ANCAMAN = [
-    ("menuduh aku", lambda r: r["menuduh_saya"], 0.5, 2),
-    ("mengaku role penting", lambda r: r["klaim_peran"], 0.5, 2),
-    ("berpengaruh", lambda r: r["pengaruh"], 0.4, 1),
-    ("dipercaya", lambda r: r["kredibilitas"], 0.8, 1),
-]
-
-BATAS_BERSIH_SANDERA = 0.6
-
-POIN_TERSANGKA, POIN_KUAT = 2, 3
-
-SELISIH_UNGGUL = 0.5
-
-URGENSI_KRITIS = 0.75
-
-PAKSA_VOTE_BUKTI_LEMAH = True
-
-# Poin bendera merah per pemain (warga); bukan kandidat dan dugaan korban Hostage (BATAS_BERSIH_SANDERA) = 0.
-# Hasilnya diurutkan urutan_bt dan dibaca kondisi pohon.
-# Masukan : tabel bukti dari hitung_bukti (kolom kandidat, p_sandera, dan ukuran setiap BENDERA).
-# Keluaran: tabel + poin, bendera (nama yang aktif), bobot_bukti (Σ poin × ukuran semua bendera, pemutus seri),
-#           kecurigaan = min(1, poin/5 + 0,001 × min(1, bobot_bukti/10)).
-# Dipakai oleh: putuskan (tabel pribadi warga, tabel publik untuk Hitman).
+# Kecurigaan dengan noisy-OR: tiap bukti berbobot menambah kecurigaan secara independen tanpa pernah melebihi 1.
+# Masukan : tabel bukti dari hitung_bukti (kolom BOBOT_BUKTI, dukungan, p_sandera, kandidat).
+# Keluaran: tabel + kolom u_<bukti> (bobot × bukti), kecurigaan_mentah = 1 − Π(1 − u), dan
+#           kecurigaan = mentah × (1 − p_sandera) untuk kandidat, 0 untuk yang lain.
+# Dipakai oleh: putuskan (tabel pribadi warga, lalu ditimpa fakta pasti; tabel publik untuk Hitman).
 def nilai_kecurigaan(tabel):
     baris = []
     for _, b in tabel.iterrows():
-        kandidat = bool(b["kandidat"]) and b["p_sandera"] < BATAS_BERSIH_SANDERA
-        aktif = [(nama, poin) for nama, fungsi, ambang, poin in BENDERA if fungsi(b) >= ambang] if kandidat else []
-        poin = sum(p for _, p in aktif)
-        bobot = sum(p * float(f(b)) for _, f, _, p in BENDERA) if kandidat else 0.0
-        baris.append({"poin": poin, "bendera": ", ".join(n for n, _ in aktif), "bobot_bukti": bobot,
-                      "kecurigaan": min(1.0, poin / 5 + 0.001 * min(1.0, bobot / 10)) if kandidat else 0.0})
+        komponen = {k: BOBOT_BUKTI[k] * float(b[k]) for k in BOBOT_BUKTI}
+        # Tekanan yang juga dibela orang lain kurang meyakinkan.
+        komponen["tekanan"] *= 1 - 0.7 * float(b["dukungan"])
+        mentah = 1 - float(np.prod([1 - v for v in komponen.values()]))
+        baris.append({**{f"u_{k}": v for k, v in komponen.items()}, "kecurigaan_mentah": mentah,
+                      "kecurigaan": mentah * (1 - b["p_sandera"]) if b["kandidat"] else 0.0})
     return pd.concat([tabel, pd.DataFrame(baris, index=tabel.index)], axis=1)
 
-# Poin ancaman Hitman dan nilai kambing hitam per warga. Hasilnya bahan calon chat/aksi Hitman dan
-# keputusan_vote_hitman.
-# Masukan : fitur dari fitur_hitman (ukuran BENDERA_ANCAMAN, kecurigaan_publik, dukungan_suara).
-# Keluaran: fitur + poin_ancaman, bendera_ancaman, ancaman = min(1, poin/5),
-#           kambing_hitam = min(1, kecurigaan_publik + 0,5 × dukungan_suara).
-# Dipakai oleh: putuskan (Hitman).
+# Ancaman tiap warga bagi Hitman (noisy-OR × kredibilitas) dan nilai kambing hitamnya (IAUS tiga consideration).
+# Masukan : fitur dari fitur_hitman (menuduh_saya, pengaruh, klaim_peran, kredibilitas, kecurigaan_publik,
+#           dukungan_suara, p_sandera).
+# Keluaran: fitur + kolom ancaman (target Hostage) dan kambing_hitam (target tuduhan dan vote Hitman).
+# Dipakai oleh: putuskan (role Hitman).
 def nilai_ancaman(fitur):
     baris = []
     for _, r in fitur.iterrows():
-        aktif = [(nama, poin) for nama, fungsi, ambang, poin in BENDERA_ANCAMAN if fungsi(r) >= ambang]
-        poin = sum(p for _, p in aktif)
-        baris.append({"poin_ancaman": poin, "bendera_ancaman": ", ".join(n for n, _ in aktif),
-                      "ancaman": min(1.0, poin / 5),
-                      "kambing_hitam": min(1.0, float(r["kecurigaan_publik"]) + 0.5 * float(r["dukungan_suara"]))})
-    # Kolom ditulis eksplisit agar tabel tanpa warga pun tetap punya kolom ini.
-    kolom = ["poin_ancaman", "bendera_ancaman", "ancaman", "kambing_hitam"]
-    return pd.concat([fitur, pd.DataFrame(baris, index=fitur.index, columns=kolom)], axis=1)
+        mentah = 1 - float(np.prod([1 - BOBOT_ANCAMAN[k] * float(r[k]) for k in BOBOT_ANCAMAN]))
+        # Kambing hitam yang baik sudah dicurigai publik, sedang didukung suara, dan bukan dugaan korban Hostage.
+        kambing = skor_iaus([kurva_logistik(r["kecurigaan_publik"], 0.35, 10),
+                             kurva_linear(r["dukungan_suara"], 0.5, 0.5), 1 - float(r["p_sandera"])])
+        # Penuduh yang dipercaya publik lebih berbahaya; yang sudah dicurigai tetap bernilai 60%.
+        baris.append({"ancaman": mentah * (0.6 + 0.4 * float(r["kredibilitas"])), "kambing_hitam": kambing})
+    return pd.concat([fitur, pd.DataFrame(baris, index=fitur.index, columns=["ancaman", "kambing_hitam"])], axis=1)
 
-# Urutan tersangka BT: poin, lalu bobot bukti, lalu nama (abjad); hanya baris kandidat.
-# Masukan : tabel hasil nilai_kecurigaan (sesudah terapkan_pengetahuan).
-# Keluaran: DataFrame kandidat terurut, tersangka terkuat di baris pertama.
-# Dipakai oleh: _papan (papan["urutan"] untuk cabang tuduh dan vote) dan urutan_tersangka.
-def urutan_bt(tabel):
-    kandidat = tabel[tabel["kandidat"]]
-    return kandidat.sort_values(["poin", "bobot_bukti", "pemain"], ascending=[False, False, True], kind="stable")
-
-# Nama tersangka menurut urutan_bt.
-# Masukan : tabel hasil nilai_kecurigaan.
-# Keluaran: list nama, tersangka terkuat di depan.
-# Dipakai oleh: putuskan (kunci urutan_tersangka; juga dasar kebijakan vote saat bukti lemah).
+# Urutan tersangka warga: kandidat dari kecurigaan tertinggi; seri diputus bukti_total, lalu nama.
+# Masukan : tabel sesudah nilai_kecurigaan dan terapkan_pengetahuan. Keluaran: daftar nama pemain.
+# Dipakai oleh: putuskan (disimpan di hasil dan diteruskan ke kebijakan vote saat bukti lemah).
 def urutan_tersangka(tabel):
-    return urutan_bt(tabel)["pemain"].tolist()
+    return urutkan_kandidat(tabel)[0]["pemain"].tolist()
 
-# Nama teratas cukup unggul dari nama kedua: poinnya lebih besar, atau poin seri dan bobot buktinya lebih besar
-# ≥ SELISIH_UNGGUL. Satu kandidat saja selalu unggul; tabel kosong tidak.
-# Masukan : kandidat = DataFrame terurut urutan_bt (utuh, atau disaring _layak).
-# Keluaran: bool.
-# Dipakai oleh: _k_tersangka (tuduh) dan _k_vote_tersangka (vote).
-def unik(kandidat):
-    if len(kandidat) < 2:
-        return len(kandidat) == 1
-    a, b = kandidat.iloc[0], kandidat.iloc[1]
-    return a["poin"] > b["poin"] or a["bobot_bukti"] - b["bobot_bukti"] >= SELISIH_UNGGUL
+# Utilitas tiap kandidat: input lewat kurva PERTIMBANGAN menjadi consideration, lalu digabung IAUS dan dikali bobot.
+# Masukan : calon = daftar kandidat {aksi, sistem (opsional), input, ...} dari calon_chat / calon_aksi.
+# Keluaran: daftar yang sama (diubah di tempat) + c["pertimbangan"] {nama: nilai 0–1} dan c["skor"] = utilitas.
+# Dipakai oleh: keputusan_chat, keputusan_aksi.
+def _nilai_calon(calon):
+    for c in calon:
+        bobot, kurva = PERTIMBANGAN[c.get("sistem", c["aksi"])]
+        c["pertimbangan"] = kurva(c["input"])
+        c["skor"] = skor_iaus(list(c["pertimbangan"].values()), bobot)
+    return calon
 
-# Pembuat kondisi "ada calon chat jenis aksi": mencari di papan["calon_chat"] (calon bersama ketiga metode, urut
-# pembuatan di calon_chat) dan menyimpan calon pertama yang lolos syarat ke papan["target"] (None bila tidak ada).
-# Masukan : aksi = jenis calon (mis. "bela_diri"), syarat(papan, calon) → bool (bawaan: selalu benar).
-# Keluaran: fungsi kondisi(papan) → bool untuk Kondisi.
-# Dipakai oleh: cabang chat yang memakai calon bersama (semua kecuali izin, jeda, dan tuduh warga).
-def _ada(aksi, syarat=lambda papan, c: True):
-    def kondisi(papan):
-        cocok = [c for c in papan["calon_chat"] if c["aksi"] == aksi and syarat(papan, c)]
-        papan["target"] = cocok[0] if cocok else None
-        return bool(cocok)
-    return kondisi
+# Baris jejak penalaran per kandidat: utilitas dan nilai tiap consideration (dibulatkan 3 desimal).
+# Masukan : calon yang sudah dinilai _nilai_calon. Keluaran: list dict {aksi, target, utilitas, pertimbangan}.
+# Dipakai oleh: keputusan_chat, keputusan_aksi.
+def _jejak_calon(calon):
+    return [{"aksi": c["aksi"], "target": c["target"], "utilitas": c["skor"],
+             "pertimbangan": {k: round(v, 3) for k, v in c["pertimbangan"].items()}} for c in calon]
 
-# Aksi chat: calon yang disimpan kondisi _ada menjadi rencana chat.
-# Masukan : papan["target"] = calon {aksi, target, alasan, input}.
-# Keluaran: rencana_chat(calon).
-# Dipakai oleh: POHON_CHAT dan POHON_CHAT_HITMAN (daun aksi sesudah kondisi calon bersama).
-def _a_calon(papan):
-    return rencana_chat(papan["target"])
-
-# Poin bendera seorang pemain di tabel papan; 0 bila namanya tidak ada di tabel.
-# Masukan : papan["tabel"], nama pemain.
-# Keluaran: int.
-# Dipakai oleh: kondisi cabang "Bela pemain tanpa bendera".
-def _poin(papan, nama):
-    return int(baris_pemain(papan["tabel"], nama)["poin"]) if nama in set(papan["tabel"]["pemain"]) else 0
-
-# Pembuat kondisi tuduh: tersangka teratas papan["urutan"] punya poin ≥ minimal, unggul (unik), dan lolos syarat chat
-# menuduh bersama (boleh_tuduh: belum dituduh/diungkap bot di fase ini, belum digemakan MAKS_GEMA pemain lain);
-# bila lolos, barisnya disimpan ke papan["target"].
-# Masukan : minimal = POIN_KUAT atau POIN_TERSANGKA.
-# Keluaran: fungsi kondisi(papan) → bool.
-# Dipakai oleh: cabang "Tuduh tersangka kuat" dan "Tuduh tersangka" (pohon chat warga).
-def _k_tersangka(minimal):
-    def kondisi(papan):
-        urutan = papan["urutan"]
-        if urutan is None or urutan.empty or urutan.iloc[0]["poin"] < minimal or not unik(urutan):
-            return False
-        if not boleh_tuduh(papan["ingatan"], papan["view"], papan["konteks"], urutan.iloc[0]["pemain"]):
-            return False
-        papan["target"] = urutan.iloc[0]
-        return True
-    return kondisi
-
-# Aksi tuduh: tersangka di papan["target"] dituduh dengan kalimat bukti dari alasan_curiga.
-# Masukan : papan["target"] = baris tabel tersangka, papan["bot"].
-# Keluaran: rencana_chat aksi "tuduh" (intent offend).
-# Dipakai oleh: daun cabang "Tuduh tersangka kuat" dan "Tuduh tersangka".
-def _a_tuduh(papan):
-    t = papan["target"]
-    return rencana_chat({"aksi": "tuduh", "target": t["pemain"], "alasan": alasan_curiga(t, papan["bot"])})
-
-# Syarat tambahan tanya_info: chat membingungkan (ketidakjelasan ≥ 0,5) atau sepi (sedikit_info ≥ 0,75).
-# Masukan : papan["konteks"]; c = calon tanya_info (tidak dibaca, tetapi syarat _ada selalu menerima (papan, calon)).
-# Keluaran: bool.
-# Dipakai oleh: cabang "Minta informasi" (pohon chat warga dan Hitman).
-def _k_butuh_info(papan, c):
-    k = papan["konteks"]
-    return k["ketidakjelasan"] >= 0.5 or k["sedikit_info"] >= 0.75
-
-# Aksi diam karena izin chat ditolak; alasannya dari izin_chat.
-# Masukan : papan["izin"]["alasan"].
-# Keluaran: rencana_chat_tunggu (kirim=False).
-# Dipakai oleh: daun cabang "Tidak boleh chat" (pohon chat warga dan Hitman).
-def _tunggu_izin(papan):
-    return rencana_chat_tunggu(papan["izin"]["alasan"])
-
-POHON_CHAT = Selector("Chat warga", [
-    # 1. Izin dulu (fase, hak chat, jatah, jeda): tanpa izin, cabang lain tidak berarti.
-    Sequence("Tidak boleh chat", [Kondisi("tidak boleh chat", lambda p: not p["izin"]["boleh"]),
-                                  Aksi("tunggu (izin)", _tunggu_izin)]),
-    # 2. Tuduhan baru dijawab sebelum hal lain; boleh walau masih jeda, karena itu di atas cabang 3.
-    Sequence("Bela diri", [Kondisi("bot dituduh baru", _ada("bela_diri")), Aksi("bela_diri", _a_calon)]),
-    # 3. Selama jeda hanya bela diri yang boleh; pengaman, karena biasanya cabang 2 sudah menangkap kasus ini.
-    Sequence("Masih jeda", [Kondisi("hanya boleh menjawab tuduhan", lambda p: p["izin"]["hanya_bela_diri"]),
-                            Aksi("tunggu (jeda)", lambda p: rencana_chat_tunggu("Masih jeda antar-chat."))]),
-    # 4. Bot dipanggil (pertanyaan langsung yang belum dijawab): diabaikan terlihat janggal, jadi dijawab sebelum
-    #    inisiatif sendiri; di bawah bela diri dan jeda (prioritas yang sama dengan fuzzy dan Utility AI).
-    Sequence("Jawab pertanyaan", [Kondisi("bot ditanya langsung", _ada("jawab")), Aksi("jawab", _a_calon)]),
-    # 5. Mencegah eksekusi pemain yang pasti bersih atau diduga korban Hostage lebih penting daripada menuduh.
-    Sequence("Bela pemain yang sangat dipercaya", [
-        Kondisi("pasti bersih / dugaan korban Hostage sedang ditekan",
-                _ada("bela_orang", lambda p, c: c["input"]["kepercayaan"] >= BATAS_BERSIH_SANDERA
-                     and (c["target"] in p["pengetahuan"]["bersih"]
-                          or baris_pemain(p["tabel"], c["target"])["p_sandera"] >= BATAS_BERSIH_SANDERA))),
-        Aksi("bela_orang (terpercaya)", _a_calon)]),
-    # 6. Bukti kuat (≥ 3 poin) cukup untuk menggiring suara.
-    Sequence("Tuduh tersangka kuat", [Kondisi("tersangka kuat (≥3 poin) unggul", _k_tersangka(POIN_KUAT)),
-                                      Aksi("tuduh (kuat)", _a_tuduh)]),
-    # 7. Dugaan Hostage menyelamatkan suara warga, tetapi masih dugaan, jadi di bawah tuduhan kuat.
-    Sequence("Umumkan dugaan Hostage", [Kondisi("dugaan sandera belum diumumkan", _ada("info_sandera")),
-                                        Aksi("info_sandera", _a_calon)]),
-    # 8. Pembelaan tanpa fakta pasti: pemain tanpa bendera yang ditekan.
-    Sequence("Bela pemain tanpa bendera", [
-        Kondisi("pemain tanpa bendera ditekan (tekanan ≥ 0,5)",
-                _ada("bela_orang", lambda p, c: c["input"]["tekanan"] >= 0.5 and _poin(p, c["target"]) == 0)),
-        Aksi("bela_orang", _a_calon)]),
-    # 9. Bukti cukup (≥ 2 poin); di bawah pembelaan karena salah tuduh lebih merugikan daripada terlambat menuduh.
-    Sequence("Tuduh tersangka", [Kondisi("tersangka (≥2 poin) unggul", _k_tersangka(POIN_TERSANGKA)),
-                                 Aksi("tuduh", _a_tuduh)]),
-    # 10. Mengumpulkan informasi dari pemain yang diam; tidak mendesak.
-    Sequence("Ajak pemain diam", [Kondisi("ada pemain diam (diskusi ramai atau ruangan hening)", _ada("ajak_bicara")),
-                                  Aksi("ajak_bicara", _a_calon)]),
-    # 11. Pertanyaan umum paling lemah: hanya saat chat membingungkan atau sepi.
-    Sequence("Minta informasi", [Kondisi("chat membingungkan atau sepi", _ada("tanya_info", _k_butuh_info)),
-                                 Aksi("tanya_info", _a_calon)]),
-    # 12. Daun tanpa kondisi: pohon selalu menghasilkan rencana.
-    Aksi("tunggu", lambda p: rencana_chat_tunggu("Tidak ada cabang chat yang terpenuhi; bot tidak spam.")),
-])
-
-POHON_CHAT_HITMAN = Selector("Chat Hitman", [
-    # 1–4. Izin, bela diri, jeda, dan jawab pertanyaan: sama dengan warga, agar Hitman terlihat seperti warga.
-    Sequence("Tidak boleh chat", [Kondisi("tidak boleh chat", lambda p: not p["izin"]["boleh"]),
-                                  Aksi("tunggu (izin)", _tunggu_izin)]),
-    Sequence("Bela diri", [Kondisi("dituduh baru", _ada("bela_diri")), Aksi("bela_diri", _a_calon)]),
-    Sequence("Masih jeda", [Kondisi("hanya boleh menjawab tuduhan", lambda p: p["izin"]["hanya_bela_diri"]),
-                            Aksi("tunggu (jeda)", lambda p: rencana_chat_tunggu("Masih jeda antar-chat."))]),
-    Sequence("Jawab pertanyaan", [Kondisi("ditanya langsung", _ada("jawab")), Aksi("jawab", _a_calon)]),
-    # 5. Langkah berisiko, hanya saat eksekusi sudah dekat (risiko ≥ 0,6 dan suara ke Hitman ≥ 0,4).
-    Sequence("Klaim palsu saat terdesak", [
-        Kondisi("risiko ≥ 0,6 dan suara ke saya ≥ 0,4",
-                _ada("klaim_palsu", lambda p, c: c["input"]["risiko"] >= 0.6 and c["input"]["suara_saya"] >= 0.4)),
-        Aksi("klaim_palsu", _a_calon)]),
-    # 6. Selamatkan rekan selama ia masih dipercaya publik; membela rekan yang sudah sangat dicurigai mencolok.
-    Sequence("Bela rekan Syndicate", [
-        Kondisi("rekan ditekan (≥ 0,5) tetapi masih dipercaya publik (≥ 0,5)",
-                _ada("bela_orang", lambda p, c: c["input"]["tekanan"] >= 0.5 and c["input"]["kepercayaan"] >= 0.5)),
-        Aksi("bela_orang (rekan)", _a_calon)]),
-    # 7. Alihkan suara ke warga (calon tuduh hanya ada bila kambing_hitam ≥ MIN_KAMBING_HITAM).
-    Sequence("Tuduh kambing hitam", [Kondisi("ada kambing hitam", _ada("tuduh")), Aksi("tuduh", _a_calon)]),
-    # 8. Terlihat membantu warga tanpa risiko.
-    Sequence("Kamuflase info sandera", [Kondisi("dugaan sandera publik", _ada("info_sandera")),
-                                        Aksi("info_sandera", _a_calon)]),
-    # 9. Pertanyaan umum paling lemah.
-    Sequence("Minta informasi", [Kondisi("chat membingungkan atau sepi", _ada("tanya_info", _k_butuh_info)),
-                                 Aksi("tanya_info", _a_calon)]),
-    # 10. Daun tanpa kondisi.
-    Aksi("tunggu", lambda p: rencana_chat_tunggu("Tidak ada cabang chat yang terpenuhi.")),
-])
-
-# Papan (blackboard) satu tick: seluruh ctx + urutan tersangka BT + calon chat bersama + tempat tulis node.
-# Masukan : ctx dari putuskan (ingatan, view, peran, bot, konteks, pengetahuan, izin, tabel, ...).
-# Keluaran: dict papan; urutan = urutan_bt (None untuk Hitman), calon_chat ([] bila tidak boleh chat),
-#           jejak = node yang di-tick, hasil = rencana dari Aksi, target = pilihan kondisi untuk Aksi berikutnya.
-# Dipakai oleh: keputusan_chat dan keputusan_vote.
-def _papan(ctx):
-    urutan = urutan_bt(ctx["tabel"]) if ctx["peran"] != "hitman" else None
-    calon = calon_chat(ctx) if ctx["izin"]["boleh"] else []
-    return {**ctx, "urutan": urutan, "calon_chat": calon, "jejak": [], "hasil": None, "target": None}
-
-# Keputusan chat BT: satu tick pohon chat sesuai role dari akar; Aksi yang dijalankan menulis rencananya.
-# Masukan : ctx dari putuskan.
-# Keluaran: (rencana chat, jejak DataFrame {node, jenis, status} + kolom status_akar).
-# Dipakai oleh: putuskan, bila tidak ada fakta pasti untuk diungkap (Stalker yang tahu Hitman langsung mengungkap).
+# Chat: kandidat dengan utilitas tertinggi dikirim hanya jika lebih berguna daripada diam (UTILITAS_TUNGGU).
+# Masukan : ctx dari putuskan (izin chat dan bahan calon_chat).
+# Keluaran: (rencana chat atau tunggu, jejak = DataFrame utilitas tiap kandidat + baris "tunggu").
+# Dipakai oleh: putuskan (bila Stalker tidak punya fakta pasti untuk diungkap).
 def keputusan_chat(ctx):
-    papan = _papan(ctx)
-    status = (POHON_CHAT_HITMAN if ctx["peran"] == "hitman" else POHON_CHAT).tick(papan)
-    return papan["hasil"], pd.DataFrame(papan["jejak"]).assign(status_akar=status.value)
+    if not ctx["izin"]["boleh"]:
+        return rencana_chat_tunggu(ctx["izin"]["alasan"]), pd.DataFrame()
+    calon = _nilai_calon(calon_chat(ctx))
+    # Skor dibulatkan 9 desimal agar galat floating dianggap seri; seri diputus URUTAN_AKSI, lalu nama target.
+    calon.sort(key=lambda c: (-round(c["skor"], 9), URUTAN_AKSI.index(c["aksi"]), c["target"] or ""))
+    jejak = pd.DataFrame(_jejak_calon(calon)
+                         + [{"aksi": "tunggu", "target": None, "utilitas": UTILITAS_TUNGGU, "pertimbangan": {}}])
+    if not calon or calon[0]["skor"] <= UTILITAS_TUNGGU:
+        return rencana_chat_tunggu("Tidak ada tindakan chat yang lebih berguna daripada diam."), jejak
+    return rencana_chat(calon[0]), jejak
 
-# Kandidat vote yang layak: urutan tersangka tanpa dugaan korban Hostage (p_sandera ≥ BATAS_SANDERA_VOTE) dan
-# tanpa pemain yang pasti bersih; urutan urutan_bt tetap.
-# Masukan : papan["urutan"], papan["pengetahuan"]["bersih"].
-# Keluaran: DataFrame terurut (bisa kosong).
-# Dipakai oleh: _k_vote_tersangka, _k_kritis, dan _k_mayoritas.
-def _layak(papan):
-    u = papan["urutan"]
-    return u[(u["p_sandera"] < BATAS_SANDERA_VOTE) & ~u["pemain"].isin(papan["pengetahuan"]["bersih"])]
+# Urutan pilihan vote: utilitas tertinggi dulu. Seri pemain dengan abstain → pemain (vote); seri antar-pemain → nama
+# tanpa membedakan huruf besar/kecil, lalu nama asli. Nama pengguna di game bebas, jadi hasil tidak boleh bergantung
+# pada huruf kapital (dulu nama berhuruf kecil kalah dari "abstain" saat seri karena urutan abjad).
+# Masukan : baris = [{pilihan, consideration..., utilitas}] untuk pemain layak; abstain = utilitas abstain.
+# Keluaran: DataFrame jejak terurut (baris pertama = pilihan terbaik) dengan kolom yang sama.
+# Dipakai oleh: keputusan_vote.
+def _urutkan_pilihan_vote(baris, abstain):
+    jejak = pd.DataFrame(baris + [{"pilihan": "abstain", "utilitas": abstain}])
+    jejak["_abstain"] = [False] * len(baris) + [True]
+    jejak["_nama"] = jejak["pilihan"].str.casefold()
+    return jejak.sort_values(["utilitas", "_abstain", "_nama", "pilihan"], ascending=[False, True, True, True],
+                             kind="stable").drop(columns=["_abstain", "_nama"])
 
-# Pembuat kondisi vote tersangka: kandidat layak teratas punya poin ≥ minimal dan unggul (unik); barisnya
-# disimpan ke papan["target"].
-# Masukan : minimal = POIN_KUAT atau POIN_TERSANGKA.
-# Keluaran: fungsi kondisi(papan) → bool.
-# Dipakai oleh: cabang "Vote tersangka kuat" dan "Vote tersangka".
-def _k_vote_tersangka(minimal):
-    def kondisi(papan):
-        layak = _layak(papan)
-        if layak.empty or layak.iloc[0]["poin"] < minimal or not unik(layak):
-            return False
-        papan["target"] = layak.iloc[0]
-        return True
-    return kondisi
-
-# Kondisi kesempatan terakhir: urgensi ≥ URGENSI_KRITIS dan ada kandidat layak; yang teratas disimpan ke papan
-# walau poinnya 0, karena abstain saat warga hampir kalah lebih berbahaya daripada salah pilih.
-# Masukan : papan["konteks"]["urgensi"] dan kandidat _layak.
-# Keluaran: bool.
-# Dipakai oleh: cabang "Kesempatan terakhir".
-def _k_kritis(papan):
-    layak = _layak(papan)
-    if papan["konteks"]["urgensi"] < URGENSI_KRITIS or layak.empty:
-        return False
-    papan["target"] = layak.iloc[0]
-    return True
-
-# Kondisi ikut mayoritas: ≥ 2 suara masuk, pemimpin suara (seri → nama abjad pertama) memegang ≥ 40% suara,
-# termasuk kandidat layak, dan punya ≥ 1 poin; barisnya disimpan ke papan["target"].
-# Masukan : papan["konteks"] (jumlah_suara, porsi_suara) dan kandidat _layak.
-# Keluaran: bool.
-# Dipakai oleh: cabang "Ikut mayoritas".
-def _k_mayoritas(papan):
-    k = papan["konteks"]
-    if k["jumlah_suara"] < 2:
-        return False
-    pemimpin = max(sorted(k["porsi_suara"]), key=k["porsi_suara"].get)
-    layak = _layak(papan)
-    if k["porsi_suara"][pemimpin] < 0.4 or pemimpin not in set(layak["pemain"]):
-        return False
-    baris = baris_pemain(layak, pemimpin)
-    if baris["poin"] < 1:
-        return False
-    papan["target"] = baris
-    return True
-
-# Aksi vote: pemain di papan["target"] di-vote; skornya = poin bendera.
-# Masukan : papan["target"] = baris tabel, papan["bot"].
-# Keluaran: rencana_vote("vote", pemain, alasan_curiga, poin).
-# Dipakai oleh: daun cabang vote (tersangka kuat, kesempatan terakhir, tersangka, ikut mayoritas).
-def _a_vote(papan):
-    t = papan["target"]
-    return rencana_vote("vote", t["pemain"], alasan_curiga(t, papan["bot"]), float(t["poin"]))
-
-POHON_VOTE = Selector("Vote warga", [
-    # 1. Izin dulu: vote hanya saat Tribunal dan selama bot punya hak suara.
-    Sequence("Tidak bisa vote", [Kondisi("tidak punya hak vote", lambda p: not izin_vote(p["view"])[0]),
-                                 Aksi("tidak_bisa", lambda p: rencana_vote("tidak_bisa", alasan=[izin_vote(p["view"])[1]]))]),
-    # 2. Bukti kuat (≥ 3 poin, unggul): tidak perlu menunggu suara lain.
-    Sequence("Vote tersangka kuat", [Kondisi("tersangka kuat unggul", _k_vote_tersangka(POIN_KUAT)),
-                                     Aksi("vote tersangka kuat", _a_vote)]),
-    # 3. Warga hampir kalah: abstain lebih berbahaya daripada salah pilih.
-    Sequence("Kesempatan terakhir", [Kondisi("urgensi ≥ 0,75 dan ada kandidat layak", _k_kritis),
-                                     Aksi("vote teratas", _a_vote)]),
-    # 4. Paruh awal Tribunal (porsi_fase < VOTE_TUNGGU_FRAKSI): tunggu diskusi. BERJALAN = dicoba lagi nanti.
-    Sequence("Tunggu suara lain", [
-        Kondisi("Tribunal belum separuh", lambda p: p["konteks"]["porsi_fase"] < VOTE_TUNGGU_FRAKSI),
-        Aksi("tunggu", lambda p: rencana_vote("tunggu", alasan=["Menunggu diskusi dan suara lain."]),
-             status=Status.BERJALAN)]),
-    # 5. Setelah separuh Tribunal: tersangka (≥ 2 poin) yang unggul.
-    Sequence("Vote tersangka", [Kondisi("tersangka unggul", _k_vote_tersangka(POIN_TERSANGKA)),
-                                Aksi("vote tersangka", _a_vote)]),
-    # 6. Agar suara warga tidak pecah, tetapi hanya ke kandidat yang punya bendera.
-    Sequence("Ikut mayoritas", [Kondisi("mayoritas ke kandidat berbendera", _k_mayoritas),
-                                Aksi("vote ikut", _a_vote)]),
-    # 7. Daun tanpa kondisi.
-    Aksi("abstain", lambda p: rencana_vote("abstain", alasan=["Belum ada tersangka yang cukup kuat."])),
-])
-
-# Keputusan vote BT (warga): satu tick POHON_VOTE dari akar.
-# Masukan : ctx dari putuskan.
-# Keluaran: (rencana vote, jejak DataFrame + kolom status_akar); status_akar BERJALAN = sengaja menunggu.
-# Dipakai oleh: putuskan (role warga, bila tidak ada hasil Peek Hitman; Hitman memakai strategi vote bersama).
+# Vote warga: utilitas tiap pemain layak (IAUS empat consideration) dibandingkan dengan utilitas abstain.
+# Masukan : ctx dari putuskan (view, tabel kecurigaan, pengetahuan bersih; konteks urgensi, porsi_suara, porsi_fase).
+# Keluaran: (rencana vote / tunggu / abstain / tidak_bisa, jejak = DataFrame consideration dan utilitas per pilihan).
+# Dipakai oleh: putuskan (role warga, bila tidak ada hasil Peek Hitman).
 def keputusan_vote(ctx):
-    papan = _papan(ctx)
-    status = POHON_VOTE.tick(papan)
-    return papan["hasil"], pd.DataFrame(papan["jejak"]).assign(status_akar=status.value)
+    view, konteks, tabel, bot = ctx["view"], ctx["konteks"], ctx["tabel"], ctx["bot"]
+    boleh, alasan = izin_vote(view)
+    if not boleh:
+        return rencana_vote("tidak_bisa", alasan=[alasan]), pd.DataFrame()
+    kandidat, _ = urutkan_kandidat(tabel)
+    # Dugaan korban Hostage dan pemain yang pasti bersih tidak pernah di-vote.
+    layak = kandidat[(kandidat["p_sandera"] < BATAS_SANDERA_VOTE) & ~kandidat["pemain"].isin(ctx["pengetahuan"]["bersih"])]
+    # Abstain makin tidak menarik saat warga terdesak: 0,65 saat urgensi 0, 0,15 saat urgensi 1.
+    abstain = 0.15 + 0.5 * (1 - konteks["urgensi"])
+    baris = []
+    for _, c in layak.iterrows():
+        tertinggi_lain = max([s for n, s in zip(layak["pemain"], layak["kecurigaan"]) if n != c["pemain"]], default=0.0)
+        pertimbangan = {
+            "kecurigaan": kurva_logistik(c["kecurigaan"], 0.45, 10),
+            "bukan sandera": 1 - float(c["p_sandera"]),
+            "dukungan suara": kurva_linear(konteks["porsi_suara"].get(c["pemain"], 0.0), 0.25, 0.75),
+            # Selisih dengan pemain layak lain yang paling dicurigai; selisih 0,30 sudah dianggap jelas.
+            "keunggulan": kurva_linear(float(np.clip((c["kecurigaan"] - tertinggi_lain) / 0.30, 0, 1)), 0.4, 0.6),
+        }
+        baris.append({"pilihan": c["pemain"], **pertimbangan, "utilitas": skor_iaus(list(pertimbangan.values()))})
+    # Seri dengan abstain dimenangkan pemain; seri antar-pemain diputus nama tanpa membedakan huruf kapital.
+    jejak = _urutkan_pilihan_vote(baris, abstain)
+    terbaik = jejak.iloc[0]
+    porsi = konteks["porsi_fase"]
+    # Pemain mengalahkan abstain: vote langsung bila sangat yakin, selain itu setelah separuh Tribunal.
+    if terbaik["pilihan"] != "abstain" and (terbaik["utilitas"] >= UTILITAS_VOTE_LANGSUNG or porsi >= VOTE_TUNGGU_FRAKSI):
+        return rencana_vote("vote", terbaik["pilihan"], alasan_curiga(baris_pemain(layak, terbaik["pilihan"]), bot),
+                            terbaik["utilitas"]), jejak
+    if porsi < VOTE_TUNGGU_FRAKSI:
+        return rencana_vote("tunggu", alasan=["Menunggu diskusi dan suara lain sebelum mengunci vote."],
+                            skor=terbaik["utilitas"]), jejak
+    return rencana_vote("abstain", alasan=["Abstain lebih berguna daripada vote yang belum yakin."],
+                        skor=abstain), jejak
 
-# Pembuat kondisi pohon aksi: calon aksi yang lolos syarat diurutkan dengan kunci cabang; yang pertama disimpan
-# ke papan["target"] (None bila tidak ada). Nama syarat/kunci dibaca builder Proses AI (_cabang_bt): jangan diganti.
-# Masukan : syarat(calon) → bool; kunci(calon) → tuple urutan (nilai terbesar dulu lewat tanda minus, lalu nama).
-# Keluaran: fungsi kondisi(papan) → bool.
-# Dipakai oleh: POHON_AKSI (setiap kondisi).
-def _ada_aksi(syarat, kunci):
-    def kondisi(papan):
-        cocok = [c for c in papan["calon_aksi"] if syarat(c)]
-        papan["target"] = sorted(cocok, key=kunci)[0] if cocok else None
-        return bool(cocok)
-    return kondisi
-
-# Aksi rahasia: target yang disimpan kondisi menjadi rencana aksi.
-# Masukan : papan["target"] = calon {aksi, target, alasan} dari calon_aksi.
-# Keluaran: rencana_aksi(aksi, target, alasan).
-# Dipakai oleh: daun hostage, gag, guard, dan peek di POHON_AKSI.
-def _a_aksi(papan):
-    c = papan["target"]
-    return rencana_aksi(c["aksi"], c["target"], c["alasan"])
-
-_KUNCI_ANCAMAN = lambda c: (-c["input"]["ancaman"], c["target"])
-
-_KUNCI_ANCAMAN_SEKARANG = lambda c: (-c["input"]["ancaman_sekarang"], c["target"])
-
-POHON_AKSI = {
-    "hostage": Selector("Hostage", [
-        # 1. Target yang pasti tidak dijaga Spy (aturan Guard dua malam): Hostage pasti berhasil.
-        Sequence("Ancaman yang pasti tidak dijaga", [
-            Kondisi("target pasti tidak dijaga dengan ≥1 poin ancaman",
-                    _ada_aksi(lambda c: c["input"]["tidak_dijaga"] >= 1 and c["input"]["ancaman"] >= 0.2, _KUNCI_ANCAMAN)),
-            Aksi("hostage", _a_aksi)]),
-        # 2. Ancaman nyata (≥ 2 poin).
-        Sequence("Ancaman nyata", [Kondisi("ancaman ≥ 2 poin", _ada_aksi(lambda c: c["input"]["ancaman"] >= 0.4,
-                                                                         _KUNCI_ANCAMAN)),
-                                   Aksi("hostage", _a_aksi)]),
-        # 3. Siapa pun yang layak: menyandera tetap mengurangi warga bebas (syarat menang Syndicate).
-        Sequence("Target terbaik", [Kondisi("ada target layak", _ada_aksi(lambda c: True, _KUNCI_ANCAMAN)),
-                                    Aksi("hostage", _a_aksi)]),
-        Aksi("tunggu", lambda p: rencana_aksi("tunggu", alasan=["Tidak ada target yang layak."])),
-    ]),
-    "gag": Selector("Gag", [
-        # 1. Penggalang suara ronde ini (yang sedang menuduh atau vote Hitman).
-        Sequence("Penggalang suara", [
-            Kondisi("ancaman sekarang ≥ 0,5",
-                    _ada_aksi(lambda c: c["input"]["ancaman_sekarang"] >= 0.5, _KUNCI_ANCAMAN_SEKARANG)),
-            Aksi("gag", _a_aksi)]),
-        # 2. Makin sore, Gag ikut membungkam Tribunal, jadi syarat ancamannya lebih rendah.
-        Sequence("Sore hari", [
-            Kondisi("siang ≥ 60% dan ancaman sekarang ≥ 0,3",
-                    _ada_aksi(lambda c: c["input"]["porsi_fase"] >= 0.6 and c["input"]["ancaman_sekarang"] >= 0.3,
-                              _KUNCI_ANCAMAN_SEKARANG)),
-            Aksi("gag", _a_aksi)]),
-        Aksi("simpan Gag", lambda p: rencana_aksi("tunggu", alasan=["Belum ada penggalang suara; Gag disimpan."])),
-    ]),
-    "guard": Selector("Guard", [
-        # 1. Jaga yang paling mungkin diincar Hitman; seri → yang lebih dipercaya.
-        Sequence("Pemain terancam", [
-            Kondisi("terancam ≥ 0,4", _ada_aksi(lambda c: c["input"]["terancam"] >= 0.4,
-                                                lambda c: (-c["input"]["terancam"], -c["input"]["kepercayaan"], c["target"]))),
-            Aksi("guard", _a_aksi)]),
-        # 2. Tidak ada yang terancam: jaga yang paling dipercaya.
-        Sequence("Pemain terpercaya", [
-            Kondisi("ada kandidat Guard", _ada_aksi(lambda c: True, lambda c: (-c["input"]["kepercayaan"], c["target"]))),
-            Aksi("guard", _a_aksi)]),
-        Aksi("tunggu", lambda p: rencana_aksi("tunggu", alasan=["Tidak ada target Guard yang sah."])),
-    ]),
-    "peek": Selector("Peek", [
-        # 1. Pastikan tersangka terkuat; seri → yang paling sedikit info.
-        Sequence("Periksa tersangka", [
-            Kondisi("ada tersangka (≥1 poin)", _ada_aksi(lambda c: c["input"]["kecurigaan"] >= 0.2,
-                                                         lambda c: (-c["input"]["kecurigaan"], -c["input"]["kurang_info"], c["target"]))),
-            Aksi("peek", _a_aksi)]),
-        # 2. Tidak ada tersangka: periksa pemain dengan info paling sedikit.
-        Sequence("Periksa yang jarang terlihat", [
-            Kondisi("ada kandidat Peek", _ada_aksi(lambda c: True, lambda c: (-c["input"]["kurang_info"], c["target"]))),
-            Aksi("peek", _a_aksi)]),
-        Aksi("tunggu", lambda p: rencana_aksi("tunggu", alasan=["Semua pemain sudah diketahui."])),
-    ]),
-}
-
-# Keputusan aksi rahasia BT: satu tick pohon sesuai kemampuan saat ini (hostage, gag, guard, atau peek).
-# Masukan : ctx dari putuskan; calon_aksi memberi kemampuan dan calon {aksi, target, alasan, input}.
-# Keluaran: (rencana aksi, jejak DataFrame + kolom status_akar); "tidak_bisa" dan jejak kosong bila tidak ada aksi.
-# Dipakai oleh: putuskan untuk semua role.
+# Aksi rahasia: target dengan utilitas tertinggi; Gag hanya bila utilitasnya mencapai AMBANG_GAG_UTILITAS.
+# Masukan : ctx dari putuskan (view.saya: ability, can_act; bahan calon_aksi).
+# Keluaran: (rencana hostage / gag / guard / peek, tunggu, atau tidak_bisa; jejak = DataFrame utilitas tiap target).
+# Dipakai oleh: putuskan.
 def keputusan_aksi(ctx):
     kemampuan, calon = calon_aksi(ctx)
+    # Dicek di sini juga agar "tidak bisa beraksi" terbedakan dari "tidak ada target layak" (calon kosong).
     if not kemampuan or not ctx["view"]["saya"].get("can_act"):
         return rencana_aksi("tidak_bisa", alasan=["Tidak ada aksi rahasia yang tersedia saat ini."]), pd.DataFrame()
-    papan = {**ctx, "calon_aksi": calon, "jejak": [], "hasil": None, "target": None}
-    status = POHON_AKSI[kemampuan].tick(papan)
-    return papan["hasil"], pd.DataFrame(papan["jejak"]).assign(status_akar=status.value)
+    calon = _nilai_calon(calon)
+    # Seri diputus kunci seri dari calon_aksi (misalnya Hostage: tidak dijaga, lalu ancaman), lalu nama target.
+    calon.sort(key=lambda c: (-round(c["skor"], 9), *c.get("seri", ()), c["target"]))
+    jejak = pd.DataFrame(_jejak_calon(calon))
+    if not calon:
+        return rencana_aksi("tunggu", alasan=["Tidak ada target yang layak."]), jejak
+    if kemampuan == "gag" and calon[0]["skor"] < AMBANG_GAG_UTILITAS:
+        return rencana_aksi("tunggu", alasan=["Belum ada penggalang suara yang layak dibungkam; Gag disimpan."]), jejak
+    terbaik = calon[0]
+    return rencana_aksi(terbaik["aksi"], terbaik["target"], terbaik["alasan"], terbaik["skor"]), jejak
 
 # Mekanik engine: satu suara pun cukup untuk eksekusi. Untuk metode dengan PAKSA_VOTE_BUKTI_LEMAH, abstain di
 # paruh akhir Tribunal diganti vote ke tersangka teratas yang layak (kebijakan per metode, hasil uji A/B).

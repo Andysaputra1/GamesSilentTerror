@@ -9,8 +9,8 @@ import logging
 
 from sqlalchemy import text
 
-from app.services.npc_brain.runtime import brain_runtime
-from app.services.persistence_service import PersistenceService
+from app.module.npc_brain.runtime import brain_runtime
+from app.module.persistence_service import PersistenceService
 
 BARIS_NPC = 2
 logger = logging.getLogger("shadow_heist.npc_config")

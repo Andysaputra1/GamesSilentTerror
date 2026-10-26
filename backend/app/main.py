@@ -11,21 +11,21 @@ from contextlib import asynccontextmanager
 import logging
 import asyncio
 from contextlib import suppress
-from app.services.room_service import room_service
+from app.module.room_service import room_service
 
 import socketio
 from fastapi import FastAPI
 
 from app.controller.controller_main import api_router
 from app.controller.middleware.cors import configure_cors
-from app.services.mysql_connector import engine, database_is_ready
+from app.module.mysql_connector import engine, database_is_ready
 from app.config.settings import settings
 from app.realtime.socket_handlers import register_socket_handlers
-from app.services.analysis_service import analysis_service
-from app.services.persistence_service import persistence_service
-from app.services.npc_service import NPCService
-from app.services.npc_brain.runtime import brain_runtime
-from app.services.npc_config_service import load_npc_configuration
+from app.module.analysis_service import analysis_service
+from app.module.persistence_service import persistence_service
+from app.module.npc_service import NPCService
+from app.module.npc_brain.runtime import brain_runtime
+from app.module.npc_config_service import load_npc_configuration
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("shadow_heist")
@@ -40,8 +40,8 @@ async def lifespan(_: FastAPI):
     analysis_service.load_model()
     if database_is_ready():
         logger.info("Koneksi MySQL siap.")
-        from app.services.ai_runtime_service import load_panel_configuration
-        from app.services.persistence_service import PersistenceError
+        from app.module.ai_runtime_service import load_panel_configuration
+        from app.module.persistence_service import PersistenceError
 
         try:
             load_panel_configuration()

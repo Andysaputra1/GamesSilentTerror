@@ -11,10 +11,10 @@ import secrets
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.services.mysql_connector import SessionLocal
+from app.module.mysql_connector import SessionLocal
 from app.config.settings import settings
 from app.models import auth_queries
-from app.services.password_service import verify_password
+from app.module.password_service import verify_password
 
 logger = logging.getLogger("shadow_heist.auth")
 
@@ -137,12 +137,12 @@ class AuthService:
     def update_profile(
         self, user: AuthenticatedUser, display_name: str, username: str | None = None
     ) -> AuthenticatedUser:
-        from app.services.room_service import room_service
+        from app.module.room_service import room_service
 
         selected_username = username or user.username
         changing_username = selected_username != user.username
         if changing_username:
-            from app.services.user_management_service import validate_username
+            from app.module.user_management_service import validate_username
 
             validate_username(selected_username)
 
@@ -163,7 +163,7 @@ class AuthService:
 
     # SERVICE: ubah skin preference pengguna; validasi daftar skin yang diizinkan.
     def update_skin(self, user: AuthenticatedUser, skin_id: str) -> str:
-        from app.services.skin_constants import ALL_SKINS
+        from app.module.skin_constants import ALL_SKINS
 
         if skin_id not in ALL_SKINS:
             raise ValueError(f"Skin tidak valid. Pilihan: {', '.join(ALL_SKINS)}")

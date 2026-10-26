@@ -16,7 +16,7 @@ from pydantic import SecretStr
 
 from app.config.settings import Settings
 from app.controller.api.panel import require_panel
-from app.services.npc_brain.runtime import (
+from app.module.npc_brain.runtime import (
     JALUR_PENULIS, BrainRuntime, NLUBersama, NLUCadangan, OtakBot,
 )  # fmt: skip
 
@@ -67,7 +67,7 @@ class WriterChainTests(unittest.TestCase):
         self.awal = (k.penulis, list(k.urutan_penulis), k.model_openrouter, k.model_tautan)
         # Tanpa jaringan: cek jalur (Claude 8 token, endpoint OpenRouter/link) diganti mock.
         self.cek = self.enterContext(patch.object(type(self.runtime), "_cek_penulis"))
-        self.enterContext(patch("app.services.npc_brain.runtime.ai_runtime.current", konfigurasi_ai))
+        self.enterContext(patch("app.module.npc_brain.runtime.ai_runtime.current", konfigurasi_ai))
 
     def tearDown(self):
         penulis, urutan, model, model_tautan = self.awal
@@ -193,9 +193,9 @@ class WriterCheckTests(unittest.TestCase):
         self.runtime = runtime_siap()
         self.addCleanup(self.runtime.tutup)
         self.runtime.konfigurasi.penulis = "otomatis"
-        self.enterContext(patch("app.services.npc_brain.runtime.ai_runtime.current", konfigurasi_ai))
+        self.enterContext(patch("app.module.npc_brain.runtime.ai_runtime.current", konfigurasi_ai))
         self.enterContext(
-            patch("app.services.npc_brain.runtime.ai_runtime.diatur_panel", return_value=True)
+            patch("app.module.npc_brain.runtime.ai_runtime.diatur_panel", return_value=True)
         )
         # Tanpa jaringan: cek tiap jalur menunggu aba-aba lalu melapor sesuai kelasnya.
         self.lepas = threading.Event()
@@ -254,7 +254,7 @@ class NpcConfigStoreTests(unittest.TestCase):
     """Baris konfigurasi NPC di DB: baris lama/tidak valid aman, simpan gagal dikembalikan utuh."""
 
     def test_old_and_invalid_rows_keep_env_values(self):
-        from app.services import npc_config_service as layanan
+        from app.module import npc_config_service as layanan
 
         with (
             patch.object(layanan, "brain_runtime") as runtime,
@@ -272,8 +272,8 @@ class NpcConfigStoreTests(unittest.TestCase):
                 layanan.load_npc_configuration()  # tidak melempar error saat startup
 
     def test_failed_save_restores_every_field(self):
-        from app.services import npc_config_service as layanan
-        from app.services.persistence_service import PersistenceError
+        from app.module import npc_config_service as layanan
+        from app.module.persistence_service import PersistenceError
 
         sebelum = {"metode": "campuran", "penulis_diminta": "otomatis", "validasi": True,
                    "urutan_penulis": ["openrouter", "tautan"], "model_openrouter": "",
@@ -329,8 +329,8 @@ class PanelWriterApiTests(unittest.TestCase):
                      "urutan_penulis": ["openrouter", "tautan"], "model_openrouter": "",
                      "model_tautan": "qwen3:4b-instruct"}  # fmt: skip
         with (
-            patch("app.services.npc_config_service.brain_runtime") as runtime,
-            patch("app.services.npc_config_service.PersistenceService._run") as simpan,
+            patch("app.module.npc_config_service.brain_runtime") as runtime,
+            patch("app.module.npc_config_service.PersistenceService._run") as simpan,
         ):
             runtime.atur.return_value = ringkasan
             response = self.client.put(

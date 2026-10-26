@@ -12,10 +12,10 @@ import time
 import unittest
 from unittest.mock import AsyncMock, Mock, patch
 
-from app.services.match_engine import Match
-from app.services.npc_brain.runtime import BrainRuntime, NLUBersama, NLUCadangan
-from app.services.npc_service import LANTAI_MAKS, NPCService, catat_nlu
-from app.services.room_service import RoomService
+from app.module.match_engine import Match
+from app.module.npc_brain.runtime import BrainRuntime, NLUBersama, NLUCadangan
+from app.module.npc_service import LANTAI_MAKS, NPCService, catat_nlu
+from app.module.room_service import RoomService
 
 AKSI_RAHASIA = {"gag", "hostage", "guard", "peek"}
 
@@ -227,11 +227,11 @@ class NPCServiceBrainTests(unittest.IsolatedAsyncioTestCase):
         self.match = self.room.match
         self.sio = Mock(emit=AsyncMock())
         self.service = NPCService(self.sio, runtime=self.runtime)
-        self.enterContext(patch("app.services.npc_service.room_service", self.rooms))
+        self.enterContext(patch("app.module.npc_service.room_service", self.rooms))
         self.persistence = self.enterContext(
-            patch("app.services.npc_service.PersistenceService")
+            patch("app.module.npc_service.PersistenceService")
         ).return_value
-        self.survey = self.enterContext(patch("app.services.npc_service.survey_service"))
+        self.survey = self.enterContext(patch("app.module.npc_service.survey_service"))
 
     async def asyncTearDown(self):
         await self.service.close()
@@ -267,7 +267,7 @@ class NPCServiceBrainTests(unittest.IsolatedAsyncioTestCase):
         with self.rooms.lock:
             self.match.add_message("human", "Aku curiga NOX, dia Hitman. Ayo vote NOX!")
         self.match.deadline = time.time() + 60
-        with patch("app.services.npc_service.asyncio.sleep", AsyncMock()):
+        with patch("app.module.npc_service.asyncio.sleep", AsyncMock()):
             otak.sibuk = True
             await self.service.brain_turn(self.room.code, self.match, otak)
         self.assertFalse(otak.sibuk)
@@ -328,7 +328,7 @@ class NPCServiceBrainTests(unittest.IsolatedAsyncioTestCase):
             self.match.add_message("human", "NOX dan ECHO mencurigakan, kalian Hitman. Vote NOX!")
         self.match.deadline = time.time() + 60
         nox, echo = (self.runtime.otak_bot(self.match.id, nama) for nama in ("NOX", "ECHO"))
-        with patch("app.services.npc_service.asyncio.sleep", AsyncMock()):
+        with patch("app.module.npc_service.asyncio.sleep", AsyncMock()):
             nox.sibuk = echo.sibuk = True
             await asyncio.gather(
                 self.service.brain_turn(self.room.code, self.match, nox),
@@ -343,7 +343,7 @@ class NPCServiceBrainTests(unittest.IsolatedAsyncioTestCase):
     async def test_scheduler_runs_brain_steps_for_every_live_bot(self):
         await self.service.prepare(self.room.code, self.match)
         self.match.begin(now=time.time() - 30)
-        with patch("app.services.npc_service.asyncio.sleep", AsyncMock()):
+        with patch("app.module.npc_service.asyncio.sleep", AsyncMock()):
             self.service.schedule()
             self.service.schedule()  # bot yang sibuk tidak dijadwalkan dua kali
             await asyncio.gather(*list(self.service.tasks))
@@ -377,7 +377,7 @@ class NPCServiceBrainTests(unittest.IsolatedAsyncioTestCase):
         # Batas laju tetap ada: langkah segera minimal JEDA_SEGERA_DETIK sesudah langkah terakhir.
         otak["NOX"].langkah_terakhir = sekarang - 0.5
         self.assertFalse(self.service._due(otak["NOX"], self.match, elapsed, sekarang, 0))
-        with patch("app.services.npc_service.asyncio.sleep", AsyncMock()):
+        with patch("app.module.npc_service.asyncio.sleep", AsyncMock()):
             otak["NOX"].sibuk = True
             await self.service.brain_turn(self.room.code, self.match, otak["NOX"])
             self.assertFalse(otak["NOX"].segera)

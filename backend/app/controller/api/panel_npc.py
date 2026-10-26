@@ -8,11 +8,11 @@ from pydantic import BaseModel, Field
 from app.controller.api.panel import require_panel
 from app.controller.middleware.auth_limits import limit_auth
 from app.controller.middleware.safe_validation import SafeValidationRoute
-from app.services.npc_brain.runtime import brain_runtime
-from app.services.npc_config_service import save_npc_configuration
-from app.services.persistence_service import PersistenceError
-from app.services.kode_alur import kode_node
-from app.services.simulasi_service import simulasi_service
+from app.module.npc_brain.runtime import brain_runtime
+from app.module.npc_config_service import save_npc_configuration
+from app.module.persistence_service import PersistenceError
+from app.module.kode_alur import kode_node
+from app.module.simulasi_service import simulasi_service
 
 router = APIRouter(tags=["panel-npc"], route_class=SafeValidationRoute)
 

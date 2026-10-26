@@ -3,7 +3,7 @@
 from fastapi import HTTPException, Security
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from app.services.auth_service import (
+from app.module.auth_service import (
     AuthenticatedUser,
     AuthenticationPersistenceError,
     SessionValidationError,

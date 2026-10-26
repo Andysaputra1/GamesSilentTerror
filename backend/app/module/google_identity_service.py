@@ -8,7 +8,7 @@ from google.auth.transport.requests import Request
 from google.auth.exceptions import TransportError
 from google.oauth2 import id_token
 from app.config.settings import settings
-from app.services.auth_service import AuthenticationError, AuthenticationPersistenceError
+from app.module.auth_service import AuthenticationError, AuthenticationPersistenceError
 
 
 class NonceStore:

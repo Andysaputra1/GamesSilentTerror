@@ -14,18 +14,18 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.services.ollama_client import generate_reply as ollama_reply
-from app.services.openrouter_client import generate_reply as openrouter_reply
-from app.services.ai_runtime_service import ai_runtime
-from app.services.checker_service import checker_service
-from app.services.npc_brain.penjelasan import lengkapi as lengkapi_penjelasan
-from app.services.npc_brain.penjelasan import ringkas as ringkas_penjelasan
-from app.services.npc_brain.runtime import brain_runtime
-from app.services.persistence_service import PersistenceService, PersistenceError
-from app.services.match_engine import snapshot_berlabel
-from app.services.room_service import room_service
-from app.services.survey_service import survey_service
-from app.services.ai_diagnostics import capture_exchange
+from app.module.ollama_client import generate_reply as ollama_reply
+from app.module.openrouter_client import generate_reply as openrouter_reply
+from app.module.ai_runtime_service import ai_runtime
+from app.module.checker_service import checker_service
+from app.module.npc_brain.penjelasan import lengkapi as lengkapi_penjelasan
+from app.module.npc_brain.penjelasan import ringkas as ringkas_penjelasan
+from app.module.npc_brain.runtime import brain_runtime
+from app.module.persistence_service import PersistenceService, PersistenceError
+from app.module.match_engine import snapshot_berlabel
+from app.module.room_service import room_service
+from app.module.survey_service import survey_service
+from app.module.ai_diagnostics import capture_exchange
 from app.config.settings import settings
 
 logger = logging.getLogger("shadow_heist.npc")

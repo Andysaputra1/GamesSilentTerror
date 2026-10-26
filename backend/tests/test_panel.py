@@ -9,8 +9,8 @@ from pydantic import SecretStr
 import httpx
 from app.config.settings import Settings, settings
 from app.controller.api.panel import router, require_panel, history_filter, validate_endpoint
-from app.services.password_service import hash_password
-from app.services.openrouter_client import generate_reply
+from app.module.password_service import hash_password
+from app.module.openrouter_client import generate_reply
 
 # Bacaan NLU satu pesan seperti yang disimpan pencatat NLU (BrainRuntime.baca_chat), beserta konteksnya.
 NLU_CONTOH = json.dumps(
@@ -143,8 +143,8 @@ class PanelTests(unittest.TestCase):
         from types import SimpleNamespace
         from app.controller.api.rooms import router as room_router
         from app.controller.middleware.auth import require_authenticated_user
-        from app.services.room_service import RoomService
-        from app.services.persistence_service import PersistenceError
+        from app.module.room_service import RoomService
+        from app.module.persistence_service import PersistenceError
 
         self.app.include_router(room_router)
         self.app.dependency_overrides[require_authenticated_user] = lambda: SimpleNamespace(
@@ -177,7 +177,7 @@ class OpenRouterTests(unittest.IsolatedAsyncioTestCase):
             request=httpx.Request("POST", "https://openrouter.ai"),
             json={"choices": [{"message": {"content": "OK"}}]},
         )
-        with patch("app.services.openrouter_client.httpx.AsyncClient") as factory:
+        with patch("app.module.openrouter_client.httpx.AsyncClient") as factory:
             factory.return_value.__aenter__.return_value = client
             result = await generate_reply(
                 "hello", config=Settings(_env_file=None, openrouter_api_key="fixture-key")

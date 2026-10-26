@@ -3,12 +3,12 @@ line-length = 100
 target-version = ['py311']
 include = '\.py$'
 # Hasil ekspor notebook skripsi harus identik dengan notebook; jangan diformat ulang.
-extend-exclude = 'backend/app/services/npc_brain/generated/'
+extend-exclude = 'backend/app/module/npc_brain/generated/'
 
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-extend-exclude = ["backend/app/services/npc_brain/generated"]
+extend-exclude = ["backend/app/module/npc_brain/generated"]
 
 [tool.ruff.lint]
 select = ["F401", "F841"]

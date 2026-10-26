@@ -4,11 +4,11 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter
 
-from app.services.mysql_connector import database_is_ready
+from app.module.mysql_connector import database_is_ready
 from app.config.settings import settings
-from app.services.analysis_service import analysis_service
-from app.services.ollama_client import model_available
-from app.services.ai_runtime_service import ai_runtime
+from app.module.analysis_service import analysis_service
+from app.module.ollama_client import model_available
+from app.module.ai_runtime_service import ai_runtime
 
 router = APIRouter(tags=["system"])
 
@@ -39,7 +39,7 @@ async def app_status() -> dict[str, object]:
 def ready():
     """Cheap deployment readiness; never calls a paid or local AI provider."""
     from fastapi.responses import JSONResponse
-    from app.services.persistence_service import PersistenceService, PersistenceError
+    from app.module.persistence_service import PersistenceService, PersistenceError
     from sqlalchemy import text
 
     schema_ready = False

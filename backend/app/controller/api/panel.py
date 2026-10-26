@@ -21,16 +21,16 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field, SecretStr
 from sqlalchemy import text
 from app.config.settings import settings
-from app.services.password_service import verify_password
-from app.services.persistence_service import PersistenceService, PersistenceError
-from app.services.ai_runtime_service import ai_runtime, save_panel_configuration
-from app.services.checker_service import checker_service
-from app.services.npc_brain.runtime import POLA_MODEL_TAUTAN, brain_runtime
-from app.services.activity_service import activity
-from app.services.room_service import room_service
+from app.module.password_service import verify_password
+from app.module.persistence_service import PersistenceService, PersistenceError
+from app.module.ai_runtime_service import ai_runtime, save_panel_configuration
+from app.module.checker_service import checker_service
+from app.module.npc_brain.runtime import POLA_MODEL_TAUTAN, brain_runtime
+from app.module.activity_service import activity
+from app.module.room_service import room_service
 from app.controller.middleware.auth_limits import limit_auth
-from app.services.ollama_client import generate_reply as local_reply
-from app.services.openrouter_client import generate_reply as api_reply, failure_message
+from app.module.ollama_client import generate_reply as local_reply
+from app.module.openrouter_client import generate_reply as api_reply, failure_message
 from app.controller.middleware.safe_validation import SafeValidationRoute
 
 router = APIRouter(tags=["panel"], route_class=SafeValidationRoute)
@@ -327,7 +327,7 @@ class AIProbe(BaseModel):
 # Kirim satu pesan uji ke provider aktif dengan skenario diskusi/vote/malam, lalu kembalikan jawabannya.
 @router.post("/api/panel/test-ai", dependencies=[Depends(limit_auth)])
 async def test_ai(body: AIProbe, token=Depends(require_panel)):
-    from app.services.ai_probe_service import run_probe
+    from app.module.ai_probe_service import run_probe
 
     if not body.message.strip():
         raise HTTPException(422, "Teks skenario tidak boleh kosong.")

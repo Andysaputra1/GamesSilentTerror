@@ -61,8 +61,8 @@ class CheckerService:
     # RINGKASAN ROOM (panel): status pertandingan, komposisi role, dan identitas setiap bot.
     # Bot diambil dari pertandingan live, lalu dari penjelasan di jejak, lalu tabel match_bots (arsip).
     def ringkasan_room(self, code, traces=()):
-        from app.services.npc_brain.runtime import brain_runtime
-        from app.services.room_service import room_service
+        from app.module.npc_brain.runtime import brain_runtime
+        from app.module.room_service import room_service
 
         ringkasan = {"kode": code, "status": "arsip", "match_id": None, "fase": None, "ronde": None,
                      "pemenang": None, "komposisi": None, "manusia": None, "bot": [], "sumber_bot": None}  # fmt: skip
@@ -129,7 +129,7 @@ def _bot_dari_jejak(traces):
 def _bot_arsip(code):
     from sqlalchemy import text
 
-    from app.services.persistence_service import PersistenceError, PersistenceService
+    from app.module.persistence_service import PersistenceError, PersistenceService
 
     def baca(db):
         return db.execute(

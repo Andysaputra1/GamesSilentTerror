@@ -13,19 +13,19 @@ from pathlib import Path
 
 from app.config.settings import BACKEND_DIR
 
-G = "app.services.npc_brain.generated."
-RT = "app.services.npc_brain.runtime"
+G = "app.module.npc_brain.generated."
+RT = "app.module.npc_brain.runtime"
 
 # node flowchart → [(modul, nama bertitik, [(potongan teks baris inti, catatan)])]
 KODE_ALUR = {
     "input": [
-        ("app.services.simulasi_service", "Simulasi.kirim", [
+        ("app.module.simulasi_service", "Simulasi.kirim", [
             ("can_chat(PEMAIN)", "izin chat diperiksa (siang/Tribunal, tidak dibungkam)"),
             ("m.add_message(PEMAIN", "pesan masuk chat pertandingan"),
             ("self._baca(PEMAIN", "langsung dibaca NLU IndoBERT"),
         ]),
-        ("app.services.match_engine", "Match.can_chat", []),
-        ("app.services.match_engine", "Match.add_message", [("06d", "ID diawali nomor urut agar chat tetap kronologis")]),
+        ("app.module.match_engine", "Match.can_chat", []),
+        ("app.module.match_engine", "Match.add_message", [("06d", "ID diawali nomor urut agar chat tetap kronologis")]),
     ],
     "nlu_pesan": [
         (RT, "BrainRuntime.baca_chat", [
@@ -224,19 +224,19 @@ KODE_ALUR = {
         ]),
     ],
     "penjelasan": [
-        ("app.services.npc_brain.penjelasan", "jelaskan", [
+        ("app.module.npc_brain.penjelasan", "jelaskan", [
             ("_penalaran(modul", "penalaran sesuai metode"),
             ("batasi(penjelasan)", "dibatasi 12 KB"),
         ]),
     ],
     "engine": [
-        ("app.services.simulasi_service", "Simulasi._langkah", [
+        ("app.module.simulasi_service", "Simulasi._langkah", [
             ("m.vote(", "vote ke engine"),
             ("m.act(", "aksi rahasia ke engine"),
             ("except ValueError", "tidak sah: ditolak engine"),
         ]),
-        ("app.services.match_engine", "Match.vote", []),
-        ("app.services.match_engine", "Match.act", []),
+        ("app.module.match_engine", "Match.vote", []),
+        ("app.module.match_engine", "Match.act", []),
     ],
     "nlg_prompt": [
         (G + "nlg", "buat_prompt", [
@@ -289,23 +289,23 @@ KODE_ALUR = {
     ],
     "kirim": [
         (RT, "BrainRuntime.catat_chat", [("catat_aksi_bot", "ingatan: bot sudah bicara (jeda antar-chat)")]),
-        ("app.services.npc_service", "catat_nlu", [
+        ("app.module.npc_service", "catat_nlu", [
             ("runtime.baca_chat", "kalimat bot dibaca NLU"),
             ("tandai_dipanggil(", "bot yang dipanggil/dituduh melangkah segera"),
             ("record_nlu", "bacaan disimpan untuk riwayat chat"),
         ]),
     ],
     "simpan": [
-        ("app.services.persistence_service", "PersistenceService.record_trace", [
+        ("app.module.persistence_service", "PersistenceService.record_trace", [
             ("INSERT INTO checker_traces", "jejak untuk checker"),
         ]),
-        ("app.services.persistence_service", "PersistenceService.record_nlu", [
+        ("app.module.persistence_service", "PersistenceService.record_nlu", [
             ("UPDATE chat_messages SET nlu", "bacaan NLU untuk riwayat chat"),
         ]),
         (G + "otak_fuzzy", "Ingatan.catat_aksi_bot", []),
     ],
     "output": [
-        ("app.services.npc_service", "isi_jejak", [
+        ("app.module.npc_service", "isi_jejak", [
             ("lengkapi_penjelasan(", "hasil engine dan NLG ditambahkan"),
             ("ringkas=ringkas_penjelasan", "ringkasan untuk item chat"),
         ]),

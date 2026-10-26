@@ -3,7 +3,7 @@ import unittest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from app.controller.api.rooms import router
-from app.services.checker_service import MAKS_ROOM_LIVE, CheckerService
+from app.module.checker_service import MAKS_ROOM_LIVE, CheckerService
 
 
 class CheckerTests(unittest.TestCase):

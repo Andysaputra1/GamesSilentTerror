@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import Mock, AsyncMock, patch
-from app.services.room_service import RoomService
-from app.services.persistence_service import PersistenceError
+from app.module.room_service import RoomService
+from app.module.persistence_service import PersistenceError
 from app.realtime.socket_handlers import SocketGameController
 
 

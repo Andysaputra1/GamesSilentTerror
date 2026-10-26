@@ -1,8 +1,8 @@
 """FILE INI DIHASILKAN OTOMATIS oleh scripts/ekspor_otak_npc.py. JANGAN DIEDIT MANUAL.
 
 Sumber : npc_fuzzy.ipynb
-Sidik  : 2ab36b68e33c57b0
-Dibuat : 2026-10-23 07:57 UTC
+Sidik  : 5592ceef3d470dcf
+Dibuat : 2026-10-26 00:47 UTC
 
 Perubahan logika bot dilakukan di notebook skripsi, dijalankan ulang sampai semua
 skenario/pengujian lulus, lalu diekspor ulang dengan skrip ini.
@@ -49,7 +49,7 @@ INTENT_MODEL_DIR = Path("models/notebook_standalone/intent_classifier_transforme
 
 TARGET_MODEL_DIR = Path("models/target_classifier/target_classifier_transformer")
 
-MATCH_ENGINE = Path("../../../Games/backend/services/match_engine.py")
+MATCH_ENGINE = Path("../../../Games/backend/app/module/match_engine.py")
 
 NLU_DEVICE = "cpu"
 

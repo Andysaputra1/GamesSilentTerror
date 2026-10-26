@@ -12,7 +12,7 @@ import random
 import time
 from uuid import uuid4
 
-from app.services.skin_constants import ALL_SKINS, SKIN_BY_BOT
+from app.module.skin_constants import ALL_SKINS, SKIN_BY_BOT
 
 
 @dataclass

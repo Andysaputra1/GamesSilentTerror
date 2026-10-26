@@ -1,6 +1,6 @@
 import unittest
-from app.services.activity_service import ActivityService
-from app.services.match_engine import Match
+from app.module.activity_service import ActivityService
+from app.module.match_engine import Match
 
 
 class PublicVoteTests(unittest.TestCase):
