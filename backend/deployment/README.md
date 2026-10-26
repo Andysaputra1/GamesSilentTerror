@@ -1,10 +1,40 @@
-# Database baru untuk Azure
+# Database Azure
 
-`mysql/001_schema.sql` adalah baseline untuk volume MySQL **kosong**, bukan
-migrasi upgrade database lama. Tidak ada DROP, penghapusan data, atau akun demo.
-Database lokal tetap menggunakan migrasi historis V1–V4 di `backend/migrations`.
-Jangan mengganti baseline ini untuk meng-upgrade database yang sudah berjalan;
-buat migrasi inkremental baru dan backup database terlebih dahulu.
+Azure memakai folder SQL yang sama dengan lokal: `backend/migrations/` (di-mount ke
+`/docker-entrypoint-initdb.d`). MySQL menjalankan semua file berurutan (V01 sampai V10) **hanya** saat
+volume masih kosong. Tidak ada DROP, penghapusan data, atau akun bawaan: akun dibuat lewat halaman daftar,
+login Google, atau menu Manajemen user di panel.
+
+Volume yang sudah berisi data tidak menjalankan file baru: backup dulu, lalu jalankan file yang versinya
+belum tercatat (tabel di bawah). Database Azure yang dibuat sebelum 26 Oktober 2026 berasal dari baseline
+lama: penanda `AZURE_BASELINE_1` menggantikan V1–V4, jadi jangan jalankan V01–V04 di sana.
+
+## Menerapkan migrasi pada database lama
+
+Masuk ke MySQL dari root repository di VM:
+
+```bash
+sudo docker compose --env-file .env.azure -f docker-compose.azure.yml exec mysql sh -c 'exec mysql -uroot -p"$MYSQL_ROOT_PASSWORD" shadow_heist'
+```
+
+Periksa `SELECT version FROM schema_migrations;`, lalu jalankan berurutan file yang versinya belum ada,
+sebelum backend versi baru diaktifkan:
+
+| Versi di `schema_migrations` | Perintah |
+| --- | --- |
+| `V5__chat_history` | `SOURCE /docker-entrypoint-initdb.d/V05__chat_history.sql;` |
+| `V6__admin_panel` | `SOURCE /docker-entrypoint-initdb.d/V06__admin_panel.sql;` |
+| `V7__add_skin_preference` | `SOURCE /docker-entrypoint-initdb.d/V07__add_skin_preference.sql;` |
+| `V7__survey_and_npc` | `SOURCE /docker-entrypoint-initdb.d/V07__survey_and_npc.sql;` |
+| `V8__fix_role_stalker_enum` | `SOURCE /docker-entrypoint-initdb.d/V08__fix_role_stalker_enum.sql;` (pastikan dulu `SELECT COUNT(*) FROM players WHERE role = 'detective';` bernilai 0) |
+| `V9__chat_nlu` | `SOURCE /docker-entrypoint-initdb.d/V09__chat_nlu.sql;` |
+| `V10__match_participants` | `SOURCE /docker-entrypoint-initdb.d/V10__match_participants.sql;` |
+
+Nama file memakai nomor dua digit (V01, V05, …) agar MySQL menjalankannya berurutan pada volume kosong
+(tanpa itu V10 jalan sebelum V1). Versi yang dicatat di dalam file tetap nama lama (`V5__chat_history`)
+agar cocok dengan database yang sudah ada dan pemeriksaan `/ready`. Jika SQL gagal, periksa struktur kolom
+sebelum mengulang: ALTER TABLE MySQL bukan transaksi yang dapat dibatalkan bersama INSERT penanda migrasi.
+Jangan menghapus volume untuk migrasi.
 
 ## Audit tabel
 
@@ -22,7 +52,7 @@ buat migrasi inkremental baru dan backup database terlebih dahulu.
 Semua tabel aplikasi masih digunakan. `players` berbeda dari `user_accounts`:
 satu akun dapat menjadi peserta beberapa room. State lengkap pertandingan,
 timer, dan voting masih di memori; volume tidak memulihkan match setelah restart.
-Baseline tidak memasukkan user1, janice, kimberly, ataupun data pertandingan lokal.
+Migrasi tidak memasukkan akun ataupun data pertandingan.
 Kolom/enum lama tetap dipertahankan untuk kompatibilitas query saat ini. Kolom `players.aggressiveness`,
 `players.suspicion_score`, `chat_messages.intent`, dan `chat_messages.suspicion_score` tidak diisi lagi
 (analisis SVM/fuzzy lama sudah dihapus); datanya dibiarkan sebagai arsip.
@@ -58,12 +88,11 @@ SHOW TABLES;
 SELECT COUNT(*) FROM user_accounts;
 ```
 
-Hasil awal: sebelas tabel dan nol akun pemain. Registrasi membutuhkan perubahan backend
-akun/email/Google yang masih harus dirilis bersama sebelum backend VPS dijalankan.
+Hasil awal: 15 tabel (termasuk `schema_migrations`) dan nol akun pemain.
 
-MySQL hanya mengeksekusi baseline saat direktori data masih kosong. Jika volume
+MySQL hanya mengeksekusi folder migrasi saat direktori data masih kosong. Jika volume
 sudah berisi database, berhenti dan audit isinya; jangan menghapus volume untuk
-memaksa inisialisasi ulang. Skema ini tidak menonaktifkan akun demo pada volume lama.
+memaksa inisialisasi ulang.
 
 
 ## Riwayat chat pemain dan bot
@@ -80,43 +109,16 @@ Untuk melihat arsip, buka `/panel` pada origin backend melalui HTTPS dan login
 sebagai administrator. `/history` dan `/admin` mengarah ke panel baru.
 Semua API panel memakai sesi administrator terpisah dari akun pemain.
 
-Database baru menjalankan 001_schema.sql sampai 007_chat_nlu.sql otomatis.
-Database/volume lama: backup dulu, hentikan backend sementara, lalu jalankan
-`backend/migrations/V5__chat_history.sql` **sekali saja** pada database shadow_heist.
-Contoh dari root repository di VM untuk service MySQL Azure:
-
-```bash
-sudo docker compose --env-file .env.azure -f docker-compose.azure.yml exec mysql sh -c 'exec mysql -uroot -p"$MYSQL_ROOT_PASSWORD" shadow_heist'
-```
-
-Di prompt MySQL, periksa `SELECT * FROM schema_migrations;`. Jika V5 belum ada:
-
-```sql
-SOURCE /docker-entrypoint-initdb.d/002_chat_history.sql;
-```
-
-Jalankan sebelum backend versi baru diaktifkan. Jangan menghapus volume untuk migrasi.
-Jika SQL gagal, periksa struktur kolom sebelum mengulang: ALTER TABLE MySQL bukan
-transaksi yang dapat dibatalkan bersama INSERT penanda migrasi.
+Database lama tanpa `V5__chat_history`: jalankan `V05__chat_history.sql` (tabel migrasi di atas).
 Pesan lama tetap ada dan ditandai `legacy`; identitas bot/ronde lama tidak direka ulang.
 Balasan AI lama tetap tersimpan di ai_analyses dan belum dimasukkan ke tabel percakapan,
 karena kode lama tidak mencatat apakah respons benar-benar dipublikasikan.
 
 ## Survei, NPC, dan avatar
 
-Database/volume Azure yang sudah ada tidak menjalankan file init baru secara otomatis.
-Backup dulu, lalu periksa `schema_migrations`. Jika `V7__survey_and_npc` belum ada,
-jalankan `SOURCE /docker-entrypoint-initdb.d/004_survey_and_npc.sql;`. Jika
-`V7__add_skin_preference` belum ada atau `SHOW COLUMNS FROM user_accounts LIKE 'skin_id';`
-tidak mengembalikan kolom, jalankan
-`SOURCE /docker-entrypoint-initdb.d/005_skin_preference.sql;` sekali sebelum backend
-versi avatar diaktifkan. Jika `V8__fix_role_stalker_enum` belum ada (kolom `players.role`
-masih berisi `detective`, bukan `stalker`), pastikan
-`SELECT COUNT(*) FROM players WHERE role = 'detective';` bernilai 0, lalu jalankan
-`SOURCE /docker-entrypoint-initdb.d/006_fix_role_stalker_enum.sql;` sekali. Tanpa ini,
-peserta Stalker gagal diarsipkan. Jika `V9__chat_nlu` belum ada, jalankan
-`SOURCE /docker-entrypoint-initdb.d/007_chat_nlu.sql;` sekali; tanpa kolom `chat_messages.nlu`
-menu Riwayat chat di panel gagal dimuat. Jangan menghapus volume untuk menjalankan migrasi.
+Database lama: jalankan file V07 sampai V10 yang versinya belum tercatat (tabel migrasi di atas).
+Tanpa V07 kolom `skin_id` dan tabel survei belum ada, tanpa V08 peserta Stalker gagal diarsipkan,
+dan tanpa V09 (kolom `chat_messages.nlu`) menu Riwayat chat di panel gagal dimuat. Jangan menghapus volume untuk menjalankan migrasi.
 
 `schema_migrations` menyimpan versi struktur yang sudah diterapkan dan waktunya.
 Saat ini project memakai SQL manual, belum ada migration runner otomatis; tabel ini
@@ -131,7 +133,7 @@ lama tidak dipakai ulang. Room lama yang tidak pernah tercatat di DB tidak dapat
 direkonstruksi. Trace checker yang selesai dicatat sejak V6; trace sebelum fitur
 ini atau request yang terputus karena proses mati tidak otomatis dipulihkan.
 
-Database lama: sesudah V5, jalankan `SOURCE /docker-entrypoint-initdb.d/003_admin_panel.sql;`
+Database lama: sesudah V5, jalankan `SOURCE /docker-entrypoint-initdb.d/V06__admin_panel.sql;`
 sekali jika `V6__admin_panel` belum ada di schema_migrations. Migrasi ini menambah
 panel_configuration, panel_sessions, dan checker_traces tanpa menghapus chat.
 

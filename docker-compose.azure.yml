@@ -12,7 +12,7 @@ services:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env.azure}
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./backend/deployment/mysql:/docker-entrypoint-initdb.d:ro
+      - ./backend/migrations:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ['CMD-SHELL', 'mysqladmin ping -h localhost --silent']
       interval: 10s

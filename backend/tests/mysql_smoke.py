@@ -22,26 +22,17 @@ class MySQLIntegration(unittest.TestCase):
     def test_http_auth_and_game_queries(self):
         client = TestClient(app)
         self.assertEqual(client.get("/api/auth/me").status_code, 401)
-        self.assertEqual(
-            client.post(
-                "/api/auth/login",
-                json={
-                    "username": "user1",
-                    "password": "wrong",
-                },
-            ).status_code,
-            401,
-        )
-        login = client.post(
-            "/api/auth/login",
-            json={
-                "username": "user1",
-                "password": "user132",
-            },
-        )
+        # Database migrasi tidak berisi akun: tes mendaftarkan akunnya sendiri.
+        akun = "smoke_" + uuid4().hex[:8]
+        sandi = "smoke-" + uuid4().hex[:10]
+        daftar = {"username": akun, "password": sandi, "password_confirmation": sandi}
+        self.assertEqual(client.post("/api/auth/register", json=daftar).status_code, 201)
+        salah = {"username": akun, "password": "wrong"}
+        self.assertEqual(client.post("/api/auth/login", json=salah).status_code, 401)
+        login = client.post("/api/auth/login", json={"username": akun, "password": sandi})
         self.assertEqual(login.status_code, 200)
         headers = {"Authorization": "Bearer " + login.json()["access_token"]}
-        self.assertEqual(client.get("/api/auth/me", headers=headers).json()["username"], "user1")
+        self.assertEqual(client.get("/api/auth/me", headers=headers).json()["username"], akun)
         # Endpoint analisis lama (/api/analyze) sudah dihapus.
         self.assertEqual(client.post("/api/analyze", headers=headers, json={}).status_code, 404)
         username = "sql-test-" + uuid4().hex[:10]

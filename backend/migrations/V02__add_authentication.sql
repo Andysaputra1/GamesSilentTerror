@@ -1,5 +1,5 @@
 -- Player accounts and opaque login sessions. Passwords are never stored in
--- plaintext. The seeded development account is user1 / user132.
+-- plaintext. No account is seeded; accounts come from registration, Google, or the panel.
 
 USE shadow_heist;
 
@@ -29,14 +29,5 @@ CREATE TABLE IF NOT EXISTS auth_sessions (
     FOREIGN KEY (user_id) REFERENCES user_accounts(id)
     ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- This account exists only to bootstrap development. Change its password or
--- remove it before deploying publicly.
-INSERT IGNORE INTO user_accounts (username, display_name, password_hash)
-VALUES (
-  'user1',
-  'User 1',
-  'pbkdf2_sha256$600000$ae3168581be547d69d9ad4ba590672ac$209d9cd9ed15918c3b1fe7593dbdd51973c67fa640986a2489c3ecc5fe431e66'
-);
 
 INSERT IGNORE INTO schema_migrations (version) VALUES ('V2__add_authentication');

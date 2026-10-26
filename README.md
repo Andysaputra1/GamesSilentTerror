@@ -202,9 +202,7 @@ Jalankan `docker compose -f docker-compose.gpu.yml up -d --no-deps ai-engine fro
 
 ## Mencoba permainan
 
-Login aplikasi development: **`user1` / `user132`**. Akun ini disiapkan oleh migration saat inisialisasi database baru.
-
-Akun demo tambahan: **`janice` / `user132`** dan **`kimberly` / `user132`** melalui migration `V3__add_demo_players.sql`. Database lama perlu menerapkan V3; startup backend tidak otomatis menjalankan migration. Migration tidak menimpa password akun yang sudah ada. Ketiga akun/password bersama ini hanya untuk development, bukan deployment publik.
+Database baru tidak berisi akun. Buat akun lewat tombol daftar di halaman login, login Google, atau CLI di bawah.
 
 Alur mencoba: **Login → Main page → Enter Tribunal → Buat Ruangan / Gabung → + Bot → Mulai Permainan**. Bot mengisi semua kursi kosong sampai kapasitas pilihan host sehingga bisa dicoba sendiri. Tanpa bot, siapkan minimal 4 akun berbeda. Pemilik ruangan menekan Mulai; anggota lain menekan Masuk Permainan ketika game sudah dimulai.
 
@@ -271,7 +269,7 @@ Panduan resmi: [Google Identity Services setup](https://developers.google.com/id
 
 MySQL menyimpan 14 tabel: akun & sesi login, arsip ruangan/pemain/chat/analisis, konfigurasi & sesi panel, jejak checker, serta survei dan metode bot per pertandingan. Pertandingan yang sedang berjalan (role, vote, timer) **tidak** disimpan di database, tetapi di memori backend.
 
-SQL di `backend/migrations/` (V1–V8) dijalankan otomatis hanya saat volume database pertama kali dibuat. Untuk database lama, terapkan file yang belum dijalankan secara manual sesuai urutan versinya, tanpa menghapus volume; salinan untuk Azure ada di `backend/deployment/mysql/`. Lihat [catatan migration](backend/migrations/README.md).
+SQL di `backend/migrations/` (V01–V10) dipakai lokal dan Azure, dan dijalankan otomatis hanya saat volume database pertama kali dibuat. Untuk database lama, terapkan file yang belum dijalankan secara manual sesuai urutan versinya, tanpa menghapus volume. Lihat [catatan migration](backend/migrations/README.md).
 
 ## Mengelola container dan data
 
@@ -343,8 +341,8 @@ backend/              Python FastAPI + Socket.IO
   public/panel/       Halaman panel administrator
   artifacts/svm/      Model intent SVM privat, disediakan terpisah
   artifacts/indobert/ Model IndoBERT intent + target untuk otak NPC (disalin manual)
-  migrations/         Skema SQL V1–V8 dan akun development
-  deployment/         Konfigurasi produksi Azure (Caddy, SQL salinan)
+  migrations/         Skema SQL V01–V10 (lokal dan Azure)
+  deployment/         Konfigurasi produksi Azure (Dockerfile, Caddy)
   scripts/            setup_panel.py, ekspor_otak_npc.py, setup_azure.py
 proxy/                Gateway Nginx
 ai-docker/            LLM penulis kalimat bot (Qwen3 4B/14B) di laptop + tunnel untuk VM; jalankan.bat

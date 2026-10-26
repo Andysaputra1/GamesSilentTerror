@@ -60,10 +60,10 @@ sudo docker compose --env-file .env.azure -f docker-compose.azure.yml up -d mysq
 sudo docker compose --env-file .env.azure -f docker-compose.azure.yml ps
 ```
 
-Fresh volume: MySQL applies all three deployment SQL files automatically, with no
-seed users. Existing volume: back up first, inspect schema_migrations, and apply only
-missing V5/V6 migrations as described in README.md. If this is an older pre-baseline
-database also inspect account_identities (V4) before enabling Google login.
+Fresh volume: MySQL applies every file in backend/migrations (V01–V10) in order, with
+no seed users. Existing volume: back up first, inspect schema_migrations, and apply only
+the missing migrations listed in README.md (this folder). Databases created from the old
+Azure baseline carry AZURE_BASELINE_1 instead of V1–V4; do not run V01–V04 there.
 Never delete the volume to force migrations.
 
 After database schema and model are ready:

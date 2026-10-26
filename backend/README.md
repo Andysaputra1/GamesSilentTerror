@@ -33,7 +33,7 @@ backend/
   artifacts/
     svm/intent_classifier.pkl   # Model ML privat, terpisah dari model database
     indobert/                   # Model NLU intent dan target
-  deployment/                   # Dockerfile Azure, proxy, dan baseline SQL
+  deployment/                   # Dockerfile Azure dan proxy
   migrations/                   # SQL untuk membuat/mengubah struktur tabel
   public/                       # Panel administrator dan dokumen
   scripts/                      # Penyiapan deployment, ekspor, dan simulasi
@@ -121,4 +121,4 @@ Tes MySQL menulis data percobaan; jangan arahkan ke database pengguna. Tes
 controller memakai respons AI mock untuk memeriksa jalur API dan penyimpanan
 SQL, tanpa panggilan berbayar ke OpenAI.
 
-Migration V2 menyediakan akun development `user1 / user132` dengan hash PBKDF2.
+Migration tidak membuat akun; buat akun lewat halaman daftar atau CLI `create_user`.

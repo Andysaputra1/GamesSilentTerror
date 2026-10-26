@@ -338,15 +338,6 @@ export class Auth implements OnInit, AfterViewInit {
       });
   }
 
-  // METHOD EVENT TOMBOL: isi akun demo untuk development; belum mengirim login.
-  useDevelopmentCredentials(): void {
-    if (this.isSubmitting) return;
-    this.username = 'user1';
-    this.password = 'user132';
-    this.hasAttemptedSubmit = false;
-    this.errorMessage = '';
-  }
-
   // METHOD EVENT TOMBOL: tampilkan atau sembunyikan teks password.
   togglePasswordVisibility(): void {
     this.passwordVisible = !this.passwordVisible;
