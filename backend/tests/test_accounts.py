@@ -10,7 +10,7 @@ from sqlalchemy.pool import StaticPool
 from app.controller.api.auth import router
 from app.controller.middleware.auth_limits import _attempts
 from app.config.settings import settings
-from app.module.google_identity_service import nonces
+from app.controller.api.auth import nonces
 
 
 class AccountTests(unittest.TestCase):
@@ -200,7 +200,7 @@ class AccountTests(unittest.TestCase):
         with (
             patch.object(settings, "google_client_id", "test-client"),
             patch(
-                "app.module.google_identity_service.id_token.verify_oauth2_token", return_value=claims
+                "app.controller.api.auth.id_token.verify_oauth2_token", return_value=claims
             ) as verify,
         ):
             response = self.client.post(
@@ -315,7 +315,7 @@ class AccountTests(unittest.TestCase):
         with (
             patch.object(settings, "google_client_id", "test-client"),
             patch(
-                "app.module.google_identity_service.id_token.verify_oauth2_token",
+                "app.controller.api.auth.id_token.verify_oauth2_token",
                 side_effect=ValueError("bad token"),
             ),
         ):

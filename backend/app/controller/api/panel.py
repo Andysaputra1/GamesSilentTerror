@@ -1,5 +1,6 @@
 """Production administration, isolated from player authentication."""
 
+import asyncio
 import base64
 import csv
 import hashlib
@@ -15,6 +16,8 @@ from pathlib import Path
 from typing import Literal
 from urllib.parse import urlsplit
 from tempfile import SpooledTemporaryFile
+from time import perf_counter
+from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import FileResponse, StreamingResponse, RedirectResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -27,6 +30,9 @@ from app.module.ai_runtime_service import ai_runtime, save_panel_configuration
 from app.module.checker_service import checker_service
 from app.module.npc_brain.runtime import POLA_MODEL_TAUTAN, brain_runtime
 from app.module.activity_service import activity
+from app.module.ai_diagnostics import capture_exchange, measure
+from app.module.match_engine import Match
+from app.module.npc_service import npc_context, decision_prompt, request_decision
 from app.module.room_service import room_service
 from app.controller.middleware.auth_limits import limit_auth
 from app.module.ollama_client import generate_reply as local_reply
@@ -327,8 +333,6 @@ class AIProbe(BaseModel):
 # Kirim satu pesan uji ke provider aktif dengan skenario diskusi/vote/malam, lalu kembalikan jawabannya.
 @router.post("/api/panel/test-ai", dependencies=[Depends(limit_auth)])
 async def test_ai(body: AIProbe, token=Depends(require_panel)):
-    from app.module.ai_probe_service import run_probe
-
     if not body.message.strip():
         raise HTTPException(422, "Teks skenario tidak boleh kosong.")
     return await run_probe(body.message.strip(), body.scenario)
@@ -601,3 +605,78 @@ def download(
             "Cache-Control": "no-store",
         },
     )
+
+
+# UJI AI: skenario permainan terisolasi dengan classifier/provider asli; pertandingan pemain tidak diubah.
+async def run_probe(message, scenario):
+    started = perf_counter()
+    config = ai_runtime.current()
+    trace = {
+        "id": uuid4().hex,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "scenario": scenario,
+        "message": message,
+        "stage": "preparing",
+        "active": False,
+        "valid_decision": False,
+        "timings": {},
+        "provider": config.ai_provider,
+        "model": (
+            config.ollama_model if config.ai_provider == "docker" else config.openrouter_model
+        ),
+        "request": None,
+        "response": None,
+        "output": None,
+        "note": "Skenario terisolasi; tidak mengirim chat atau menjalankan aksi di room pemain.",
+    }
+    try:
+        with measure(trace, "prompt_ms"):
+            match = Match(["Pemain_A", "Pemain_B", "Pemain_C", "Pemain_D", "Pemain_E"], ["NOX"])
+            for name, role in zip(
+                match.players, ["hitman", "stalker", "civilian", "civilian", "civilian", "spy"]
+            ):
+                match.players[name].role = role
+            match.phase = {"discussion": "day", "vote": "tribunal", "night": "night"}[scenario]
+            match.add_message("Pemain_A", message)
+            context = npc_context(match, "NOX")
+            trace["context"] = context
+            trace["prompt"] = decision_prompt(context)
+        trace["stage"] = "llm_pending"
+        with capture_exchange(trace):
+            decision = await asyncio.wait_for(request_decision(trace["prompt"], config), timeout=35)
+        trace["active"] = True
+        trace["output"] = decision.model_dump()
+        with measure(trace, "validation_ms"):
+            if decision.action == "wait":
+                legal = decision.target is None
+            else:
+                legal = decision.target in context["legal_actions"].get(decision.action, [])
+            legal = legal and (context["me"]["can_chat"] or not decision.message.strip())
+            trace["valid_decision"] = legal
+        trace["stage"] = "complete" if legal else "invalid_decision"
+        trace["message_status"] = (
+            "AI merespons dan keputusan valid."
+            if legal
+            else "AI merespons, tetapi keputusan tidak sesuai aturan skenario."
+        )
+    except Exception as error:
+        response = trace.get("response") or {}
+        trace["active"] = bool(response.get("body", {}).get("output"))
+        trace["stage"] = "invalid_response" if trace["active"] else "failed"
+        trace["error_type"] = type(error).__name__
+        trace["message_status"] = (
+            "Provider merespons, tetapi output bukan JSON keputusan yang valid."
+            if trace["active"]
+            else failure_message(error)
+        )
+    finally:
+        trace["duration_ms"] = round((perf_counter() - started) * 1000, 2)
+        response = trace.get("response") or {}
+        trace["provider_reachable"] = 200 <= response.get("status_code", 0) < 300
+        if not trace["active"] and trace["provider_reachable"]:
+            trace["message_status"] = (
+                "Provider terhubung, tetapi output kosong karena batas token tercapai."
+                if response.get("body", {}).get("finish_reason") == "length"
+                else "Provider terhubung, tetapi belum menghasilkan teks yang dapat digunakan."
+            )
+    return trace
