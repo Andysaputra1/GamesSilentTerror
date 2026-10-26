@@ -2,7 +2,7 @@
   class="match-shell"
   [class.night]="game?.phase === 'night'"
   [class.tribunal]="game?.phase === 'tribunal'"
-  [class.preparing]="game?.phase === 'preparing'"
+  [class.preparing]="showPreparation"
   [class.finished]="!!game?.winner"
 >
   <!-- Kartu role pribadi: tertutup sampai pemain membukanya sendiri (dipakai di splash dan panel kiri). -->
@@ -11,7 +11,7 @@
       type="button"
       class="role-flip"
       [class.open]="revealRole || !!state.winner"
-      [disabled]="!!state.winner"
+      [disabled]="!!state.winner || readingRole"
       (click)="toggleRole()"
       [attr.aria-pressed]="revealRole"
       [attr.aria-label]="revealRole ? 'Sembunyikan role' : 'Lihat role saya'"
@@ -22,8 +22,7 @@
           <small>Ketuk untuk melihat role</small>
         </span>
         <span class="flip-face flip-front" [attr.aria-hidden]="!(revealRole || state.winner)">
-          <img class="card-art" [src]="roleCard(state.me.role)" alt="" />
-          <img class="card-skin" [src]="skinFor(state.me.name)" alt="" />
+          <app-role-reveal-card [role]="state.me.role" [skinId]="mySkinId" />
         </span>
       </span>
     </button>
@@ -69,7 +68,7 @@
   }
 
   @if (game; as state) {
-    @if (state.phase === 'preparing') {
+    @if (showPreparation) {
       <!-- LAYAR PERSIAPAN: panduan singkat sambil menunggu otak bot siap. -->
       <section
         class="splash"
@@ -79,49 +78,81 @@
       >
         <header class="wood-sign splash-sign">
           <p>Persiapan pertandingan · Ruang {{ code }}</p>
-          <h1><span>Silent</span><i aria-hidden="true">◆</i><span>Terror</span></h1>
+          <h1>
+            <span>Silent</span
+            ><img
+              class="brand-emblem"
+              src="/assets/brand/silent-terror-logo.png"
+              width="256"
+              height="256"
+              alt=""
+            /><span>Terror</span>
+          </h1>
         </header>
         <div class="splash-body">
-          <article class="paper briefing">
-            <header class="briefing-head">
-              <h2 id="splash-title">Sebelum lampu dimatikan…</h2>
-              <p>{{ threatLine }}</p>
-              @if (composition.length) {
-                <ng-container *ngTemplateOutlet="compositionChips; context: { $implicit: '' }" />
-              }
-            </header>
-            <!-- Ringkasan satu baris per hal; aturan lengkap ada di tombol "?" saat bermain. -->
-            <ol class="brief-steps">
-              @for (step of briefSteps; track step.title) {
-                <li>
-                  <span class="guide-icon" aria-hidden="true">{{ step.icon }}</span>
-                  <b>{{ step.title }}</b>
-                  <p>{{ step.text }}</p>
-                </li>
-              }
-            </ol>
-          </article>
-          <aside class="splash-side">
-            <div class="splash-role">
-              <ng-container *ngTemplateOutlet="roleFlip; context: { $implicit: state }" />
-              @if (revealRole) {
-                <p class="role-note">
-                  <b>{{ roleNames[state.me.role] || state.me.role }}</b> —
-                  {{ roleHelp[state.me.role] }}
+          <header class="prep-heading">
+            <p class="eyebrow">Berkas rahasia · Hanya untukmu</p>
+            <h2 id="splash-title">Kenali peranmu sebelum bermain</h2>
+            <p>40 detik untuk membaca. Buka kartu, pahami aksi, ingat target.</p>
+          </header>
+          <section class="prep-cards" aria-label="Panduan tiga kartu">
+            <article class="paper prep-card prep-role">
+              <span class="prep-number">01 / ROLE</span>
+              <h3>{{ revealRole ? roleNames[state.me.role] : 'Siapa kamu?' }}</h3>
+              <div class="prep-role-art">
+                <ng-container *ngTemplateOutlet="roleFlip; context: { $implicit: state }" />
+              </div>
+              <p>
+                {{ revealRole ? roleSummary[state.me.role] : 'Ketuk kartu untuk membuka identitas rahasiamu.' }}
+              </p>
+              @if (revealRole && allies.length) {
+                <p class="prep-allies">
+                  Rekan: <b>{{ namaDaftar(allies) }}</b>
                 </p>
-                @if (allies.length) {
-                  <p class="role-note allies">
-                    Rekan Syndicate: <b>{{ namaDaftar(allies) }}</b>
-                  </p>
+              }
+            </article>
+            <article class="paper prep-card prep-actions">
+              <span class="prep-number">02 / AKSI</span>
+              <h3>Apa yang bisa kamu lakukan?</h3>
+              <img
+                class="prep-illustration prep-books"
+                src="/assets/decorations/objects/detective-book-stack.png"
+                alt=""
+              />
+              <ul class="prep-action-list">
+                @for (action of preparationActions; track action.label) {
+                  <li>
+                    <span class="prep-action-label">{{ action.label }}</span>
+                    <p>{{ action.text }}</p>
+                  </li>
                 }
-              } @else {
-                <p class="role-note hand">
-                  Ketuk kartu untuk melihat role. Role hanya untukmu, jangan sampai terlihat pemain
-                  lain!
-                </p>
+              </ul>
+              @if (!revealRole) {
+                <small>Buka kartu untuk melihat aksi khususmu.</small>
               }
-            </div>
-          </aside>
+            </article>
+            <article class="paper prep-card prep-target">
+              <span class="prep-number">03 / TARGET</span>
+              <h3>{{ revealRole ? 'Cara kamu menang' : 'Misi rahasiamu' }}</h3>
+              <img
+                class="prep-illustration"
+                src="/assets/decorations/objects/case-lens.svg"
+                alt=""
+              />
+              <p class="prep-objective">{{ preparationTarget }}</p>
+              @if (revealRole) {
+                <small
+                  >{{ state.me.role === 'hitman' ? 'Pilih warga sebagai target. Sandera menghilangkan suara, bukan nyawa.' : 'Suara terbanyak tunggal dieksekusi. Seri: tidak ada eksekusi.' }}</small
+                >
+              }
+              @if (composition.length) {
+                <div class="prep-composition">
+                  <small>Komposisi room</small>
+                  <ng-container *ngTemplateOutlet="compositionChips; context: { $implicit: '' }" />
+                </div>
+              }
+            </article>
+          </section>
           <!-- Meja malam ini: karakter semua peserta (skin masing-masing) dan kesiapan AI. -->
           <section class="paper splash-table" aria-labelledby="splash-table-title">
             <div class="splash-cast">
@@ -141,13 +172,10 @@
             @if (state.preparation; as prep) {
               <div class="splash-status" aria-live="polite">
                 <p class="splash-state">
-                  @if (prep.ready && prep.unrevealed) {
-                    Menunggu {{ prep.unrevealed }} pemain membuka kartu role · paling lama
-                    {{ prep.starts_in }} detik
-                  } @else if (prep.ready) {
-                    {{ prep.starts_in ? 'Ronde 1 dimulai dalam ' + prep.starts_in + ' detik' : 'Memulai ronde 1…' }}
+                  @if (prep.ready) {
+                    {{ preparationSeconds ? 'Ronde 1 dimulai dalam ' + preparationSeconds + ' detik' : 'Memulai ronde 1…' }}
                   } @else {
-                    Menyiapkan AI…
+                    Menyiapkan AI · batas tunggu {{ prep.max_wait }} detik
                   }
                 </p>
                 <div
@@ -182,7 +210,7 @@
         </div>
       </section>
       @if (revealPrompt) {
-        <!-- Belum membuka kartu setelah 10 detik: layar meredup, kartu besar di tengah minta diketuk. -->
+        <!-- Sepuluh detik terakhir: ajak membuka kartu; lima detik terakhir dibuka otomatis. -->
         <div
           class="reveal-nudge"
           role="dialog"
@@ -190,19 +218,33 @@
           aria-labelledby="nudge-title"
           animate.leave="splash-leave"
         >
-          <h2 id="nudge-title">Kartu role-mu belum dibuka</h2>
-          <p class="hand">Ketuk kartumu. Pertandingan menunggu semua pemain melihat role-nya.</p>
+          @if (readingRole) {
+            <h2 id="nudge-title">Role kamu: {{ roleNames[state.me.role] || state.me.role }}</h2>
+            <p class="hand">Ingat role-mu sebelum masuk ke permainan.</p>
+          } @else {
+            <h2 id="nudge-title">Kartu role-mu belum dibuka</h2>
+            <p class="hand">Ketuk kartumu. Terbuka otomatis saat tersisa 5 detik.</p>
+          }
           <div class="nudge-card">
             <ng-container *ngTemplateOutlet="roleFlip; context: { $implicit: state }" />
           </div>
-          <span class="nudge-hand" aria-hidden="true">☝</span>
         </div>
       }
     } @else {
       <!-- HUD: papan fase, timer, aturan, dan profil. -->
       <header class="hud" animate.enter="game-enter">
         <div class="wood-sign hud-brand">
-          <b>Silent<i aria-hidden="true">◆</i>Terror</b>
+          <b
+            >Silent
+            <img
+              class="brand-emblem"
+              src="/assets/brand/silent-terror-logo.png"
+              width="256"
+              height="256"
+              alt=""
+            />
+            Terror</b
+          >
           <small>Ruang {{ code }}</small>
         </div>
         <div class="hud-phase">
@@ -494,49 +536,6 @@
 
           @if (!state.winner) {
             <section class="action-panel" [attr.data-phase]="state.phase">
-              <div class="action-copy">
-                <p class="eyebrow">{{ actionTitle }}</p>
-                <p class="action-text">{{ actionHint }}</p>
-                @if (state.me.action) {
-                  <p class="locked">
-                    🔒 Pilihan malammu terkunci: <b>{{ nama(state.me.action.target) }}</b>
-                  </p>
-                }
-                @if (state.phase === 'tribunal' && state.me.vote) {
-                  <p class="locked">
-                    🔒 Suaramu terkunci: <b>{{ nama(state.me.vote) }}</b>
-                  </p>
-                }
-                @if (allyPlan.length) {
-                  <p class="ally-plan">
-                    <span aria-hidden="true">◆</span> Pilihan rekan:
-                    @for (ally of allyPlan; track ally.name) {
-                      <span class="ally-choice"
-                        ><b>{{ nama(ally.name) }}</b> →
-                        {{ nama(ally.target) || 'belum memilih' }}</span
-                      >
-                    }
-                  </p>
-                  @if (state.me.action && allyTarget && state.me.action.target !== allyTarget) {
-                    <p class="hint">
-                      Pilihanmu berbeda dengan rekan. Syndicate memakai target terbanyak; seri →
-                      pilihan yang masuk lebih dulu.
-                    </p>
-                  }
-                }
-                @if (state.me.role === 'stalker') {
-                  <p class="hint">Peek tersedia mulai ronde {{ state.me.next_peek }}.</p>
-                }
-                @if (state.me.role === 'hitman') {
-                  <p class="hint">
-                    Gag Order{{ allies.length ? ' (dipakai bersama rekan)' : '' }} tersedia mulai
-                    ronde {{ state.me.next_gag }}.
-                  </p>
-                }
-                @if (notice) {
-                  <p class="notice" role="status">{{ notice }}</p>
-                }
-              </div>
               <div class="action-buttons">
                 @if (state.me.can_vote) {
                   <button
@@ -578,6 +577,47 @@
                     {{ state.discussion_skip.consented ? 'Sudah setuju' : 'Setuju skip diskusi' }}
                     ({{ state.discussion_skip.agreed }}/{{ state.discussion_skip.required }})
                   </button>
+                }
+              </div>
+              <div class="action-copy">
+                @if (state.me.action) {
+                  <p class="locked">
+                    🔒 Pilihan malammu terkunci: <b>{{ nama(state.me.action.target) }}</b>
+                  </p>
+                }
+                @if (state.phase === 'tribunal' && state.me.vote) {
+                  <p class="locked">
+                    🔒 Suaramu terkunci: <b>{{ nama(state.me.vote) }}</b>
+                  </p>
+                }
+                @if (allyPlan.length) {
+                  <p class="ally-plan">
+                    <span aria-hidden="true">◆</span> Pilihan rekan:
+                    @for (ally of allyPlan; track ally.name) {
+                      <span class="ally-choice"
+                        ><b>{{ nama(ally.name) }}</b> →
+                        {{ nama(ally.target) || 'belum memilih' }}</span
+                      >
+                    }
+                  </p>
+                  @if (state.me.action && allyTarget && state.me.action.target !== allyTarget) {
+                    <p class="hint">
+                      Pilihanmu berbeda dengan rekan. Syndicate memakai target terbanyak; seri →
+                      pilihan yang masuk lebih dulu.
+                    </p>
+                  }
+                }
+                @if (state.me.role === 'stalker') {
+                  <p class="hint">Peek tersedia mulai ronde {{ state.me.next_peek }}.</p>
+                }
+                @if (state.me.role === 'hitman') {
+                  <p class="hint">
+                    Gag Order{{ allies.length ? ' (dipakai bersama rekan)' : '' }} tersedia mulai
+                    ronde {{ state.me.next_gag }}.
+                  </p>
+                }
+                @if (notice) {
+                  <p class="notice" role="status">{{ notice }}</p>
                 }
               </div>
             </section>

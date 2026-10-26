@@ -181,6 +181,16 @@ a {
 .danger-button:disabled {
   opacity: 0.6;
 }
+/* Emblem Arthur yang sama dengan favicon; judul tetap berupa teks yang dapat dibaca. */
+.brand-emblem {
+  display: inline-block;
+  flex: none;
+  width: 1.15em;
+  height: 1.15em;
+  object-fit: contain;
+  vertical-align: middle;
+}
+
 /* Papan nama kayu di kiri atas Main dan Room. */
 .desk-brand {
   display: grid;
@@ -200,16 +210,8 @@ a {
   transform: rotate(-0.6deg);
 }
 .desk-brand > span {
-  font: 800 clamp(17px, 1.9vw, 25px) / 0.95 var(--font-display);
+  font: 800 clamp(15px, 1.65vw, 22px) / 0.95 var(--font-display);
   white-space: nowrap;
-}
-.desk-brand i {
-  display: inline-block;
-  margin: 0 0.15em;
-  color: #e9c06d;
-  font-size: 0.35em;
-  font-style: normal;
-  vertical-align: middle;
 }
 .desk-brand small {
   margin-top: 5px;
@@ -228,7 +230,7 @@ a {
     padding: 6px 16px 8px;
   }
   .desk-brand > span {
-    font-size: 16px;
+    font-size: 13px;
   }
   .desk-brand small {
     font-size: 7px;
@@ -317,7 +319,7 @@ a {
 .boot-loader__title {
   margin: 0;
   color: #fbeacb;
-  font: 800 2.55em / 1 var(--font-display);
+  font: 800 2.15em / 1 var(--font-display);
   font-variation-settings:
     'SOFT' 100,
     'WONK' 1;
@@ -325,12 +327,6 @@ a {
   text-shadow:
     0 0.05em 0 #3a200f,
     0 0.1em 0.14em rgb(0 0 0 / 0.4);
-}
-.boot-loader__title span {
-  margin: 0 0.1em;
-  color: #e8c073;
-  font-size: 0.3em;
-  vertical-align: middle;
 }
 .boot-loader__tagline {
   margin: 0;

@@ -412,9 +412,8 @@
 .action-copy p {
   margin: 2px 0;
 }
-.action-text {
-  font-size: 14px;
-  line-height: 1.4;
+.action-copy:empty {
+  display: none;
 }
 .action-copy .hint {
   margin: 0;
@@ -439,9 +438,6 @@
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 10px;
-}
-.action-panel[data-phase='tribunal'] .eyebrow {
-  color: var(--red);
 }
 .board-bar p {
   margin: 0;

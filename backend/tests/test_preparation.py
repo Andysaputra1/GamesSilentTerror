@@ -1,4 +1,4 @@
-"""Layar persiapan: ronde 1 menunggu AI siap, minimal sepuluh detik, dan kartu role dibuka."""
+"""Layar persiapan: ronde 1 menunggu AI siap, minimal 40 detik dengan countdown stabil untuk membuka role."""
 
 import unittest
 import unittest.mock
@@ -6,7 +6,7 @@ import unittest.mock
 from app.module.match_engine import (
     PREPARATION_MAX_SECONDS,
     PREPARATION_MIN_SECONDS,
-    REVEAL_WAIT_SECONDS,
+    PREPARATION_COUNTDOWN_SECONDS,
     Match,
 )
 
@@ -45,16 +45,16 @@ class PreparationTests(unittest.TestCase):
         self.assertEqual(self.match.deadline, PREPARATION_MIN_SECONDS + self.match.durations["day"])
         self.assertIsNone(self.match.snapshot("alice")["preparation"])
 
-    def test_all_humans_ready_cannot_skip_ten_seconds_or_ai(self):
+    def test_all_humans_ready_cannot_skip_forty_seconds_or_ai(self):
         self.reveal_all()
         self.match.ready_consent("alice", now=1.0)
         self.match.ready_consent("bob", now=1.0)
         self.assertEqual(self.match.phase, "preparing")  # AI belum siap
         self.assertTrue(self.match.snapshot("bob")["preparation"]["consented"])
         self.match.mark_ai_ready(now=3.0)
-        self.match.tick(9.999)
+        self.match.tick(39.999)
         self.assertEqual(self.match.phase, "preparing")
-        self.match.tick(10.0)
+        self.match.tick(40.0)
         self.assertEqual(self.match.phase, "day")
         with self.assertRaises(ValueError):
             self.match.ready_consent("alice")  # hanya saat persiapan
@@ -74,16 +74,26 @@ class PreparationTests(unittest.TestCase):
         for name in "abcd":
             match.ready_consent(name, now=0.5)
         self.reveal_all(match)
-        match.tick(9.999)
+        match.tick(39.999)
         self.assertEqual(match.phase, "preparing")
-        match.tick(10.0)
+        match.tick(40.0)
         self.assertEqual(match.phase, "day")
 
-    def test_ai_ready_after_minimum_starts_without_an_extra_wait(self):
+    def test_late_ai_readiness_keeps_ten_seconds_to_reveal(self):
         self.reveal_all()
-        self.match.mark_ai_ready(now=12.0)
+        self.match.mark_ai_ready(now=45.0)
+        self.match.tick(54.999)
+        self.assertEqual(self.match.phase, "preparing")
+        self.match.tick(45.0 + PREPARATION_COUNTDOWN_SECONDS)
         self.assertEqual(self.match.phase, "day")
-        self.assertEqual(self.match.deadline, 12.0 + self.match.durations["day"])
+        self.assertEqual(self.match.deadline, 55.0 + self.match.durations["day"])
+
+    def test_late_ai_countdown_never_exceeds_maximum_wait(self):
+        self.match.mark_ai_ready(now=PREPARATION_MAX_SECONDS - 3)
+        with unittest.mock.patch("app.module.match_engine.time.time", return_value=PREPARATION_MAX_SECONDS - 3):
+            self.assertEqual(self.match.snapshot("alice")["preparation"]["starts_in"], 3)
+        self.match.tick(PREPARATION_MAX_SECONDS)
+        self.assertEqual(self.match.phase, "day")
 
     def test_progress_is_clamped_and_only_while_preparing(self):
         self.match.update_preparation(detail="Memuat IndoBERT…", progress=4)
@@ -93,30 +103,27 @@ class PreparationTests(unittest.TestCase):
         self.assertIsNone(self.match.preparation.get("ignored"))
         self.assertEqual(self.match.phase, "day")
 
-    def test_waits_for_unrevealed_humans_at_most_the_reveal_limit(self):
+    def test_unopened_cards_do_not_extend_the_shared_countdown(self):
         self.match.mark_ai_ready(now=2.0)
-        self.match.tick(PREPARATION_MIN_SECONDS)
-        self.assertEqual(self.match.phase, "preparing")  # belum ada yang membuka kartu
-        with unittest.mock.patch("app.module.match_engine.time.time", return_value=12.0):
+        self.match.tick(30.0)
+        with unittest.mock.patch("app.module.match_engine.time.time", return_value=30.0):
             view = self.match.snapshot("alice")["preparation"]
-        self.assertEqual((view["unrevealed"], view["revealed"], view["elapsed"]), (2, False, 12))
-        self.assertEqual(view["starts_in"], PREPARATION_MIN_SECONDS + REVEAL_WAIT_SECONDS - 12)
-        self.match.reveal_role("alice", now=12.0)
-        self.assertEqual(self.match.phase, "preparing")  # bob masih menutup kartu
-        self.match.tick(PREPARATION_MIN_SECONDS + REVEAL_WAIT_SECONDS - 0.001)
+        self.assertEqual((view["unrevealed"], view["revealed"], view["elapsed"]), (2, False, 30))
+        self.assertEqual(view["starts_in"], 10)
+        self.match.tick(39.999)
         self.assertEqual(self.match.phase, "preparing")
-        self.match.tick(PREPARATION_MIN_SECONDS + REVEAL_WAIT_SECONDS)
+        self.match.tick(40.0)
         self.assertEqual(self.match.phase, "day")
-        self.assertNotIn("cadangan", self.match.events[-1])
 
-    def test_last_reveal_after_minimum_starts_at_once(self):
+    def test_last_reveal_does_not_change_the_countdown(self):
         self.match.mark_ai_ready(now=2.0)
         self.match.reveal_role("alice", now=3.0)
-        self.match.tick(13.0)
+        self.match.reveal_role("bob", now=35.0)
         self.assertEqual(self.match.phase, "preparing")
-        self.match.reveal_role("bob", now=13.5)
+        with unittest.mock.patch("app.module.match_engine.time.time", return_value=35.0):
+            self.assertEqual(self.match.snapshot("bob")["preparation"]["starts_in"], 5)
+        self.match.tick(40.0)
         self.assertEqual(self.match.phase, "day")
-        self.assertEqual(self.match.deadline, 13.5 + self.match.durations["day"])
 
     def test_reveal_does_not_skip_minimum_or_ai(self):
         self.reveal_all(now=1.0)

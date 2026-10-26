@@ -199,11 +199,7 @@
     box-shadow: 0 0 0 12px rgb(232 192 115 / 0.35);
   }
 }
-@keyframes ketuk {
-  50% {
-    transform: translateY(-10px);
-  }
-}
+
 @keyframes konfeti {
   0% {
     opacity: 1;
@@ -396,9 +392,7 @@
   .splash-body {
     grid-template-columns: minmax(0, 1fr);
   }
-  .splash-side {
-    order: -1;
-  }
+
   .splash-table {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -407,8 +401,7 @@
     border-top: 2px dashed rgb(139 90 43 / 0.35);
     border-left: 0;
   }
-  .guide-grid,
-  .brief-steps {
+  .guide-grid {
     grid-template-columns: minmax(0, 1fr);
   }
   /* HUD HP: kotak akun cukup avatar, tombol Keluar cukup ikon (teks tetap untuk pembaca layar). */
@@ -429,7 +422,6 @@
     clip: rect(0 0 0 0);
     white-space: nowrap;
   }
-  .briefing,
   .survey,
   .rules-modal {
     padding: 24px 22px 16px;
@@ -478,12 +470,8 @@
     width: min(72vw, 320px);
     font-size: 12px;
   }
-  .briefing {
-    padding: 20px 24px 18px;
-  }
-  .briefing-head h2 {
-    font-size: clamp(23px, 3vw, 31px);
-  }
+
+
   .guide-grid {
     gap: 10px;
     margin-top: 10px;
@@ -494,9 +482,7 @@
   .guide-card p {
     font-size: 12px;
   }
-  .splash-role .role-flip {
-    width: min(100%, 155px);
-  }
+
   .splash-status {
     gap: 5px;
   }
@@ -559,8 +545,7 @@
   .chat-jump,
   .final-count b,
   .reveal-nudge,
-  .nudge-card,
-  .nudge-hand {
+  .nudge-card {
     animation: none !important;
   }
   .phase-transition {

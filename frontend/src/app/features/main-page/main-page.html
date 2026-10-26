@@ -1,8 +1,24 @@
 <main class="home-desk" [class.home-desk--case-open]="caseFileOpen">
+  <img
+    class="desk-case-lens"
+    src="/assets/decorations/objects/case-lens.svg"
+    alt=""
+    aria-hidden="true"
+  />
   <div class="home-desk__content">
     <header class="home-header">
       <a class="desk-brand" routerLink="/main" aria-label="Silent Terror, halaman utama">
-        <span>Silent <i aria-hidden="true">◆</i> Terror</span>
+        <span
+          >Silent
+          <img
+            class="brand-emblem"
+            src="/assets/brand/silent-terror-logo.png"
+            width="256"
+            height="256"
+            alt=""
+          />
+          Terror</span
+        >
         <small>PRIVATE CASE FILES</small>
       </a>
       <app-profile-menu [username]="username" (profileChanged)="username = $event.username" />

@@ -341,8 +341,6 @@ describe('Game', () => {
     }));
     expect(component.skinFor('alice')).toBe('/assets/characters/skin_kiera.png');
     expect(component.skinFor('NOX')).toBe('/assets/characters/skin_sadie.png');
-    expect(component.roleCard('spy')).toBe('/assets/cards/card_spy.png');
-    expect(component.roleCard('unknown')).toBe('/assets/cards/card_blank.png');
   });
 
   // TIMER: sisa waktu dibandingkan durasi fase dari room snapshot.
@@ -603,15 +601,19 @@ describe('Game', () => {
     };
     component.game = state.game;
     expect(render().querySelector('.composition')).toBeNull();
-    expect(component.threatLine).toBe('Hitman bersembunyi di antara kalian.');
 
     state.game.composition = { hitman: 2, spy: 1, stalker: 1, civilian: 4 };
     const splash = render().querySelector('.splash') as HTMLElement;
     expect(splash.querySelectorAll('.comp-chip').length).toBe(4);
     expect(component.compositionLabel).toBe('2 Hitman · 1 Spy · 1 Stalker · 4 Civilian');
-    expect(splash.textContent).toContain('2 Hitman bersembunyi di antara kalian');
-    // Persiapan diringkas: empat poin satu baris (aturan lengkap ada di modal "?").
-    expect(splash.querySelectorAll('.brief-steps li').length).toBe(4);
+    expect(splash.querySelectorAll('.prep-card').length).toBe(3);
+    expect(splash.querySelector('.prep-target')?.textContent).toContain('Buka kartu role');
+    expect(splash.querySelector('.prep-actions')?.textContent).not.toContain('Sandera');
+    component.revealRole = true;
+    const opened = render();
+    expect(opened.querySelector('.prep-actions')?.textContent).toContain('Sandera');
+    expect(opened.querySelector('.prep-target')?.textContent).toContain('bebas bersuara');
+    expect(opened.querySelector('.nudge-hand')).toBeNull();
 
     state.game.phase = 'day';
     state.game.me.role = 'spy';
@@ -690,7 +692,7 @@ describe('Game', () => {
     expect(component.allyTarget).toBe('bob');
     const panel = page.querySelector('.action-panel') as HTMLElement;
     expect(panel.textContent).toContain('belum memilih');
-    expect(panel.textContent).toContain('Syndicate hanya menyandera satu orang');
+    expect(panel.firstElementChild?.classList).toContain('action-buttons');
     expect(page.querySelectorAll('.player-card')[3].querySelector('.ally-pick')).not.toBeNull();
     (panel.querySelector('.ally-match') as HTMLButtonElement).click();
     expect(component.target).toBe('bob');
@@ -814,7 +816,7 @@ describe('Game', () => {
       ready: true,
       detail: 'AI siap.',
       progress: 1,
-      starts_in: 12,
+      starts_in: Math.max(0, 40 - elapsed),
       max_wait: 80,
       agreed: 0,
       required: 2,
@@ -852,7 +854,7 @@ describe('Game', () => {
     expect(request).toHaveBeenLastCalledWith('ABC123', undefined, 'play');
     expect(component.notice).toBe('');
     expect(render().querySelector('.splash')?.textContent).toContain(
-      'Menunggu 1 pemain membuka kartu role',
+      'Ronde 1 dimulai dalam 37 detik',
     );
   });
 
@@ -877,22 +879,189 @@ describe('Game', () => {
     expect(component.game?.phase).toBe('day');
   });
 
-  // KARTU ROLE: setelah 10 detik belum dibuka, layar meredup dan kartu besar minta diketuk.
-  it('dims the screen after ten seconds until the role card is opened', () => {
-    component.game = preparing(false, 9).game;
+  // KARTU ROLE: ajakan membuka kartu hanya pada sepuluh detik terakhir.
+  it('keeps the prompted card visible for three seconds after opening it', () => {
+    vi.useFakeTimers();
+    try {
+      component.game = preparing(false, 29).game;
+      expect(component.revealPrompt).toBe(false);
+      component.game = preparing(false, 30).game;
+      expect(component.revealPrompt).toBe(true);
+      const nudge = render().querySelector('.reveal-nudge') as HTMLElement;
+      expect(nudge.textContent).toContain('Ketuk kartumu');
+      vi.spyOn(TestBed.inject(GameService), 'request').mockReturnValue(of(preparing(false, 30)));
+      (nudge.querySelector('.role-flip') as HTMLButtonElement).click();
+      expect(component.revealRole).toBe(true);
+      expect(render().querySelector('.reveal-nudge .role-flip')?.classList).toContain('open');
+      expect(render().querySelector('#nudge-title')?.textContent).toContain('Role kamu: Hitman');
+      vi.advanceTimersByTime(2999);
+      expect(render().querySelector('.reveal-nudge')).not.toBeNull();
+      vi.advanceTimersByTime(1);
+      expect(component.readingRole).toBe(false);
+      expect(component.revealPrompt).toBe(false);
+      // Sudah tercatat di server (mis. setelah memuat ulang halaman): tidak ditegur lagi.
+      component.revealRole = false;
+      component.game = preparing(true, 30).game;
+      expect(component.revealPrompt).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('holds the last player’s role before showing the game and start curtain', () => {
+    vi.useFakeTimers();
+    try {
+      const request = vi
+        .spyOn(TestBed.inject(GameService), 'request')
+        .mockReturnValue(of(preparing(false, 34)));
+      component.code = 'ABC123';
+      component.refresh();
+      request.mockReturnValue(of(snapshot()));
+      (render().querySelector('.reveal-nudge .role-flip') as HTMLButtonElement).click();
+      expect(component.game?.phase).toBe('day');
+      expect(component.showPreparation).toBe(true);
+      expect(component.transition).toBeNull();
+      expect(render().querySelector('.hud')).toBeNull();
+      const card = render().querySelector('.reveal-nudge .role-flip') as HTMLButtonElement;
+      expect(card.classList).toContain('open');
+      expect(card.disabled).toBe(true);
+      component.toggleRole();
+      expect(component.revealRole).toBe(true);
+
+      vi.advanceTimersByTime(2000);
+      const latest = snapshot();
+      latest.game.server_time = 102;
+      request.mockReturnValue(of(latest));
+      component.refresh();
+      expect(component.seconds).toBe(18);
+      expect(component.showPreparation).toBe(true);
+      expect(component.transition).toBeNull();
+      vi.advanceTimersByTime(999);
+      expect(component.showPreparation).toBe(true);
+      vi.advanceTimersByTime(1);
+      expect(component.showPreparation).toBe(false);
+      expect(component.transition?.phase).toBe('start');
+      expect(render().querySelector('.hud')).not.toBeNull();
+      expect(component.revealRole).toBe(true);
+    } finally {
+      fixture.destroy();
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not add another delay when a role was read before the match starts', () => {
+    vi.useFakeTimers();
+    try {
+      const request = vi
+        .spyOn(TestBed.inject(GameService), 'request')
+        .mockReturnValue(of(preparing()));
+      component.code = 'ABC123';
+      component.refresh();
+      component.toggleRole();
+      vi.advanceTimersByTime(3000);
+      expect(component.readingRole).toBe(false);
+      expect(component.showPreparation).toBe(true);
+      component.toggleRole();
+      component.toggleRole();
+      expect(component.readingRole).toBe(false);
+      request.mockReturnValue(of(snapshot()));
+      component.refresh();
+      expect(component.showPreparation).toBe(false);
+      expect(component.transition?.phase).toBe('start');
+    } finally {
+      fixture.destroy();
+      vi.useRealTimers();
+    }
+  });
+
+  it('automatically opens an unread card at five seconds and preserves the reading time', () => {
+    vi.useFakeTimers();
+    try {
+      const request = vi
+        .spyOn(TestBed.inject(GameService), 'request')
+        .mockReturnValue(of(preparing(false, 34)));
+      component.code = 'ABC123';
+      component.refresh();
+      expect(component.revealRole).toBe(false);
+      request.mockReturnValue(of(preparing(false, 35)));
+      component.refresh();
+      expect(component.revealRole).toBe(true);
+      expect(component.readingRole).toBe(true);
+      expect(render().querySelector('.reveal-nudge .role-flip')?.classList).toContain('open');
+      component.refresh();
+      expect(request).toHaveBeenLastCalledWith('ABC123', { match_id: 'match-1' }, 'reveal');
+      vi.advanceTimersByTime(3000);
+      request.mockReturnValue(of(preparing(true, 38)));
+      component.refresh();
+      component.toggleRole();
+      component.refresh();
+      expect(component.revealRole).toBe(false); // Do not reopen a card the player has already read.
+    } finally {
+      fixture.destroy();
+      vi.useRealTimers();
+    }
+  });
+
+  it('uses the fallback countdown when AI is not ready', () => {
+    const state = preparing(false, 80).game;
+    state.preparation!.ready = false;
+    state.preparation!.starts_in = null;
+    state.preparation!.max_wait = 11;
+    component.game = state;
     expect(component.revealPrompt).toBe(false);
-    component.game = preparing(false, 10).game;
+    state.preparation!.max_wait = 10;
     expect(component.revealPrompt).toBe(true);
-    const nudge = render().querySelector('.reveal-nudge') as HTMLElement;
-    expect(nudge.textContent).toContain('Ketuk kartumu');
-    vi.spyOn(TestBed.inject(GameService), 'request').mockReturnValue(of(preparing(false, 10)));
-    (nudge.querySelector('.role-flip') as HTMLButtonElement).click();
-    expect(component.revealRole).toBe(true);
-    expect(render().querySelector('.reveal-nudge')).toBeNull();
-    // Sudah tercatat di server (mis. setelah memuat ulang halaman): tidak ditegur lagi.
-    component.revealRole = false;
-    component.game = preparing(true, 30).game;
-    expect(component.revealPrompt).toBe(false);
+  });
+
+  it('opens the role after reconnect if the last five seconds were missed', () => {
+    vi.useFakeTimers();
+    try {
+      const request = vi
+        .spyOn(TestBed.inject(GameService), 'request')
+        .mockReturnValue(of(preparing(false, 28)));
+      component.code = 'ABC123';
+      component.refresh();
+      request.mockReturnValue(of(snapshot()));
+      component.refresh();
+      expect(component.revealRole).toBe(true);
+      expect(component.showPreparation).toBe(true);
+      vi.advanceTimersByTime(3000);
+      expect(component.showPreparation).toBe(false);
+    } finally {
+      fixture.destroy();
+      vi.useRealTimers();
+    }
+  });
+
+  it('cancels the role-reading timer when the game component is destroyed', () => {
+    vi.useFakeTimers();
+    try {
+      component.game = preparing().game;
+      component.toggleRole();
+      expect(component.readingRole).toBe(true);
+      fixture.destroy();
+      vi.advanceTimersByTime(3000);
+      expect(component.readingRole).toBe(false);
+      expect(component.transition).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('shows action buttons directly without the discussion heading or explanation', () => {
+    component.game = snapshot().game;
+    component.game.me = { ...component.game.me, role: 'civilian', can_act: false, ability: null };
+    const panel = render().querySelector('.action-panel') as HTMLElement;
+    expect(panel.firstElementChild?.classList).toContain('action-buttons');
+    expect(panel.querySelector('.skip-button')).not.toBeNull();
+    expect(panel.textContent).not.toContain('Diskusi siang');
+    expect(panel.textContent).not.toContain('Bicara di chat:');
+    expect(panel.querySelector('.action-text')).toBeNull();
+
+    component.game.me.can_act = true;
+    component.game.me.ability = 'gag';
+    expect(render().querySelector('.action-buttons .green')?.textContent).toContain('Gag Order');
+    expect(render().querySelector('.action-buttons .skip-button')).not.toBeNull();
   });
 
   // TRANSISI: dari layar persiapan, tirai "Ronde 1 dimulai" menutup splash lalu membuka meja.

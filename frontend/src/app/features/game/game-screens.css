@@ -88,12 +88,7 @@
   align-items: center;
   gap: 0.3em;
   margin: 0;
-  font: 800 2.2em/1 var(--font-display);
-}
-.splash-sign h1 i {
-  color: var(--gold);
-  font-size: 0.35em;
-  font-style: normal;
+  font: 800 2em/1 var(--font-display);
 }
 /* Isi persiapan di tengah sisa layar: panduan dan kartu role sejajar, lalu bilah meja selebar penuh. */
 .splash-body {
@@ -102,25 +97,9 @@
   margin-block: auto;
   align-items: stretch;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(250px, 300px);
+  grid-template-columns: minmax(0, 1fr);
   gap: clamp(14px, 2vw, 24px);
   width: min(1180px, 100%);
-}
-.briefing {
-  --edge: 24px;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  padding: 30px 34px 26px;
-}
-.briefing-head p {
-  margin: 0;
-  line-height: 1.5;
-}
-.briefing-head h2 {
-  margin: 2px 0 6px;
-  font: 800 clamp(26px, 3.4vw, 38px)/1.05 var(--font-display);
-  color: #5b311b;
 }
 .guide-grid {
   flex: 1;
@@ -169,39 +148,6 @@
   font-size: 14px;
   line-height: 1.55;
 }
-.splash-side {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
-  min-height: 0;
-}
-.splash-role {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-}
-.splash-role .role-flip {
-  width: min(100%, 200px);
-}
-.role-note {
-  margin: 0;
-  color: var(--wood-text);
-  font-size: 14px;
-  line-height: 1.45;
-  text-align: center;
-  text-shadow: 0 1px 2px rgb(0 0 0 / 0.6);
-}
-.role-note.hand {
-  font-size: 16px;
-}
-.role-note.allies {
-  color: #ffc2b3;
-}
-
 /* ---------- Komposisi role room (chip dari server) ---------- */
 .composition {
   display: flex;
@@ -269,42 +215,6 @@
   text-overflow: ellipsis;
   background: rgb(107 42 28 / 0.9);
   color: #ffe3d6;
-}
-.briefing-head .composition {
-  justify-content: flex-start;
-  margin-top: 10px;
-}
-.brief-steps {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin: 20px 0 0;
-  padding: 0;
-  list-style: none;
-}
-.brief-steps li {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  column-gap: 10px;
-  padding: 14px;
-  border: 1px solid rgb(139 90 43 / 0.35);
-  border-radius: 8px;
-  background: #fffaf0;
-  box-shadow: 0 3px 0 rgb(139 90 43 / 0.18);
-}
-.brief-steps .guide-icon {
-  grid-row: span 2;
-  font-size: 24px;
-  line-height: 1.1;
-}
-.brief-steps b {
-  font: 700 18px/1.2 var(--font-display);
-  color: #5b311b;
-}
-.brief-steps p {
-  margin: 2px 0 0;
-  font-size: 14px;
-  line-height: 1.45;
 }
 /* Bilah meja: barisan karakter semua peserta di kiri, kesiapan AI dan tombol Siap di kanan. */
 .splash-table {
@@ -545,10 +455,4 @@
 }
 .nudge-card .role-flip {
   width: 100%;
-}
-.nudge-hand {
-  color: var(--cream);
-  font-size: 40px;
-  line-height: 1;
-  animation: ketuk 1s ease-in-out infinite;
 }

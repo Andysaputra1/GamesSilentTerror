@@ -1,0 +1,82 @@
+/* Tiga kartu persiapan: role pribadi, aksi, dan target kemenangan. */
+.prep-heading {
+  text-align: center;
+  color: var(--cream);
+  text-shadow: 0 2px 3px rgb(20 10 5 / 0.6);
+}
+.prep-heading h2 {
+  margin: 2px 0 6px;
+  font: 800 clamp(23px, 3vw, 34px)/1.1 var(--font-display);
+}
+.prep-heading p { margin: 0; }
+.prep-heading .eyebrow { color: #edc786; }
+.prep-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(12px, 2vw, 22px);
+  align-items: stretch;
+}
+.prep-card {
+  --edge: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+  padding: 24px clamp(18px, 2vw, 28px);
+  text-align: center;
+  color: #5b3a22;
+}
+.prep-number {
+  align-self: flex-start;
+  font: 800 12px/1.3 var(--font-display);
+  letter-spacing: .14em;
+  color: #8a6237;
+}
+.prep-card h3 {
+  margin: 10px 0;
+  min-height: 2.2em;
+  display: grid;
+  place-items: center;
+  font: 800 clamp(20px, 2vw, 26px)/1.1 var(--font-display);
+  color: #4a2a18;
+}
+.prep-card p { margin: 10px 0 0; font-size: 15px; line-height: 1.45; }
+.prep-card small { margin-top: 12px; font-size: 13px; line-height: 1.4; }
+.prep-role-art { width: min(160px, 100%); margin-bottom: 6px; }
+.prep-role-art .role-flip { width: 100%; }
+.prep-illustration {
+  width: min(220px, 100%);
+  height: 170px;
+  object-fit: contain;
+  filter: drop-shadow(0 5px 3px rgb(67 37 15 / .16));
+}
+.prep-books { height: 100px; margin: -6px 0 8px; }
+.prep-action-list { display: grid; gap: 10px; width: 100%; padding: 0; margin: 0; list-style: none; text-align: left; }
+.prep-action-list li { display: grid; grid-template-columns: 86px minmax(0, 1fr); gap: 10px; align-items: center; }
+.prep-action-label {
+  display: grid;
+  place-items: center;
+  min-height: 34px;
+  padding: 4px 6px;
+  border: 1px solid #85603a;
+  border-radius: 6px;
+  background: #60442d;
+  color: #fff0d2;
+  box-shadow: 0 2px 0 #382416, inset 0 1px 0 #ab8455;
+  font: 700 13px/1.15 var(--font-display);
+}
+.prep-action-list p { margin: 0; font-size: 13px; }
+.prep-objective { font-weight: 700; }
+.prep-allies { color: #8f3027; }
+.prep-composition { margin-top: auto; padding-top: 12px; }
+.prep-composition > small { display: block; margin: 0 0 6px; }
+.prep-composition .comp-chip { font-size: 12px; }
+.prep-composition .comp-chip i { display: none; }
+@media (max-width: 759px) {
+  .prep-cards { grid-template-columns: minmax(0, 1fr); }
+  .prep-card { padding: 22px; }
+  .prep-card h3 { min-height: 0; }
+  .prep-illustration { height: 140px; }
+  .prep-books { height: 100px; }
+  .prep-action-list { max-width: 370px; }
+}

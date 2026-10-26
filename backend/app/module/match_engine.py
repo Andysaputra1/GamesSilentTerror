@@ -33,10 +33,10 @@ class Participant:
 
 
 # Layar persiapan: minimal cukup untuk membaca panduan, maksimal agar model yang gagal dimuat tidak menahan room.
-PREPARATION_MIN_SECONDS = 10
+PREPARATION_MIN_SECONDS = 40
 PREPARATION_MAX_SECONDS = 90
-# Setelah AI siap dan waktu baca minimal lewat, ronde 1 menunggu manusia yang belum membuka kartu role paling lama ini.
-REVEAL_WAIT_SECONDS = 15
+# AI yang terlambat siap tetap memberi countdown untuk membuka role, dibatasi maksimum tunggu.
+PREPARATION_COUNTDOWN_SECONDS = 10
 
 # Komposisi role per jumlah peserta: (hitman, spy, stalker); sisanya civilian.
 # Dipilih lewat simulasi keseimbangan semua kursi bot metode campuran, dengan pengumuman jumlah Hitman tersisa
@@ -227,7 +227,7 @@ class Match:
         self.ready_consents.add(name)
         self.try_begin(time.time() if now is None else now)
 
-    # PERSIAPAN: manusia membuka kartu role-nya; ronde 1 menunggu semua (lihat try_begin).
+    # PERSIAPAN: catat kartu yang dibuka; pembukaan tidak mempercepat countdown.
     def reveal_role(self, name, now=None):
         player = self.players.get(name)
         if self.phase != "preparing" or not player or player.bot:
@@ -243,19 +243,24 @@ class Match:
             if not p.bot and p.alive and p.name not in self.revealed
         ]
 
-    # Saat ronde 1 boleh mulai bila semua kartu sudah dibuka (AI siap dan waktu baca minimal lewat).
+    # Jadwal bersama: minimal 40 detik, countdown AI siap, dan batas maksimum tunggu.
     def _start_at(self):
         prep = self.preparation
-        return max(prep["min_until"], prep["ready_at"]) if prep["ready"] else None
+        if not prep["ready"]:
+            return None
+        return min(
+            self.deadline,
+            max(prep["min_until"], prep["ready_at"] + PREPARATION_COUNTDOWN_SECONDS),
+        )
 
-    # Mulai jika AI siap, waktu baca minimal lewat, dan semua manusia sudah membuka kartu role;
-    # pemain yang belum membuka ditunggu paling lama REVEAL_WAIT_SECONDS. Tombol Siap tidak melewati minimum.
+    # Mulai sesuai countdown; UI membuka kartu otomatis lima detik sebelum mulai.
+    # Tombol Siap maupun pembukaan kartu terakhir tidak melewati waktu baca minimum.
     def try_begin(self, now=None):
         start_at = self._start_at() if self.phase == "preparing" else None
         if start_at is None:
             return False
         now = time.time() if now is None else now
-        if now >= start_at and (not self.unrevealed() or now >= start_at + REVEAL_WAIT_SECONDS):
+        if now >= start_at:
             self.begin(now)
             return True
         return False
@@ -622,10 +627,6 @@ class Match:
         prep = self.preparation
         unrevealed = self.unrevealed()
         starts_at = self._start_at()
-        if starts_at is not None and unrevealed:
-            starts_at += (
-                REVEAL_WAIT_SECONDS  # batas atas; mulai lebih cepat begitu semua kartu dibuka
-            )
         return {
             "ready": prep["ready"],
             "detail": prep["detail"],

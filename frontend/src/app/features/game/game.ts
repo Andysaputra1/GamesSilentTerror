@@ -31,6 +31,7 @@ import { PhaseDurations } from '../../core/room.service';
 import { FullscreenPrompt } from '../../core/fullscreen-prompt';
 import { forgetRoom, STORAGE } from '../../core/storage';
 import { SurveyForm } from '../../core/survey-form/survey-form';
+import { RoleRevealCard } from '../../core/role-reveal-card/role-reveal-card';
 
 // Karakter cadangan dan warna label pemain: berdasarkan urutan kursi, bukan role atau status rahasia.
 const SKINS = ['arthur', 'jenny', 'dexter', 'eloise', 'kiera', 'sadie'];
@@ -47,19 +48,29 @@ const TAG_COLORS = [
   '#8a5530',
 ];
 const ROLES = ['hitman', 'spy', 'stalker', 'civilian'];
+const ROLE_REVEAL_READ_MS = 3000;
 // Singkatan metode otak bot di samping namanya: Behavior Tree, Utility AI, Fuzzy Logic.
 const METODE_SINGKAT: Record<string, string> = { bt: 'BT', utility: 'UA', fuzzy: 'FL', llm: 'LLM' };
 
 // KOMPONEN: render snapshot privat server; tidak mengacak role atau memutuskan hasil aksi di browser.
 @Component({
   selector: 'app-game',
-  imports: [FormsModule, RouterLink, ProfileMenu, FullscreenPrompt, NgTemplateOutlet, SurveyForm],
+  imports: [
+    FormsModule,
+    RouterLink,
+    ProfileMenu,
+    FullscreenPrompt,
+    NgTemplateOutlet,
+    SurveyForm,
+    RoleRevealCard,
+  ],
   templateUrl: './game.html',
   styleUrls: [
     './game.css',
     './game-table.css',
     './game-cards.css',
     './game-screens.css',
+    './game-preparation.css',
     './game-end.css',
     './game-motion.css',
   ],
@@ -82,6 +93,10 @@ export class Game implements OnInit, OnDestroy {
     if (button) queueMicrotask(() => button.nativeElement.focus());
   }
   revealRole = false;
+  readingRole = false;
+  private readingPrompt = false;
+  private readRoleMatch = '';
+  private roleReadTimer?: ReturnType<typeof setTimeout>;
   seconds = 0;
   // Tampilan: tab di HP, panel aturan, dan layar akhir (pengumuman → kuesioner → meja akhir).
   mobileTab: 'table' | 'chat' | 'info' = 'table';
@@ -177,23 +192,6 @@ export class Game implements OnInit, OnDestroy {
     return this.hitmanCount > 1;
   }
 
-  // Ringkasan layar persiapan: satu baris per hal agar terbaca sekilas sambil menunggu.
-  // Penjelasan lengkap tetap di `guide` (modal aturan "?").
-  readonly briefSteps = [
-    {
-      icon: '🎭',
-      title: 'Tujuan',
-      text: 'Warga menang jika semua Hitman dieksekusi; Hitman menang jika menguasai suara.',
-    },
-    { icon: '☀', title: 'Siang', text: 'Diskusikan alibi dan cari kejanggalan.' },
-    {
-      icon: '⚖',
-      title: 'Tribunal',
-      text: 'Mulai ronde 2, setelah siang: pilih tersangka. Suara terbanyak tunggal dieksekusi.',
-    },
-    { icon: '☾', title: 'Malam', text: 'Chat terkunci; role khusus beraksi diam-diam.' },
-  ];
-
   // Panduan lengkap untuk modal aturan "?" di HUD.
   get guide(): { icon: string; title: string; text: string }[] {
     const banyak = this.multiHitman;
@@ -286,15 +284,6 @@ export class Game implements OnInit, OnDestroy {
   // Chip Hitman di tepi meja menampilkan "tersisa/total"; chip lain dan layar persiapan: null.
   hitmanLeft(item: { role: string }, place: string): number | null {
     return item.role === 'hitman' && place === 'felt-composition' ? this.hitmanRemaining : null;
-  }
-
-  // Kalimat pembuka layar persiapan.
-  get threatLine(): string {
-    if (this.hitmanCount > 1)
-      return `${this.hitmanCount} Hitman bersembunyi di antara kalian dan saling mengenal.`;
-    return this.hitmanCount === 1
-      ? 'Satu Hitman bersembunyi di antara kalian.'
-      : 'Hitman bersembunyi di antara kalian.';
   }
 
   // REKAN SYNDICATE: server hanya mengirim daftar ini kepada Hitman; role lain selalu kosong.
@@ -461,38 +450,6 @@ export class Game implements OnInit, OnDestroy {
     finished: 'Selesai',
   };
 
-  // Judul dan penjelasan baki aksi sesuai fase dan hak pemain.
-  get actionTitle(): string {
-    const state = this.game;
-    if (!state) return '';
-    if (state.me.can_vote) return 'Tribunal · satu suara final';
-    if (state.me.can_act)
-      return `Aksi rahasia · ${this.abilityNames[state.me.ability ?? ''] ?? state.me.ability}`;
-    return (
-      ({ day: 'Diskusi siang', night: 'Malam', tribunal: 'Tribunal' } as Record<string, string>)[
-        state.phase
-      ] ?? ''
-    );
-  }
-
-  get actionHint(): string {
-    const state = this.game;
-    if (!state) return '';
-    if (state.me.can_vote)
-      return 'Pilih tersangka di meja, lalu kunci suaramu. Suara terbanyak tunggal dieksekusi; seri berarti tidak ada eksekusi.';
-    if (state.me.can_act && this.allies.length && state.me.ability === 'hostage')
-      return 'Pilih satu warga di meja. Syndicate hanya menyandera satu orang: target terbanyak dari pilihan para Hitman; seri → pilihan yang masuk lebih dulu.';
-    if (state.me.can_act && this.allies.length && state.me.ability === 'gag')
-      return 'Pilih pemain yang dibungkam. Gag Order dipakai bersama rekan: satu kali per siang, lalu jeda satu ronde penuh.';
-    if (state.me.can_act)
-      return 'Pilih target di meja. Pilihan tidak dapat diubah setelah dikunci.';
-    if (state.phase === 'night')
-      return 'Tunggu aksi malam diselesaikan. Skill mungkin sudah dipakai, cooldown, atau tidak tersedia untuk role/statusmu.';
-    if (state.phase === 'day')
-      return 'Bicara di chat: tanya alibi, tuduh dengan alasan, dan bela pemain yang kamu percaya.';
-    return 'Tidak ada aksi tersedia saat ini. Amati percakapan dan tunggu fase berikutnya.';
-  }
-
   get chatHint(): string {
     if (!this.game) return '';
     if (this.game.winner) return 'Pertandingan selesai. Riwayat diskusi tetap bisa dibaca.';
@@ -539,10 +496,6 @@ export class Game implements OnInit, OnDestroy {
   // Warna chip pemilih sama dengan label nama pemilih di meja dan chat.
   voterColor(name: string): string {
     return this.colorFor(name);
-  }
-
-  roleCard(role?: string | null): string {
-    return `/assets/cards/card_${role && ROLES.includes(role) ? role : 'blank'}.png`;
   }
 
   // PANAS VOTE: 0 = tanpa suara, 1 = suara sudah mencapai mayoritas pemain hidup (bingkai paling merah).
@@ -625,16 +578,97 @@ export class Game implements OnInit, OnDestroy {
     );
   }
 
-  // KARTU ROLE: setelah 10 detik persiapan, pemain yang belum membuka kartu diminta membukanya.
-  get revealPrompt(): boolean {
-    const prep = this.game?.phase === 'preparing' ? this.game.preparation : null;
-    return !!prep && !this.revealRole && !prep.revealed && (prep.elapsed ?? 0) >= 10;
+  // Countdown server juga mencakup batas tunggu AI bila model belum siap.
+  get preparationSeconds(): number {
+    const prep = this.game?.preparation;
+    return prep ? (prep.starts_in ?? prep.max_wait) : 0;
   }
 
-  // Buka/tutup kartu role; pembukaan pertama dilaporkan ke server (ronde 1 menunggu semua pemain).
+  get mySkinId(): string {
+    return this.game
+      ? this.skinFor(this.game.me.name).split('skin_')[1].replace('.png', '')
+      : 'arthur';
+  }
+
+  readonly roleSummary: Record<string, string> = {
+    hitman: 'Penyusup yang menyamar sebagai warga. Rahasiakan identitasmu.',
+    spy: 'Pelindung warga. Jaga pemain dari sandera saat malam.',
+    stalker: 'Pencari informasi. Intip role pemain secara diam-diam.',
+    civilian: 'Warga biasa. Baca alibi, cari bukti, lalu tentukan suara.',
+  };
+
+  get preparationActions(): { label: string; text: string }[] {
+    const shared = [
+      { label: 'Chat', text: 'Siang: diskusikan alibi.' },
+      { label: 'Vote', text: 'Tribunal mulai ronde 2: pilih tersangka.' },
+    ];
+    if (!this.revealRole) return shared;
+    const special: Record<string, { label: string; text: string }[]> = {
+      hitman: [
+        { label: 'Gag Order', text: 'Siang: bungkam chat; jeda satu ronde.' },
+        { label: 'Sandera', text: 'Malam: hilangkan suara satu warga.' },
+      ],
+      spy: [
+        {
+          label: 'Jaga',
+          text: 'Malam: lindungi satu pemain, boleh diri sendiri. Ganti target tiap malam.',
+        },
+      ],
+      stalker: [{ label: 'Intip', text: 'Malam: lihat role satu pemain; jeda satu ronde.' }],
+    };
+    return [...shared, ...(special[this.game?.me.role ?? ''] ?? [])];
+  }
+
+  get preparationTarget(): string {
+    if (!this.revealRole) return 'Buka kartu role untuk melihat target kemenanganmu.';
+    return this.game?.me.role === 'hitman'
+      ? 'Buat jumlah warga yang bebas bersuara tidak melebihi Hitman yang masih hidup.'
+      : 'Temukan dan eksekusi semua Hitman lewat voting Tribunal.';
+  }
+
+  // Pengingat muncul pada 10 detik terakhir; pembukaan otomatis pada 5 detik terakhir.
+  get revealPrompt(): boolean {
+    if (this.readingRole && this.readingPrompt) return true;
+    const prep = this.game?.phase === 'preparing' ? this.game.preparation : null;
+    return !!prep && !this.revealRole && !prep.revealed && this.preparationSeconds <= 10;
+  }
+
+  // Snapshot tetap mengikuti server; layar persiapan memberi waktu membaca kartu sebelum berpindah.
+  get showPreparation(): boolean {
+    return this.game?.phase === 'preparing' || this.readingRole;
+  }
+
+  // Buka/tutup kartu role; pembukaan pertama dilaporkan tanpa mempercepat countdown server.
   toggleRole(): void {
+    if (this.readingRole) return;
+    const prompted = this.revealPrompt;
     this.revealRole = !this.revealRole;
+    if (
+      this.revealRole &&
+      this.game?.phase === 'preparing' &&
+      this.readRoleMatch !== this.game.id
+    ) {
+      this.startRoleReading(prompted);
+    }
     if (this.revealRole) this.refresh();
+  }
+
+  private startRoleReading(prompted: boolean): void {
+    this.readRoleMatch = this.game!.id;
+    this.readingRole = true;
+    this.readingPrompt = prompted;
+    this.roleReadTimer = setTimeout(() => {
+      this.stopRoleReading();
+      this.updatePhaseTransition();
+      this.cdr.markForCheck();
+    }, ROLE_REVEAL_READ_MS);
+  }
+
+  private stopRoleReading(): void {
+    clearTimeout(this.roleReadTimer);
+    this.roleReadTimer = undefined;
+    this.readingRole = false;
+    this.readingPrompt = false;
   }
 
   // Kartu sudah dibuka di layar ini, tetapi server belum mencatatnya.
@@ -740,6 +774,7 @@ export class Game implements OnInit, OnDestroy {
 
   // Putuskan socket dan hentikan polling saat meninggalkan halaman pertandingan.
   ngOnDestroy(): void {
+    this.stopRoleReading();
     this.socket?.disconnect();
     if (this.poll) clearInterval(this.poll);
     if (this.transitionTimer) clearTimeout(this.transitionTimer);
@@ -830,6 +865,15 @@ export class Game implements OnInit, OnDestroy {
     );
   }
 
+  private updatePhaseTransition(): void {
+    if (!this.game || this.readingRole) return;
+    const shown = `${this.game.id}/${this.game.phase}`;
+    // Hanya saat fase berganti di pertandingan yang sama, setelah jeda membaca role selesai.
+    if (this.shownPhase.startsWith(this.game.id + '/') && this.shownPhase !== shown)
+      this.showTransition(this.game.phase, this.shownPhase.endsWith('/preparing'));
+    this.shownPhase = shown;
+  }
+
   // Pengumuman Tribunal terakhir dari server ("Tribunal mengeksekusi …" atau "… tanpa eksekusi").
   private get lastVerdict(): string {
     const events = this.game?.events ?? [];
@@ -897,6 +941,19 @@ export class Game implements OnInit, OnDestroy {
       )
       .subscribe({
         next: (snapshot) => {
+          const missedReveal =
+            this.game?.phase === 'preparing' &&
+            this.game.id === snapshot.game.id &&
+            !this.revealRole &&
+            !this.game.preparation?.revealed &&
+            snapshot.game.phase !== 'preparing' &&
+            !snapshot.game.winner;
+          if (this.readingRole && (snapshot.game.id !== this.game?.id || snapshot.game.winner))
+            this.stopRoleReading();
+          if (this.game && this.game.id !== snapshot.game.id) {
+            this.revealRole = false;
+            this.readRoleMatch = '';
+          }
           // Echo socket dapat tiba sesudah snapshot server dibuat tetapi sebelum HTTP selesai.
           // Pertahankan pesan baru itu, tanpa menghidupkan lagi riwayat lama yang sudah dipangkas.
           const receivedDuringRequest =
@@ -909,6 +966,19 @@ export class Game implements OnInit, OnDestroy {
             ...receivedDuringRequest.filter((message) => !snapshotIds.has(message.id)),
           ].slice(-100);
           this.game = snapshot.game;
+          if (missedReveal) {
+            // Reconnect/tab tidur bisa melewati lima detik terakhir: tetap beri waktu melihat role.
+            this.revealRole = true;
+            this.startRoleReading(true);
+          } else if (
+            this.game.phase === 'preparing' &&
+            this.preparationSeconds <= 5 &&
+            !this.revealRole &&
+            !this.game.preparation?.revealed &&
+            this.readRoleMatch !== this.game.id
+          ) {
+            this.toggleRole();
+          }
           this.durations = snapshot.room?.match_durations ?? this.durations;
           this.afterMessages();
           this.seconds = this.game.winner
@@ -920,11 +990,7 @@ export class Game implements OnInit, OnDestroy {
             this.notice = '';
             this.loadedPhase = phase;
           }
-          // Overlay transisi hanya saat fase berganti di pertandingan yang sama (bukan saat halaman dibuka).
-          const shown = `${this.game.id}/${this.game.phase}`;
-          if (this.shownPhase.startsWith(this.game.id + '/') && this.shownPhase !== shown)
-            this.showTransition(this.game.phase, this.shownPhase.endsWith('/preparing'));
-          this.shownPhase = shown;
+          this.updatePhaseTransition();
           if (this.game.winner) {
             this.loadSurvey();
             this.startEnding();
@@ -1010,6 +1076,7 @@ export class Game implements OnInit, OnDestroy {
 
   // Lepas room di tab ini: hentikan polling/socket, hapus pointer room, lalu pindah halaman.
   private exitRoom(url: string): void {
+    this.stopRoleReading();
     if (this.poll) clearInterval(this.poll);
     this.socket?.disconnect();
     this.game = null;

@@ -21,7 +21,7 @@ export interface Preparation {
   required: number;
   consented: boolean;
   bots: number;
-  // Buka kartu role: ronde 1 menunggu semua manusia (opsional agar cocok dengan backend versi lama).
+  // Status pembukaan role; tidak mempercepat countdown bersama (opsional untuk backend lama).
   elapsed?: number;
   revealed?: boolean;
   unrevealed?: number;

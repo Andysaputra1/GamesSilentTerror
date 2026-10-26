@@ -38,6 +38,25 @@
   margin: 0 auto;
 }
 
+/* Berkas dan lensa di sudut meja desktop; tidak menerima klik atau menutupi binder. */
+.desk-case-lens {
+  display: none;
+}
+@media (min-width: 1100px) {
+  .desk-case-lens {
+    display: block;
+    position: absolute;
+    z-index: -1;
+    left: -24px;
+    bottom: 42px;
+    width: clamp(160px, 19vw, 300px);
+    transform: rotate(-14deg);
+    filter: drop-shadow(4px 12px 8px rgb(20 8 3 / 0.5));
+    pointer-events: none;
+    user-select: none;
+  }
+}
+
 /* ==========================================================================
    HEADER
    ========================================================================== */

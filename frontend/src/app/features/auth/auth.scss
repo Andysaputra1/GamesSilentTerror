@@ -153,19 +153,13 @@
     color: #fbeacb;
     font-family: 'Fraunces', Georgia, serif;
     font-weight: 800;
-    font-size: min(2.55em, 8vw);
+    font-size: min(2.15em, 6.7vw);
     line-height: 1;
     font-variation-settings: 'SOFT' 100, 'WONK' 1;
     letter-spacing: -.005em;
     white-space: nowrap;
     text-shadow: 0 .05em 0 #3a200f, 0 .1em .14em rgba(0, 0, 0, .4);
 
-    i {
-      color: #e8c073;
-      font-size: .3em;
-      font-style: normal;
-      text-shadow: 0 .16em 0 #3a200f;
-    }
   }
 
   p {

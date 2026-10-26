@@ -5,12 +5,13 @@
     <title>Silent Terror</title>
     <base href="/" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="icon" href="favicon.ico" sizes="any" />
-    <link rel="icon" type="image/svg+xml" href="icon.svg" />
-    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <link rel="icon" href="favicon.ico?v=arthur" sizes="16x16 32x32 48x48 256x256" />
+    <link rel="icon" type="image/png" href="/assets/brand/silent-terror-logo.png" sizes="256x256" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png?v=arthur" sizes="180x180" />
     <meta name="theme-color" content="#2a170c" />
     <!-- Gambar layar loading diminta sejak awal; semuanya juga dipakai halaman login/main. -->
     <link rel="preload" as="image" href="/assets/backgrounds/backwood.jpg" />
+    <link rel="preload" as="image" href="/assets/brand/silent-terror-logo.png" />
     <link rel="preload" as="image" href="/assets/buttons/btn-wood.png" />
     <link rel="preload" as="image" href="/assets/characters/loader-cast.webp" type="image/webp" />
   </head>
@@ -20,7 +21,17 @@
          Gaya sama dengan halaman login: meja kayu, papan judul berpaku, dan kertas krem. -->
     <div id="boot-loader" class="boot-loader" role="status" aria-live="polite">
       <div class="boot-loader__board">
-        <p class="boot-loader__title">Silent <span aria-hidden="true">◆</span> Terror</p>
+        <p class="boot-loader__title">
+          Silent
+          <img
+            class="brand-emblem"
+            src="/assets/brand/silent-terror-logo.png"
+            width="256"
+            height="256"
+            alt=""
+          />
+          Terror
+        </p>
         <p class="boot-loader__tagline">Social Deduction Party Game</p>
       </div>
       <!-- Enam karakter skin game berbaris; kaca pembesar menyisir mencari Hitman. -->

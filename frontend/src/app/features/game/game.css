@@ -252,15 +252,8 @@ textarea:focus-visible {
   transform: rotate(-0.8deg);
 }
 .hud-brand b {
-  font: 800 1.35em/1 var(--font-display);
+  font: 800 1.15em/1 var(--font-display);
   white-space: nowrap;
-}
-.hud-brand b i {
-  margin: 0 0.25em;
-  color: var(--gold);
-  font-size: 0.45em;
-  font-style: normal;
-  vertical-align: middle;
 }
 .hud-brand small {
   font: 1.05em/1 var(--font-hand);
@@ -501,18 +494,9 @@ textarea:focus-visible {
 .flip-front {
   transform: rotateY(180deg);
 }
-.card-art {
-  position: absolute;
-  inset: 0;
+.flip-front app-role-reveal-card {
+  display: block;
   width: 100%;
-  height: 100%;
-}
-.card-skin {
-  position: absolute;
-  left: 50%;
-  top: 53%;
-  width: 66%;
-  transform: translate(-50%, -50%);
 }
 .role-help {
   color: #5b3a22;
