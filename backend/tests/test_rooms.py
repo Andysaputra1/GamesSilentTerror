@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import AsyncMock, Mock, patch
 
 from app.module.room_service import RoomService
-from app.realtime.socket_handlers import SocketGameController
+from app.controller.realtime.socket_handlers import SocketGameController
 from app.module.checker_service import checker_service
 from app.module.auth_service import SessionValidationError
 
@@ -63,14 +63,14 @@ class SocketRoomTests(unittest.IsolatedAsyncioTestCase):
         controller.socket_players.update({"alice-sid": "alice", "bob-sid": "bob"})
         controller.socket_rooms.update({"alice-sid": room.code, "bob-sid": room.code})
         rooms.leave(room.code, "bob")
-        with patch("app.realtime.socket_handlers.room_service", rooms):
+        with patch("app.controller.realtime.socket_handlers.room_service", rooms):
             await controller.emit_room("receive_chat", {"message": "private room"}, to=room.code)
             sio.leave_room.assert_awaited_once_with("bob-sid", room.code)
             sio.leave_room.reset_mock()
             rooms.join(room.code, "bob")
             controller.socket_tokens["bob-sid"] = "revoked-session"
             with patch(
-                "app.realtime.socket_handlers.auth_service.user_for_token",
+                "app.controller.realtime.socket_handlers.auth_service.user_for_token",
                 side_effect=SessionValidationError("revoked"),
             ):
                 await controller.emit_room("receive_chat", {"message": "next"}, to=room.code)
@@ -98,9 +98,9 @@ class SocketRoomTests(unittest.IsolatedAsyncioTestCase):
                 controller.socket_players["sid"] = "alice"
                 controller.socket_rooms["sid"] = room.code
                 with (
-                    patch("app.realtime.socket_handlers.room_service", rooms),
-                    patch("app.realtime.socket_handlers.PersistenceService") as persistence,
-                    patch("app.realtime.socket_handlers.checker_service.begin", side_effect=begin),
+                    patch("app.controller.realtime.socket_handlers.room_service", rooms),
+                    patch("app.controller.realtime.socket_handlers.PersistenceService") as persistence,
+                    patch("app.controller.realtime.socket_handlers.checker_service.begin", side_effect=begin),
                 ):
                     await controller.send_chat("sid", {"username": "alice", "message": "Halo"})
                 persistence.return_value.record_player_message.assert_not_called()
@@ -118,8 +118,8 @@ class SocketRoomTests(unittest.IsolatedAsyncioTestCase):
         controller.socket_players["sid"] = "alice"
         controller.socket_rooms["sid"] = room.code
         with (
-            patch("app.realtime.socket_handlers.room_service", rooms),
-            patch("app.realtime.socket_handlers.PersistenceService") as persistence,
+            patch("app.controller.realtime.socket_handlers.room_service", rooms),
+            patch("app.controller.realtime.socket_handlers.PersistenceService") as persistence,
         ):
             await controller.send_chat("sid", {"username": "alice", "message": "Halo"})
         chats = [c for c in sio.emit.call_args_list if c.args[0] == "receive_chat"]

@@ -17,6 +17,8 @@ backend/
         health.py
         panel.py                # Panel administrator (/panel)
         rooms.py                # Lobby, start, snapshot privat, aksi/vote, checker
+      realtime/
+        socket_handlers.py      # Controller event Socket.IO (chat)
       middleware/
         auth.py                 # Validasi bearer token sebelum controller
         cors.py                 # Kebijakan cross-origin
@@ -29,7 +31,6 @@ backend/
       openrouter_client.py      # Klien HTTP OpenRouter
       create_user.py            # CLI akun tambahan untuk multiplayer lokal
     schemas/                    # Validasi request/response API
-    realtime/                   # Controller event Socket.IO
   artifacts/
     svm/intent_classifier.pkl   # Model ML privat, terpisah dari model database
     indobert/                   # Model NLU intent dan target

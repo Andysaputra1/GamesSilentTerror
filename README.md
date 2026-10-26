@@ -332,11 +332,10 @@ backend/              Python FastAPI + Socket.IO
     __init__.py       Paket aplikasi
     main.py           Entry point ASGI (app.main:asgi_app)
     config/           Konfigurasi aplikasi, AI, MySQL
-    controller/       Endpoint API dan middleware
+    controller/       Pintu masuk: api/ (REST), realtime/ (event Socket.IO), middleware/
     module/           Logika autentikasi/game, koneksi MySQL, klien AI, dan CLI akun
       npc_brain/      Runtime otak NPC; generated/ = ekspor notebook skripsi
     models/           Query SQL terparameterisasi
-    realtime/         Event Socket.IO
     schemas/          Validasi request/response API
   public/panel/       Halaman panel administrator
   artifacts/svm/      Model intent SVM privat, disediakan terpisah

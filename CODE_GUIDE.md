@@ -18,7 +18,7 @@ permintaan pengguna.
 | `backend/app/controller/api/` | Validasi request, autentikasi route, dan respons HTTP |
 | `backend/app/module/` | Aturan aplikasi, pertandingan, analisis, dan transaksi; termasuk koneksi database, klien AI (OpenRouter/Ollama), dan CLI akun |
 | `backend/app/models/` | Kueri SQL berparameter |
-| `backend/app/realtime/socket_handlers.py` | Autentikasi socket, otorisasi, penyimpanan, dan siaran chat |
+| `backend/app/controller/realtime/socket_handlers.py` | Autentikasi socket, otorisasi, penyimpanan, dan siaran chat |
 | `backend/app/config/` | Konfigurasi environment dan database |
 | `backend/app/controller/middleware/` | Autentikasi request, batas percobaan login, dan CORS |
 | `backend/public/panel/` | Halaman administrasi yang disajikan backend |

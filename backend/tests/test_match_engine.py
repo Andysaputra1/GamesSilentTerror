@@ -9,7 +9,7 @@ from fastapi import FastAPI, Header
 from fastapi.testclient import TestClient
 from app.controller.api.rooms import router
 from app.controller.middleware.auth import require_authenticated_user
-from app.realtime.socket_handlers import SocketGameController
+from app.controller.realtime.socket_handlers import SocketGameController
 from app.module.match_engine import KOMPOSISI_PERAN, Match, label_unik, snapshot_berlabel
 from app.module.skin_constants import ALL_SKINS
 from app.module.room_service import RoomService
@@ -636,7 +636,7 @@ class SocketGameTests(unittest.IsolatedAsyncioTestCase):
         controller.socket_players["sid"] = "alice"
         controller.socket_tokens["sid"] = "revoked-test-token"
         with patch(
-            "app.realtime.socket_handlers.auth_service.user_for_token",
+            "app.controller.realtime.socket_handlers.auth_service.user_for_token",
             side_effect=SessionValidationError(),
         ):
             await controller.send_chat("sid", {"username": "alice", "message": "halo"})
@@ -653,8 +653,8 @@ class SocketGameTests(unittest.IsolatedAsyncioTestCase):
         controller.socket_players["sid"] = "alice"
         controller.socket_rooms["sid"] = room.code
         with (
-            patch("app.realtime.socket_handlers.room_service", rooms),
-            patch("app.realtime.socket_handlers.PersistenceService"),
+            patch("app.controller.realtime.socket_handlers.room_service", rooms),
+            patch("app.controller.realtime.socket_handlers.PersistenceService"),
         ):
             for data in [
                 None,
