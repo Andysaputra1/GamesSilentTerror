@@ -706,19 +706,17 @@ describe('Game', () => {
   });
 
   // ATURAN BARU: semua Hitman harus dieksekusi; Hitman menang saat warga bebas ≤ Hitman hidup.
-  it('explains the multi-Hitman win conditions in the rules and the result', () => {
+  it('explains the multi-Hitman win conditions in the guide cards and the result', () => {
     const game = snapshot().game;
     game.composition = { hitman: 2, spy: 2, stalker: 1, civilian: 5 };
     component.game = game;
+    // Tombol "?" membuka tiga kartu yang sama dengan layar persiapan, termasuk komposisi room.
     component.showRules = true;
-    const rules = (render().querySelector('.rules-modal') as HTMLElement).textContent ?? '';
-    expect(rules).toContain('2 Hitman · 2 Spy · 1 Stalker · 5 Civilian');
-    expect(rules).toContain('menang jika semua Hitman dieksekusi');
-    expect(rules).toContain('tidak lebih banyak dari Hitman yang masih hidup');
-    expect(rules).not.toContain('Hitman yang tersisa diumumkan');
-    game.hitman_remaining = 2;
-    const announced = (render().querySelector('.rules-modal') as HTMLElement).textContent ?? '';
-    expect(announced).toContain('jumlah Hitman yang tersisa diumumkan setelah setiap eksekusi');
+    const rules = render().querySelector('.rules-modal') as HTMLElement;
+    expect(rules.querySelectorAll('.prep-card').length).toBe(3);
+    expect(rules.textContent).toMatch(/2\s*Hitman/);
+    expect(rules.textContent).toMatch(/5\s*Civilian/);
+    component.showRules = false;
 
     game.phase = 'finished';
     game.winner = 'civilians';
@@ -759,23 +757,16 @@ describe('Game', () => {
     expect(render().querySelectorAll('.lineup li').length).toBe(2);
   });
 
-  // Room satu Hitman: teks Syndicate (Hostage/Gag bersama, "para Hitman") tidak ditampilkan.
+  // Room satu Hitman: teks Syndicate ("rekan", "Spy lain") tidak ditampilkan.
   it('keeps single-Hitman wording in rooms with one Hitman', () => {
     const game = snapshot().game;
     game.composition = { hitman: 1, spy: 1, stalker: 1, civilian: 2 };
     game.me.role = 'hitman';
     component.game = game;
-    component.showRules = true;
-    const rules = (render().querySelector('.rules-modal') as HTMLElement).textContent ?? '';
-    expect(rules).not.toContain('Syndicate hanya menyandera');
-    expect(rules).not.toContain('dipakai bersama');
-    expect(rules).toContain('Hitman menyandera satu pemain per malam');
-    expect(component.guide.map((item) => item.text).join(' ')).not.toMatch(/Para Hitman|bersama/);
     expect(component.roleHelp['hitman']).not.toContain('Syndicate');
     expect(component.roleHelp['spy']).not.toContain('Spy lain');
 
     game.composition = { hitman: 2, spy: 2, stalker: 1, civilian: 3 };
-    expect(component.guide.find((item) => item.title === 'Malam')?.text).toContain('Para Hitman');
     expect(component.roleHelp['hitman']).toContain('Syndicate');
     expect(component.roleHelp['spy']).toContain('Spy lain');
   });

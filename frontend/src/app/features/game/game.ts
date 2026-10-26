@@ -192,49 +192,6 @@ export class Game implements OnInit, OnDestroy {
     return this.hitmanCount > 1;
   }
 
-  // Panduan lengkap untuk modal aturan "?" di HUD.
-  get guide(): { icon: string; title: string; text: string }[] {
-    const banyak = this.multiHitman;
-    return [
-      {
-        icon: '🎭',
-        title: 'Tujuan',
-        text: 'Warga (Civilian, Spy, Stalker) menang jika semua Hitman dieksekusi. Hitman menang jika warga yang masih bebas bersuara tidak lebih banyak dari Hitman yang masih hidup. Jumlah Hitman dan Spy mengikuti jumlah pemain.',
-      },
-      {
-        icon: '☀',
-        title: 'Siang',
-        text: banyak
-          ? 'Diskusi bebas. Tanyakan alibi, tuduh dengan alasan, dan bela pemain yang kamu percaya. Hitman bisa membungkam satu pemain (Gag Order, dipakai bersama seluruh Hitman).'
-          : 'Diskusi bebas. Tanyakan alibi, tuduh dengan alasan, dan bela pemain yang kamu percaya. Hitman bisa membungkam satu pemain (Gag).',
-      },
-      {
-        icon: '⚖',
-        title: 'Tribunal',
-        text: 'Mulai ronde 2, Tribunal datang setelah diskusi siang (ronde 1 langsung ke malam). Pemain yang masih punya suara memilih tersangka. Suara terbanyak tunggal dieksekusi; seri berarti tidak ada eksekusi.',
-      },
-      {
-        icon: '☾',
-        title: 'Malam',
-        text: banyak
-          ? 'Layar meredup dan chat dikunci. Para Hitman menyandera satu pemain (pilihan terbanyak mereka), setiap Spy menjaga satu pemain, Stalker mengintip role seseorang.'
-          : 'Layar meredup dan chat dikunci. Hitman menyandera satu pemain, Spy menjaga satu pemain, Stalker mengintip role seseorang.',
-      },
-      {
-        icon: '◆',
-        title: 'Bot AI',
-        text: 'Sebagian kursi diisi bot. Mereka membaca chat, menimbang bukti, dan bisa berbohong jika menjadi Hitman. Perlakukan seperti pemain lain.',
-      },
-      {
-        icon: '💡',
-        title: 'Tips',
-        text: banyak
-          ? 'Diam bukan bukti. Para Hitman saling mengenal: perhatikan siapa yang kompak saling membela atau mendorong vote bersama.'
-          : 'Diam bukan bukti. Perhatikan siapa yang mendorong vote ke pemain yang ternyata bukan Hitman.',
-      },
-    ];
-  }
-
   get roleHelp(): Record<string, string> {
     return {
       hitman: this.multiHitman

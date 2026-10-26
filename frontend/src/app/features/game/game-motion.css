@@ -287,9 +287,6 @@
   .profile-chip {
     --profile-name-display: none;
   }
-  .guide-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 @media (max-width: 899px) {
   .hud-brand {
@@ -401,9 +398,6 @@
     border-top: 2px dashed rgb(139 90 43 / 0.35);
     border-left: 0;
   }
-  .guide-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
   /* HUD HP: kotak akun cukup avatar, tombol Keluar cukup ikon (teks tetap untuk pembaca layar). */
   .hud-side {
     gap: 6px;
@@ -468,18 +462,6 @@
   }
   .splash-sign {
     width: min(72vw, 320px);
-    font-size: 12px;
-  }
-
-
-  .guide-grid {
-    gap: 10px;
-    margin-top: 10px;
-  }
-  .guide-card {
-    padding: 10px 12px 9px;
-  }
-  .guide-card p {
     font-size: 12px;
   }
 

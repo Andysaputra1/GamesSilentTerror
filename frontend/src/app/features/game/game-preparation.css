@@ -80,3 +80,96 @@
   .prep-books { height: 100px; }
   .prep-action-list { max-width: 370px; }
 }
+
+/* Desktop: layar persiapan muat satu layar tanpa scroll. Papan nama, kartu, dan meja berbagi tinggi layar;
+   ukuran gambar dan huruf mengikuti tinggi layar. Teks tidak boleh menyusut, hanya gambar. */
+@media (min-width: 760px) {
+  .splash {
+    overflow: hidden;
+  }
+  .splash-sign {
+    width: min(92vw, 400px, 36vh);
+    font-size: clamp(11px, 1.7vh, 15px);
+  }
+  .splash-body {
+    flex: 1;
+    margin-block: 0;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: clamp(8px, 1.6vh, 20px);
+  }
+  .prep-heading h2 {
+    font-size: clamp(22px, 4vh, 34px);
+  }
+  .prep-cards {
+    min-height: 0;
+  }
+  .prep-card {
+    min-height: 0;
+    overflow: hidden;
+    padding-block: clamp(10px, 2.2vh, 24px);
+  }
+  .prep-card > * {
+    flex-shrink: 0;
+  }
+  .prep-card > img {
+    flex-shrink: 1;
+    min-height: 0;
+  }
+  .prep-card h3 {
+    min-height: 0;
+    margin: clamp(4px, 1vh, 10px) 0;
+    font-size: clamp(17px, 2.8vh, 26px);
+  }
+  .prep-card p {
+    margin-top: clamp(4px, 0.9vh, 10px);
+    font-size: clamp(13px, 2vh, 15px);
+  }
+  .prep-card small,
+  .prep-action-list p {
+    margin-top: clamp(4px, 1vh, 12px);
+    font-size: clamp(12px, 1.8vh, 13px);
+  }
+  .prep-action-list p {
+    margin-top: 0;
+  }
+  .prep-role-art {
+    width: clamp(72px, 14vh, 160px);
+  }
+  .prep-illustration {
+    height: clamp(36px, 10vh, 170px);
+  }
+  .prep-books {
+    height: clamp(32px, 7vh, 100px);
+    margin: 0 0 clamp(4px, 1vh, 8px);
+  }
+  .prep-action-list {
+    gap: clamp(4px, 1vh, 10px);
+  }
+  .prep-action-label {
+    min-height: clamp(24px, 4vh, 34px);
+  }
+  .prep-composition {
+    padding-top: clamp(4px, 1vh, 12px);
+  }
+  .splash-table {
+    padding-block: clamp(8px, 1.6vh, 16px);
+  }
+  .splash-cast h3 {
+    margin-bottom: clamp(4px, 0.8vh, 8px);
+  }
+  /* Semua peserta dalam satu baris; foto mengecil bila pemain banyak (sampai 10 kursi). */
+  .splash-cast ul {
+    flex-wrap: nowrap;
+    gap: clamp(6px, 1.2vw, 18px);
+  }
+  .splash-cast li {
+    flex: 0 1 clamp(44px, 8vh, 86px);
+    min-width: 0;
+  }
+  .splash-status {
+    gap: clamp(4px, 0.8vh, 8px);
+  }
+  .splash-ready {
+    width: min(100%, 280px, 30vh);
+  }
+}

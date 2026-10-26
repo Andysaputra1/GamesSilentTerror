@@ -57,6 +57,64 @@
     </p>
   </ng-template>
 
+  <!-- Tiga kartu panduan (role, aksi, target): dipakai di layar persiapan dan modal "?". -->
+  <ng-template #tigaKartu let-state>
+    <section class="prep-cards" aria-label="Panduan tiga kartu">
+      <article class="paper prep-card prep-role">
+        <span class="prep-number">01 / ROLE</span>
+        <h3>{{ revealRole ? roleNames[state.me.role] : 'Siapa kamu?' }}</h3>
+        <div class="prep-role-art">
+          <ng-container *ngTemplateOutlet="roleFlip; context: { $implicit: state }" />
+        </div>
+        <p>
+          {{ revealRole ? roleSummary[state.me.role] : 'Ketuk kartu untuk membuka identitas rahasiamu.' }}
+        </p>
+        @if (revealRole && allies.length) {
+          <p class="prep-allies">
+            Rekan: <b>{{ namaDaftar(allies) }}</b>
+          </p>
+        }
+      </article>
+      <article class="paper prep-card prep-actions">
+        <span class="prep-number">02 / AKSI</span>
+        <h3>Apa yang bisa kamu lakukan?</h3>
+        <img
+          class="prep-illustration prep-books"
+          src="/assets/decorations/objects/detective-book-stack.png"
+          alt=""
+        />
+        <ul class="prep-action-list">
+          @for (action of preparationActions; track action.label) {
+            <li>
+              <span class="prep-action-label">{{ action.label }}</span>
+              <p>{{ action.text }}</p>
+            </li>
+          }
+        </ul>
+        @if (!revealRole) {
+          <small>Buka kartu untuk melihat aksi khususmu.</small>
+        }
+      </article>
+      <article class="paper prep-card prep-target">
+        <span class="prep-number">03 / TARGET</span>
+        <h3>{{ revealRole ? 'Cara kamu menang' : 'Misi rahasiamu' }}</h3>
+        <img class="prep-illustration" src="/assets/decorations/objects/case-lens.svg" alt="" />
+        <p class="prep-objective">{{ preparationTarget }}</p>
+        @if (revealRole) {
+          <small
+            >{{ state.me.role === 'hitman' ? 'Pilih warga sebagai target. Sandera menghilangkan suara, bukan nyawa.' : 'Suara terbanyak tunggal dieksekusi. Seri: tidak ada eksekusi.' }}</small
+          >
+        }
+        @if (composition.length) {
+          <div class="prep-composition">
+            <small>Komposisi room</small>
+            <ng-container *ngTemplateOutlet="compositionChips; context: { $implicit: '' }" />
+          </div>
+        }
+      </article>
+    </section>
+  </ng-template>
+
   @if (transition; as t) {
     <div class="phase-transition" [attr.data-phase]="t.phase" role="status" aria-live="polite">
       <div class="transition-card">
@@ -93,66 +151,8 @@
           <header class="prep-heading">
             <p class="eyebrow">Berkas rahasia · Hanya untukmu</p>
             <h2 id="splash-title">Kenali peranmu sebelum bermain</h2>
-            <p>40 detik untuk membaca. Buka kartu, pahami aksi, ingat target.</p>
           </header>
-          <section class="prep-cards" aria-label="Panduan tiga kartu">
-            <article class="paper prep-card prep-role">
-              <span class="prep-number">01 / ROLE</span>
-              <h3>{{ revealRole ? roleNames[state.me.role] : 'Siapa kamu?' }}</h3>
-              <div class="prep-role-art">
-                <ng-container *ngTemplateOutlet="roleFlip; context: { $implicit: state }" />
-              </div>
-              <p>
-                {{ revealRole ? roleSummary[state.me.role] : 'Ketuk kartu untuk membuka identitas rahasiamu.' }}
-              </p>
-              @if (revealRole && allies.length) {
-                <p class="prep-allies">
-                  Rekan: <b>{{ namaDaftar(allies) }}</b>
-                </p>
-              }
-            </article>
-            <article class="paper prep-card prep-actions">
-              <span class="prep-number">02 / AKSI</span>
-              <h3>Apa yang bisa kamu lakukan?</h3>
-              <img
-                class="prep-illustration prep-books"
-                src="/assets/decorations/objects/detective-book-stack.png"
-                alt=""
-              />
-              <ul class="prep-action-list">
-                @for (action of preparationActions; track action.label) {
-                  <li>
-                    <span class="prep-action-label">{{ action.label }}</span>
-                    <p>{{ action.text }}</p>
-                  </li>
-                }
-              </ul>
-              @if (!revealRole) {
-                <small>Buka kartu untuk melihat aksi khususmu.</small>
-              }
-            </article>
-            <article class="paper prep-card prep-target">
-              <span class="prep-number">03 / TARGET</span>
-              <h3>{{ revealRole ? 'Cara kamu menang' : 'Misi rahasiamu' }}</h3>
-              <img
-                class="prep-illustration"
-                src="/assets/decorations/objects/case-lens.svg"
-                alt=""
-              />
-              <p class="prep-objective">{{ preparationTarget }}</p>
-              @if (revealRole) {
-                <small
-                  >{{ state.me.role === 'hitman' ? 'Pilih warga sebagai target. Sandera menghilangkan suara, bukan nyawa.' : 'Suara terbanyak tunggal dieksekusi. Seri: tidak ada eksekusi.' }}</small
-                >
-              }
-              @if (composition.length) {
-                <div class="prep-composition">
-                  <small>Komposisi room</small>
-                  <ng-container *ngTemplateOutlet="compositionChips; context: { $implicit: '' }" />
-                </div>
-              }
-            </article>
-          </section>
+          <ng-container *ngTemplateOutlet="tigaKartu; context: { $implicit: state }" />
           <!-- Meja malam ini: karakter semua peserta (skin masing-masing) dan kesiapan AI. -->
           <section class="paper splash-table" aria-labelledby="splash-table-title">
             <div class="splash-cast">
@@ -831,7 +831,7 @@
         </div>
       }
 
-      <!-- ATURAN: dibuka dari tombol "?" di HUD. -->
+      <!-- PANDUAN: tombol "?" dan "Cara bermain" membuka tiga kartu yang sama dengan layar persiapan. -->
       @if (showRules) {
         <div class="modal-backdrop" (click)="showRules = false">
           <section
@@ -854,56 +854,7 @@
               </button>
             </header>
             <div class="rules-body">
-              <div class="guide-grid compact">
-                @for (item of guide; track item.title) {
-                  <article class="guide-card">
-                    <span class="guide-icon" aria-hidden="true">{{ item.icon }}</span>
-                    <h3>{{ item.title }}</h3>
-                    <p>{{ item.text }}</p>
-                  </article>
-                }
-              </div>
-              <p>
-                <b>Komposisi:</b>
-                {{ compositionLabel ? 'room ini berisi ' + compositionLabel + '.' : '' }}
-                Jumlah Hitman dan Spy mengikuti jumlah pemain.
-                @if (hitmanRemaining !== null) {
-                  Karena Hitman lebih dari satu, jumlah Hitman yang tersisa diumumkan setelah setiap
-                  eksekusi; role korban tetap rahasia sampai akhir.
-                }
-              </p>
-              <p>
-                <b>Kubu warga (Spy, Stalker, Civilian):</b> menang jika semua Hitman dieksekusi.
-              </p>
-              <p>
-                <b>Hitman (Syndicate):</b> menang ketika warga hidup yang masih memiliki hak voting
-                tidak lebih banyak dari Hitman yang masih hidup.
-                @if (multiHitman) {
-                  Para Hitman saling mengenal dan tidak bisa menyandera atau membungkam rekan
-                  sendiri.
-                }
-              </p>
-              @if (multiHitman) {
-                <p>
-                  Syndicate hanya menyandera satu pemain per malam: target terbanyak dari pilihan
-                  para Hitman; jika seri, pilihan yang masuk lebih dulu. Gag Order dipakai bersama:
-                  satu kali per siang, lalu jeda satu ronde penuh. Setiap Spy menjaga satu pemain.
-                </p>
-              } @else {
-                <p>
-                  Hitman menyandera satu pemain per malam dan bisa memakai Gag Order satu kali per
-                  siang, lalu jeda satu ronde penuh. Spy menjaga satu pemain.
-                </p>
-              }
-              <p>
-                Hostage tetap hidup dan masih bisa memakai skill malam, tetapi kehilangan chat dan
-                voting permanen. Gag hanya membatasi chat sampai akhir ronde; hak voting tetap ada.
-              </p>
-              <p>
-                Voting seri atau tanpa suara tidak mengeksekusi siapa pun, dan role pemain yang
-                dieksekusi tetap rahasia sampai permainan selesai. Ronde berikutnya dimulai jika
-                belum ada pemenang. Tidak ada batas ronde atau hasil seri pertandingan.
-              </p>
+              <ng-container *ngTemplateOutlet="tigaKartu; context: { $implicit: state }" />
             </div>
           </section>
         </div>

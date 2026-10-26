@@ -265,7 +265,7 @@
   --edge: 24px;
   display: flex;
   flex-direction: column;
-  width: min(900px, 100%);
+  width: min(1120px, 100%);
   max-height: 100%;
   padding: 26px 30px 22px;
 }
@@ -283,20 +283,8 @@
 .rules-body {
   min-height: 0;
   overflow-y: auto;
-  padding-right: 6px;
+  padding: 14px 6px 4px 0;
 }
-.rules-body > p {
-  margin: 8px 0;
-  font-size: 14px;
-  line-height: 1.6;
-}
-.guide-grid.compact {
-  flex: none;
-  grid-auto-rows: auto;
-  overflow: visible;
-  margin-bottom: 12px;
-}
-
 /* ---------- Memuat ---------- */
 .loading-card {
   --edge: 22px;

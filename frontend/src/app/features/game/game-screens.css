@@ -101,53 +101,6 @@
   gap: clamp(14px, 2vw, 24px);
   width: min(1180px, 100%);
 }
-.guide-grid {
-  flex: 1;
-  min-height: 0;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-auto-rows: minmax(min-content, 1fr);
-  gap: 16px 14px;
-  margin-top: 18px;
-  overflow-y: auto;
-}
-.guide-card {
-  position: relative;
-  padding: 14px 14px 12px;
-  border: 1px solid rgb(139 90 43 / 0.35);
-  border-radius: 6px;
-  background: #fffaf0;
-  box-shadow: 0 3px 0 rgb(139 90 43 / 0.18);
-  rotate: -0.6deg;
-}
-.guide-card:nth-child(even) {
-  rotate: 0.7deg;
-}
-/* selotip di atas catatan */
-.guide-card::before {
-  content: '';
-  position: absolute;
-  top: -8px;
-  left: 50%;
-  width: 54px;
-  height: 16px;
-  background: rgb(232 192 115 / 0.65);
-  translate: -50% 0;
-  rotate: -3deg;
-}
-.guide-icon {
-  font-size: 26px;
-}
-.guide-card h3 {
-  margin: 4px 0 6px;
-  font: 700 18px/1.2 var(--font-display);
-  color: #5b311b;
-}
-.guide-card p {
-  margin: 0;
-  font-size: 14px;
-  line-height: 1.55;
-}
 /* ---------- Komposisi role room (chip dari server) ---------- */
 .composition {
   display: flex;
