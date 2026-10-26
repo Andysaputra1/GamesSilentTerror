@@ -111,6 +111,7 @@ describe('Game', () => {
         ability: 'gag',
       },
       'play',
+      10000,
     );
     expect(component.busy).toBe(false);
   });
@@ -137,6 +138,7 @@ describe('Game', () => {
       'ABC123',
       expect.objectContaining({ target: 'NOX' }),
       'play',
+      10000,
     );
     poll.next(snapshot());
     poll.complete();
@@ -161,6 +163,7 @@ describe('Game', () => {
       'ABC123',
       { match_id: 'match-1', round_number: 1, phase: 'tribunal' },
       'cancel-vote',
+      10000,
     );
   });
 
@@ -185,6 +188,7 @@ describe('Game', () => {
       'ABC123',
       { match_id: 'match-1', round_number: 1, phase: 'night' },
       'cancel-action',
+      10000,
     );
   });
 
@@ -219,6 +223,54 @@ describe('Game', () => {
     component.refresh();
     expect(component.busy).toBe(false);
     expect(component.error).toBe('Server belum bisa dihubungi.');
+  });
+
+  // TIMER: sisa detik dihitung dari jam browser, jadi tetap turun walau polling berikutnya tersendat.
+  it('keeps the timer counting down locally while a poll is stalled', () => {
+    component.code = 'ABC123';
+    const sekarang = vi.spyOn(Date, 'now').mockReturnValue(1_000_000);
+    const request = vi
+      .spyOn(TestBed.inject(GameService), 'request')
+      .mockReturnValue(of(snapshot()));
+    component.refresh();
+    expect(component.seconds).toBe(20);
+    request.mockReturnValue(new Subject<GameSnapshot>());
+    component.refresh();
+    sekarang.mockReturnValue(1_007_500);
+    (component as unknown as { detak(): void }).detak();
+    expect(component.seconds).toBe(13);
+    sekarang.mockRestore();
+  });
+
+  // POLLING: error jaringan dari polling latar hilang sendiri saat polling berikutnya berhasil.
+  it('clears a background poll error once polling recovers', () => {
+    component.code = 'ABC123';
+    const request = vi
+      .spyOn(TestBed.inject(GameService), 'request')
+      .mockReturnValue(throwError(() => ({ status: 0 })));
+    component.refresh();
+    expect(component.error).toBe('Server belum bisa dihubungi.');
+    request.mockReturnValue(of(snapshot()));
+    component.refresh();
+    expect(component.error).toBe('');
+  });
+
+  // AKSI DITOLAK: fase berganti tepat saat pilihan dikirim, jadi snapshot baru diambil tanpa menunggu
+  // polling berikutnya; pesan penolakannya tetap terlihat.
+  it('refreshes right away when an action is rejected', async () => {
+    component.game = snapshot().game;
+    component.code = 'ABC123';
+    component.target = 'NOX';
+    const detail = 'Fase sudah berubah sebelum pilihanmu terkirim.';
+    const request = vi
+      .spyOn(TestBed.inject(GameService), 'request')
+      .mockReturnValue(throwError(() => ({ status: 400, error: { detail } })));
+    component.act();
+    expect(component.error).toBe(detail);
+    request.mockReturnValue(of(snapshot()));
+    await new Promise((selesai) => setTimeout(selesai));
+    expect(request).toHaveBeenLastCalledWith('ABC123', undefined, 'play', 4000);
+    expect(component.error).toBe(detail);
   });
 
   it('returns to the lobby when the server no longer has the current match', () => {
@@ -565,7 +617,7 @@ describe('Game', () => {
     expect(splash.textContent).toContain('Memuat NLU IndoBERT');
     expect(fixture.nativeElement.querySelector('.match-grid')).toBeNull();
     component.readyUp();
-    expect(request).toHaveBeenLastCalledWith('ABC123', { match_id: 'match-1' }, 'ready');
+    expect(request).toHaveBeenLastCalledWith('ABC123', { match_id: 'match-1' }, 'ready', 10000);
   });
 
   // TRANSISI: overlay muncul saat fase berganti, tidak saat halaman pertama kali dimuat.
@@ -891,20 +943,20 @@ describe('Game', () => {
       .mockReturnValue(of(preparing()));
     component.code = 'ABC123';
     component.refresh();
-    expect(request).toHaveBeenLastCalledWith('ABC123', undefined, 'play');
+    expect(request).toHaveBeenLastCalledWith('ABC123', undefined, 'play', 4000);
     component.toggleRole();
-    expect(request).toHaveBeenLastCalledWith('ABC123', { match_id: 'match-1' }, 'reveal');
+    expect(request).toHaveBeenLastCalledWith('ABC123', { match_id: 'match-1' }, 'reveal', 4000);
     component.refresh(); // belum 4 detik: polling biasa agar layar tetap mengikuti server
-    expect(request).toHaveBeenLastCalledWith('ABC123', undefined, 'play');
+    expect(request).toHaveBeenLastCalledWith('ABC123', undefined, 'play', 4000);
     now += 4000;
     component.refresh(); // server belum mencatat: kirim ulang
-    expect(request).toHaveBeenLastCalledWith('ABC123', { match_id: 'match-1' }, 'reveal');
+    expect(request).toHaveBeenLastCalledWith('ABC123', { match_id: 'match-1' }, 'reveal', 4000);
     request.mockReturnValue(of(preparing(true)));
     now += 4000;
     component.refresh();
     now += 4000;
     component.refresh(); // sudah tercatat: kembali polling biasa
-    expect(request).toHaveBeenLastCalledWith('ABC123', undefined, 'play');
+    expect(request).toHaveBeenLastCalledWith('ABC123', undefined, 'play', 4000);
     expect(render().querySelector('.splash')?.textContent).toContain(
       'Ronde 1 dimulai dalam 37 detik',
     );
@@ -927,7 +979,7 @@ describe('Game', () => {
     expect(component.error).toBe('');
     expect(component.busy).toBe(false);
     component.refresh(); // polling berikutnya tetap GET dan membawa fase terbaru
-    expect(request).toHaveBeenLastCalledWith('ABC123', undefined, 'play');
+    expect(request).toHaveBeenLastCalledWith('ABC123', undefined, 'play', 4000);
     expect(component.game?.phase).toBe('day');
   });
 
@@ -1041,7 +1093,7 @@ describe('Game', () => {
       expect(component.readingRole).toBe(true);
       expect(render().querySelector('.reveal-nudge .role-flip')?.classList).toContain('open');
       component.refresh();
-      expect(request).toHaveBeenLastCalledWith('ABC123', { match_id: 'match-1' }, 'reveal');
+      expect(request).toHaveBeenLastCalledWith('ABC123', { match_id: 'match-1' }, 'reveal', 4000);
       vi.advanceTimersByTime(3000);
       request.mockReturnValue(of(preparing(true, 38)));
       component.refresh();
@@ -1265,7 +1317,7 @@ describe('Game', () => {
     component.refresh();
     request.mockReturnValue(of(snapshot()));
     component.readyUp();
-    expect(request).toHaveBeenLastCalledWith('ABC123', { match_id: 'match-1' }, 'ready');
+    expect(request).toHaveBeenLastCalledWith('ABC123', { match_id: 'match-1' }, 'ready', 10000);
     expect(component.transition?.phase).toBe('start');
   });
 

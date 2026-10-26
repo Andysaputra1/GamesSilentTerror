@@ -162,6 +162,12 @@ export class Game implements OnInit, OnDestroy {
   // harus ditekan berkali-kali. Nomor aksi membuang respons polling yang lebih tua dari klik terakhir.
   private polling = false;
   private aksi = 0;
+  // Batas fase menurut jam browser (deadline server dikoreksi selisih jam). Timer dihitung dari sini tiap
+  // setengah detik, jadi tetap berjalan walau satu polling tersendat di jaringan (dulu layar tampak membeku).
+  private batasLokal = 0;
+  private jam?: ReturnType<typeof setInterval>;
+  // Pesan error dari polling latar dihapus lagi oleh polling berikutnya yang berhasil.
+  private errorLatar = false;
   private loadedPhase = '';
   private shownPhase = '';
   private surveyMatch = '';
@@ -690,6 +696,7 @@ export class Game implements OnInit, OnDestroy {
     }
     this.refresh();
     this.poll = setInterval(() => this.refresh(), 1000);
+    this.jam = setInterval(() => this.detak(), 500);
     this.socket = io(`${backendUrl()}`, {
       auth: { token: localStorage.getItem(STORAGE.token), room_code: this.code },
       transports: ['websocket', 'polling'],
@@ -727,9 +734,19 @@ export class Game implements OnInit, OnDestroy {
     this.stopRoleReading();
     this.socket?.disconnect();
     if (this.poll) clearInterval(this.poll);
+    if (this.jam) clearInterval(this.jam);
     if (this.transitionTimer) clearTimeout(this.transitionTimer);
     if (this.endTimer) clearTimeout(this.endTimer);
     this.feltObserver?.disconnect();
+  }
+
+  // TIMER: sisa detik dari jam browser, tidak menunggu snapshot polling berikutnya.
+  private detak(): void {
+    if (!this.game || this.game.winner) return;
+    const sisa = Math.max(0, Math.ceil((this.batasLokal - Date.now()) / 1000));
+    if (sisa === this.seconds) return;
+    this.seconds = sisa;
+    this.cdr.markForCheck();
   }
 
   // CHAT: posisi gulir dicatat saat pemain menggulir; di dasar = ikut turun saat ada pesan baru.
@@ -883,7 +900,8 @@ export class Game implements OnInit, OnDestroy {
     else this.busy = true;
     const messagesAtRequest = new Set(this.game?.messages.map((message) => message.id));
     this.api
-      .request(this.code, body, action)
+      // Polling yang tersendat di jaringan dilepas sesudah 4 detik agar polling berikutnya bisa jalan.
+      .request(this.code, body, action, latar ? 4000 : 10000)
       .pipe(
         takeUntilDestroyed(this.destroy),
         finalize(() => {
@@ -936,6 +954,7 @@ export class Game implements OnInit, OnDestroy {
           }
           this.durations = snapshot.room?.match_durations ?? this.durations;
           this.afterMessages();
+          this.batasLokal = Date.now() + (this.game.deadline - this.game.server_time) * 1000;
           this.seconds = this.game.winner
             ? 0
             : Math.max(0, Math.ceil(this.game.deadline - this.game.server_time));
@@ -949,12 +968,16 @@ export class Game implements OnInit, OnDestroy {
             this.loadSurvey();
             this.startEnding();
           }
-          // Aksi berhasil: hapus pesan error dari percobaan sebelumnya.
-          if (body && action !== 'reveal') this.error = '';
+          // Aksi berhasil, atau polling pulih dari gangguan jaringan: hapus pesan error sebelumnya.
+          if ((body && action !== 'reveal') || this.errorLatar) {
+            this.error = '';
+            this.errorLatar = false;
+          }
         },
         error: (error: HttpErrorResponse) => {
           // Pembukaan kartu dikirim ulang oleh polling; backend lama belum punya /reveal (404).
-          if (action === 'reveal') return;
+          // Polling yang sudah dilewati klik pemain juga tidak boleh menimpa hasil klik itu.
+          if (action === 'reveal' || nomor !== this.aksi) return;
           // GET /game menolak room hilang, keanggotaan lama, atau match belum dimulai.
           // Pulihkan lewat lobby; kesalahan aksi dan jaringan tidak boleh mengeluarkan pemain.
           if (!body && error.status === 400) {
@@ -965,7 +988,10 @@ export class Game implements OnInit, OnDestroy {
             typeof error.error?.detail === 'string'
               ? error.error.detail
               : 'Server belum bisa dihubungi.';
+          this.errorLatar = latar;
           if (error.status === 401) void this.router.navigateByUrl('/login');
+          // Aksi ditolak, mis. fase berganti tepat saat pilihan dikirim: ambil snapshot baru tanpa menunggu.
+          else if (!latar && error.status === 400) setTimeout(() => this.refresh());
         },
       });
   }
@@ -1047,6 +1073,7 @@ export class Game implements OnInit, OnDestroy {
   private exitRoom(url: string): void {
     this.stopRoleReading();
     if (this.poll) clearInterval(this.poll);
+    if (this.jam) clearInterval(this.jam);
     this.socket?.disconnect();
     this.game = null;
     this.code = '';

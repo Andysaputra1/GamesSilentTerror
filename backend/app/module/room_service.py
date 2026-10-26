@@ -270,7 +270,7 @@ class RoomService:
                 raise ValueError("Pertandingan belum dimulai.")
             match.tick()
             if (match.id, match.round, match.phase) != (match_id, round_number, phase):
-                raise ValueError("Fase sudah berubah. Perbarui halaman sebelum menyetujui.")
+                raise ValueError("Fase sudah berubah sebelum persetujuanmu terkirim.")
             match.skip_discussion(username)
             return self.state(code, username)
 
@@ -284,7 +284,7 @@ class RoomService:
                 raise ValueError("Pertandingan belum dimulai.")
             match.tick()
             if (match.id, match.round, match.phase) != (match_id, round_number, phase):
-                raise ValueError("Fase sudah berubah. Perbarui halaman sebelum membatalkan.")
+                raise ValueError("Fase sudah berubah sebelum pembatalan terkirim.")
             match.cancel_vote(username)
             return self.state(code, username)
 
@@ -298,7 +298,7 @@ class RoomService:
                 raise ValueError("Pertandingan belum dimulai.")
             match.tick()
             if (match.id, match.round, match.phase) != (match_id, round_number, phase):
-                raise ValueError("Fase sudah berubah. Perbarui halaman sebelum membatalkan.")
+                raise ValueError("Fase sudah berubah sebelum pembatalan terkirim.")
             match.cancel_action(username)
             return self.state(code, username)
 
@@ -321,7 +321,7 @@ class RoomService:
                 raise ValueError("Pertandingan belum dimulai.")
             match.tick()
             if (match.id, match.round, match.phase) != (match_id, round_number, phase):
-                raise ValueError("Fase sudah berubah. Perbarui halaman sebelum memilih lagi.")
+                raise ValueError("Fase sudah berubah sebelum pilihanmu terkirim.")
             if ability:
                 match.act(username, ability, target)
             else:
