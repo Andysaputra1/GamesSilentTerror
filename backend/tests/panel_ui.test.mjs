@@ -652,21 +652,32 @@ test('menu dokumen membuka semua dokumen sistem, AI, dan NLU di tab baru', async
   assert.deepEqual(
     links.map((a) => a.getAttribute('href')),
     [
+      '/panel/dokumen/arsitektur',
       '/panel/dokumen/erd',
       '/panel/dokumen/proses-ai',
-      '/panel/dokumen/arsitektur',
-      '/panel/dokumen/kode-fuzzy',
-      '/panel/dokumen/diagram-alir-fuzzy',
-      '/panel/dokumen/kode-utility',
-      '/panel/dokumen/diagram-alir-utility',
-      '/panel/dokumen/kode-bt',
-      '/panel/dokumen/diagram-alir-bt',
+      '/panel/dokumen/diagram-alir-nlu',
       '/panel/dokumen/kode-nlu-intent',
       '/panel/dokumen/kode-nlu-target',
-      '/panel/dokumen/diagram-alir-nlu',
+      '/panel/dokumen/diagram-alir-fuzzy',
+      '/panel/dokumen/kode-fuzzy',
+      '/panel/dokumen/diagram-alir-utility',
+      '/panel/dokumen/kode-utility',
+      '/panel/dokumen/diagram-alir-bt',
+      '/panel/dokumen/kode-bt',
     ],
   );
   assert.ok(links.every((a) => a.target === '_blank' && a.rel === 'noopener'));
+  // Dokumen dikelompokkan per bagian: gambaran sistem, NLU, lalu satu bagian per metode bot.
+  assert.deepEqual(
+    [...doc.querySelectorAll('#menu-dokumen .doc-section h3')].map((h) => h.textContent),
+    [
+      '1. Gambaran sistem',
+      '2. NLU: bot membaca chat (IndoBERT)',
+      '3. Otak bot: Fuzzy Logic',
+      '4. Otak bot: Utility AI',
+      '5. Otak bot: Behavior Tree',
+    ],
+  );
 });
 
 test('riwayat chat menampilkan intent, target, dan konteks IndoBERT sebagai teks', async (t) => {

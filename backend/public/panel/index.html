@@ -64,83 +64,112 @@
               </p>
             </div>
           </div>
-          <div class="metric-grid">
-            <a class="metric" href="/panel/dokumen/erd" target="_blank" rel="noopener"
-              ><small>Database</small><strong>ERD Silent Terror</strong
-              ><span class="hint"
-                >14 tabel MySQL beserta kunci dan relasinya (migrasi V1–V9).</span
-              ></a
-            >
-            <a class="metric" href="/panel/dokumen/proses-ai" target="_blank" rel="noopener"
-              ><small>Bot</small><strong>Proses AI</strong
-              ><span class="hint"
-                >IndoBERT, Fuzzy, Utility AI, Behavior Tree, dan NLG, dengan satu ronde nyata dan
-                alasan tiap keputusan.</span
-              ></a
-            >
-            <a class="metric" href="/panel/dokumen/arsitektur" target="_blank" rel="noopener"
-              ><small>Sistem</small><strong>Arsitektur Sistem</strong
-              ><span class="hint"
-                >Frontend, backend, API, database, dan deployment dari umum ke khusus, plus diagram
-                UML (use case, class, sequence, state, activity, flowchart).</span
-              ></a
-            >
-            <a class="metric" href="/panel/dokumen/kode-fuzzy" target="_blank" rel="noopener"
-              ><small>Bot</small><strong>Kode Fuzzy Logic</strong
-              ><span class="hint"
-                >Notebook Fuzzy sel demi sel: kurva, sistem Mamdani, hierarki kecurigaan, keputusan, dengan keluaran run dan lokasinya di backend.</span
-              ></a
-            >
-            <a class="metric" href="/panel/dokumen/diagram-alir-fuzzy" target="_blank" rel="noopener"
-              ><small>Bot</small><strong>Diagram Alir Fuzzy Logic</strong
-              ><span class="hint"
-                >Inferensi Mamdani, hierarki tujuh sistem, keputusan chat/vote/aksi, tabel aturan, asumsi, dan cara hitung dengan angka contoh.</span
-              ></a
-            >
-            <a class="metric" href="/panel/dokumen/kode-utility" target="_blank" rel="noopener"
-              ><small>Bot</small><strong>Kode Utility AI</strong
-              ><span class="hint"
-                >Notebook Utility AI sel demi sel: kurva respons, IAUS, noisy-OR, keputusan, dengan keluaran run dan lokasinya di backend.</span
-              ></a
-            >
-            <a class="metric" href="/panel/dokumen/diagram-alir-utility" target="_blank" rel="noopener"
-              ><small>Bot</small><strong>Diagram Alir Utility AI</strong
-              ><span class="hint"
-                >Utilitas IAUS satu kandidat, noisy-OR, keputusan chat/vote/aksi, tabel consideration, asumsi, dan cara hitung.</span
-              ></a
-            >
-            <a class="metric" href="/panel/dokumen/kode-bt" target="_blank" rel="noopener"
-              ><small>Bot</small><strong>Kode Behavior Tree</strong
-              ><span class="hint"
-                >Notebook Behavior Tree sel demi sel: node, bendera merah, pohon chat/vote/aksi, dengan keluaran run dan lokasinya di backend.</span
-              ></a
-            >
-            <a class="metric" href="/panel/dokumen/diagram-alir-bt" target="_blank" rel="noopener"
-              ><small>Bot</small><strong>Diagram Alir Behavior Tree</strong
-              ><span class="hint"
-                >Cara kerja tick, bendera merah, setiap pohon digambar dari kodenya, asumsi, dan cara hitung dengan angka contoh.</span
-              ></a
-            >
-            <a class="metric" href="/panel/dokumen/kode-nlu-intent" target="_blank" rel="noopener"
-              ><small>NLU</small><strong>Kode NLU Intent</strong
-              ><span class="hint"
-                >Training Model 1 (intent): EDA, SVM, Naive Bayes, IndoBERT, dengan hasil run yang
-                sudah ada.</span
-              ></a
-            >
-            <a class="metric" href="/panel/dokumen/kode-nlu-target" target="_blank" rel="noopener"
-              ><small>NLU</small><strong>Kode NLU Target</strong
-              ><span class="hint"
-                >Training Model 2 (target dan relasi per pemain), dari preprocessing pasangan sampai
-                IndoBERT.</span
-              ></a
-            >
-            <a class="metric" href="/panel/dokumen/diagram-alir-nlu" target="_blank" rel="noopener"
-              ><small>NLU</small><strong>Diagram Alir NLU</strong
-              ><span class="hint"
-                >Alur training kedua model, asumsi, dan cara hitung metrik dari artefak model.</span
-              ></a
-            >
+          <div class="doc-section">
+            <h3>1. Gambaran sistem</h3>
+            <p class="hint">Mulai dari sini: susunan aplikasi, database, dan alur AI secara utuh.</p>
+            <div class="metric-grid">
+              <a class="metric" href="/panel/dokumen/arsitektur" target="_blank" rel="noopener"
+                ><small>Sistem</small><strong>Arsitektur Sistem</strong
+                ><span class="hint"
+                  >Frontend, backend, API, database, dan deployment dari umum ke khusus, plus diagram
+                  UML (use case, class, sequence, state, activity, flowchart).</span
+                ></a
+              >
+              <a class="metric" href="/panel/dokumen/erd" target="_blank" rel="noopener"
+                ><small>Database</small><strong>ERD Silent Terror</strong
+                ><span class="hint"
+                  >14 tabel MySQL beserta kunci dan relasinya (migrasi V1–V9).</span
+                ></a
+              >
+              <a class="metric" href="/panel/dokumen/proses-ai" target="_blank" rel="noopener"
+                ><small>Bot</small><strong>Proses AI</strong
+                ><span class="hint"
+                  >IndoBERT, Fuzzy, Utility AI, Behavior Tree, dan NLG, dengan satu ronde nyata dan
+                  alasan tiap keputusan.</span
+                ></a
+              >
+            </div>
+          </div>
+          <div class="doc-section">
+            <h3>2. NLU: bot membaca chat (IndoBERT)</h3>
+            <p class="hint">
+              Model 1 menebak intent chat (offend, defend, neutral); Model 2 menebak siapa yang
+              dituduh, dibela, atau diajak bicara. Label dataset mengikuti aturan relabel 26 Oktober.
+            </p>
+            <div class="metric-grid">
+              <a class="metric" href="/panel/dokumen/diagram-alir-nlu" target="_blank" rel="noopener"
+                ><small>Diagram alir</small><strong>Diagram Alir NLU</strong
+                ><span class="hint"
+                  >Alur training kedua model, relabel dataset, asumsi, dan cara hitung metrik dari
+                  artefak model.</span
+                ></a
+              >
+              <a class="metric" href="/panel/dokumen/kode-nlu-intent" target="_blank" rel="noopener"
+                ><small>Kode</small><strong>Kode NLU Intent</strong
+                ><span class="hint"
+                  >Training Model 1 (intent) sel demi sel: aturan label, EDA, IndoBERT, dengan
+                  keluaran run 27 Oktober.</span
+                ></a
+              >
+              <a class="metric" href="/panel/dokumen/kode-nlu-target" target="_blank" rel="noopener"
+                ><small>Kode</small><strong>Kode NLU Target</strong
+                ><span class="hint"
+                  >Training Model 2 (target dan relasi per pemain), dari preprocessing pasangan sampai
+                  IndoBERT, dengan keluaran run 27 Oktober.</span
+                ></a
+              >
+            </div>
+          </div>
+          <div class="doc-section">
+            <h3>3. Otak bot: Fuzzy Logic</h3>
+            <div class="metric-grid">
+              <a class="metric" href="/panel/dokumen/diagram-alir-fuzzy" target="_blank" rel="noopener"
+                ><small>Diagram alir</small><strong>Diagram Alir Fuzzy Logic</strong
+                ><span class="hint"
+                  >Inferensi Mamdani, hierarki tujuh sistem, keputusan chat/vote/aksi, tabel aturan, asumsi, dan cara hitung dengan angka contoh.</span
+                ></a
+              >
+              <a class="metric" href="/panel/dokumen/kode-fuzzy" target="_blank" rel="noopener"
+                ><small>Kode</small><strong>Kode Fuzzy Logic</strong
+                ><span class="hint"
+                  >Notebook Fuzzy sel demi sel: kurva, sistem Mamdani, hierarki kecurigaan, keputusan, dengan keluaran run dan lokasinya di backend.</span
+                ></a
+              >
+            </div>
+          </div>
+          <div class="doc-section">
+            <h3>4. Otak bot: Utility AI</h3>
+            <div class="metric-grid">
+              <a class="metric" href="/panel/dokumen/diagram-alir-utility" target="_blank" rel="noopener"
+                ><small>Diagram alir</small><strong>Diagram Alir Utility AI</strong
+                ><span class="hint"
+                  >Utilitas IAUS satu kandidat, noisy-OR, keputusan chat/vote/aksi, tabel consideration, asumsi, dan cara hitung.</span
+                ></a
+              >
+              <a class="metric" href="/panel/dokumen/kode-utility" target="_blank" rel="noopener"
+                ><small>Kode</small><strong>Kode Utility AI</strong
+                ><span class="hint"
+                  >Notebook Utility AI sel demi sel: kurva respons, IAUS, noisy-OR, keputusan, dengan keluaran run dan lokasinya di backend.</span
+                ></a
+              >
+            </div>
+          </div>
+          <div class="doc-section">
+            <h3>5. Otak bot: Behavior Tree</h3>
+            <div class="metric-grid">
+              <a class="metric" href="/panel/dokumen/diagram-alir-bt" target="_blank" rel="noopener"
+                ><small>Diagram alir</small><strong>Diagram Alir Behavior Tree</strong
+                ><span class="hint"
+                  >Cara kerja tick, bendera merah, setiap pohon digambar dari kodenya, asumsi, dan cara hitung dengan angka contoh.</span
+                ></a
+              >
+              <a class="metric" href="/panel/dokumen/kode-bt" target="_blank" rel="noopener"
+                ><small>Kode</small><strong>Kode Behavior Tree</strong
+                ><span class="hint"
+                  >Notebook Behavior Tree sel demi sel: node, bendera merah, pohon chat/vote/aksi, dengan keluaran run dan lokasinya di backend.</span
+                ></a
+              >
+            </div>
           </div>
         </section>
         <section id="menu-npc" class="card" hidden>
