@@ -95,11 +95,60 @@ details[open] > summary { margin-bottom: 8px; }
     <dt>Notebook</dt><dd><code>training/prethesis/ai_2_dataset_baru/nlu_target.ipynb</code> (commit 2c70aad 2026-10-27)</dd>
     <dt>Model hasil</dt><dd><code>ai_2_dataset_baru/models/target_classifier/target_classifier_transformer</code>, dimuat game sebagai NLU IndoBERT
       (pemakaiannya di game: dokumen Kode Fuzzy Logic / Utility AI / Behavior Tree, sel 17–18)</dd>
-    <dt>Dibuat</dt><dd>2026-10-27 10:54</dd>
+    <dt>Dibuat</dt><dd>2026-10-27 15:22</dd>
   </dl>
-  <nav><ol><li><a href="#nlu_target-0">Library yang digunakan</a></li><li><a href="#nlu_target-3">EDA</a></li><li><a href="#nlu_target-16">Preprocessing</a></li><li><a href="#nlu_target-36">Cara membaca dan menjalankan notebook</a></li><li><a href="#nlu_target-37">Pengaturan eksperimen</a></li><li><a href="#nlu_target-54">SVM</a></li><li><a href="#nlu_target-102">Naive Bayes</a></li><li><a href="#nlu_target-150">Transformer (IndoBERT)</a></li><li><a href="#nlu_target-181">Ringkasan Perbandingan</a></li></ol></nav>
+  <nav><ol><li><a href="#dataset">Pembuatan dataset</a></li><li><a href="#nlu_target-0">Library yang digunakan</a></li><li><a href="#nlu_target-3">EDA</a></li><li><a href="#nlu_target-16">Preprocessing</a></li><li><a href="#nlu_target-36">Cara membaca dan menjalankan notebook</a></li><li><a href="#nlu_target-37">Pengaturan eksperimen</a></li><li><a href="#nlu_target-54">SVM</a></li><li><a href="#nlu_target-102">Naive Bayes</a></li><li><a href="#nlu_target-150">Transformer (IndoBERT)</a></li><li><a href="#nlu_target-181">Ringkasan Perbandingan</a></li></ol></nav>
 </header>
-<p class="note">Keluaran yang tampil adalah keluaran tersimpan run 27 Oktober 2026, sesudah dataset target dilabel ulang (26 Oktober; 262 pesan, sebagian besar pesan konteks). Run itu hanya melatih IndoBERT (saklar <code>LATIH_SVM</code> dan <code>LATIH_NB</code> = False), jadi sel SVM dan Naive Bayes hanya mencetak "dilewati". SVM/NB terakhir dilatih 29 September dengan format teks pasangan lama dan tidak dibandingkan di sini.</p>
+<div class="md" id="dataset"><h2>Pembuatan dataset</h2>
+<h3>Format</h3>
+<p>CSV UTF-8 dengan pemisah koma; satu baris = satu sesi, yaitu satu pesan utama beserta riwayat chat, daftar pemain, dan jawaban target. Kolom JSON ditulis ringkas dalam satu sel. Berkas tambahan memakai kolom yang sama.</p>
+<div class="tbl"><table><thead><tr><th>Kolom</th><th>Isi</th></tr></thead><tbody><tr><td><code>pengirim</code></td><td>Nama pengirim pesan utama.</td></tr><tr><td><code>teks_chat</code></td><td>Pesan utama yang ditebak targetnya.</td></tr><tr><td><code>label_intent</code></td><td>Intent pesan utama: offend, defend, atau neutral.</td></tr><tr><td><code>chat_sebelumnya</code></td><td>JSON list maksimal 12 pesan sebelumnya; tiap pesan berisi pengirim, teks_chat, label_intent, dan target (anotasi = memori).</td></tr><tr><td><code>daftar_pemain</code></td><td>JSON list pemain di sesi; menjadi kandidat target.</td></tr><tr><td><code>target</code></td><td>Jawaban: JSON list {pemain, relasi}, relasi offend/defend/neutral; pemain tidak_diketahui bila acuannya tidak jelas; list kosong untuk pesan neutral yang ditujukan ke semua orang.</td></tr><tr><td><code>session_id</code></td><td>ID sesi: r&lt;baris kalimat sumber&gt;_v&lt;versi&gt;.</td></tr><tr><td><code>case_name</code></td><td>Kasus yang diuji sesi ini (tabel kasus di bawah).</td></tr><tr><td><code>source_group</code></td><td>Grup kalimat sumber; satu grup tidak pernah dipisah ke train dan test.</td></tr><tr><td><code>source_csv_row</code></td><td>Nomor baris kalimat sumber di dataset_final3.csv.</td></tr><tr><td><code>synthetic_context</code></td><td>True bila riwayat chat dibuat sintetis.</td></tr><tr><td><code>panggilan</code></td><td>JSON list sebutan pemain di pesan (kasus nickname), mis. Rak untuk Raka.</td></tr><tr><td><code>direvisi</code></td><td>True bila sesi diperbaiki saat pemeriksaan manual.</td></tr></tbody></table></div>
+<p>Contoh satu baris (kolom JSON sudah dibuka):</p>
+<pre class="md-pre">{
+ "pengirim": "Tono",
+ "teks_chat": "Nggak ada, aku cuma malas ngetik. Kalau kalian curiga vote aku saja sekarang.",
+ "label_intent": "offend",
+ "chat_sebelumnya": [
+  {
+   "pengirim": "Budi",
+   "teks_chat": "Tono belum mengetik sejak diskusi dibuka. Apa ada kendala?",
+   "label_intent": "neutral",
+   "target": [
+    {
+     "pemain": "Tono",
+     "relasi": "neutral"
+    }
+   ]
+  }
+ ],
+ "daftar_pemain": [
+  "Tono",
+  "Budi"
+ ],
+ "target": [
+  {
+   "pemain": "Tono",
+   "relasi": "offend"
+  }
+ ],
+ "session_id": "r000011_v01",
+ "case_name": "self",
+ "source_group": "9c7602507958d1b1a0b0",
+ "source_csv_row": "11",
+ "synthetic_context": "True",
+ "panggilan": [],
+ "direvisi": "True"
+}</pre>
+<h3>Cara dibuat</h3>
+<ol><li>Pesan utama berangkat dari kalimat <code>dataset_final3.csv</code> (<code>source_csv_row</code>). Untuk setiap kasus, LLM diberi tugas kasus (prompt di <code>data/manual_pilot_25/prompt/</code>, penjelasan kasus di <code>lama/generateDataset/label_target.py</code>) lalu menulis riwayat chat, daftar pemain, dan target; 25 sesi per kasus.</li><li>Hasil diperiksa satu per satu; 351 dari 775 sesi diperbaiki (kolom <code>direvisi</code>): kalimat tidak natural, label, singkatan, dan aturan game (<code>data/manual_pilot_25/ringkasan_revisi.md</code>).</li><li>26 Oktober 2026: intent dan target dilabel ulang dengan <code>data/ATURAN_LABEL.md</code> (262 pesan berubah, sebagian besar pesan riwayat).</li><li>27 Oktober 2026: 500 sesi tambahan untuk 14 kasus yang paling sering salah (<code>Games/plan/plan03.md</code>). Ditulis Codex, direvisi sekali agar gaya kalimat tidak berulang, lalu dicek otomatis dengan <code>data/tambahan_2026-10-27/cek_tambahan.py</code>.</li></ol>
+<h3>Kasus</h3>
+<div class="tbl"><table><thead><tr><th>Kasus</th><th>Penjelasan (tugas kasus di prompt)</th><th>Pilot</th><th>Tambahan</th><th>Total</th></tr></thead><tbody><tr><td><code>original</code></td><td>Satu pesan tanpa riwayat. Pertahankan teks dan intent sumber persis; jangan mengarang riwayat asli.</td><td>25</td><td>–</td><td>25</td></tr><tr><td><code>explicit</code></td><td>Target eksplisit di pesan sekarang. Contoh: Aku yakin bukan Andy = defend Andy.</td><td>25</td><td>–</td><td>25</td></tr><tr><td><code>reference_start</code></td><td>Tepat 12 konteks. Penyebutan target eksplisit di pesan konteks pertama; pesan sekarang memakai kata ganti.</td><td>25</td><td>50</td><td>75</td></tr><tr><td><code>reference_middle</code></td><td>Tepat 12 konteks. Penyebutan target eksplisit di pesan konteks ke-6 atau ke-7.</td><td>25</td><td>–</td><td>25</td></tr><tr><td><code>reference_end</code></td><td>Tepat 12 konteks. Penyebutan target eksplisit di pesan konteks terakhir.</td><td>25</td><td>–</td><td>25</td></tr><tr><td><code>memory_outside_window</code></td><td>14-16 pesan total. Nama target hanya disebut sebelum 12 konteks terakhir. Dalam jendela, ada pesan yang meneruskan acuan dengan jelas dan menyimpan anotasi target berdasarkan pesan lama. Pesan sekarang merujuk target sama. Nama target tidak muncul dalam teks 12 konteks terakhir atau pesan sekarang; target diketahui lewat memori.</td><td>25</td><td>–</td><td>25</td></tr><tr><td><code>outside_window_unknown</code></td><td>14-16 pesan total. Pembahasan lama telah putus/beralih. Teks dan anotasi 12 konteks terakhir tidak cukup menentukan acuan sekarang. Target harus tidak_diketahui; jangan menggunakan informasi lama yang tidak tersedia dalam input.</td><td>25</td><td>–</td><td>25</td></tr><tr><td><code>interruption</code></td><td>Pembahasan target disela obrolan waktu/ronde; kaitan kembali ke target masih jelas.</td><td>25</td><td>25</td><td>50</td></tr><tr><td><code>topic_switch</code></td><td>Pembahasan berganti pemain; pesan sekarang mengikuti topik baru, bukan otomatis target lama.</td><td>25</td><td>–</td><td>25</td></tr><tr><td><code>ambiguous</code></td><td>Beberapa acuan sama-sama mungkin; target tidak_diketahui, bukan nama terakhir.</td><td>25</td><td>50</td><td>75</td></tr><tr><td><code>self</code></td><td>Defend diri sendiri atau offend/vote diri sendiri sesuai label. Target = pengirim.</td><td>25</td><td>50</td><td>75</td></tr><tr><td><code>witness</code></td><td>Nama saksi/korban disebut, tetapi bukan target serangan atau pembelaan.</td><td>25</td><td>50</td><td>75</td></tr><tr><td><code>multiple_targets</code></td><td>Dua atau lebih pemain menjadi target relasi yang sama secara jelas.</td><td>25</td><td>25</td><td>50</td></tr><tr><td><code>mixed_relations</code></td><td>Membela satu pemain dan menuduh pemain lain. Intent utama offend; simpan kedua relasi.</td><td>25</td><td>50</td><td>75</td></tr><tr><td><code>quotation</code></td><td>Ada tuduhan yang dikutip; bedakan sikap pengirim dari ucapan orang yang dikutip.</td><td>25</td><td>–</td><td>25</td></tr><tr><td><code>negation</code></td><td>Negasi menentukan relasi: Andy Hitman berbeda dari Andy bukan Hitman.</td><td>25</td><td>–</td><td>25</td></tr><tr><td><code>second_person</code></td><td>Kamu/lu: gunakan pergantian pembicara dan teks yang jelas. Tanpa acuan jelas, target tidak_diketahui.</td><td>25</td><td>25</td><td>50</td></tr><tr><td><code>first_message</code></td><td>Pesan pertama permainan, tanpa konteks. Neutral boleh menyapa/membuka diskusi; offend/defend menyebut target jelas. Jangan mengarang kejadian malam, voting, atau percakapan yang belum terjadi.</td><td>25</td><td>–</td><td>25</td></tr><tr><td><code>first_message_unknown</code></td><td>Pesan pertama tanpa konteks memakai dia/kamu/lu tanpa acuan jelas. Intent offend/defend tetap diketahui tetapi target tidak_diketahui; roster bukan bukti lawan bicara.</td><td>25</td><td>25</td><td>50</td></tr><tr><td><code>first_message_self</code></td><td>Pesan pertama tanpa konteks membela atau menuduh diri sendiri. Target = pengirim; tidak perlu riwayat untuk memahami aku.</td><td>25</td><td>–</td><td>25</td></tr><tr><td><code>short_history_1</code></td><td>Awal diskusi dengan tepat 1 pesan sebelumnya. Jangan menambah riwayat fiktif atau mengisi sampai 12.</td><td>25</td><td>50</td><td>75</td></tr><tr><td><code>short_history_2</code></td><td>Awal diskusi dengan tepat 2 pesan sebelumnya. Gunakan hanya petunjuk yang tersedia.</td><td>25</td><td>–</td><td>25</td></tr><tr><td><code>short_history_3</code></td><td>Awal diskusi dengan tepat 3 pesan sebelumnya. Acuan tidak harus berada di pesan terakhir.</td><td>25</td><td>–</td><td>25</td></tr><tr><td><code>neutral_names</code></td><td>Neutral menyebut nama tanpa menuduh/membela; target kosong.</td><td>25</td><td>–</td><td>25</td></tr><tr><td><code>neutral_after_accusation</code></td><td>Konteks berisi tuduhan, tetapi pesan sekarang neutral; jangan mewarisi relasi lama.</td><td>25</td><td>–</td><td>25</td></tr><tr><td><code>neutral_status</code></td><td>Klaim status/role atau pertanyaan informasi saja tanpa pembelaan/serangan; target kosong.</td><td>25</td><td>25</td><td>50</td></tr><tr><td><code>agreement</code></td><td>Pesan sekarang menyetujui atau membantah pesan pemain lain di konteks tanpa menyebut ulang nama target. Setuju dengan tuduhan = offend pemain yang dituduh; membantah tuduhan atau setuju dengan pembelaan = defend. Identitas target diwarisi dari pesan yang ditanggapi.</td><td>25</td><td>25</td><td>50</td></tr><tr><td><code>plural_reference</code></td><td>Pesan sekarang memakai mereka/kalian/keduanya/berdua untuk dua pemain atau lebih yang jelas dari konteks, tanpa menyebut ulang nama mereka. Simpan semua pemain itu sebagai target.</td><td>25</td><td>25</td><td>50</td></tr><tr><td><code>rhetorical_question</code></td><td>Pesan sekarang berbentuk pertanyaan retoris yang sebenarnya menuduh atau membela, misalnya 'kenapa Andy diam terus?' (offend) atau 'masa sih Andy Hitman?' (defend). Bukan pertanyaan informasi.</td><td>25</td><td>25</td><td>50</td></tr><tr><td><code>nickname</code></td><td>Pesan sekarang menyebut pemain dengan nama panggilan, singkatan, atau salah ketik ringan (Andy -&gt; ndy, andi, si And) tanpa menulis nama aslinya. Catat sebutan itu di panggilan. Target tetap memakai nama asli; jika neutral, target kosong.</td><td>25</td><td>–</td><td>25</td></tr><tr><td><code>stance_change</code></td><td>Pengirim pesan sekarang sebelumnya menuduh atau membela seorang pemain di konteks, lalu berubah sikap terhadap pemain yang sama. Anotasi mengikuti sikap terbaru.</td><td>25</td><td>–</td><td>25</td></tr><tr><td><b>Total</b></td><td></td><td><b>775</b></td><td><b>500</b></td><td><b>1.275</b></td></tr></tbody></table></div>
+<h3>Jumlah data</h3>
+<div class="tbl"><table><thead><tr><th>Dataset</th><th>Sesi</th><th>Pesan riwayat</th><th>Total pesan</th><th>Pesan utama offend / defend / neutral</th><th>Dipakai untuk</th></tr></thead><tbody><tr><td><code>dataset_final3_context_target_pilot25_lengkap.csv</code></td><td>775</td><td>4.606</td><td>5.381</td><td>322 / 323 / 130</td><td>train / validation / test per grup kalimat sumber</td></tr><tr><td><code>dataset_target_tambahan.csv</code></td><td>500</td><td>1.375</td><td>1.875</td><td>247 / 216 / 37</td><td>80% train, 20% uji tambahan terpisah</td></tr><tr><td><b>Total</b></td><td><b>1.275</b></td><td><b>5.981</b></td><td><b>7.256</b></td><td>569 / 539 / 167</td><td></td></tr></tbody></table></div>
+<h3>Total seluruh data NLU</h3>
+<div class="tbl"><table><thead><tr><th>Dataset</th><th>Isi</th><th>Jumlah</th></tr></thead><tbody><tr><td><code>dataset_final3.csv</code></td><td>chat intent</td><td>5.615 chat</td></tr><tr><td><code>dataset_intent_tambahan.csv</code></td><td>chat intent</td><td>100 chat</td></tr><tr><td><code>dataset_final3_context_target_pilot25_lengkap.csv</code></td><td>sesi target (pesan utama + riwayat)</td><td>775 sesi = 5.381 pesan</td></tr><tr><td><code>dataset_target_tambahan.csv</code></td><td>sesi target (pesan utama + riwayat)</td><td>500 sesi = 1.875 pesan</td></tr><tr><td><b>Total</b></td><td></td><td><b>5.715 chat intent + 7.256 pesan target = 12.971 chat berlabel</b></td></tr></tbody></table></div>
+<p>Pesan utama dataset target berangkat dari kalimat <code>dataset_final3.csv</code> (kolom <code>source_csv_row</code>), jadi sebagian kalimatnya mirip dengan dataset intent; pesan riwayat ditulis baru.</p></div>
+<p class="note">Keluaran yang tampil adalah keluaran tersimpan run 27 Oktober 2026 siang, sesudah dataset target dilabel ulang (26 Oktober; 262 pesan, sebagian besar pesan konteks). Train ditambah 400 sesi dari <code>data/dataset_target_tambahan.csv</code>; 100 sesi lainnya menjadi uji tambahan. Model ini dipakai game sejak 27 Oktober 2026. Run itu hanya melatih IndoBERT (saklar <code>LATIH_SVM</code> dan <code>LATIH_NB</code> = False), jadi sel SVM dan Naive Bayes hanya mencetak "dilewati". Sel "Perbandingan Semua Model" di akhir tidak punya keluaran: penyimpanan notebook gagal tepat sebelum sel itu (berkas sedang dibaca proses lain), dan isinya hanya mengulang metrik IndoBERT di atas. Perbandingan dengan model lama game ada di dokumen Diagram Alir NLU.</p>
 <div class="md" id="nlu_target-0"><h2>Library yang digunakan</h2></div><div class="md"><p>Notebook ini melatih <b>Model 2: target dan relasi</b>. Model 1 (intent) ada di <code>nlu_baru.ipynb</code>. Model 2 menjawab pertanyaan per pemain: <i>pesan ini menuduh (offend), membela (defend), atau tidak ada hubungannya (tidak_ada) dengan pemain ini?</i> Struktur notebook mengikuti <code>nlu_baru</code>: EDA, split, evaluasi, SVM, Naive Bayes, IndoBERT, lalu perbandingan.</p></div><section class="cell" id="nlu_target-2"><div class="lbl">Sel 2 · nlu_target.ipynb</div><pre class="code"><span class="c1"># Library standar Python: file, konfigurasi, waktu, dan memori.</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">gc</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
@@ -154,9 +203,13 @@ details[open] > summary { margin-bottom: 8px; }
     <span class="n">set_seed</span><span class="p">,</span>
 <span class="p">)</span>
 </pre><div class="keluaran"><div class="lbl">Keluaran</div><pre class="out">C:\Users\andyc\Documents\a_skripsi\training\prethesis\venv\Lib\site-packages\tqdm\auto.py:21: TqdmWarning: IProgress not found. Please update jupyter and ipywidgets. See https://ipywidgets.readthedocs.io/en/stable/user_install.html
-  from .autonotebook import tqdm as notebook_tqdm</pre></div></section><div class="md" id="nlu_target-3"><h2>EDA</h2></div><section class="cell" id="nlu_target-4"><div class="lbl">Sel 4 · nlu_target.ipynb</div><ul class="isi-sel"><li><code>DATASET_PATH</code> <span class='jenis'>konstanta</span><br>Dataset target (hasil pilot) dan dataset sumber untuk daftar kata umum.</li><li><code>SOURCE_PATH</code> <span class='jenis'>konstanta</span></li></ul><pre class="code"><span class="c1"># Dataset target (hasil pilot) dan dataset sumber untuk daftar kata umum.</span>
+  from .autonotebook import tqdm as notebook_tqdm</pre></div></section><div class="md" id="nlu_target-3"><h2>EDA</h2></div><section class="cell" id="nlu_target-4"><div class="lbl">Sel 4 · nlu_target.ipynb</div><ul class="isi-sel"><li><code>DATASET_PATH</code> <span class='jenis'>konstanta</span><br>Dataset target (hasil pilot) dan dataset sumber untuk daftar kata umum.</li><li><code>SOURCE_PATH</code> <span class='jenis'>konstanta</span></li><li><code>DATASET_TAMBAHAN</code> <span class='jenis'>konstanta</span><br>Sesi tambahan (plan03, 27 Okt 2026): 80% hanya untuk train IndoBERT, 20% menjadi "uji tambahan" yang dilaporkan</li></ul><pre class="code"><span class="c1"># Dataset target (hasil pilot) dan dataset sumber untuk daftar kata umum.</span>
 <span class="n">DATASET_PATH</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;data/dataset_final3_context_target_pilot25_lengkap.csv&quot;</span><span class="p">)</span>
 <span class="n">SOURCE_PATH</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;data/dataset_final3.csv&quot;</span><span class="p">)</span>
+
+<span class="c1"># Sesi tambahan (plan03, 27 Okt 2026): 80% hanya untuk train IndoBERT, 20% menjadi &quot;uji tambahan&quot; yang dilaporkan</span>
+<span class="c1"># terpisah. Validation dan test tetap dari DATASET_PATH sehingga bisa dibandingkan dengan run sebelumnya.</span>
+<span class="n">DATASET_TAMBAHAN</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;data/dataset_target_tambahan.csv&quot;</span><span class="p">)</span>
 </pre></section><div class="md"><h3>Membaca Dataset Target</h3></div><div class="md"><p>Setiap baris adalah satu pesan utama beserta konteks 12 pesan sebelumnya, daftar pemain, dan target. Kolom JSON diubah menjadi list Python.</p>
 <div class="tbl"><table><thead><tr><th>Nama variabel / proses</th><th>Untuk apa?</th><th>Arti nilai dan pengaruhnya</th></tr></thead><tbody><tr><td><code>chat_sebelumnya</code></td><td>Riwayat maksimal 12 pesan sebelum pesan utama.</td><td>Setiap pesan memuat pengirim, teks, intent, dan target anotasinya (memori). List kosong berarti pesan pembuka.</td></tr><tr><td><code>daftar_pemain</code></td><td>Pemain yang ada di sesi.</td><td>Menjadi daftar kandidat Model 2; diketahui game saat inferensi.</td></tr><tr><td><code>target</code></td><td>Jawaban yang benar untuk pesan utama.</td><td>List <code>{pemain, relasi}</code>. Offend/defend minimal satu target; neutral berelasi <code>neutral</code> (pemain yang diajak bicara atau dibicarakan) atau kosong jika pesan untuk semua orang; <code>tidak_diketahui</code> berarti acuannya tidak jelas.</td></tr><tr><td><code>source_group</code></td><td>Kelompok kalimat sumber.</td><td>Baris dengan grup sama tidak boleh terpisah ke train dan test agar tidak bocor.</td></tr><tr><td><code>problems</code></td><td>Pemeriksaan konsistensi.</td><td>Jika ada pengirim/target di luar daftar pemain, target neutral berelasi selain <code>neutral</code>, atau offend/defend tanpa target, notebook berhenti dengan pesan jelas.</td></tr></tbody></table></div></div><section class="cell" id="nlu_target-7"><div class="lbl">Sel 7 · nlu_target.ipynb</div><ul class="isi-sel"><li><code>JSON_COLUMNS</code> <span class='jenis'>konstanta</span><br>Kolom yang disimpan sebagai teks JSON di CSV.</li><li><code>load_target_dataset</code> <span class='jenis'>fungsi</span><br>Membaca CSV target, mengubah kolom JSON, lalu memeriksa konsistensi setiap baris.</li></ul><pre class="code"><span class="c1"># Kolom yang disimpan sebagai teks JSON di CSV.</span>
 <span class="n">JSON_COLUMNS</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;chat_sebelumnya&quot;</span><span class="p">,</span> <span class="s2">&quot;daftar_pemain&quot;</span><span class="p">,</span> <span class="s2">&quot;target&quot;</span><span class="p">]</span>
@@ -514,44 +567,44 @@ Ciri target per intent:</pre><div class="tbl"><div>
     <span class="n">subset</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;teks&quot;</span><span class="p">],</span> <span class="o">**</span><span class="p">{</span><span class="s2">&quot;white-space&quot;</span><span class="p">:</span> <span class="s2">&quot;normal&quot;</span><span class="p">,</span> <span class="s2">&quot;max-width&quot;</span><span class="p">:</span> <span class="s2">&quot;900px&quot;</span><span class="p">},</span>
 <span class="p">)</span><span class="o">.</span><span class="n">hide</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="s2">&quot;index&quot;</span><span class="p">))</span>
 </pre><div class="keluaran"><div class="lbl">Keluaran</div><div class="tbl"><style type="text/css">
-#T_475ea_row0_col2, #T_475ea_row1_col2, #T_475ea_row2_col2, #T_475ea_row3_col2, #T_475ea_row4_col2 {
+#T_c9c70_row0_col2, #T_c9c70_row1_col2, #T_c9c70_row2_col2, #T_c9c70_row3_col2, #T_c9c70_row4_col2 {
   white-space: normal;
   max-width: 900px;
 }
 </style>
-<table id="T_475ea">
+<table id="T_c9c70">
   <thead>
     <tr>
-      <th id="T_475ea_level0_col0" class="col_heading level0 col0" >kandidat</th>
-      <th id="T_475ea_level0_col1" class="col_heading level0 col1" >relasi</th>
-      <th id="T_475ea_level0_col2" class="col_heading level0 col2" >teks</th>
+      <th id="T_c9c70_level0_col0" class="col_heading level0 col0" >kandidat</th>
+      <th id="T_c9c70_level0_col1" class="col_heading level0 col1" >relasi</th>
+      <th id="T_c9c70_level0_col2" class="col_heading level0 col2" >teks</th>
     </tr>
   </thead>
   <tbody>
     <tr>
-      <td id="T_475ea_row0_col0" class="data row0 col0" >Fajar</td>
-      <td id="T_475ea_row0_col1" class="data row0 col1" >defend</td>
-      <td id="T_475ea_row0_col2" class="data row0 col2" >intent defend || pesan sekarang PENGIRIM_X: Iya juga, aku setuju dengan pendapatmu barusan, dia pasti tidak bersalah. || konteks: PEMAIN_X: Bisa saja kan dia sedang membaca riwayat chat karena baru kembali dari toilet, dia civilian kok. [defend: defend KANDIDAT_X] | PEMAIN_X: Padahal kita butuh semua orang buat berdiskusi dan mencari petunjuk bersama. [neutral] | PENGIRIM_X: Iya benar, setuju banget sama teori itu. [offend: offend KANDIDAT_X] | PEMAIN_X: Orang yang terlalu pasif kayak KANDIDAT_X biasanya lagi menyembunyikan sesuatu, dia pasti Hitman. [offend: offend KANDIDAT_X] | PEMAIN_X: KANDIDAT_X belum mengirim chat sejak diskusi dibuka. Ada yang tahu alasannya? [neutral: neutral KANDIDAT_X]</td>
+      <td id="T_c9c70_row0_col0" class="data row0 col0" >Fajar</td>
+      <td id="T_c9c70_row0_col1" class="data row0 col1" >defend</td>
+      <td id="T_c9c70_row0_col2" class="data row0 col2" >intent defend || pesan sekarang PENGIRIM_X: Iya juga, aku setuju dengan pendapatmu barusan, dia pasti tidak bersalah. || konteks: PEMAIN_X: Bisa saja kan dia sedang membaca riwayat chat karena baru kembali dari toilet, dia civilian kok. [defend: defend KANDIDAT_X] | PEMAIN_X: Padahal kita butuh semua orang buat berdiskusi dan mencari petunjuk bersama. [neutral] | PENGIRIM_X: Iya benar, setuju banget sama teori itu. [offend: offend KANDIDAT_X] | PEMAIN_X: Orang yang terlalu pasif kayak KANDIDAT_X biasanya lagi menyembunyikan sesuatu, dia pasti Hitman. [offend: offend KANDIDAT_X] | PEMAIN_X: KANDIDAT_X belum mengirim chat sejak diskusi dibuka. Ada yang tahu alasannya? [neutral: neutral KANDIDAT_X]</td>
     </tr>
     <tr>
-      <td id="T_475ea_row1_col0" class="data row1 col0" >Gilang</td>
-      <td id="T_475ea_row1_col1" class="data row1 col1" >tidak_ada</td>
-      <td id="T_475ea_row1_col2" class="data row1 col2" >intent defend || pesan sekarang PENGIRIM_X: Iya juga, aku setuju dengan pendapatmu barusan, dia pasti tidak bersalah. || konteks: PEMAIN_X: Bisa saja kan dia sedang membaca riwayat chat karena baru kembali dari toilet, dia civilian kok. [defend: defend PEMAIN_X] | KANDIDAT_X: Padahal kita butuh semua orang buat berdiskusi dan mencari petunjuk bersama. [neutral] | PENGIRIM_X: Iya benar, setuju banget sama teori itu. [offend: offend PEMAIN_X] | PEMAIN_X: Orang yang terlalu pasif kayak PEMAIN_X biasanya lagi menyembunyikan sesuatu, dia pasti Hitman. [offend: offend PEMAIN_X] | KANDIDAT_X: PEMAIN_X belum mengirim chat sejak diskusi dibuka. Ada yang tahu alasannya? [neutral: neutral PEMAIN_X]</td>
+      <td id="T_c9c70_row1_col0" class="data row1 col0" >Gilang</td>
+      <td id="T_c9c70_row1_col1" class="data row1 col1" >tidak_ada</td>
+      <td id="T_c9c70_row1_col2" class="data row1 col2" >intent defend || pesan sekarang PENGIRIM_X: Iya juga, aku setuju dengan pendapatmu barusan, dia pasti tidak bersalah. || konteks: PEMAIN_X: Bisa saja kan dia sedang membaca riwayat chat karena baru kembali dari toilet, dia civilian kok. [defend: defend PEMAIN_X] | KANDIDAT_X: Padahal kita butuh semua orang buat berdiskusi dan mencari petunjuk bersama. [neutral] | PENGIRIM_X: Iya benar, setuju banget sama teori itu. [offend: offend PEMAIN_X] | PEMAIN_X: Orang yang terlalu pasif kayak PEMAIN_X biasanya lagi menyembunyikan sesuatu, dia pasti Hitman. [offend: offend PEMAIN_X] | KANDIDAT_X: PEMAIN_X belum mengirim chat sejak diskusi dibuka. Ada yang tahu alasannya? [neutral: neutral PEMAIN_X]</td>
     </tr>
     <tr>
-      <td id="T_475ea_row2_col0" class="data row2 col0" >Hana</td>
-      <td id="T_475ea_row2_col1" class="data row2 col1" >tidak_ada</td>
-      <td id="T_475ea_row2_col2" class="data row2 col2" >intent defend || pesan sekarang PENGIRIM_X: Iya juga, aku setuju dengan pendapatmu barusan, dia pasti tidak bersalah. || konteks: PEMAIN_X: Bisa saja kan dia sedang membaca riwayat chat karena baru kembali dari toilet, dia civilian kok. [defend: defend PEMAIN_X] | PEMAIN_X: Padahal kita butuh semua orang buat berdiskusi dan mencari petunjuk bersama. [neutral] | PENGIRIM_X: Iya benar, setuju banget sama teori itu. [offend: offend PEMAIN_X] | KANDIDAT_X: Orang yang terlalu pasif kayak PEMAIN_X biasanya lagi menyembunyikan sesuatu, dia pasti Hitman. [offend: offend PEMAIN_X] | PEMAIN_X: PEMAIN_X belum mengirim chat sejak diskusi dibuka. Ada yang tahu alasannya? [neutral: neutral PEMAIN_X]</td>
+      <td id="T_c9c70_row2_col0" class="data row2 col0" >Hana</td>
+      <td id="T_c9c70_row2_col1" class="data row2 col1" >tidak_ada</td>
+      <td id="T_c9c70_row2_col2" class="data row2 col2" >intent defend || pesan sekarang PENGIRIM_X: Iya juga, aku setuju dengan pendapatmu barusan, dia pasti tidak bersalah. || konteks: PEMAIN_X: Bisa saja kan dia sedang membaca riwayat chat karena baru kembali dari toilet, dia civilian kok. [defend: defend PEMAIN_X] | PEMAIN_X: Padahal kita butuh semua orang buat berdiskusi dan mencari petunjuk bersama. [neutral] | PENGIRIM_X: Iya benar, setuju banget sama teori itu. [offend: offend PEMAIN_X] | KANDIDAT_X: Orang yang terlalu pasif kayak PEMAIN_X biasanya lagi menyembunyikan sesuatu, dia pasti Hitman. [offend: offend PEMAIN_X] | PEMAIN_X: PEMAIN_X belum mengirim chat sejak diskusi dibuka. Ada yang tahu alasannya? [neutral: neutral PEMAIN_X]</td>
     </tr>
     <tr>
-      <td id="T_475ea_row3_col0" class="data row3 col0" >Iwan</td>
-      <td id="T_475ea_row3_col1" class="data row3 col1" >tidak_ada</td>
-      <td id="T_475ea_row3_col2" class="data row3 col2" >intent defend || pesan sekarang KANDIDAT_X: Iya juga, aku setuju dengan pendapatmu barusan, dia pasti tidak bersalah. || konteks: PEMAIN_X: Bisa saja kan dia sedang membaca riwayat chat karena baru kembali dari toilet, dia civilian kok. [defend: defend PEMAIN_X] | PEMAIN_X: Padahal kita butuh semua orang buat berdiskusi dan mencari petunjuk bersama. [neutral] | KANDIDAT_X: Iya benar, setuju banget sama teori itu. [offend: offend PEMAIN_X] | PEMAIN_X: Orang yang terlalu pasif kayak PEMAIN_X biasanya lagi menyembunyikan sesuatu, dia pasti Hitman. [offend: offend PEMAIN_X] | PEMAIN_X: PEMAIN_X belum mengirim chat sejak diskusi dibuka. Ada yang tahu alasannya? [neutral: neutral PEMAIN_X]</td>
+      <td id="T_c9c70_row3_col0" class="data row3 col0" >Iwan</td>
+      <td id="T_c9c70_row3_col1" class="data row3 col1" >tidak_ada</td>
+      <td id="T_c9c70_row3_col2" class="data row3 col2" >intent defend || pesan sekarang KANDIDAT_X: Iya juga, aku setuju dengan pendapatmu barusan, dia pasti tidak bersalah. || konteks: PEMAIN_X: Bisa saja kan dia sedang membaca riwayat chat karena baru kembali dari toilet, dia civilian kok. [defend: defend PEMAIN_X] | PEMAIN_X: Padahal kita butuh semua orang buat berdiskusi dan mencari petunjuk bersama. [neutral] | KANDIDAT_X: Iya benar, setuju banget sama teori itu. [offend: offend PEMAIN_X] | PEMAIN_X: Orang yang terlalu pasif kayak PEMAIN_X biasanya lagi menyembunyikan sesuatu, dia pasti Hitman. [offend: offend PEMAIN_X] | PEMAIN_X: PEMAIN_X belum mengirim chat sejak diskusi dibuka. Ada yang tahu alasannya? [neutral: neutral PEMAIN_X]</td>
     </tr>
     <tr>
-      <td id="T_475ea_row4_col0" class="data row4 col0" >Jihan</td>
-      <td id="T_475ea_row4_col1" class="data row4 col1" >tidak_ada</td>
-      <td id="T_475ea_row4_col2" class="data row4 col2" >intent defend || pesan sekarang PENGIRIM_X: Iya juga, aku setuju dengan pendapatmu barusan, dia pasti tidak bersalah. || konteks: KANDIDAT_X: Bisa saja kan dia sedang membaca riwayat chat karena baru kembali dari toilet, dia civilian kok. [defend: defend PEMAIN_X] | PEMAIN_X: Padahal kita butuh semua orang buat berdiskusi dan mencari petunjuk bersama. [neutral] | PENGIRIM_X: Iya benar, setuju banget sama teori itu. [offend: offend PEMAIN_X] | PEMAIN_X: Orang yang terlalu pasif kayak PEMAIN_X biasanya lagi menyembunyikan sesuatu, dia pasti Hitman. [offend: offend PEMAIN_X] | PEMAIN_X: PEMAIN_X belum mengirim chat sejak diskusi dibuka. Ada yang tahu alasannya? [neutral: neutral PEMAIN_X]</td>
+      <td id="T_c9c70_row4_col0" class="data row4 col0" >Jihan</td>
+      <td id="T_c9c70_row4_col1" class="data row4 col1" >tidak_ada</td>
+      <td id="T_c9c70_row4_col2" class="data row4 col2" >intent defend || pesan sekarang PENGIRIM_X: Iya juga, aku setuju dengan pendapatmu barusan, dia pasti tidak bersalah. || konteks: KANDIDAT_X: Bisa saja kan dia sedang membaca riwayat chat karena baru kembali dari toilet, dia civilian kok. [defend: defend PEMAIN_X] | PEMAIN_X: Padahal kita butuh semua orang buat berdiskusi dan mencari petunjuk bersama. [neutral] | PENGIRIM_X: Iya benar, setuju banget sama teori itu. [offend: offend PEMAIN_X] | PEMAIN_X: Orang yang terlalu pasif kayak PEMAIN_X biasanya lagi menyembunyikan sesuatu, dia pasti Hitman. [offend: offend PEMAIN_X] | PEMAIN_X: PEMAIN_X belum mengirim chat sejak diskusi dibuka. Ada yang tahu alasannya? [neutral: neutral PEMAIN_X]</td>
     </tr>
   </tbody>
 </table>
@@ -3863,7 +3916,8 @@ Ciri target per intent:</pre><div class="tbl"><div>
 </pre><div class="keluaran"><div class="lbl">Keluaran</div><pre class="out">Memeriksa perangkat dan presisi selesai.</pre></div></section><div class="md"><h4>2. Membagi data dan mengodekan label</h4>
 <p>Test dipertahankan sama dengan model klasik. Validation diambil dari pool train; encoder label dan pemetaan label ke angka dibuat dari label yang tersedia.</p>
 <p>Masukan dari tahap sebelumnya: <code>dataset_path</code>, <code>validation_size</code>.</p>
-<p>Hasil untuk tahap selanjutnya: <code>encoder</code>, <code>id2label</code>, <code>label2id</code>, <code>labels</code>, <code>pairs_test</code>, <code>pairs_train</code>, <code>pairs_val</code>, <code>report</code>, <code>test_rows</code>, <code>val_rows</code>.</p></div><section class="cell" id="nlu_target-161"><div class="lbl">Sel 161 · nlu_target.ipynb</div><ul class="isi-sel"><li><code>siapkan_data_transformer_result</code> <span class='jenis'>fungsi</span><br>Cell ini untuk membagi data dan mengodekan label.</li></ul><pre class="code"><span class="c1"># Cell ini untuk membagi data dan mengodekan label.</span>
+<p>Hasil untuk tahap selanjutnya: <code>encoder</code>, <code>id2label</code>, <code>label2id</code>, <code>labels</code>, <code>pairs_test</code>, <code>pairs_train</code>, <code>pairs_val</code>, <code>report</code>, <code>test_rows</code>, <code>val_rows</code>.</p>
+<p>Sesi dari <code>data/dataset_target_tambahan.csv</code> (plan03: 500 sesi untuk 14 kasus yang lemah) dibagi per grup sumber: 80% ditambahkan ke <b>train</b>, 20% menjadi <b>uji tambahan</b>. Validation dan test tetap dari dataset utama, sehingga metrik test bisa dibandingkan langsung dengan run sebelumnya. Uji tambahan dilaporkan terpisah di tahap evaluasi.</p></div><section class="cell" id="nlu_target-161"><div class="lbl">Sel 161 · nlu_target.ipynb</div><ul class="isi-sel"><li><code>siapkan_data_transformer_result</code> <span class='jenis'>fungsi</span><br>Cell ini untuk membagi data dan mengodekan label.</li></ul><pre class="code"><span class="c1"># Cell ini untuk membagi data dan mengodekan label.</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">siapkan_data_transformer_result</span><span class="p">(</span><span class="n">dataset_path</span><span class="p">,</span> <span class="n">validation_size</span><span class="p">):</span>
     <span class="c1"># Menyiapkan pasangan train, validation, dan test IndoBERT dengan test yang sama seperti model klasik.</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">_split_transformer_dataset</span><span class="p">(</span><span class="n">dataset_path</span><span class="p">,</span> <span class="n">validation_size</span><span class="o">=</span><span class="mf">0.15</span><span class="p">):</span>
@@ -3874,12 +3928,25 @@ Ciri target per intent:</pre><div class="tbl"><div>
         <span class="n">train_rows</span><span class="p">,</span> <span class="n">val_rows</span> <span class="o">=</span> <span class="n">pool_rows</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">train_index</span><span class="p">],</span> <span class="n">pool_rows</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">val_index</span><span class="p">]</span>
         <span class="n">pairs</span> <span class="o">=</span> <span class="p">{</span><span class="n">name</span><span class="p">:</span> <span class="n">bentuk_pasangan</span><span class="p">(</span><span class="n">rows</span><span class="p">,</span> <span class="n">COMMON_WORDS</span><span class="p">,</span> <span class="n">JUMLAH_PEMAIN_MINIMUM</span><span class="p">)</span>
                  <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">rows</span> <span class="ow">in</span> <span class="p">((</span><span class="s2">&quot;train&quot;</span><span class="p">,</span> <span class="n">train_rows</span><span class="p">),</span> <span class="p">(</span><span class="s2">&quot;validation&quot;</span><span class="p">,</span> <span class="n">val_rows</span><span class="p">),</span> <span class="p">(</span><span class="s2">&quot;test&quot;</span><span class="p">,</span> <span class="n">test_rows</span><span class="p">))}</span>
+        <span class="c1"># Sesi tambahan: 20% per grup sumber (strata kasus) menjadi uji tambahan, sisanya ikut train.</span>
+        <span class="c1"># Indeks digeser agar row_id tidak bentrok dengan pesan dataset utama.</span>
+        <span class="n">uji_rows</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">DATASET_TAMBAHAN</span><span class="o">.</span><span class="n">is_file</span><span class="p">():</span>
+            <span class="n">tambahan</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">load_target_dataset</span><span class="p">(</span><span class="n">DATASET_TAMBAHAN</span><span class="p">)</span>
+            <span class="n">tambahan</span><span class="o">.</span><span class="n">index</span> <span class="o">=</span> <span class="n">tambahan</span><span class="o">.</span><span class="n">index</span> <span class="o">+</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+            <span class="n">tambahan_train</span><span class="p">,</span> <span class="n">uji_rows</span> <span class="o">=</span> <span class="n">_split_rows</span><span class="p">(</span><span class="n">tambahan</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">)</span>
+            <span class="n">pairs</span><span class="p">[</span><span class="s2">&quot;train&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">pairs</span><span class="p">[</span><span class="s2">&quot;train&quot;</span><span class="p">],</span> <span class="n">bentuk_pasangan</span><span class="p">(</span><span class="n">tambahan_train</span><span class="p">,</span> <span class="n">COMMON_WORDS</span><span class="p">,</span> <span class="n">JUMLAH_PEMAIN_MINIMUM</span><span class="p">)],</span>
+                                       <span class="n">ignore_index</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="n">report</span><span class="p">[</span><span class="s2">&quot;rows_tambahan_train&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">tambahan_train</span><span class="p">)</span>
+        <span class="n">pairs</span><span class="p">[</span><span class="s2">&quot;uji_tambahan&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">bentuk_pasangan</span><span class="p">(</span><span class="n">uji_rows</span><span class="p">,</span> <span class="n">COMMON_WORDS</span><span class="p">,</span> <span class="n">JUMLAH_PEMAIN_MINIMUM</span><span class="p">)</span>
         <span class="n">report</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="n">report</span><span class="p">,</span> <span class="o">**</span><span class="p">{</span><span class="sa">f</span><span class="s2">&quot;rows_</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">rows</span><span class="p">)</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">rows</span> <span class="ow">in</span>
-                               <span class="p">((</span><span class="s2">&quot;train&quot;</span><span class="p">,</span> <span class="n">train_rows</span><span class="p">),</span> <span class="p">(</span><span class="s2">&quot;validation&quot;</span><span class="p">,</span> <span class="n">val_rows</span><span class="p">),</span> <span class="p">(</span><span class="s2">&quot;test&quot;</span><span class="p">,</span> <span class="n">test_rows</span><span class="p">))},</span>
+                               <span class="p">((</span><span class="s2">&quot;train&quot;</span><span class="p">,</span> <span class="n">train_rows</span><span class="p">),</span> <span class="p">(</span><span class="s2">&quot;validation&quot;</span><span class="p">,</span> <span class="n">val_rows</span><span class="p">),</span> <span class="p">(</span><span class="s2">&quot;test&quot;</span><span class="p">,</span> <span class="n">test_rows</span><span class="p">),</span>
+                                <span class="p">(</span><span class="s2">&quot;uji_tambahan&quot;</span><span class="p">,</span> <span class="n">uji_rows</span><span class="p">))},</span>
                   <span class="o">**</span><span class="p">{</span><span class="sa">f</span><span class="s2">&quot;pairs_</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">frame</span><span class="p">)</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">frame</span> <span class="ow">in</span> <span class="n">pairs</span><span class="o">.</span><span class="n">items</span><span class="p">()}}</span>
-        <span class="k">return</span> <span class="n">pairs</span><span class="p">[</span><span class="s2">&quot;train&quot;</span><span class="p">],</span> <span class="n">pairs</span><span class="p">[</span><span class="s2">&quot;validation&quot;</span><span class="p">],</span> <span class="n">pairs</span><span class="p">[</span><span class="s2">&quot;test&quot;</span><span class="p">],</span> <span class="n">val_rows</span><span class="p">,</span> <span class="n">test_rows</span><span class="p">,</span> <span class="n">report</span>
+        <span class="k">return</span> <span class="n">pairs</span><span class="p">[</span><span class="s2">&quot;train&quot;</span><span class="p">],</span> <span class="n">pairs</span><span class="p">[</span><span class="s2">&quot;validation&quot;</span><span class="p">],</span> <span class="n">pairs</span><span class="p">[</span><span class="s2">&quot;test&quot;</span><span class="p">],</span> <span class="n">val_rows</span><span class="p">,</span> <span class="n">test_rows</span><span class="p">,</span> <span class="n">pairs</span><span class="p">[</span><span class="s2">&quot;uji_tambahan&quot;</span><span class="p">],</span> <span class="n">uji_rows</span><span class="p">,</span> <span class="n">report</span>
 
-    <span class="n">pairs_train</span><span class="p">,</span> <span class="n">pairs_val</span><span class="p">,</span> <span class="n">pairs_test</span><span class="p">,</span> <span class="n">val_rows</span><span class="p">,</span> <span class="n">test_rows</span><span class="p">,</span> <span class="n">report</span> <span class="o">=</span> <span class="n">_split_transformer_dataset</span><span class="p">(</span><span class="n">dataset_path</span><span class="p">,</span> <span class="n">validation_size</span><span class="p">)</span>
+    <span class="p">(</span><span class="n">pairs_train</span><span class="p">,</span> <span class="n">pairs_val</span><span class="p">,</span> <span class="n">pairs_test</span><span class="p">,</span> <span class="n">val_rows</span><span class="p">,</span> <span class="n">test_rows</span><span class="p">,</span> <span class="n">pairs_uji</span><span class="p">,</span> <span class="n">uji_rows</span><span class="p">,</span>
+     <span class="n">report</span><span class="p">)</span> <span class="o">=</span> <span class="n">_split_transformer_dataset</span><span class="p">(</span><span class="n">dataset_path</span><span class="p">,</span> <span class="n">validation_size</span><span class="p">)</span>
     <span class="n">encoder</span> <span class="o">=</span> <span class="n">LabelEncoder</span><span class="p">()</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">RELASI_LABELS</span><span class="p">)</span>
     <span class="n">labels</span> <span class="o">=</span> <span class="n">encoder</span><span class="o">.</span><span class="n">classes_</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
     <span class="n">id2label</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="nb">enumerate</span><span class="p">(</span><span class="n">labels</span><span class="p">))</span>
@@ -3891,9 +3958,11 @@ Ciri target per intent:</pre><div class="tbl"><div>
         <span class="n">labels</span><span class="p">,</span>
         <span class="n">pairs_test</span><span class="p">,</span>
         <span class="n">pairs_train</span><span class="p">,</span>
+        <span class="n">pairs_uji</span><span class="p">,</span>
         <span class="n">pairs_val</span><span class="p">,</span>
         <span class="n">report</span><span class="p">,</span>
         <span class="n">test_rows</span><span class="p">,</span>
+        <span class="n">uji_rows</span><span class="p">,</span>
         <span class="n">val_rows</span><span class="p">,</span>
     <span class="p">)</span>
 
@@ -3907,9 +3976,11 @@ Ciri target per intent:</pre><div class="tbl"><div>
         <span class="n">labels</span><span class="p">,</span>
         <span class="n">pairs_test</span><span class="p">,</span>
         <span class="n">pairs_train</span><span class="p">,</span>
+        <span class="n">pairs_uji</span><span class="p">,</span>
         <span class="n">pairs_val</span><span class="p">,</span>
         <span class="n">report</span><span class="p">,</span>
         <span class="n">test_rows</span><span class="p">,</span>
+        <span class="n">uji_rows</span><span class="p">,</span>
         <span class="n">val_rows</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">=</span> <span class="n">siapkan_data_transformer_result</span><span class="p">(</span><span class="n">dataset_path</span><span class="p">,</span> <span class="n">validation_size</span><span class="p">)</span>
     <span class="n">waktu_transformer_result</span> <span class="o">+=</span> <span class="n">perf_counter</span><span class="p">()</span> <span class="o">-</span> <span class="n">_mulai_tahap</span>
@@ -3957,7 +4028,7 @@ Ciri target per intent:</pre><div class="tbl"><div>
     <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Menyiapkan tokenizer dan dataset token&#39;</span> <span class="o">+</span> <span class="s2">&quot; selesai.&quot;</span><span class="p">)</span>
 <span class="k">else</span><span class="p">:</span>
     <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Menyiapkan tokenizer dan dataset token dilewati: LATIH_INDOBERT = False.&quot;</span><span class="p">)</span>
-</pre><div class="keluaran"><div class="lbl">Keluaran</div><pre class="out">Map: 100%|██████████| 745/745 [00:00&lt;00:00, 6092.20 examples/s]Menyiapkan tokenizer dan dataset token selesai.</pre></div></section><div class="md"><h4>4. Menyiapkan folder run</h4>
+</pre><div class="keluaran"><div class="lbl">Keluaran</div><pre class="out">Map: 100%|██████████| 745/745 [00:00&lt;00:00, 4059.27 examples/s]Menyiapkan tokenizer dan dataset token selesai.</pre></div></section><div class="md"><h4>4. Menyiapkan folder run</h4>
 <p>Folder unik dibuat untuk menyimpan checkpoint dan riwayat eksperimen.</p>
 <p>Masukan dari tahap sebelumnya: <code>model_dir</code>.</p>
 <p>Hasil untuk tahap selanjutnya: <code>output_dir</code>.</p></div><section class="cell" id="nlu_target-165"><div class="lbl">Sel 165 · nlu_target.ipynb</div><ul class="isi-sel"><li><code>siapkan_folder_transformer_result</code> <span class='jenis'>fungsi</span><br>Cell ini untuk menyiapkan folder run.</li></ul><pre class="code"><span class="c1"># Cell ini untuk menyiapkan folder run.</span>
@@ -4113,11 +4184,11 @@ Ciri target per intent:</pre><div class="tbl"><div>
     <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Melatih kandidat learning rate dilewati: LATIH_INDOBERT = False.&quot;</span><span class="p">)</span>
 </pre><div class="keluaran"><div class="lbl">Keluaran</div><pre class="out">Some weights of BertForSequenceClassification were not initialized from the model checkpoint at indobenchmark/indobert-base-p1 and are newly initialized: ['classifier.bias', 'classifier.weight']
 You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
-Transformer trial 1/3 | indobenchmark/indobert-base-p1 | CUDA | pasangan train=2977 val=745 test=931 | max_epoch=12 lr=1e-05</pre><div class="tbl">
+Transformer trial 1/3 | indobenchmark/indobert-base-p1 | CUDA | pasangan train=5377 val=745 test=931 | max_epoch=12 lr=1e-05</pre><div class="tbl">
     <div>
       
-      <progress value='1676' max='2232' style='width:300px; height:20px; vertical-align: middle;'></progress>
-      [1676/2232 11:26 < 03:48, 2.44 it/s, Epoch 8/12]
+      <progress value='2353' max='4032' style='width:300px; height:20px; vertical-align: middle;'></progress>
+      [2353/4032 14:19 < 10:14, 2.73 it/s, Epoch 6/12]
     </div>
     <table border="1" class="dataframe">
   <thead>
@@ -4133,69 +4204,61 @@ Transformer trial 1/3 | indobenchmark/indobert-base-p1 | CUDA | pasangan train=2
   <tbody>
     <tr>
       <td>0</td>
-      <td>0.661300</td>
-      <td>0.315220</td>
-      <td>0.852349</td>
-      <td>0.364651</td>
-      <td>0.835349</td>
+      <td>0.604700</td>
+      <td>0.299690</td>
+      <td>0.880537</td>
+      <td>0.482639</td>
+      <td>0.876263</td>
     </tr>
     <tr>
       <td>1</td>
-      <td>0.241600</td>
-      <td>0.144872</td>
-      <td>0.950336</td>
-      <td>0.837645</td>
-      <td>0.949490</td>
+      <td>0.249100</td>
+      <td>0.163151</td>
+      <td>0.958389</td>
+      <td>0.902245</td>
+      <td>0.959704</td>
     </tr>
     <tr>
       <td>2</td>
-      <td>0.157700</td>
-      <td>0.145364</td>
-      <td>0.966443</td>
-      <td>0.921048</td>
-      <td>0.966881</td>
+      <td>0.135900</td>
+      <td>0.174801</td>
+      <td>0.961074</td>
+      <td>0.900038</td>
+      <td>0.961723</td>
     </tr>
     <tr>
       <td>4</td>
-      <td>0.093100</td>
-      <td>0.160363</td>
-      <td>0.971812</td>
-      <td>0.929673</td>
-      <td>0.971871</td>
+      <td>0.047900</td>
+      <td>0.211144</td>
+      <td>0.970470</td>
+      <td>0.923428</td>
+      <td>0.970517</td>
     </tr>
     <tr>
       <td>5</td>
-      <td>0.069600</td>
-      <td>0.142975</td>
-      <td>0.975839</td>
-      <td>0.932858</td>
-      <td>0.975863</td>
+      <td>0.034400</td>
+      <td>0.207758</td>
+      <td>0.969128</td>
+      <td>0.919890</td>
+      <td>0.969544</td>
     </tr>
     <tr>
       <td>6</td>
-      <td>0.046800</td>
-      <td>0.197529</td>
-      <td>0.966443</td>
-      <td>0.910597</td>
-      <td>0.966568</td>
-    </tr>
-    <tr>
-      <td>8</td>
-      <td>0.028300</td>
-      <td>0.194570</td>
-      <td>0.969128</td>
-      <td>0.923815</td>
-      <td>0.969498</td>
+      <td>0.025000</td>
+      <td>0.223408</td>
+      <td>0.970470</td>
+      <td>0.924792</td>
+      <td>0.970860</td>
     </tr>
   </tbody>
-</table><p></div><pre class="out">Trial 1: best epoch=5.99731543624161, val macro-F1=0.9329
+</table><p></div><pre class="out">Trial 1: best epoch=4.0, val macro-F1=0.9457
 Some weights of BertForSequenceClassification were not initialized from the model checkpoint at indobenchmark/indobert-base-p1 and are newly initialized: ['classifier.bias', 'classifier.weight']
 You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
-Transformer trial 2/3 | indobenchmark/indobert-base-p1 | CUDA | pasangan train=2977 val=745 test=931 | max_epoch=12 lr=2e-05</pre><div class="tbl">
+Transformer trial 2/3 | indobenchmark/indobert-base-p1 | CUDA | pasangan train=5377 val=745 test=931 | max_epoch=12 lr=2e-05</pre><div class="tbl">
     <div>
       
-      <progress value='1676' max='2232' style='width:300px; height:20px; vertical-align: middle;'></progress>
-      [1676/2232 11:40 < 03:52, 2.39 it/s, Epoch 8/12]
+      <progress value='4032' max='4032' style='width:300px; height:20px; vertical-align: middle;'></progress>
+      [4032/4032 23:59, Epoch 11/12]
     </div>
     <table border="1" class="dataframe">
   <thead>
@@ -4211,164 +4274,164 @@ Transformer trial 2/3 | indobenchmark/indobert-base-p1 | CUDA | pasangan train=2
   <tbody>
     <tr>
       <td>0</td>
-      <td>0.580000</td>
-      <td>0.281460</td>
-      <td>0.910067</td>
-      <td>0.633633</td>
-      <td>0.909174</td>
-    </tr>
-    <tr>
-      <td>1</td>
-      <td>0.191900</td>
-      <td>0.210398</td>
+      <td>0.541700</td>
+      <td>0.171191</td>
       <td>0.944966</td>
-      <td>0.876268</td>
-      <td>0.947823</td>
-    </tr>
-    <tr>
-      <td>2</td>
-      <td>0.154000</td>
-      <td>0.144280</td>
-      <td>0.963758</td>
-      <td>0.915958</td>
-      <td>0.964684</td>
-    </tr>
-    <tr>
-      <td>4</td>
-      <td>0.080100</td>
-      <td>0.168584</td>
-      <td>0.963758</td>
-      <td>0.918851</td>
-      <td>0.964241</td>
-    </tr>
-    <tr>
-      <td>5</td>
-      <td>0.060800</td>
-      <td>0.133773</td>
-      <td>0.978523</td>
-      <td>0.945934</td>
-      <td>0.978776</td>
-    </tr>
-    <tr>
-      <td>6</td>
-      <td>0.034700</td>
-      <td>0.165921</td>
-      <td>0.977181</td>
-      <td>0.943806</td>
-      <td>0.977505</td>
-    </tr>
-    <tr>
-      <td>8</td>
-      <td>0.025900</td>
-      <td>0.130012</td>
-      <td>0.978523</td>
-      <td>0.946665</td>
-      <td>0.978377</td>
-    </tr>
-  </tbody>
-</table><p></div><pre class="out">Trial 2: best epoch=8.998657718120805, val macro-F1=0.9467
-Some weights of BertForSequenceClassification were not initialized from the model checkpoint at indobenchmark/indobert-base-p1 and are newly initialized: ['classifier.bias', 'classifier.weight']
-You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
-Transformer trial 3/3 | indobenchmark/indobert-base-p1 | CUDA | pasangan train=2977 val=745 test=931 | max_epoch=12 lr=3e-05</pre><div class="tbl">
-    <div>
-      
-      <progress value='2232' max='2232' style='width:300px; height:20px; vertical-align: middle;'></progress>
-      [2232/2232 14:46, Epoch 11/12]
-    </div>
-    <table border="1" class="dataframe">
-  <thead>
- <tr style="text-align: left;">
-      <th>Epoch</th>
-      <th>Training Loss</th>
-      <th>Validation Loss</th>
-      <th>Accuracy</th>
-      <th>F1 Macro</th>
-      <th>F1 Weighted</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>0</td>
-      <td>0.567100</td>
-      <td>0.281201</td>
-      <td>0.857718</td>
-      <td>0.387980</td>
-      <td>0.842212</td>
+      <td>0.819696</td>
+      <td>0.945202</td>
     </tr>
     <tr>
       <td>1</td>
-      <td>0.208500</td>
-      <td>0.289748</td>
-      <td>0.938255</td>
-      <td>0.833711</td>
-      <td>0.933685</td>
+      <td>0.257600</td>
+      <td>0.148403</td>
+      <td>0.957047</td>
+      <td>0.889112</td>
+      <td>0.958393</td>
     </tr>
     <tr>
       <td>2</td>
-      <td>0.170400</td>
-      <td>0.132056</td>
-      <td>0.959732</td>
-      <td>0.905603</td>
-      <td>0.960359</td>
+      <td>0.162800</td>
+      <td>0.146162</td>
+      <td>0.973154</td>
+      <td>0.922729</td>
+      <td>0.973433</td>
     </tr>
     <tr>
       <td>4</td>
-      <td>0.103400</td>
-      <td>0.108251</td>
+      <td>0.064900</td>
+      <td>0.172086</td>
       <td>0.969128</td>
-      <td>0.922980</td>
-      <td>0.969316</td>
+      <td>0.925367</td>
+      <td>0.968574</td>
     </tr>
     <tr>
       <td>5</td>
-      <td>0.082800</td>
-      <td>0.124406</td>
-      <td>0.975839</td>
-      <td>0.937141</td>
-      <td>0.975755</td>
+      <td>0.034600</td>
+      <td>0.165108</td>
+      <td>0.971812</td>
+      <td>0.929307</td>
+      <td>0.971656</td>
     </tr>
     <tr>
       <td>6</td>
-      <td>0.043300</td>
-      <td>0.136881</td>
-      <td>0.971812</td>
-      <td>0.919477</td>
-      <td>0.971713</td>
+      <td>0.017900</td>
+      <td>0.160530</td>
+      <td>0.977181</td>
+      <td>0.949541</td>
+      <td>0.977532</td>
     </tr>
     <tr>
       <td>8</td>
-      <td>0.018600</td>
-      <td>0.099820</td>
-      <td>0.982550</td>
-      <td>0.960016</td>
-      <td>0.982532</td>
+      <td>0.002400</td>
+      <td>0.199179</td>
+      <td>0.975839</td>
+      <td>0.940564</td>
+      <td>0.976008</td>
     </tr>
     <tr>
       <td>9</td>
-      <td>0.010700</td>
-      <td>0.106094</td>
-      <td>0.982550</td>
-      <td>0.954302</td>
-      <td>0.982436</td>
+      <td>0.001900</td>
+      <td>0.188088</td>
+      <td>0.978523</td>
+      <td>0.951261</td>
+      <td>0.978692</td>
     </tr>
     <tr>
       <td>10</td>
-      <td>0.009100</td>
-      <td>0.119020</td>
-      <td>0.979866</td>
-      <td>0.950314</td>
-      <td>0.980018</td>
+      <td>0.001400</td>
+      <td>0.190821</td>
+      <td>0.977181</td>
+      <td>0.942734</td>
+      <td>0.977232</td>
     </tr>
     <tr>
       <td>11</td>
-      <td>0.005700</td>
-      <td>0.116720</td>
-      <td>0.981208</td>
-      <td>0.947031</td>
-      <td>0.981196</td>
+      <td>0.000200</td>
+      <td>0.191223</td>
+      <td>0.977181</td>
+      <td>0.942734</td>
+      <td>0.977232</td>
     </tr>
   </tbody>
-</table><p></div><pre class="out">Trial 3: best epoch=8.998657718120805, val macro-F1=0.9600
+</table><p></div><pre class="out">Trial 2: best epoch=9.998513011152417, val macro-F1=0.9513
+Some weights of BertForSequenceClassification were not initialized from the model checkpoint at indobenchmark/indobert-base-p1 and are newly initialized: ['classifier.bias', 'classifier.weight']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+Transformer trial 3/3 | indobenchmark/indobert-base-p1 | CUDA | pasangan train=5377 val=745 test=931 | max_epoch=12 lr=3e-05</pre><div class="tbl">
+    <div>
+      
+      <progress value='3026' max='4032' style='width:300px; height:20px; vertical-align: middle;'></progress>
+      [3026/4032 18:10 < 06:02, 2.77 it/s, Epoch 8/12]
+    </div>
+    <table border="1" class="dataframe">
+  <thead>
+ <tr style="text-align: left;">
+      <th>Epoch</th>
+      <th>Training Loss</th>
+      <th>Validation Loss</th>
+      <th>Accuracy</th>
+      <th>F1 Macro</th>
+      <th>F1 Weighted</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>0</td>
+      <td>0.507200</td>
+      <td>0.199710</td>
+      <td>0.927517</td>
+      <td>0.671495</td>
+      <td>0.919471</td>
+    </tr>
+    <tr>
+      <td>1</td>
+      <td>0.251200</td>
+      <td>0.189627</td>
+      <td>0.947651</td>
+      <td>0.865770</td>
+      <td>0.950676</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td>0.172000</td>
+      <td>0.126828</td>
+      <td>0.971812</td>
+      <td>0.927255</td>
+      <td>0.971865</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td>0.072100</td>
+      <td>0.170537</td>
+      <td>0.973154</td>
+      <td>0.938349</td>
+      <td>0.973001</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td>0.041200</td>
+      <td>0.113547</td>
+      <td>0.979866</td>
+      <td>0.952663</td>
+      <td>0.979700</td>
+    </tr>
+    <tr>
+      <td>6</td>
+      <td>0.021600</td>
+      <td>0.183308</td>
+      <td>0.975839</td>
+      <td>0.939099</td>
+      <td>0.975763</td>
+    </tr>
+    <tr>
+      <td>8</td>
+      <td>0.004700</td>
+      <td>0.203263</td>
+      <td>0.970470</td>
+      <td>0.933310</td>
+      <td>0.971161</td>
+    </tr>
+  </tbody>
+</table><p></div><pre class="out">Trial 3: best epoch=5.998513011152417, val macro-F1=0.9527
 Melatih kandidat learning rate selesai.</pre></div></section><div class="md"><h4>6. Memuat checkpoint terbaik</h4>
 <p>Checkpoint dengan validation macro-F1 tertinggi dimuat untuk evaluasi akhir. Tahap ini tidak memilih model berdasarkan test.</p>
 <p>Masukan dari tahap sebelumnya: <code>collator</code>, <code>device</code>, <code>eval_batch_size</code>, <code>output_dir</code>, <code>tokenizer</code>, <code>trial_results</code>.</p>
@@ -4400,14 +4463,17 @@ Melatih kandidat learning rate selesai.</pre></div></section><div class="md"><h4
 </pre><div class="keluaran"><div class="lbl">Keluaran</div><pre class="out">Memuat checkpoint terbaik selesai.</pre></div></section><div class="md"><h4>7. Mengevaluasi IndoBERT pada test</h4>
 <p>Probabilitas validation dipakai memilih ambang target (hanya untuk offend/defend); ambang tersebut kemudian diterapkan pada test.</p>
 <p>Masukan dari tahap sebelumnya: <code>labels</code>, <code>make_dataset</code>, <code>pairs_test</code>, <code>pairs_val</code>, <code>test_rows</code>, <code>trainer</code>, <code>val_rows</code>.</p>
-<p>Hasil untuk tahap selanjutnya: <code>ambang</code>, <code>metrics</code>, <code>tabel_ambang</code>.</p></div><section class="cell" id="nlu_target-171"><div class="lbl">Sel 171 · nlu_target.ipynb</div><ul class="isi-sel"><li><code>evaluasi_transformer_result</code> <span class='jenis'>fungsi</span><br>Cell ini untuk mengevaluasi indobert pada test.</li></ul><pre class="code"><span class="c1"># Cell ini untuk mengevaluasi indobert pada test.</span>
+<p>Hasil untuk tahap selanjutnya: <code>ambang</code>, <code>metrics</code>, <code>tabel_ambang</code>.</p>
+<p><code>uji_tambahan</code> dinilai dengan model dan ambang yang sama, lalu disimpan di <code>metrics.json</code>. Metrik utama tetap test dataset utama.</p></div><section class="cell" id="nlu_target-171"><div class="lbl">Sel 171 · nlu_target.ipynb</div><ul class="isi-sel"><li><code>evaluasi_transformer_result</code> <span class='jenis'>fungsi</span><br>Cell ini untuk mengevaluasi indobert pada test.</li></ul><pre class="code"><span class="c1"># Cell ini untuk mengevaluasi indobert pada test.</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">evaluasi_transformer_result</span><span class="p">(</span>
     <span class="n">labels</span><span class="p">,</span>
     <span class="n">make_dataset</span><span class="p">,</span>
     <span class="n">pairs_test</span><span class="p">,</span>
+    <span class="n">pairs_uji</span><span class="p">,</span>
     <span class="n">pairs_val</span><span class="p">,</span>
     <span class="n">test_rows</span><span class="p">,</span>
     <span class="n">trainer</span><span class="p">,</span>
+    <span class="n">uji_rows</span><span class="p">,</span>
     <span class="n">val_rows</span><span class="p">,</span>
 <span class="p">):</span>
     <span class="c1"># -----------------------------------------------------------------------------</span>
@@ -4507,6 +4573,15 @@ Melatih kandidat learning rate selesai.</pre></div></section><div class="md"><h4
 
     <span class="n">ambang</span><span class="p">,</span> <span class="n">tabel_ambang</span> <span class="o">=</span> <span class="n">pilih_ambang</span><span class="p">(</span><span class="n">val_rows</span><span class="p">,</span> <span class="n">pairs_val</span><span class="p">,</span> <span class="n">proba_dari</span><span class="p">(</span><span class="n">pairs_val</span><span class="p">))</span>
     <span class="n">metrics</span> <span class="o">=</span> <span class="n">_evaluasi_dengan_ambang</span><span class="p">(</span><span class="n">pairs_test</span><span class="p">,</span> <span class="n">test_rows</span><span class="p">,</span> <span class="n">proba_dari</span><span class="p">(</span><span class="n">pairs_test</span><span class="p">),</span> <span class="n">ambang</span><span class="p">)</span>
+    <span class="c1"># Uji tambahan (sesi plan03 yang tidak dilatih): kasus sulit dengan 5x lebih banyak contoh per kasus.</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">uji_rows</span><span class="p">):</span>
+        <span class="n">uji</span> <span class="o">=</span> <span class="n">_evaluasi_dengan_ambang</span><span class="p">(</span><span class="n">pairs_uji</span><span class="p">,</span> <span class="n">uji_rows</span><span class="p">,</span> <span class="n">proba_dari</span><span class="p">(</span><span class="n">pairs_uji</span><span class="p">),</span> <span class="n">ambang</span><span class="p">)[</span><span class="s2">&quot;pesan&quot;</span><span class="p">]</span>
+        <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;uji_tambahan&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;pesan&quot;</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">uji_rows</span><span class="p">),</span> <span class="s2">&quot;exact_match&quot;</span><span class="p">:</span> <span class="n">uji</span><span class="p">[</span><span class="s2">&quot;exact_match&quot;</span><span class="p">],</span> <span class="s2">&quot;target_f1&quot;</span><span class="p">:</span> <span class="n">uji</span><span class="p">[</span><span class="s2">&quot;target_f1&quot;</span><span class="p">],</span>
+            <span class="s2">&quot;per_case&quot;</span><span class="p">:</span> <span class="n">uji</span><span class="p">[</span><span class="s2">&quot;per_case&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">reset_index</span><span class="p">()</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(</span><span class="n">orient</span><span class="o">=</span><span class="s2">&quot;records&quot;</span><span class="p">),</span>
+        <span class="p">}</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Uji tambahan: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">uji_rows</span><span class="p">)</span><span class="si">}</span><span class="s2"> pesan | exact match </span><span class="si">{</span><span class="n">uji</span><span class="p">[</span><span class="s1">&#39;exact_match&#39;</span><span class="p">]</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2"> | target F1 </span><span class="si">{</span><span class="n">uji</span><span class="p">[</span><span class="s1">&#39;target_f1&#39;</span><span class="p">]</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">display</span><span class="p">(</span><span class="n">uji</span><span class="p">[</span><span class="s2">&quot;per_case&quot;</span><span class="p">])</span>
     <span class="k">return</span> <span class="p">(</span><span class="n">ambang</span><span class="p">,</span> <span class="n">metrics</span><span class="p">,</span> <span class="n">tabel_ambang</span><span class="p">)</span>
 
 <span class="c1"># Langsung jalankan tahap di atas.</span>
@@ -4516,16 +4591,118 @@ Melatih kandidat learning rate selesai.</pre></div></section><div class="md"><h4
         <span class="n">labels</span><span class="p">,</span>
         <span class="n">make_dataset</span><span class="p">,</span>
         <span class="n">pairs_test</span><span class="p">,</span>
+        <span class="n">pairs_uji</span><span class="p">,</span>
         <span class="n">pairs_val</span><span class="p">,</span>
         <span class="n">test_rows</span><span class="p">,</span>
         <span class="n">trainer</span><span class="p">,</span>
+        <span class="n">uji_rows</span><span class="p">,</span>
         <span class="n">val_rows</span><span class="p">,</span>
     <span class="p">)</span>
     <span class="n">waktu_transformer_result</span> <span class="o">+=</span> <span class="n">perf_counter</span><span class="p">()</span> <span class="o">-</span> <span class="n">_mulai_tahap</span>
     <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Mengevaluasi IndoBERT pada test&#39;</span> <span class="o">+</span> <span class="s2">&quot; selesai.&quot;</span><span class="p">)</span>
 <span class="k">else</span><span class="p">:</span>
     <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Mengevaluasi IndoBERT pada test dilewati: LATIH_INDOBERT = False.&quot;</span><span class="p">)</span>
-</pre><div class="keluaran"><div class="lbl">Keluaran</div><div class="tbl"></div><div class="tbl"></div><pre class="out">Mengevaluasi IndoBERT pada test selesai.</pre></div></section><div class="md"><h4>8. Menyusun ringkasan training</h4>
+</pre><div class="keluaran"><div class="lbl">Keluaran</div><div class="tbl"></div><div class="tbl"></div><div class="tbl"></div><pre class="out">Uji tambahan: 100 pesan | exact match 0.8900 | target F1 0.8962</pre><div class="tbl"><div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>jumlah</th>
+      <th>exact_match</th>
+    </tr>
+    <tr>
+      <th>case_name</th>
+      <th></th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>agreement</th>
+      <td>5</td>
+      <td>1.0</td>
+    </tr>
+    <tr>
+      <th>ambiguous</th>
+      <td>10</td>
+      <td>1.0</td>
+    </tr>
+    <tr>
+      <th>first_message_unknown</th>
+      <td>5</td>
+      <td>0.8</td>
+    </tr>
+    <tr>
+      <th>interruption</th>
+      <td>5</td>
+      <td>0.8</td>
+    </tr>
+    <tr>
+      <th>mixed_relations</th>
+      <td>10</td>
+      <td>0.7</td>
+    </tr>
+    <tr>
+      <th>multiple_targets</th>
+      <td>5</td>
+      <td>0.8</td>
+    </tr>
+    <tr>
+      <th>neutral_status</th>
+      <td>5</td>
+      <td>1.0</td>
+    </tr>
+    <tr>
+      <th>plural_reference</th>
+      <td>5</td>
+      <td>1.0</td>
+    </tr>
+    <tr>
+      <th>reference_start</th>
+      <td>10</td>
+      <td>0.5</td>
+    </tr>
+    <tr>
+      <th>rhetorical_question</th>
+      <td>5</td>
+      <td>1.0</td>
+    </tr>
+    <tr>
+      <th>second_person</th>
+      <td>5</td>
+      <td>1.0</td>
+    </tr>
+    <tr>
+      <th>self</th>
+      <td>10</td>
+      <td>1.0</td>
+    </tr>
+    <tr>
+      <th>short_history_1</th>
+      <td>10</td>
+      <td>1.0</td>
+    </tr>
+    <tr>
+      <th>witness</th>
+      <td>10</td>
+      <td>1.0</td>
+    </tr>
+  </tbody>
+</table>
+</div></div><pre class="out">Mengevaluasi IndoBERT pada test selesai.</pre></div></section><div class="md"><h4>8. Menyusun ringkasan training</h4>
 <p>Konfigurasi run, trial pemenang, riwayat epoch, dan hasil evaluasi dikumpulkan agar proses pemilihan model bisa diperiksa.</p>
 <p>Masukan dari tahap sebelumnya: <code>ambang</code>, <code>batch_size</code>, <code>best_trial</code>, <code>device</code>, <code>effective_precision</code>, <code>epochs</code>, <code>gradient_accumulation_steps</code>, <code>max_length</code>, <code>metrics</code>, <code>model_name</code>, <code>output_dir</code>, <code>report</code>, <code>tabel_ambang</code>, <code>trial_results</code>.</p>
 <p>Hasil untuk tahap selanjutnya: <code>summary</code>.</p></div><section class="cell" id="nlu_target-173"><div class="lbl">Sel 173 · nlu_target.ipynb</div><ul class="isi-sel"><li><code>ringkas_transformer_result</code> <span class='jenis'>fungsi</span><br>Cell ini untuk menyusun ringkasan training.</li></ul><pre class="code"><span class="c1"># Cell ini untuk menyusun ringkasan training.</span>
@@ -4585,8 +4762,8 @@ Melatih kandidat learning rate selesai.</pre></div></section><div class="md"><h4
 <span class="k">else</span><span class="p">:</span>
     <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Menyusun ringkasan training dilewati: LATIH_INDOBERT = False.&quot;</span><span class="p">)</span>
 </pre><div class="keluaran"><div class="lbl">Keluaran</div><pre class="out">--- Evaluasi Transformer (test; seleksi hanya dari validation) ---
-Best LR: 3e-05 | best epoch: 8.998657718120805
-Macro-F1 pasangan: 0.9236 | Exact match pesan: 0.8581 (tanpa ambang 0.8581, ambang 0.5 dari validation)
+Best LR: 3e-05 | best epoch: 5.998513011152417
+Macro-F1 pasangan: 0.9548 | Exact match pesan: 0.9032 (tanpa ambang 0.9032, ambang 0.5 dari validation)
 Menyusun ringkasan training selesai.</pre></div></section><div class="md"><h4>9. Menyimpan IndoBERT dan artefak</h4>
 <p>Model, tokenizer, label encoder, hasil prediksi test, dan ringkasan disimpan. Hasil dikemas untuk laporan tanpa mengulang training.</p>
 <p>Masukan dari tahap sebelumnya: <code>ambang</code>, <code>encoder</code>, <code>final_dir</code>, <code>metrics</code>, <code>model</code>, <code>report</code>, <code>summary</code>, <code>tokenizer</code>, <code>trainer</code>.</p>
@@ -4802,33 +4979,33 @@ Menyimpan IndoBERT dan artefak selesai.</pre></div></section><div class="md"><h4
     <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Laporan IndoBERT Transformer dilewati karena model tidak dilatih.&quot;</span><span class="p">)</span>
 </pre><div class="keluaran"><div class="lbl">Keluaran</div><pre class="out">RINGKASAN EVALUASI:</pre><div class="tbl"><style type="text/css">
 </style>
-<table id="T_25fa8">
+<table id="T_ff6d0">
   <thead>
     <tr>
-      <th id="T_25fa8_level0_col0" class="col_heading level0 col0" >Model</th>
-      <th id="T_25fa8_level0_col1" class="col_heading level0 col1" >Accuracy pasangan</th>
-      <th id="T_25fa8_level0_col2" class="col_heading level0 col2" >Macro-F1 pasangan</th>
-      <th id="T_25fa8_level0_col3" class="col_heading level0 col3" >Macro-F1 relasi</th>
-      <th id="T_25fa8_level0_col4" class="col_heading level0 col4" >F1 neutral</th>
-      <th id="T_25fa8_level0_col5" class="col_heading level0 col5" >Exact match pesan</th>
-      <th id="T_25fa8_level0_col6" class="col_heading level0 col6" >Exact match tanpa ambang</th>
-      <th id="T_25fa8_level0_col7" class="col_heading level0 col7" >Ambang</th>
-      <th id="T_25fa8_level0_col8" class="col_heading level0 col8" >Target F1 pesan</th>
-      <th id="T_25fa8_level0_col9" class="col_heading level0 col9" >Durasi (detik)</th>
+      <th id="T_ff6d0_level0_col0" class="col_heading level0 col0" >Model</th>
+      <th id="T_ff6d0_level0_col1" class="col_heading level0 col1" >Accuracy pasangan</th>
+      <th id="T_ff6d0_level0_col2" class="col_heading level0 col2" >Macro-F1 pasangan</th>
+      <th id="T_ff6d0_level0_col3" class="col_heading level0 col3" >Macro-F1 relasi</th>
+      <th id="T_ff6d0_level0_col4" class="col_heading level0 col4" >F1 neutral</th>
+      <th id="T_ff6d0_level0_col5" class="col_heading level0 col5" >Exact match pesan</th>
+      <th id="T_ff6d0_level0_col6" class="col_heading level0 col6" >Exact match tanpa ambang</th>
+      <th id="T_ff6d0_level0_col7" class="col_heading level0 col7" >Ambang</th>
+      <th id="T_ff6d0_level0_col8" class="col_heading level0 col8" >Target F1 pesan</th>
+      <th id="T_ff6d0_level0_col9" class="col_heading level0 col9" >Durasi (detik)</th>
     </tr>
   </thead>
   <tbody>
     <tr>
-      <td id="T_25fa8_row0_col0" class="data row0 col0" >IndoBERT Transformer</td>
-      <td id="T_25fa8_row0_col1" class="data row0 col1" >0.969900</td>
-      <td id="T_25fa8_row0_col2" class="data row0 col2" >0.923600</td>
-      <td id="T_25fa8_row0_col3" class="data row0 col3" >0.896100</td>
-      <td id="T_25fa8_row0_col4" class="data row0 col4" >0.918900</td>
-      <td id="T_25fa8_row0_col5" class="data row0 col5" >0.858100</td>
-      <td id="T_25fa8_row0_col6" class="data row0 col6" >0.858100</td>
-      <td id="T_25fa8_row0_col7" class="data row0 col7" >0.500000</td>
-      <td id="T_25fa8_row0_col8" class="data row0 col8" >0.898600</td>
-      <td id="T_25fa8_row0_col9" class="data row0 col9" >2290.7</td>
+      <td id="T_ff6d0_row0_col0" class="data row0 col0" >IndoBERT Transformer</td>
+      <td id="T_ff6d0_row0_col1" class="data row0 col1" >0.981700</td>
+      <td id="T_ff6d0_row0_col2" class="data row0 col2" >0.954800</td>
+      <td id="T_ff6d0_row0_col3" class="data row0 col3" >0.940100</td>
+      <td id="T_ff6d0_row0_col4" class="data row0 col4" >0.950000</td>
+      <td id="T_ff6d0_row0_col5" class="data row0 col5" >0.903200</td>
+      <td id="T_ff6d0_row0_col6" class="data row0 col6" >0.903200</td>
+      <td id="T_ff6d0_row0_col7" class="data row0 col7" >0.500000</td>
+      <td id="T_ff6d0_row0_col8" class="data row0 col8" >0.942800</td>
+      <td id="T_ff6d0_row0_col9" class="data row0 col9" >3411.9</td>
     </tr>
   </tbody>
 </table>
@@ -4836,23 +5013,23 @@ Menyimpan IndoBERT dan artefak selesai.</pre></div></section><div class="md"><h4
 LAPORAN PER RELASI (pasangan):
               precision    recall  f1-score   support
 
-      defend       0.94      0.85      0.89        72
-     neutral       0.94      0.89      0.92        19
-      offend       0.89      0.92      0.90        60
-   tidak_ada       0.98      0.99      0.98       780
+      defend       0.99      0.93      0.96        72
+     neutral       0.90      1.00      0.95        19
+      offend       0.95      0.90      0.92        60
+   tidak_ada       0.99      0.99      0.99       780
 
-    accuracy                           0.97       931
-   macro avg       0.94      0.91      0.92       931
-weighted avg       0.97      0.97      0.97       931
+    accuracy                           0.98       931
+   macro avg       0.96      0.96      0.95       931
+weighted avg       0.98      0.98      0.98       931
 
 EXACT MATCH PER KASUS (pesan test):</pre><div class="tbl"><style type="text/css">
 </style>
-<table id="T_a0729">
+<table id="T_4c2f0">
   <thead>
     <tr>
       <th class="blank level0" >&nbsp;</th>
-      <th id="T_a0729_level0_col0" class="col_heading level0 col0" >jumlah</th>
-      <th id="T_a0729_level0_col1" class="col_heading level0 col1" >exact_match</th>
+      <th id="T_4c2f0_level0_col0" class="col_heading level0 col0" >jumlah</th>
+      <th id="T_4c2f0_level0_col1" class="col_heading level0 col1" >exact_match</th>
     </tr>
     <tr>
       <th class="index_name level0" >case_name</th>
@@ -4862,262 +5039,262 @@ EXACT MATCH PER KASUS (pesan test):</pre><div class="tbl"><style type="text/css"
   </thead>
   <tbody>
     <tr>
-      <th id="T_a0729_level0_row0" class="row_heading level0 row0" >ambiguous</th>
-      <td id="T_a0729_row0_col0" class="data row0 col0" >5</td>
-      <td id="T_a0729_row0_col1" class="data row0 col1" >0.60</td>
+      <th id="T_4c2f0_level0_row0" class="row_heading level0 row0" >mixed_relations</th>
+      <td id="T_4c2f0_row0_col0" class="data row0 col0" >5</td>
+      <td id="T_4c2f0_row0_col1" class="data row0 col1" >0.60</td>
     </tr>
     <tr>
-      <th id="T_a0729_level0_row1" class="row_heading level0 row1" >mixed_relations</th>
-      <td id="T_a0729_row1_col0" class="data row1 col0" >5</td>
-      <td id="T_a0729_row1_col1" class="data row1 col1" >0.60</td>
+      <th id="T_4c2f0_level0_row1" class="row_heading level0 row1" >reference_start</th>
+      <td id="T_4c2f0_row1_col0" class="data row1 col0" >5</td>
+      <td id="T_4c2f0_row1_col1" class="data row1 col1" >0.60</td>
     </tr>
     <tr>
-      <th id="T_a0729_level0_row2" class="row_heading level0 row2" >short_history_1</th>
-      <td id="T_a0729_row2_col0" class="data row2 col0" >5</td>
-      <td id="T_a0729_row2_col1" class="data row2 col1" >0.60</td>
+      <th id="T_4c2f0_level0_row2" class="row_heading level0 row2" >self</th>
+      <td id="T_4c2f0_row2_col0" class="data row2 col0" >5</td>
+      <td id="T_4c2f0_row2_col1" class="data row2 col1" >0.60</td>
     </tr>
     <tr>
-      <th id="T_a0729_level0_row3" class="row_heading level0 row3" >reference_start</th>
-      <td id="T_a0729_row3_col0" class="data row3 col0" >5</td>
-      <td id="T_a0729_row3_col1" class="data row3 col1" >0.60</td>
+      <th id="T_4c2f0_level0_row3" class="row_heading level0 row3" >negation</th>
+      <td id="T_4c2f0_row3_col0" class="data row3 col0" >5</td>
+      <td id="T_4c2f0_row3_col1" class="data row3 col1" >0.80</td>
     </tr>
     <tr>
-      <th id="T_a0729_level0_row4" class="row_heading level0 row4" >witness</th>
-      <td id="T_a0729_row4_col0" class="data row4 col0" >5</td>
-      <td id="T_a0729_row4_col1" class="data row4 col1" >0.60</td>
+      <th id="T_4c2f0_level0_row4" class="row_heading level0 row4" >outside_window_unknown</th>
+      <td id="T_4c2f0_row4_col0" class="data row4 col0" >5</td>
+      <td id="T_4c2f0_row4_col1" class="data row4 col1" >0.80</td>
     </tr>
     <tr>
-      <th id="T_a0729_level0_row5" class="row_heading level0 row5" >multiple_targets</th>
-      <td id="T_a0729_row5_col0" class="data row5 col0" >5</td>
-      <td id="T_a0729_row5_col1" class="data row5 col1" >0.80</td>
+      <th id="T_4c2f0_level0_row5" class="row_heading level0 row5" >rhetorical_question</th>
+      <td id="T_4c2f0_row5_col0" class="data row5 col0" >5</td>
+      <td id="T_4c2f0_row5_col1" class="data row5 col1" >0.80</td>
     </tr>
     <tr>
-      <th id="T_a0729_level0_row6" class="row_heading level0 row6" >interruption</th>
-      <td id="T_a0729_row6_col0" class="data row6 col0" >5</td>
-      <td id="T_a0729_row6_col1" class="data row6 col1" >0.80</td>
+      <th id="T_4c2f0_level0_row6" class="row_heading level0 row6" >short_history_3</th>
+      <td id="T_4c2f0_row6_col0" class="data row6 col0" >5</td>
+      <td id="T_4c2f0_row6_col1" class="data row6 col1" >0.80</td>
     </tr>
     <tr>
-      <th id="T_a0729_level0_row7" class="row_heading level0 row7" >agreement</th>
-      <td id="T_a0729_row7_col0" class="data row7 col0" >5</td>
-      <td id="T_a0729_row7_col1" class="data row7 col1" >0.80</td>
+      <th id="T_4c2f0_level0_row7" class="row_heading level0 row7" >second_person</th>
+      <td id="T_4c2f0_row7_col0" class="data row7 col0" >5</td>
+      <td id="T_4c2f0_row7_col1" class="data row7 col1" >0.80</td>
     </tr>
     <tr>
-      <th id="T_a0729_level0_row8" class="row_heading level0 row8" >quotation</th>
-      <td id="T_a0729_row8_col0" class="data row8 col0" >5</td>
-      <td id="T_a0729_row8_col1" class="data row8 col1" >0.80</td>
+      <th id="T_4c2f0_level0_row8" class="row_heading level0 row8" >plural_reference</th>
+      <td id="T_4c2f0_row8_col0" class="data row8 col0" >5</td>
+      <td id="T_4c2f0_row8_col1" class="data row8 col1" >0.80</td>
     </tr>
     <tr>
-      <th id="T_a0729_level0_row9" class="row_heading level0 row9" >reference_middle</th>
-      <td id="T_a0729_row9_col0" class="data row9 col0" >5</td>
-      <td id="T_a0729_row9_col1" class="data row9 col1" >0.80</td>
+      <th id="T_4c2f0_level0_row9" class="row_heading level0 row9" >short_history_1</th>
+      <td id="T_4c2f0_row9_col0" class="data row9 col0" >5</td>
+      <td id="T_4c2f0_row9_col1" class="data row9 col1" >0.80</td>
     </tr>
     <tr>
-      <th id="T_a0729_level0_row10" class="row_heading level0 row10" >second_person</th>
-      <td id="T_a0729_row10_col0" class="data row10 col0" >5</td>
-      <td id="T_a0729_row10_col1" class="data row10 col1" >0.80</td>
+      <th id="T_4c2f0_level0_row10" class="row_heading level0 row10" >topic_switch</th>
+      <td id="T_4c2f0_row10_col0" class="data row10 col0" >5</td>
+      <td id="T_4c2f0_row10_col1" class="data row10 col1" >0.80</td>
     </tr>
     <tr>
-      <th id="T_a0729_level0_row11" class="row_heading level0 row11" >rhetorical_question</th>
-      <td id="T_a0729_row11_col0" class="data row11 col0" >5</td>
-      <td id="T_a0729_row11_col1" class="data row11 col1" >0.80</td>
+      <th id="T_4c2f0_level0_row11" class="row_heading level0 row11" >witness</th>
+      <td id="T_4c2f0_row11_col0" class="data row11 col0" >5</td>
+      <td id="T_4c2f0_row11_col1" class="data row11 col1" >0.80</td>
     </tr>
     <tr>
-      <th id="T_a0729_level0_row12" class="row_heading level0 row12" >plural_reference</th>
-      <td id="T_a0729_row12_col0" class="data row12 col0" >5</td>
-      <td id="T_a0729_row12_col1" class="data row12 col1" >0.80</td>
+      <th id="T_4c2f0_level0_row12" class="row_heading level0 row12" >first_message_self</th>
+      <td id="T_4c2f0_row12_col0" class="data row12 col0" >5</td>
+      <td id="T_4c2f0_row12_col1" class="data row12 col1" >1.00</td>
     </tr>
     <tr>
-      <th id="T_a0729_level0_row13" class="row_heading level0 row13" >neutral_status</th>
-      <td id="T_a0729_row13_col0" class="data row13 col0" >5</td>
-      <td id="T_a0729_row13_col1" class="data row13 col1" >0.80</td>
+      <th id="T_4c2f0_level0_row13" class="row_heading level0 row13" >first_message_unknown</th>
+      <td id="T_4c2f0_row13_col0" class="data row13 col0" >5</td>
+      <td id="T_4c2f0_row13_col1" class="data row13 col1" >1.00</td>
     </tr>
     <tr>
-      <th id="T_a0729_level0_row14" class="row_heading level0 row14" >first_message_unknown</th>
-      <td id="T_a0729_row14_col0" class="data row14 col0" >5</td>
-      <td id="T_a0729_row14_col1" class="data row14 col1" >0.80</td>
+      <th id="T_4c2f0_level0_row14" class="row_heading level0 row14" >agreement</th>
+      <td id="T_4c2f0_row14_col0" class="data row14 col0" >5</td>
+      <td id="T_4c2f0_row14_col1" class="data row14 col1" >1.00</td>
     </tr>
     <tr>
-      <th id="T_a0729_level0_row15" class="row_heading level0 row15" >topic_switch</th>
-      <td id="T_a0729_row15_col0" class="data row15 col0" >5</td>
-      <td id="T_a0729_row15_col1" class="data row15 col1" >0.80</td>
+      <th id="T_4c2f0_level0_row15" class="row_heading level0 row15" >ambiguous</th>
+      <td id="T_4c2f0_row15_col0" class="data row15 col0" >5</td>
+      <td id="T_4c2f0_row15_col1" class="data row15 col1" >1.00</td>
     </tr>
     <tr>
-      <th id="T_a0729_level0_row16" class="row_heading level0 row16" >self</th>
-      <td id="T_a0729_row16_col0" class="data row16 col0" >5</td>
-      <td id="T_a0729_row16_col1" class="data row16 col1" >0.80</td>
+      <th id="T_4c2f0_level0_row16" class="row_heading level0 row16" >original</th>
+      <td id="T_4c2f0_row16_col0" class="data row16 col0" >5</td>
+      <td id="T_4c2f0_row16_col1" class="data row16 col1" >1.00</td>
     </tr>
     <tr>
-      <th id="T_a0729_level0_row17" class="row_heading level0 row17" >original</th>
-      <td id="T_a0729_row17_col0" class="data row17 col0" >5</td>
-      <td id="T_a0729_row17_col1" class="data row17 col1" >1.00</td>
+      <th id="T_4c2f0_level0_row17" class="row_heading level0 row17" >nickname</th>
+      <td id="T_4c2f0_row17_col0" class="data row17 col0" >5</td>
+      <td id="T_4c2f0_row17_col1" class="data row17 col1" >1.00</td>
     </tr>
     <tr>
-      <th id="T_a0729_level0_row18" class="row_heading level0 row18" >neutral_names</th>
-      <td id="T_a0729_row18_col0" class="data row18 col0" >5</td>
-      <td id="T_a0729_row18_col1" class="data row18 col1" >1.00</td>
+      <th id="T_4c2f0_level0_row18" class="row_heading level0 row18" >neutral_status</th>
+      <td id="T_4c2f0_row18_col0" class="data row18 col0" >5</td>
+      <td id="T_4c2f0_row18_col1" class="data row18 col1" >1.00</td>
     </tr>
     <tr>
-      <th id="T_a0729_level0_row19" class="row_heading level0 row19" >neutral_after_accusation</th>
-      <td id="T_a0729_row19_col0" class="data row19 col0" >5</td>
-      <td id="T_a0729_row19_col1" class="data row19 col1" >1.00</td>
+      <th id="T_4c2f0_level0_row19" class="row_heading level0 row19" >neutral_names</th>
+      <td id="T_4c2f0_row19_col0" class="data row19 col0" >5</td>
+      <td id="T_4c2f0_row19_col1" class="data row19 col1" >1.00</td>
     </tr>
     <tr>
-      <th id="T_a0729_level0_row20" class="row_heading level0 row20" >negation</th>
-      <td id="T_a0729_row20_col0" class="data row20 col0" >5</td>
-      <td id="T_a0729_row20_col1" class="data row20 col1" >1.00</td>
+      <th id="T_4c2f0_level0_row20" class="row_heading level0 row20" >neutral_after_accusation</th>
+      <td id="T_4c2f0_row20_col0" class="data row20 col0" >5</td>
+      <td id="T_4c2f0_row20_col1" class="data row20 col1" >1.00</td>
     </tr>
     <tr>
-      <th id="T_a0729_level0_row21" class="row_heading level0 row21" >explicit</th>
-      <td id="T_a0729_row21_col0" class="data row21 col0" >5</td>
-      <td id="T_a0729_row21_col1" class="data row21 col1" >1.00</td>
+      <th id="T_4c2f0_level0_row21" class="row_heading level0 row21" >multiple_targets</th>
+      <td id="T_4c2f0_row21_col0" class="data row21 col0" >5</td>
+      <td id="T_4c2f0_row21_col1" class="data row21 col1" >1.00</td>
     </tr>
     <tr>
-      <th id="T_a0729_level0_row22" class="row_heading level0 row22" >first_message_self</th>
-      <td id="T_a0729_row22_col0" class="data row22 col0" >5</td>
-      <td id="T_a0729_row22_col1" class="data row22 col1" >1.00</td>
+      <th id="T_4c2f0_level0_row22" class="row_heading level0 row22" >interruption</th>
+      <td id="T_4c2f0_row22_col0" class="data row22 col0" >5</td>
+      <td id="T_4c2f0_row22_col1" class="data row22 col1" >1.00</td>
     </tr>
     <tr>
-      <th id="T_a0729_level0_row23" class="row_heading level0 row23" >memory_outside_window</th>
-      <td id="T_a0729_row23_col0" class="data row23 col0" >5</td>
-      <td id="T_a0729_row23_col1" class="data row23 col1" >1.00</td>
+      <th id="T_4c2f0_level0_row23" class="row_heading level0 row23" >memory_outside_window</th>
+      <td id="T_4c2f0_row23_col0" class="data row23 col0" >5</td>
+      <td id="T_4c2f0_row23_col1" class="data row23 col1" >1.00</td>
     </tr>
     <tr>
-      <th id="T_a0729_level0_row24" class="row_heading level0 row24" >first_message</th>
-      <td id="T_a0729_row24_col0" class="data row24 col0" >5</td>
-      <td id="T_a0729_row24_col1" class="data row24 col1" >1.00</td>
+      <th id="T_4c2f0_level0_row24" class="row_heading level0 row24" >first_message</th>
+      <td id="T_4c2f0_row24_col0" class="data row24 col0" >5</td>
+      <td id="T_4c2f0_row24_col1" class="data row24 col1" >1.00</td>
     </tr>
     <tr>
-      <th id="T_a0729_level0_row25" class="row_heading level0 row25" >nickname</th>
-      <td id="T_a0729_row25_col0" class="data row25 col0" >5</td>
-      <td id="T_a0729_row25_col1" class="data row25 col1" >1.00</td>
+      <th id="T_4c2f0_level0_row25" class="row_heading level0 row25" >explicit</th>
+      <td id="T_4c2f0_row25_col0" class="data row25 col0" >5</td>
+      <td id="T_4c2f0_row25_col1" class="data row25 col1" >1.00</td>
     </tr>
     <tr>
-      <th id="T_a0729_level0_row26" class="row_heading level0 row26" >outside_window_unknown</th>
-      <td id="T_a0729_row26_col0" class="data row26 col0" >5</td>
-      <td id="T_a0729_row26_col1" class="data row26 col1" >1.00</td>
+      <th id="T_4c2f0_level0_row26" class="row_heading level0 row26" >quotation</th>
+      <td id="T_4c2f0_row26_col0" class="data row26 col0" >5</td>
+      <td id="T_4c2f0_row26_col1" class="data row26 col1" >1.00</td>
     </tr>
     <tr>
-      <th id="T_a0729_level0_row27" class="row_heading level0 row27" >reference_end</th>
-      <td id="T_a0729_row27_col0" class="data row27 col0" >5</td>
-      <td id="T_a0729_row27_col1" class="data row27 col1" >1.00</td>
+      <th id="T_4c2f0_level0_row27" class="row_heading level0 row27" >reference_end</th>
+      <td id="T_4c2f0_row27_col0" class="data row27 col0" >5</td>
+      <td id="T_4c2f0_row27_col1" class="data row27 col1" >1.00</td>
     </tr>
     <tr>
-      <th id="T_a0729_level0_row28" class="row_heading level0 row28" >short_history_3</th>
-      <td id="T_a0729_row28_col0" class="data row28 col0" >5</td>
-      <td id="T_a0729_row28_col1" class="data row28 col1" >1.00</td>
+      <th id="T_4c2f0_level0_row28" class="row_heading level0 row28" >reference_middle</th>
+      <td id="T_4c2f0_row28_col0" class="data row28 col0" >5</td>
+      <td id="T_4c2f0_row28_col1" class="data row28 col1" >1.00</td>
     </tr>
     <tr>
-      <th id="T_a0729_level0_row29" class="row_heading level0 row29" >short_history_2</th>
-      <td id="T_a0729_row29_col0" class="data row29 col0" >5</td>
-      <td id="T_a0729_row29_col1" class="data row29 col1" >1.00</td>
+      <th id="T_4c2f0_level0_row29" class="row_heading level0 row29" >short_history_2</th>
+      <td id="T_4c2f0_row29_col0" class="data row29 col0" >5</td>
+      <td id="T_4c2f0_row29_col1" class="data row29 col1" >1.00</td>
     </tr>
     <tr>
-      <th id="T_a0729_level0_row30" class="row_heading level0 row30" >stance_change</th>
-      <td id="T_a0729_row30_col0" class="data row30 col0" >5</td>
-      <td id="T_a0729_row30_col1" class="data row30 col1" >1.00</td>
+      <th id="T_4c2f0_level0_row30" class="row_heading level0 row30" >stance_change</th>
+      <td id="T_4c2f0_row30_col0" class="data row30 col0" >5</td>
+      <td id="T_4c2f0_row30_col1" class="data row30 col1" >1.00</td>
     </tr>
   </tbody>
 </table>
 </div><pre class="out">HASIL 12 SKENARIO UJI (bukan data pemilihan model):</pre><div class="tbl"><style type="text/css">
-#T_6d8e0_row0_col1, #T_6d8e0_row1_col1, #T_6d8e0_row2_col1, #T_6d8e0_row3_col1, #T_6d8e0_row4_col1, #T_6d8e0_row5_col1, #T_6d8e0_row6_col1, #T_6d8e0_row7_col1, #T_6d8e0_row8_col1, #T_6d8e0_row9_col1, #T_6d8e0_row10_col1, #T_6d8e0_row11_col1 {
+#T_43147_row0_col1, #T_43147_row1_col1, #T_43147_row2_col1, #T_43147_row3_col1, #T_43147_row4_col1, #T_43147_row5_col1, #T_43147_row6_col1, #T_43147_row7_col1, #T_43147_row8_col1, #T_43147_row9_col1, #T_43147_row10_col1, #T_43147_row11_col1 {
   white-space: normal;
   max-width: 380px;
 }
 </style>
-<table id="T_6d8e0">
+<table id="T_43147">
   <thead>
     <tr>
-      <th id="T_6d8e0_level0_col0" class="col_heading level0 col0" >Skenario</th>
-      <th id="T_6d8e0_level0_col1" class="col_heading level0 col1" >Pesan</th>
-      <th id="T_6d8e0_level0_col2" class="col_heading level0 col2" >Target harapan</th>
-      <th id="T_6d8e0_level0_col3" class="col_heading level0 col3" >Prediksi</th>
-      <th id="T_6d8e0_level0_col4" class="col_heading level0 col4" >Cocok</th>
+      <th id="T_43147_level0_col0" class="col_heading level0 col0" >Skenario</th>
+      <th id="T_43147_level0_col1" class="col_heading level0 col1" >Pesan</th>
+      <th id="T_43147_level0_col2" class="col_heading level0 col2" >Target harapan</th>
+      <th id="T_43147_level0_col3" class="col_heading level0 col3" >Prediksi</th>
+      <th id="T_43147_level0_col4" class="col_heading level0 col4" >Cocok</th>
     </tr>
   </thead>
   <tbody>
     <tr>
-      <td id="T_6d8e0_row0_col0" class="data row0 col0" >nama langsung</td>
-      <td id="T_6d8e0_row0_col1" class="data row0 col1" >Aku curiga Budi, alibinya berubah terus.</td>
-      <td id="T_6d8e0_row0_col2" class="data row0 col2" >[('Budi', 'offend')]</td>
-      <td id="T_6d8e0_row0_col3" class="data row0 col3" >[('Budi', 'offend')]</td>
-      <td id="T_6d8e0_row0_col4" class="data row0 col4" >True</td>
+      <td id="T_43147_row0_col0" class="data row0 col0" >nama langsung</td>
+      <td id="T_43147_row0_col1" class="data row0 col1" >Aku curiga Budi, alibinya berubah terus.</td>
+      <td id="T_43147_row0_col2" class="data row0 col2" >[('Budi', 'offend')]</td>
+      <td id="T_43147_row0_col3" class="data row0 col3" >[('Budi', 'offend')]</td>
+      <td id="T_43147_row0_col4" class="data row0 col4" >True</td>
     </tr>
     <tr>
-      <td id="T_6d8e0_row1_col0" class="data row1 col0" >membela diri</td>
-      <td id="T_6d8e0_row1_col1" class="data row1 col1" >Aku bukan Hitman, dari tadi aku cuma baca chat.</td>
-      <td id="T_6d8e0_row1_col2" class="data row1 col2" >[('Citra', 'defend')]</td>
-      <td id="T_6d8e0_row1_col3" class="data row1 col3" >[('Citra', 'defend')]</td>
-      <td id="T_6d8e0_row1_col4" class="data row1 col4" >True</td>
+      <td id="T_43147_row1_col0" class="data row1 col0" >membela diri</td>
+      <td id="T_43147_row1_col1" class="data row1 col1" >Aku bukan Hitman, dari tadi aku cuma baca chat.</td>
+      <td id="T_43147_row1_col2" class="data row1 col2" >[('Citra', 'defend')]</td>
+      <td id="T_43147_row1_col3" class="data row1 col3" >[('Citra', 'defend')]</td>
+      <td id="T_43147_row1_col4" class="data row1 col4" >True</td>
     </tr>
     <tr>
-      <td id="T_6d8e0_row2_col0" class="data row2 col0" >kata ganti dari konteks</td>
-      <td id="T_6d8e0_row2_col1" class="data row2 col1" >Iya, dia pasti pelakunya.</td>
-      <td id="T_6d8e0_row2_col2" class="data row2 col2" >[('Budi', 'offend')]</td>
-      <td id="T_6d8e0_row2_col3" class="data row2 col3" >[('Budi', 'offend')]</td>
-      <td id="T_6d8e0_row2_col4" class="data row2 col4" >True</td>
+      <td id="T_43147_row2_col0" class="data row2 col0" >kata ganti dari konteks</td>
+      <td id="T_43147_row2_col1" class="data row2 col1" >Iya, dia pasti pelakunya.</td>
+      <td id="T_43147_row2_col2" class="data row2 col2" >[('Budi', 'offend')]</td>
+      <td id="T_43147_row2_col3" class="data row2 col3" >[('Budi', 'offend')]</td>
+      <td id="T_43147_row2_col4" class="data row2 col4" >True</td>
     </tr>
     <tr>
-      <td id="T_6d8e0_row3_col0" class="data row3 col0" >relasi campuran</td>
-      <td id="T_6d8e0_row3_col1" class="data row3 col1" >Budi bukan Hitman, justru Andi yang aneh dari tadi.</td>
-      <td id="T_6d8e0_row3_col2" class="data row3 col2" >[('Andi', 'offend'), ('Budi', 'defend')]</td>
-      <td id="T_6d8e0_row3_col3" class="data row3 col3" >[('Andi', 'offend'), ('Budi', 'defend')]</td>
-      <td id="T_6d8e0_row3_col4" class="data row3 col4" >True</td>
+      <td id="T_43147_row3_col0" class="data row3 col0" >relasi campuran</td>
+      <td id="T_43147_row3_col1" class="data row3 col1" >Budi bukan Hitman, justru Andi yang aneh dari tadi.</td>
+      <td id="T_43147_row3_col2" class="data row3 col2" >[('Andi', 'offend'), ('Budi', 'defend')]</td>
+      <td id="T_43147_row3_col3" class="data row3 col3" >[('Andi', 'offend'), ('Budi', 'defend')]</td>
+      <td id="T_43147_row3_col4" class="data row3 col4" >True</td>
     </tr>
     <tr>
-      <td id="T_6d8e0_row4_col0" class="data row4 col0" >kamu ke pengirim sebelumnya</td>
-      <td id="T_6d8e0_row4_col1" class="data row4 col1" >Kamu dari tadi menghindar terus, kamu Hitman ya?</td>
-      <td id="T_6d8e0_row4_col2" class="data row4 col2" >[('Budi', 'offend')]</td>
-      <td id="T_6d8e0_row4_col3" class="data row4 col3" >[('tidak_diketahui', 'offend')]</td>
-      <td id="T_6d8e0_row4_col4" class="data row4 col4" >False</td>
+      <td id="T_43147_row4_col0" class="data row4 col0" >kamu ke pengirim sebelumnya</td>
+      <td id="T_43147_row4_col1" class="data row4 col1" >Kamu dari tadi menghindar terus, kamu Hitman ya?</td>
+      <td id="T_43147_row4_col2" class="data row4 col2" >[('Budi', 'offend')]</td>
+      <td id="T_43147_row4_col3" class="data row4 col3" >[('Budi', 'offend')]</td>
+      <td id="T_43147_row4_col4" class="data row4 col4" >True</td>
     </tr>
     <tr>
-      <td id="T_6d8e0_row5_col0" class="data row5 col0" >setuju dengan tuduhan</td>
-      <td id="T_6d8e0_row5_col1" class="data row5 col1" >Setuju, aku juga merasa begitu.</td>
-      <td id="T_6d8e0_row5_col2" class="data row5 col2" >[('Citra', 'offend')]</td>
-      <td id="T_6d8e0_row5_col3" class="data row5 col3" >[('Citra', 'offend')]</td>
-      <td id="T_6d8e0_row5_col4" class="data row5 col4" >True</td>
+      <td id="T_43147_row5_col0" class="data row5 col0" >setuju dengan tuduhan</td>
+      <td id="T_43147_row5_col1" class="data row5 col1" >Setuju, aku juga merasa begitu.</td>
+      <td id="T_43147_row5_col2" class="data row5 col2" >[('Citra', 'offend')]</td>
+      <td id="T_43147_row5_col3" class="data row5 col3" >[('Citra', 'offend')]</td>
+      <td id="T_43147_row5_col4" class="data row5 col4" >True</td>
     </tr>
     <tr>
-      <td id="T_6d8e0_row6_col0" class="data row6 col0" >rujukan jamak</td>
-      <td id="T_6d8e0_row6_col1" class="data row6 col1" >Mereka berdua memang mencurigakan.</td>
-      <td id="T_6d8e0_row6_col2" class="data row6 col2" >[('Budi', 'offend'), ('Citra', 'offend')]</td>
-      <td id="T_6d8e0_row6_col3" class="data row6 col3" >[('Budi', 'offend'), ('Citra', 'offend')]</td>
-      <td id="T_6d8e0_row6_col4" class="data row6 col4" >True</td>
+      <td id="T_43147_row6_col0" class="data row6 col0" >rujukan jamak</td>
+      <td id="T_43147_row6_col1" class="data row6 col1" >Mereka berdua memang mencurigakan.</td>
+      <td id="T_43147_row6_col2" class="data row6 col2" >[('Budi', 'offend'), ('Citra', 'offend')]</td>
+      <td id="T_43147_row6_col3" class="data row6 col3" >[('Budi', 'offend'), ('Citra', 'offend')]</td>
+      <td id="T_43147_row6_col4" class="data row6 col4" >True</td>
     </tr>
     <tr>
-      <td id="T_6d8e0_row7_col0" class="data row7 col0" >saksi bukan target</td>
-      <td id="T_6d8e0_row7_col1" class="data row7 col1" >Dari cerita Citra, aku curiga Budi yang menyandera.</td>
-      <td id="T_6d8e0_row7_col2" class="data row7 col2" >[('Budi', 'offend')]</td>
-      <td id="T_6d8e0_row7_col3" class="data row7 col3" >[('Budi', 'offend'), ('Citra', 'defend')]</td>
-      <td id="T_6d8e0_row7_col4" class="data row7 col4" >False</td>
+      <td id="T_43147_row7_col0" class="data row7 col0" >saksi bukan target</td>
+      <td id="T_43147_row7_col1" class="data row7 col1" >Dari cerita Citra, aku curiga Budi yang menyandera.</td>
+      <td id="T_43147_row7_col2" class="data row7 col2" >[('Budi', 'offend')]</td>
+      <td id="T_43147_row7_col3" class="data row7 col3" >[('Budi', 'offend')]</td>
+      <td id="T_43147_row7_col4" class="data row7 col4" >True</td>
     </tr>
     <tr>
-      <td id="T_6d8e0_row8_col0" class="data row8 col0" >nama panggilan</td>
-      <td id="T_6d8e0_row8_col1" class="data row8 col1" >Jangan vote Dika, dia bukan pelakunya.</td>
-      <td id="T_6d8e0_row8_col2" class="data row8 col2" >[('Andika', 'defend')]</td>
-      <td id="T_6d8e0_row8_col3" class="data row8 col3" >[('Andika', 'defend')]</td>
-      <td id="T_6d8e0_row8_col4" class="data row8 col4" >True</td>
+      <td id="T_43147_row8_col0" class="data row8 col0" >nama panggilan</td>
+      <td id="T_43147_row8_col1" class="data row8 col1" >Jangan vote Dika, dia bukan pelakunya.</td>
+      <td id="T_43147_row8_col2" class="data row8 col2" >[('Andika', 'defend')]</td>
+      <td id="T_43147_row8_col3" class="data row8 col3" >[('Andika', 'defend')]</td>
+      <td id="T_43147_row8_col4" class="data row8 col4" >True</td>
     </tr>
     <tr>
-      <td id="T_6d8e0_row9_col0" class="data row9 col0" >acuan tidak jelas</td>
-      <td id="T_6d8e0_row9_col1" class="data row9 col1" >Dia pasti Hitman.</td>
-      <td id="T_6d8e0_row9_col2" class="data row9 col2" >[('tidak_diketahui', 'offend')]</td>
-      <td id="T_6d8e0_row9_col3" class="data row9 col3" >[('tidak_diketahui', 'offend')]</td>
-      <td id="T_6d8e0_row9_col4" class="data row9 col4" >True</td>
+      <td id="T_43147_row9_col0" class="data row9 col0" >acuan tidak jelas</td>
+      <td id="T_43147_row9_col1" class="data row9 col1" >Dia pasti Hitman.</td>
+      <td id="T_43147_row9_col2" class="data row9 col2" >[('tidak_diketahui', 'offend')]</td>
+      <td id="T_43147_row9_col3" class="data row9 col3" >[('tidak_diketahui', 'offend')]</td>
+      <td id="T_43147_row9_col4" class="data row9 col4" >True</td>
     </tr>
     <tr>
-      <td id="T_6d8e0_row10_col0" class="data row10 col0" >pertanyaan neutral ke pemain</td>
-      <td id="T_6d8e0_row10_col1" class="data row10 col1" >Budi, kamu semalam Guard siapa?</td>
-      <td id="T_6d8e0_row10_col2" class="data row10 col2" >[('Budi', 'neutral')]</td>
-      <td id="T_6d8e0_row10_col3" class="data row10 col3" >[('Budi', 'neutral')]</td>
-      <td id="T_6d8e0_row10_col4" class="data row10 col4" >True</td>
+      <td id="T_43147_row10_col0" class="data row10 col0" >pertanyaan neutral ke pemain</td>
+      <td id="T_43147_row10_col1" class="data row10 col1" >Budi, kamu semalam Guard siapa?</td>
+      <td id="T_43147_row10_col2" class="data row10 col2" >[('Budi', 'neutral')]</td>
+      <td id="T_43147_row10_col3" class="data row10 col3" >[('Budi', 'neutral')]</td>
+      <td id="T_43147_row10_col4" class="data row10 col4" >True</td>
     </tr>
     <tr>
-      <td id="T_6d8e0_row11_col0" class="data row11 col0" >pertanyaan neutral ke semua</td>
-      <td id="T_6d8e0_row11_col1" class="data row11 col1" >Ada yang tau sisa waktu vote tinggal berapa?</td>
-      <td id="T_6d8e0_row11_col2" class="data row11 col2" >[]</td>
-      <td id="T_6d8e0_row11_col3" class="data row11 col3" >[]</td>
-      <td id="T_6d8e0_row11_col4" class="data row11 col4" >True</td>
+      <td id="T_43147_row11_col0" class="data row11 col0" >pertanyaan neutral ke semua</td>
+      <td id="T_43147_row11_col1" class="data row11 col1" >Ada yang tau sisa waktu vote tinggal berapa?</td>
+      <td id="T_43147_row11_col2" class="data row11 col2" >[]</td>
+      <td id="T_43147_row11_col3" class="data row11 col3" >[]</td>
+      <td id="T_43147_row11_col4" class="data row11 col4" >True</td>
     </tr>
   </tbody>
 </table>
@@ -5149,9 +5326,9 @@ EXACT MATCH PER KASUS (pesan test):</pre><div class="tbl"><style type="text/css"
     <tr>
       <th>0</th>
       <td>IndoBERT Transformer</td>
-      <td>10</td>
       <td>12</td>
-      <td>0.833333</td>
+      <td>12</td>
+      <td>1.0</td>
     </tr>
   </tbody>
 </table>
@@ -5177,292 +5354,278 @@ EXACT MATCH PER KASUS (pesan test):</pre><div class="tbl"><style type="text/css"
         <span class="n">display</span><span class="p">(</span><span class="n">table</span><span class="o">.</span><span class="n">style</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">precision</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">na_rep</span><span class="o">=</span><span class="s2">&quot;belum tercatat&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">format</span><span class="p">({</span><span class="s2">&quot;Epoch&quot;</span><span class="p">:</span> <span class="s2">&quot;</span><span class="si">{:.0f}</span><span class="s2">&quot;</span><span class="p">})</span><span class="o">.</span><span class="n">hide</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="s2">&quot;index&quot;</span><span class="p">))</span>
 </pre><div class="keluaran"><div class="lbl">Keluaran</div><div class="tbl"><style type="text/css">
 </style>
-<table id="T_9f977">
+<table id="T_70b8b">
   <thead>
     <tr>
-      <th id="T_9f977_level0_col0" class="col_heading level0 col0" >Trial</th>
-      <th id="T_9f977_level0_col1" class="col_heading level0 col1" >Learning rate</th>
-      <th id="T_9f977_level0_col2" class="col_heading level0 col2" >Epoch terbaik</th>
-      <th id="T_9f977_level0_col3" class="col_heading level0 col3" >Epoch dijalankan</th>
-      <th id="T_9f977_level0_col4" class="col_heading level0 col4" >Val macro-F1 terbaik</th>
+      <th id="T_70b8b_level0_col0" class="col_heading level0 col0" >Trial</th>
+      <th id="T_70b8b_level0_col1" class="col_heading level0 col1" >Learning rate</th>
+      <th id="T_70b8b_level0_col2" class="col_heading level0 col2" >Epoch terbaik</th>
+      <th id="T_70b8b_level0_col3" class="col_heading level0 col3" >Epoch dijalankan</th>
+      <th id="T_70b8b_level0_col4" class="col_heading level0 col4" >Val macro-F1 terbaik</th>
     </tr>
   </thead>
   <tbody>
     <tr>
-      <td id="T_9f977_row0_col0" class="data row0 col0" >1</td>
-      <td id="T_9f977_row0_col1" class="data row0 col1" >1e-05</td>
-      <td id="T_9f977_row0_col2" class="data row0 col2" >6</td>
-      <td id="T_9f977_row0_col3" class="data row0 col3" >9</td>
-      <td id="T_9f977_row0_col4" class="data row0 col4" >0.9329</td>
+      <td id="T_70b8b_row0_col0" class="data row0 col0" >1</td>
+      <td id="T_70b8b_row0_col1" class="data row0 col1" >1e-05</td>
+      <td id="T_70b8b_row0_col2" class="data row0 col2" >4</td>
+      <td id="T_70b8b_row0_col3" class="data row0 col3" >7</td>
+      <td id="T_70b8b_row0_col4" class="data row0 col4" >0.9457</td>
     </tr>
     <tr>
-      <td id="T_9f977_row1_col0" class="data row1 col0" >2</td>
-      <td id="T_9f977_row1_col1" class="data row1 col1" >2e-05</td>
-      <td id="T_9f977_row1_col2" class="data row1 col2" >9</td>
-      <td id="T_9f977_row1_col3" class="data row1 col3" >9</td>
-      <td id="T_9f977_row1_col4" class="data row1 col4" >0.9467</td>
+      <td id="T_70b8b_row1_col0" class="data row1 col0" >2</td>
+      <td id="T_70b8b_row1_col1" class="data row1 col1" >2e-05</td>
+      <td id="T_70b8b_row1_col2" class="data row1 col2" >10</td>
+      <td id="T_70b8b_row1_col3" class="data row1 col3" >12</td>
+      <td id="T_70b8b_row1_col4" class="data row1 col4" >0.9513</td>
     </tr>
     <tr>
-      <td id="T_9f977_row2_col0" class="data row2 col0" >3</td>
-      <td id="T_9f977_row2_col1" class="data row2 col1" >3e-05</td>
-      <td id="T_9f977_row2_col2" class="data row2 col2" >9</td>
-      <td id="T_9f977_row2_col3" class="data row2 col3" >12</td>
-      <td id="T_9f977_row2_col4" class="data row2 col4" >0.9600</td>
+      <td id="T_70b8b_row2_col0" class="data row2 col0" >3</td>
+      <td id="T_70b8b_row2_col1" class="data row2 col1" >3e-05</td>
+      <td id="T_70b8b_row2_col2" class="data row2 col2" >6</td>
+      <td id="T_70b8b_row2_col3" class="data row2 col3" >9</td>
+      <td id="T_70b8b_row2_col4" class="data row2 col4" >0.9527</td>
     </tr>
   </tbody>
 </table>
 </div><pre class="out">Trial 1 | learning rate 1e-05</pre><div class="tbl"><style type="text/css">
 </style>
-<table id="T_bdf28">
+<table id="T_797bb">
   <thead>
     <tr>
-      <th id="T_bdf28_level0_col0" class="col_heading level0 col0" >Epoch</th>
-      <th id="T_bdf28_level0_col1" class="col_heading level0 col1" >Train loss</th>
-      <th id="T_bdf28_level0_col2" class="col_heading level0 col2" >Val loss</th>
-      <th id="T_bdf28_level0_col3" class="col_heading level0 col3" >Val accuracy</th>
-      <th id="T_bdf28_level0_col4" class="col_heading level0 col4" >Val macro-F1</th>
+      <th id="T_797bb_level0_col0" class="col_heading level0 col0" >Epoch</th>
+      <th id="T_797bb_level0_col1" class="col_heading level0 col1" >Train loss</th>
+      <th id="T_797bb_level0_col2" class="col_heading level0 col2" >Val loss</th>
+      <th id="T_797bb_level0_col3" class="col_heading level0 col3" >Val accuracy</th>
+      <th id="T_797bb_level0_col4" class="col_heading level0 col4" >Val macro-F1</th>
     </tr>
   </thead>
   <tbody>
     <tr>
-      <td id="T_bdf28_row0_col0" class="data row0 col0" >1</td>
-      <td id="T_bdf28_row0_col1" class="data row0 col1" >0.661300</td>
-      <td id="T_bdf28_row0_col2" class="data row0 col2" >0.315220</td>
-      <td id="T_bdf28_row0_col3" class="data row0 col3" >0.852349</td>
-      <td id="T_bdf28_row0_col4" class="data row0 col4" >0.364651</td>
+      <td id="T_797bb_row0_col0" class="data row0 col0" >1</td>
+      <td id="T_797bb_row0_col1" class="data row0 col1" >0.604700</td>
+      <td id="T_797bb_row0_col2" class="data row0 col2" >0.299690</td>
+      <td id="T_797bb_row0_col3" class="data row0 col3" >0.880537</td>
+      <td id="T_797bb_row0_col4" class="data row0 col4" >0.482639</td>
     </tr>
     <tr>
-      <td id="T_bdf28_row1_col0" class="data row1 col0" >2</td>
-      <td id="T_bdf28_row1_col1" class="data row1 col1" >0.241600</td>
-      <td id="T_bdf28_row1_col2" class="data row1 col2" >0.144872</td>
-      <td id="T_bdf28_row1_col3" class="data row1 col3" >0.950336</td>
-      <td id="T_bdf28_row1_col4" class="data row1 col4" >0.837645</td>
+      <td id="T_797bb_row1_col0" class="data row1 col0" >2</td>
+      <td id="T_797bb_row1_col1" class="data row1 col1" >0.249100</td>
+      <td id="T_797bb_row1_col2" class="data row1 col2" >0.163151</td>
+      <td id="T_797bb_row1_col3" class="data row1 col3" >0.958389</td>
+      <td id="T_797bb_row1_col4" class="data row1 col4" >0.902245</td>
     </tr>
     <tr>
-      <td id="T_bdf28_row2_col0" class="data row2 col0" >3</td>
-      <td id="T_bdf28_row2_col1" class="data row2 col1" >0.157700</td>
-      <td id="T_bdf28_row2_col2" class="data row2 col2" >0.145364</td>
-      <td id="T_bdf28_row2_col3" class="data row2 col3" >0.966443</td>
-      <td id="T_bdf28_row2_col4" class="data row2 col4" >0.921048</td>
+      <td id="T_797bb_row2_col0" class="data row2 col0" >3</td>
+      <td id="T_797bb_row2_col1" class="data row2 col1" >0.135900</td>
+      <td id="T_797bb_row2_col2" class="data row2 col2" >0.174801</td>
+      <td id="T_797bb_row2_col3" class="data row2 col3" >0.961074</td>
+      <td id="T_797bb_row2_col4" class="data row2 col4" >0.900038</td>
     </tr>
     <tr>
-      <td id="T_bdf28_row3_col0" class="data row3 col0" >4</td>
-      <td id="T_bdf28_row3_col1" class="data row3 col1" >0.112800</td>
-      <td id="T_bdf28_row3_col2" class="data row3 col2" >0.154545</td>
-      <td id="T_bdf28_row3_col3" class="data row3 col3" >0.971812</td>
-      <td id="T_bdf28_row3_col4" class="data row3 col4" >0.929934</td>
+      <td id="T_797bb_row3_col0" class="data row3 col0" >4</td>
+      <td id="T_797bb_row3_col1" class="data row3 col1" >0.081300</td>
+      <td id="T_797bb_row3_col2" class="data row3 col2" >0.142027</td>
+      <td id="T_797bb_row3_col3" class="data row3 col3" >0.978523</td>
+      <td id="T_797bb_row3_col4" class="data row3 col4" >0.945745</td>
     </tr>
     <tr>
-      <td id="T_bdf28_row4_col0" class="data row4 col0" >5</td>
-      <td id="T_bdf28_row4_col1" class="data row4 col1" >0.093100</td>
-      <td id="T_bdf28_row4_col2" class="data row4 col2" >0.160363</td>
-      <td id="T_bdf28_row4_col3" class="data row4 col3" >0.971812</td>
-      <td id="T_bdf28_row4_col4" class="data row4 col4" >0.929673</td>
+      <td id="T_797bb_row4_col0" class="data row4 col0" >5</td>
+      <td id="T_797bb_row4_col1" class="data row4 col1" >0.047900</td>
+      <td id="T_797bb_row4_col2" class="data row4 col2" >0.211144</td>
+      <td id="T_797bb_row4_col3" class="data row4 col3" >0.970470</td>
+      <td id="T_797bb_row4_col4" class="data row4 col4" >0.923428</td>
     </tr>
     <tr>
-      <td id="T_bdf28_row5_col0" class="data row5 col0" >6</td>
-      <td id="T_bdf28_row5_col1" class="data row5 col1" >0.069600</td>
-      <td id="T_bdf28_row5_col2" class="data row5 col2" >0.142975</td>
-      <td id="T_bdf28_row5_col3" class="data row5 col3" >0.975839</td>
-      <td id="T_bdf28_row5_col4" class="data row5 col4" >0.932858</td>
+      <td id="T_797bb_row5_col0" class="data row5 col0" >6</td>
+      <td id="T_797bb_row5_col1" class="data row5 col1" >0.034400</td>
+      <td id="T_797bb_row5_col2" class="data row5 col2" >0.207758</td>
+      <td id="T_797bb_row5_col3" class="data row5 col3" >0.969128</td>
+      <td id="T_797bb_row5_col4" class="data row5 col4" >0.919890</td>
     </tr>
     <tr>
-      <td id="T_bdf28_row6_col0" class="data row6 col0" >7</td>
-      <td id="T_bdf28_row6_col1" class="data row6 col1" >0.046800</td>
-      <td id="T_bdf28_row6_col2" class="data row6 col2" >0.197529</td>
-      <td id="T_bdf28_row6_col3" class="data row6 col3" >0.966443</td>
-      <td id="T_bdf28_row6_col4" class="data row6 col4" >0.910597</td>
-    </tr>
-    <tr>
-      <td id="T_bdf28_row7_col0" class="data row7 col0" >8</td>
-      <td id="T_bdf28_row7_col1" class="data row7 col1" >0.041000</td>
-      <td id="T_bdf28_row7_col2" class="data row7 col2" >0.209921</td>
-      <td id="T_bdf28_row7_col3" class="data row7 col3" >0.967785</td>
-      <td id="T_bdf28_row7_col4" class="data row7 col4" >0.919827</td>
-    </tr>
-    <tr>
-      <td id="T_bdf28_row8_col0" class="data row8 col0" >9</td>
-      <td id="T_bdf28_row8_col1" class="data row8 col1" >0.028300</td>
-      <td id="T_bdf28_row8_col2" class="data row8 col2" >0.194570</td>
-      <td id="T_bdf28_row8_col3" class="data row8 col3" >0.969128</td>
-      <td id="T_bdf28_row8_col4" class="data row8 col4" >0.923815</td>
+      <td id="T_797bb_row6_col0" class="data row6 col0" >7</td>
+      <td id="T_797bb_row6_col1" class="data row6 col1" >0.025000</td>
+      <td id="T_797bb_row6_col2" class="data row6 col2" >0.223408</td>
+      <td id="T_797bb_row6_col3" class="data row6 col3" >0.970470</td>
+      <td id="T_797bb_row6_col4" class="data row6 col4" >0.924792</td>
     </tr>
   </tbody>
 </table>
 </div><pre class="out">Trial 2 | learning rate 2e-05</pre><div class="tbl"><style type="text/css">
 </style>
-<table id="T_6bf0e">
+<table id="T_1476a">
   <thead>
     <tr>
-      <th id="T_6bf0e_level0_col0" class="col_heading level0 col0" >Epoch</th>
-      <th id="T_6bf0e_level0_col1" class="col_heading level0 col1" >Train loss</th>
-      <th id="T_6bf0e_level0_col2" class="col_heading level0 col2" >Val loss</th>
-      <th id="T_6bf0e_level0_col3" class="col_heading level0 col3" >Val accuracy</th>
-      <th id="T_6bf0e_level0_col4" class="col_heading level0 col4" >Val macro-F1</th>
+      <th id="T_1476a_level0_col0" class="col_heading level0 col0" >Epoch</th>
+      <th id="T_1476a_level0_col1" class="col_heading level0 col1" >Train loss</th>
+      <th id="T_1476a_level0_col2" class="col_heading level0 col2" >Val loss</th>
+      <th id="T_1476a_level0_col3" class="col_heading level0 col3" >Val accuracy</th>
+      <th id="T_1476a_level0_col4" class="col_heading level0 col4" >Val macro-F1</th>
     </tr>
   </thead>
   <tbody>
     <tr>
-      <td id="T_6bf0e_row0_col0" class="data row0 col0" >1</td>
-      <td id="T_6bf0e_row0_col1" class="data row0 col1" >0.580000</td>
-      <td id="T_6bf0e_row0_col2" class="data row0 col2" >0.281460</td>
-      <td id="T_6bf0e_row0_col3" class="data row0 col3" >0.910067</td>
-      <td id="T_6bf0e_row0_col4" class="data row0 col4" >0.633633</td>
+      <td id="T_1476a_row0_col0" class="data row0 col0" >1</td>
+      <td id="T_1476a_row0_col1" class="data row0 col1" >0.541700</td>
+      <td id="T_1476a_row0_col2" class="data row0 col2" >0.171191</td>
+      <td id="T_1476a_row0_col3" class="data row0 col3" >0.944966</td>
+      <td id="T_1476a_row0_col4" class="data row0 col4" >0.819696</td>
     </tr>
     <tr>
-      <td id="T_6bf0e_row1_col0" class="data row1 col0" >2</td>
-      <td id="T_6bf0e_row1_col1" class="data row1 col1" >0.191900</td>
-      <td id="T_6bf0e_row1_col2" class="data row1 col2" >0.210398</td>
-      <td id="T_6bf0e_row1_col3" class="data row1 col3" >0.944966</td>
-      <td id="T_6bf0e_row1_col4" class="data row1 col4" >0.876268</td>
+      <td id="T_1476a_row1_col0" class="data row1 col0" >2</td>
+      <td id="T_1476a_row1_col1" class="data row1 col1" >0.257600</td>
+      <td id="T_1476a_row1_col2" class="data row1 col2" >0.148403</td>
+      <td id="T_1476a_row1_col3" class="data row1 col3" >0.957047</td>
+      <td id="T_1476a_row1_col4" class="data row1 col4" >0.889112</td>
     </tr>
     <tr>
-      <td id="T_6bf0e_row2_col0" class="data row2 col0" >3</td>
-      <td id="T_6bf0e_row2_col1" class="data row2 col1" >0.154000</td>
-      <td id="T_6bf0e_row2_col2" class="data row2 col2" >0.144280</td>
-      <td id="T_6bf0e_row2_col3" class="data row2 col3" >0.963758</td>
-      <td id="T_6bf0e_row2_col4" class="data row2 col4" >0.915958</td>
+      <td id="T_1476a_row2_col0" class="data row2 col0" >3</td>
+      <td id="T_1476a_row2_col1" class="data row2 col1" >0.162800</td>
+      <td id="T_1476a_row2_col2" class="data row2 col2" >0.146162</td>
+      <td id="T_1476a_row2_col3" class="data row2 col3" >0.973154</td>
+      <td id="T_1476a_row2_col4" class="data row2 col4" >0.922729</td>
     </tr>
     <tr>
-      <td id="T_6bf0e_row3_col0" class="data row3 col0" >4</td>
-      <td id="T_6bf0e_row3_col1" class="data row3 col1" >0.103600</td>
-      <td id="T_6bf0e_row3_col2" class="data row3 col2" >0.145887</td>
-      <td id="T_6bf0e_row3_col3" class="data row3 col3" >0.969128</td>
-      <td id="T_6bf0e_row3_col4" class="data row3 col4" >0.915713</td>
+      <td id="T_1476a_row3_col0" class="data row3 col0" >4</td>
+      <td id="T_1476a_row3_col1" class="data row3 col1" >0.095700</td>
+      <td id="T_1476a_row3_col2" class="data row3 col2" >0.146654</td>
+      <td id="T_1476a_row3_col3" class="data row3 col3" >0.973154</td>
+      <td id="T_1476a_row3_col4" class="data row3 col4" >0.921318</td>
     </tr>
     <tr>
-      <td id="T_6bf0e_row4_col0" class="data row4 col0" >5</td>
-      <td id="T_6bf0e_row4_col1" class="data row4 col1" >0.080100</td>
-      <td id="T_6bf0e_row4_col2" class="data row4 col2" >0.168584</td>
-      <td id="T_6bf0e_row4_col3" class="data row4 col3" >0.963758</td>
-      <td id="T_6bf0e_row4_col4" class="data row4 col4" >0.918851</td>
+      <td id="T_1476a_row4_col0" class="data row4 col0" >5</td>
+      <td id="T_1476a_row4_col1" class="data row4 col1" >0.064900</td>
+      <td id="T_1476a_row4_col2" class="data row4 col2" >0.172086</td>
+      <td id="T_1476a_row4_col3" class="data row4 col3" >0.969128</td>
+      <td id="T_1476a_row4_col4" class="data row4 col4" >0.925367</td>
     </tr>
     <tr>
-      <td id="T_6bf0e_row5_col0" class="data row5 col0" >6</td>
-      <td id="T_6bf0e_row5_col1" class="data row5 col1" >0.060800</td>
-      <td id="T_6bf0e_row5_col2" class="data row5 col2" >0.133773</td>
-      <td id="T_6bf0e_row5_col3" class="data row5 col3" >0.978523</td>
-      <td id="T_6bf0e_row5_col4" class="data row5 col4" >0.945934</td>
+      <td id="T_1476a_row5_col0" class="data row5 col0" >6</td>
+      <td id="T_1476a_row5_col1" class="data row5 col1" >0.034600</td>
+      <td id="T_1476a_row5_col2" class="data row5 col2" >0.165108</td>
+      <td id="T_1476a_row5_col3" class="data row5 col3" >0.971812</td>
+      <td id="T_1476a_row5_col4" class="data row5 col4" >0.929307</td>
     </tr>
     <tr>
-      <td id="T_6bf0e_row6_col0" class="data row6 col0" >7</td>
-      <td id="T_6bf0e_row6_col1" class="data row6 col1" >0.034700</td>
-      <td id="T_6bf0e_row6_col2" class="data row6 col2" >0.165921</td>
-      <td id="T_6bf0e_row6_col3" class="data row6 col3" >0.977181</td>
-      <td id="T_6bf0e_row6_col4" class="data row6 col4" >0.943806</td>
+      <td id="T_1476a_row6_col0" class="data row6 col0" >7</td>
+      <td id="T_1476a_row6_col1" class="data row6 col1" >0.017900</td>
+      <td id="T_1476a_row6_col2" class="data row6 col2" >0.160530</td>
+      <td id="T_1476a_row6_col3" class="data row6 col3" >0.977181</td>
+      <td id="T_1476a_row6_col4" class="data row6 col4" >0.949541</td>
     </tr>
     <tr>
-      <td id="T_6bf0e_row7_col0" class="data row7 col0" >8</td>
-      <td id="T_6bf0e_row7_col1" class="data row7 col1" >0.021400</td>
-      <td id="T_6bf0e_row7_col2" class="data row7 col2" >0.156377</td>
-      <td id="T_6bf0e_row7_col3" class="data row7 col3" >0.977181</td>
-      <td id="T_6bf0e_row7_col4" class="data row7 col4" >0.934229</td>
+      <td id="T_1476a_row7_col0" class="data row7 col0" >8</td>
+      <td id="T_1476a_row7_col1" class="data row7 col1" >0.007200</td>
+      <td id="T_1476a_row7_col2" class="data row7 col2" >0.159116</td>
+      <td id="T_1476a_row7_col3" class="data row7 col3" >0.977181</td>
+      <td id="T_1476a_row7_col4" class="data row7 col4" >0.948610</td>
     </tr>
     <tr>
-      <td id="T_6bf0e_row8_col0" class="data row8 col0" >9</td>
-      <td id="T_6bf0e_row8_col1" class="data row8 col1" >0.025900</td>
-      <td id="T_6bf0e_row8_col2" class="data row8 col2" >0.130012</td>
-      <td id="T_6bf0e_row8_col3" class="data row8 col3" >0.978523</td>
-      <td id="T_6bf0e_row8_col4" class="data row8 col4" >0.946665</td>
+      <td id="T_1476a_row8_col0" class="data row8 col0" >9</td>
+      <td id="T_1476a_row8_col1" class="data row8 col1" >0.002400</td>
+      <td id="T_1476a_row8_col2" class="data row8 col2" >0.199179</td>
+      <td id="T_1476a_row8_col3" class="data row8 col3" >0.975839</td>
+      <td id="T_1476a_row8_col4" class="data row8 col4" >0.940564</td>
+    </tr>
+    <tr>
+      <td id="T_1476a_row9_col0" class="data row9 col0" >10</td>
+      <td id="T_1476a_row9_col1" class="data row9 col1" >0.001900</td>
+      <td id="T_1476a_row9_col2" class="data row9 col2" >0.188088</td>
+      <td id="T_1476a_row9_col3" class="data row9 col3" >0.978523</td>
+      <td id="T_1476a_row9_col4" class="data row9 col4" >0.951261</td>
+    </tr>
+    <tr>
+      <td id="T_1476a_row10_col0" class="data row10 col0" >11</td>
+      <td id="T_1476a_row10_col1" class="data row10 col1" >0.001400</td>
+      <td id="T_1476a_row10_col2" class="data row10 col2" >0.190821</td>
+      <td id="T_1476a_row10_col3" class="data row10 col3" >0.977181</td>
+      <td id="T_1476a_row10_col4" class="data row10 col4" >0.942734</td>
+    </tr>
+    <tr>
+      <td id="T_1476a_row11_col0" class="data row11 col0" >12</td>
+      <td id="T_1476a_row11_col1" class="data row11 col1" >0.000200</td>
+      <td id="T_1476a_row11_col2" class="data row11 col2" >0.191223</td>
+      <td id="T_1476a_row11_col3" class="data row11 col3" >0.977181</td>
+      <td id="T_1476a_row11_col4" class="data row11 col4" >0.942734</td>
     </tr>
   </tbody>
 </table>
 </div><pre class="out">Trial 3 | learning rate 3e-05</pre><div class="tbl"><style type="text/css">
 </style>
-<table id="T_e0504">
+<table id="T_fdd2c">
   <thead>
     <tr>
-      <th id="T_e0504_level0_col0" class="col_heading level0 col0" >Epoch</th>
-      <th id="T_e0504_level0_col1" class="col_heading level0 col1" >Train loss</th>
-      <th id="T_e0504_level0_col2" class="col_heading level0 col2" >Val loss</th>
-      <th id="T_e0504_level0_col3" class="col_heading level0 col3" >Val accuracy</th>
-      <th id="T_e0504_level0_col4" class="col_heading level0 col4" >Val macro-F1</th>
+      <th id="T_fdd2c_level0_col0" class="col_heading level0 col0" >Epoch</th>
+      <th id="T_fdd2c_level0_col1" class="col_heading level0 col1" >Train loss</th>
+      <th id="T_fdd2c_level0_col2" class="col_heading level0 col2" >Val loss</th>
+      <th id="T_fdd2c_level0_col3" class="col_heading level0 col3" >Val accuracy</th>
+      <th id="T_fdd2c_level0_col4" class="col_heading level0 col4" >Val macro-F1</th>
     </tr>
   </thead>
   <tbody>
     <tr>
-      <td id="T_e0504_row0_col0" class="data row0 col0" >1</td>
-      <td id="T_e0504_row0_col1" class="data row0 col1" >0.567100</td>
-      <td id="T_e0504_row0_col2" class="data row0 col2" >0.281201</td>
-      <td id="T_e0504_row0_col3" class="data row0 col3" >0.857718</td>
-      <td id="T_e0504_row0_col4" class="data row0 col4" >0.387980</td>
+      <td id="T_fdd2c_row0_col0" class="data row0 col0" >1</td>
+      <td id="T_fdd2c_row0_col1" class="data row0 col1" >0.507200</td>
+      <td id="T_fdd2c_row0_col2" class="data row0 col2" >0.199710</td>
+      <td id="T_fdd2c_row0_col3" class="data row0 col3" >0.927517</td>
+      <td id="T_fdd2c_row0_col4" class="data row0 col4" >0.671495</td>
     </tr>
     <tr>
-      <td id="T_e0504_row1_col0" class="data row1 col0" >2</td>
-      <td id="T_e0504_row1_col1" class="data row1 col1" >0.208500</td>
-      <td id="T_e0504_row1_col2" class="data row1 col2" >0.289748</td>
-      <td id="T_e0504_row1_col3" class="data row1 col3" >0.938255</td>
-      <td id="T_e0504_row1_col4" class="data row1 col4" >0.833711</td>
+      <td id="T_fdd2c_row1_col0" class="data row1 col0" >2</td>
+      <td id="T_fdd2c_row1_col1" class="data row1 col1" >0.251200</td>
+      <td id="T_fdd2c_row1_col2" class="data row1 col2" >0.189627</td>
+      <td id="T_fdd2c_row1_col3" class="data row1 col3" >0.947651</td>
+      <td id="T_fdd2c_row1_col4" class="data row1 col4" >0.865770</td>
     </tr>
     <tr>
-      <td id="T_e0504_row2_col0" class="data row2 col0" >3</td>
-      <td id="T_e0504_row2_col1" class="data row2 col1" >0.170400</td>
-      <td id="T_e0504_row2_col2" class="data row2 col2" >0.132056</td>
-      <td id="T_e0504_row2_col3" class="data row2 col3" >0.959732</td>
-      <td id="T_e0504_row2_col4" class="data row2 col4" >0.905603</td>
+      <td id="T_fdd2c_row2_col0" class="data row2 col0" >3</td>
+      <td id="T_fdd2c_row2_col1" class="data row2 col1" >0.172000</td>
+      <td id="T_fdd2c_row2_col2" class="data row2 col2" >0.126828</td>
+      <td id="T_fdd2c_row2_col3" class="data row2 col3" >0.971812</td>
+      <td id="T_fdd2c_row2_col4" class="data row2 col4" >0.927255</td>
     </tr>
     <tr>
-      <td id="T_e0504_row3_col0" class="data row3 col0" >4</td>
-      <td id="T_e0504_row3_col1" class="data row3 col1" >0.108800</td>
-      <td id="T_e0504_row3_col2" class="data row3 col2" >0.138810</td>
-      <td id="T_e0504_row3_col3" class="data row3 col3" >0.969128</td>
-      <td id="T_e0504_row3_col4" class="data row3 col4" >0.920401</td>
+      <td id="T_fdd2c_row3_col0" class="data row3 col0" >4</td>
+      <td id="T_fdd2c_row3_col1" class="data row3 col1" >0.114000</td>
+      <td id="T_fdd2c_row3_col2" class="data row3 col2" >0.158529</td>
+      <td id="T_fdd2c_row3_col3" class="data row3 col3" >0.973154</td>
+      <td id="T_fdd2c_row3_col4" class="data row3 col4" >0.937696</td>
     </tr>
     <tr>
-      <td id="T_e0504_row4_col0" class="data row4 col0" >5</td>
-      <td id="T_e0504_row4_col1" class="data row4 col1" >0.103400</td>
-      <td id="T_e0504_row4_col2" class="data row4 col2" >0.108251</td>
-      <td id="T_e0504_row4_col3" class="data row4 col3" >0.969128</td>
-      <td id="T_e0504_row4_col4" class="data row4 col4" >0.922980</td>
+      <td id="T_fdd2c_row4_col0" class="data row4 col0" >5</td>
+      <td id="T_fdd2c_row4_col1" class="data row4 col1" >0.072100</td>
+      <td id="T_fdd2c_row4_col2" class="data row4 col2" >0.170537</td>
+      <td id="T_fdd2c_row4_col3" class="data row4 col3" >0.973154</td>
+      <td id="T_fdd2c_row4_col4" class="data row4 col4" >0.938349</td>
     </tr>
     <tr>
-      <td id="T_e0504_row5_col0" class="data row5 col0" >6</td>
-      <td id="T_e0504_row5_col1" class="data row5 col1" >0.082800</td>
-      <td id="T_e0504_row5_col2" class="data row5 col2" >0.124406</td>
-      <td id="T_e0504_row5_col3" class="data row5 col3" >0.975839</td>
-      <td id="T_e0504_row5_col4" class="data row5 col4" >0.937141</td>
+      <td id="T_fdd2c_row5_col0" class="data row5 col0" >6</td>
+      <td id="T_fdd2c_row5_col1" class="data row5 col1" >0.041200</td>
+      <td id="T_fdd2c_row5_col2" class="data row5 col2" >0.113547</td>
+      <td id="T_fdd2c_row5_col3" class="data row5 col3" >0.979866</td>
+      <td id="T_fdd2c_row5_col4" class="data row5 col4" >0.952663</td>
     </tr>
     <tr>
-      <td id="T_e0504_row6_col0" class="data row6 col0" >7</td>
-      <td id="T_e0504_row6_col1" class="data row6 col1" >0.043300</td>
-      <td id="T_e0504_row6_col2" class="data row6 col2" >0.136881</td>
-      <td id="T_e0504_row6_col3" class="data row6 col3" >0.971812</td>
-      <td id="T_e0504_row6_col4" class="data row6 col4" >0.919477</td>
+      <td id="T_fdd2c_row6_col0" class="data row6 col0" >7</td>
+      <td id="T_fdd2c_row6_col1" class="data row6 col1" >0.021600</td>
+      <td id="T_fdd2c_row6_col2" class="data row6 col2" >0.183308</td>
+      <td id="T_fdd2c_row6_col3" class="data row6 col3" >0.975839</td>
+      <td id="T_fdd2c_row6_col4" class="data row6 col4" >0.939099</td>
     </tr>
     <tr>
-      <td id="T_e0504_row7_col0" class="data row7 col0" >8</td>
-      <td id="T_e0504_row7_col1" class="data row7 col1" >0.037000</td>
-      <td id="T_e0504_row7_col2" class="data row7 col2" >0.115692</td>
-      <td id="T_e0504_row7_col3" class="data row7 col3" >0.977181</td>
-      <td id="T_e0504_row7_col4" class="data row7 col4" >0.933496</td>
+      <td id="T_fdd2c_row7_col0" class="data row7 col0" >8</td>
+      <td id="T_fdd2c_row7_col1" class="data row7 col1" >0.012100</td>
+      <td id="T_fdd2c_row7_col2" class="data row7 col2" >0.173287</td>
+      <td id="T_fdd2c_row7_col3" class="data row7 col3" >0.974497</td>
+      <td id="T_fdd2c_row7_col4" class="data row7 col4" >0.939526</td>
     </tr>
     <tr>
-      <td id="T_e0504_row8_col0" class="data row8 col0" >9</td>
-      <td id="T_e0504_row8_col1" class="data row8 col1" >0.018600</td>
-      <td id="T_e0504_row8_col2" class="data row8 col2" >0.099820</td>
-      <td id="T_e0504_row8_col3" class="data row8 col3" >0.982550</td>
-      <td id="T_e0504_row8_col4" class="data row8 col4" >0.960016</td>
-    </tr>
-    <tr>
-      <td id="T_e0504_row9_col0" class="data row9 col0" >10</td>
-      <td id="T_e0504_row9_col1" class="data row9 col1" >0.010700</td>
-      <td id="T_e0504_row9_col2" class="data row9 col2" >0.106094</td>
-      <td id="T_e0504_row9_col3" class="data row9 col3" >0.982550</td>
-      <td id="T_e0504_row9_col4" class="data row9 col4" >0.954302</td>
-    </tr>
-    <tr>
-      <td id="T_e0504_row10_col0" class="data row10 col0" >11</td>
-      <td id="T_e0504_row10_col1" class="data row10 col1" >0.009100</td>
-      <td id="T_e0504_row10_col2" class="data row10 col2" >0.119020</td>
-      <td id="T_e0504_row10_col3" class="data row10 col3" >0.979866</td>
-      <td id="T_e0504_row10_col4" class="data row10 col4" >0.950314</td>
-    </tr>
-    <tr>
-      <td id="T_e0504_row11_col0" class="data row11 col0" >12</td>
-      <td id="T_e0504_row11_col1" class="data row11 col1" >0.005700</td>
-      <td id="T_e0504_row11_col2" class="data row11 col2" >0.116720</td>
-      <td id="T_e0504_row11_col3" class="data row11 col3" >0.981208</td>
-      <td id="T_e0504_row11_col4" class="data row11 col4" >0.947031</td>
+      <td id="T_fdd2c_row8_col0" class="data row8 col0" >9</td>
+      <td id="T_fdd2c_row8_col1" class="data row8 col1" >0.004700</td>
+      <td id="T_fdd2c_row8_col2" class="data row8 col2" >0.203263</td>
+      <td id="T_fdd2c_row8_col3" class="data row8 col3" >0.970470</td>
+      <td id="T_fdd2c_row8_col4" class="data row8 col4" >0.933310</td>
     </tr>
   </tbody>
 </table>
@@ -5501,223 +5664,7 @@ EXACT MATCH PER KASUS (pesan test):</pre><div class="tbl"><style type="text/css"
 <span class="n">MODEL_DIR</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="n">perbandingan_semua_model</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">MODEL_DIR</span> <span class="o">/</span> <span class="s2">&quot;perbandingan_semua_model.csv&quot;</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 <span class="n">perbandingan_per_kasus</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">MODEL_DIR</span> <span class="o">/</span> <span class="s2">&quot;perbandingan_per_kasus.csv&quot;</span><span class="p">)</span>
-</pre><div class="keluaran"><div class="lbl">Keluaran</div><pre class="out">Model pada perbandingan ini: IndoBERT</pre><div class="tbl"><style type="text/css">
-</style>
-<table id="T_9c678">
-  <thead>
-    <tr>
-      <th id="T_9c678_level0_col0" class="col_heading level0 col0" >model</th>
-      <th id="T_9c678_level0_col1" class="col_heading level0 col1" >accuracy_pasangan</th>
-      <th id="T_9c678_level0_col2" class="col_heading level0 col2" >macro_f1_pasangan</th>
-      <th id="T_9c678_level0_col3" class="col_heading level0 col3" >macro_f1_relasi</th>
-      <th id="T_9c678_level0_col4" class="col_heading level0 col4" >f1_neutral</th>
-      <th id="T_9c678_level0_col5" class="col_heading level0 col5" >exact_match_pesan</th>
-      <th id="T_9c678_level0_col6" class="col_heading level0 col6" >exact_match_tanpa_ambang</th>
-      <th id="T_9c678_level0_col7" class="col_heading level0 col7" >ambang</th>
-      <th id="T_9c678_level0_col8" class="col_heading level0 col8" >target_f1_pesan</th>
-      <th id="T_9c678_level0_col9" class="col_heading level0 col9" >waktu_detik</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td id="T_9c678_row0_col0" class="data row0 col0" >IndoBERT Transformer</td>
-      <td id="T_9c678_row0_col1" class="data row0 col1" >0.969900</td>
-      <td id="T_9c678_row0_col2" class="data row0 col2" >0.923600</td>
-      <td id="T_9c678_row0_col3" class="data row0 col3" >0.896100</td>
-      <td id="T_9c678_row0_col4" class="data row0 col4" >0.918900</td>
-      <td id="T_9c678_row0_col5" class="data row0 col5" >0.858100</td>
-      <td id="T_9c678_row0_col6" class="data row0 col6" >0.858100</td>
-      <td id="T_9c678_row0_col7" class="data row0 col7" >0.500000</td>
-      <td id="T_9c678_row0_col8" class="data row0 col8" >0.898600</td>
-      <td id="T_9c678_row0_col9" class="data row0 col9" >2290.7</td>
-    </tr>
-  </tbody>
-</table>
-</div><div class="tbl"><style type="text/css">
-#T_8f563_row0_col0, #T_8f563_row5_col0, #T_8f563_row6_col0, #T_8f563_row9_col0, #T_8f563_row13_col0, #T_8f563_row17_col0, #T_8f563_row18_col0, #T_8f563_row20_col0, #T_8f563_row22_col0, #T_8f563_row23_col0, #T_8f563_row24_col0, #T_8f563_row29_col0 {
-  background-color: #66bd63;
-  color: #f1f1f1;
-}
-#T_8f563_row1_col0, #T_8f563_row8_col0, #T_8f563_row21_col0, #T_8f563_row25_col0, #T_8f563_row30_col0 {
-  background-color: #d9ef8b;
-  color: #000000;
-}
-#T_8f563_row2_col0, #T_8f563_row3_col0, #T_8f563_row4_col0, #T_8f563_row7_col0, #T_8f563_row10_col0, #T_8f563_row11_col0, #T_8f563_row12_col0, #T_8f563_row14_col0, #T_8f563_row15_col0, #T_8f563_row16_col0, #T_8f563_row19_col0, #T_8f563_row26_col0, #T_8f563_row27_col0, #T_8f563_row28_col0 {
-  background-color: #006837;
-  color: #f1f1f1;
-}
-</style>
-<table id="T_8f563">
-  <thead>
-    <tr>
-      <th class="blank level0" >&nbsp;</th>
-      <th id="T_8f563_level0_col0" class="col_heading level0 col0" >IndoBERT</th>
-    </tr>
-    <tr>
-      <th class="index_name level0" >case_name</th>
-      <th class="blank col0" >&nbsp;</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <th id="T_8f563_level0_row0" class="row_heading level0 row0" >agreement</th>
-      <td id="T_8f563_row0_col0" class="data row0 col0" >0.80</td>
-    </tr>
-    <tr>
-      <th id="T_8f563_level0_row1" class="row_heading level0 row1" >ambiguous</th>
-      <td id="T_8f563_row1_col0" class="data row1 col0" >0.60</td>
-    </tr>
-    <tr>
-      <th id="T_8f563_level0_row2" class="row_heading level0 row2" >explicit</th>
-      <td id="T_8f563_row2_col0" class="data row2 col0" >1.00</td>
-    </tr>
-    <tr>
-      <th id="T_8f563_level0_row3" class="row_heading level0 row3" >first_message</th>
-      <td id="T_8f563_row3_col0" class="data row3 col0" >1.00</td>
-    </tr>
-    <tr>
-      <th id="T_8f563_level0_row4" class="row_heading level0 row4" >first_message_self</th>
-      <td id="T_8f563_row4_col0" class="data row4 col0" >1.00</td>
-    </tr>
-    <tr>
-      <th id="T_8f563_level0_row5" class="row_heading level0 row5" >first_message_unknown</th>
-      <td id="T_8f563_row5_col0" class="data row5 col0" >0.80</td>
-    </tr>
-    <tr>
-      <th id="T_8f563_level0_row6" class="row_heading level0 row6" >interruption</th>
-      <td id="T_8f563_row6_col0" class="data row6 col0" >0.80</td>
-    </tr>
-    <tr>
-      <th id="T_8f563_level0_row7" class="row_heading level0 row7" >memory_outside_window</th>
-      <td id="T_8f563_row7_col0" class="data row7 col0" >1.00</td>
-    </tr>
-    <tr>
-      <th id="T_8f563_level0_row8" class="row_heading level0 row8" >mixed_relations</th>
-      <td id="T_8f563_row8_col0" class="data row8 col0" >0.60</td>
-    </tr>
-    <tr>
-      <th id="T_8f563_level0_row9" class="row_heading level0 row9" >multiple_targets</th>
-      <td id="T_8f563_row9_col0" class="data row9 col0" >0.80</td>
-    </tr>
-    <tr>
-      <th id="T_8f563_level0_row10" class="row_heading level0 row10" >negation</th>
-      <td id="T_8f563_row10_col0" class="data row10 col0" >1.00</td>
-    </tr>
-    <tr>
-      <th id="T_8f563_level0_row11" class="row_heading level0 row11" >neutral_after_accusation</th>
-      <td id="T_8f563_row11_col0" class="data row11 col0" >1.00</td>
-    </tr>
-    <tr>
-      <th id="T_8f563_level0_row12" class="row_heading level0 row12" >neutral_names</th>
-      <td id="T_8f563_row12_col0" class="data row12 col0" >1.00</td>
-    </tr>
-    <tr>
-      <th id="T_8f563_level0_row13" class="row_heading level0 row13" >neutral_status</th>
-      <td id="T_8f563_row13_col0" class="data row13 col0" >0.80</td>
-    </tr>
-    <tr>
-      <th id="T_8f563_level0_row14" class="row_heading level0 row14" >nickname</th>
-      <td id="T_8f563_row14_col0" class="data row14 col0" >1.00</td>
-    </tr>
-    <tr>
-      <th id="T_8f563_level0_row15" class="row_heading level0 row15" >original</th>
-      <td id="T_8f563_row15_col0" class="data row15 col0" >1.00</td>
-    </tr>
-    <tr>
-      <th id="T_8f563_level0_row16" class="row_heading level0 row16" >outside_window_unknown</th>
-      <td id="T_8f563_row16_col0" class="data row16 col0" >1.00</td>
-    </tr>
-    <tr>
-      <th id="T_8f563_level0_row17" class="row_heading level0 row17" >plural_reference</th>
-      <td id="T_8f563_row17_col0" class="data row17 col0" >0.80</td>
-    </tr>
-    <tr>
-      <th id="T_8f563_level0_row18" class="row_heading level0 row18" >quotation</th>
-      <td id="T_8f563_row18_col0" class="data row18 col0" >0.80</td>
-    </tr>
-    <tr>
-      <th id="T_8f563_level0_row19" class="row_heading level0 row19" >reference_end</th>
-      <td id="T_8f563_row19_col0" class="data row19 col0" >1.00</td>
-    </tr>
-    <tr>
-      <th id="T_8f563_level0_row20" class="row_heading level0 row20" >reference_middle</th>
-      <td id="T_8f563_row20_col0" class="data row20 col0" >0.80</td>
-    </tr>
-    <tr>
-      <th id="T_8f563_level0_row21" class="row_heading level0 row21" >reference_start</th>
-      <td id="T_8f563_row21_col0" class="data row21 col0" >0.60</td>
-    </tr>
-    <tr>
-      <th id="T_8f563_level0_row22" class="row_heading level0 row22" >rhetorical_question</th>
-      <td id="T_8f563_row22_col0" class="data row22 col0" >0.80</td>
-    </tr>
-    <tr>
-      <th id="T_8f563_level0_row23" class="row_heading level0 row23" >second_person</th>
-      <td id="T_8f563_row23_col0" class="data row23 col0" >0.80</td>
-    </tr>
-    <tr>
-      <th id="T_8f563_level0_row24" class="row_heading level0 row24" >self</th>
-      <td id="T_8f563_row24_col0" class="data row24 col0" >0.80</td>
-    </tr>
-    <tr>
-      <th id="T_8f563_level0_row25" class="row_heading level0 row25" >short_history_1</th>
-      <td id="T_8f563_row25_col0" class="data row25 col0" >0.60</td>
-    </tr>
-    <tr>
-      <th id="T_8f563_level0_row26" class="row_heading level0 row26" >short_history_2</th>
-      <td id="T_8f563_row26_col0" class="data row26 col0" >1.00</td>
-    </tr>
-    <tr>
-      <th id="T_8f563_level0_row27" class="row_heading level0 row27" >short_history_3</th>
-      <td id="T_8f563_row27_col0" class="data row27 col0" >1.00</td>
-    </tr>
-    <tr>
-      <th id="T_8f563_level0_row28" class="row_heading level0 row28" >stance_change</th>
-      <td id="T_8f563_row28_col0" class="data row28 col0" >1.00</td>
-    </tr>
-    <tr>
-      <th id="T_8f563_level0_row29" class="row_heading level0 row29" >topic_switch</th>
-      <td id="T_8f563_row29_col0" class="data row29 col0" >0.80</td>
-    </tr>
-    <tr>
-      <th id="T_8f563_level0_row30" class="row_heading level0 row30" >witness</th>
-      <td id="T_8f563_row30_col0" class="data row30 col0" >0.60</td>
-    </tr>
-  </tbody>
-</table>
-</div><div class="tbl"><div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>model</th>
-      <th>jumlah_benar</th>
-      <th>jumlah_skenario</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <th>0</th>
-      <td>IndoBERT Transformer</td>
-      <td>10</td>
-      <td>12</td>
-    </tr>
-  </tbody>
-</table>
-</div></div></div></section><div class="md"><h3>Catatan Evaluasi</h3></div><div class="md"><ul><li><b>Dataset pilot kecil</b> (775 pesan: offend, defend, dan neutral; 25 per kasus; target neutral hanya 95). Setiap kasus hanya punya sekitar 5 pesan test, jadi exact match per kasus masih sangat bervariasi. Tambah data untuk kasus yang lemah sebelum menarik kesimpulan akhir.</li><li><b>Anotasi konteks</b> pada data ini adalah label yang benar. Saat game berjalan, anotasi berasal dari prediksi sebelumnya sehingga kesalahan bisa merambat; skor di sini adalah batas atas untuk kondisi tersebut.</li><li><b>Pemain semu</b> menambah pasangan <code>tidak_ada</code> yang mudah. Karena itu accuracy pasangan cenderung tinggi; gunakan macro-F1 relasi dan exact match pesan sebagai acuan utama.</li><li><b>Model klasik</b> hanya melihat kata dan potongan kata, sehingga kasus kata ganti dan memori bergantung pada token <code>KANDIDAT_X</code> di anotasi konteks. IndoBERT dapat membaca urutan kalimat, tetapi tetap dibatasi 512 token.</li><li><b>Pemilihan parameter</b> hanya memakai CV atau validation per grup kalimat sumber; test tidak dipakai untuk memilih.</li></ul></div>
+</pre></section><div class="md"><h3>Catatan Evaluasi</h3></div><div class="md"><ul><li><b>Dataset pilot kecil</b> (775 pesan: offend, defend, dan neutral; 25 per kasus; target neutral hanya 95). Setiap kasus hanya punya sekitar 5 pesan test, jadi exact match per kasus masih sangat bervariasi. Karena itu ditambah <b>500 sesi</b> (<code>data/dataset_target_tambahan.csv</code>, 27 Oktober 2026) untuk 14 kasus yang paling sering salah: 400 sesi masuk train, 100 sesi menjadi <b>uji tambahan</b>. Test tetap 155 pesan pilot, jadi bisa dibandingkan dengan run sebelumnya: exact match 0,858 → 0,903.</li><li><b>Uji tambahan</b> dibuat dengan cara yang sama seperti sesi tambahan di train, jadi skornya (exact match 0,89) bisa lebih tinggi daripada pada chat pemain sungguhan. Angka utama tetap test pilot.</li><li><b>Dibanding model lama game</b> (run 16 Okt, dinilai dengan label baru lewat kode NLU game): exact match 0,852 → 0,903, salah tuduh 9 → 4, tetapi recall offend turun 0,950 → 0,900 (3 dari 60 target) karena model baru lebih hati-hati menunjuk nama. Rinciannya ada di <code>models/eksperimen/banding_target_game_vs_baru.csv</code>.</li><li><b>Anotasi konteks</b> pada data ini adalah label yang benar. Saat game berjalan, anotasi berasal dari prediksi sebelumnya sehingga kesalahan bisa merambat; skor di sini adalah batas atas untuk kondisi tersebut.</li><li><b>Pemain semu</b> menambah pasangan <code>tidak_ada</code> yang mudah. Karena itu accuracy pasangan cenderung tinggi; gunakan macro-F1 relasi dan exact match pesan sebagai acuan utama.</li><li><b>Model klasik</b> hanya melihat kata dan potongan kata, sehingga kasus kata ganti dan memori bergantung pada token <code>KANDIDAT_X</code> di anotasi konteks. IndoBERT dapat membaca urutan kalimat, tetapi tetap dibatasi 512 token.</li><li><b>Pemilihan parameter</b> hanya memakai CV atau validation per grup kalimat sumber; test tidak dipakai untuk memilih.</li></ul></div>
 
 </main>
 </body>
