@@ -1,8 +1,8 @@
 """FILE INI DIHASILKAN OTOMATIS oleh scripts/ekspor_otak_npc.py. JANGAN DIEDIT MANUAL.
 
 Sumber : npc_utility_ai.ipynb
-Sidik  : 22e657bb24bc04b2
-Dibuat : 2026-10-26 09:09 UTC
+Sidik  : 185c73561a69c37f
+Dibuat : 2026-10-27 01:42 UTC
 
 Perubahan logika bot dilakukan di notebook skripsi, dijalankan ulang sampai semua
 skenario/pengujian lulus, lalu diekspor ulang dengan skrip ini.
@@ -1867,7 +1867,7 @@ UTILITAS_VOTE_LANGSUNG = 0.85
 
 AMBANG_GAG_UTILITAS = 0.55
 
-PAKSA_VOTE_BUKTI_LEMAH = False
+PAKSA_VOTE_BUKTI_LEMAH = True
 
 BOBOT_BUKTI = {"dituduh_korban": 0.75, "dorong_salah_eksekusi": 0.65, "klaim": 0.60, "serang_bersih": 0.50,
                "tekanan": 0.40, "pengalihan": 0.30, "inkonsistensi": 0.30}
