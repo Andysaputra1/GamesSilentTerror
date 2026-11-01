@@ -1,7 +1,8 @@
 """Engine aturan murni: tidak bergantung HTTP, Socket.IO, MySQL, atau LLM.
 
 RoomService memegang lock ketika memanggil engine. Snapshot selalu dibuat
-untuk satu pemain: role, Hostage, Gag, dan hasil Peek tidak masuk data publik.
+untuk satu pemain: role, Gag, dan hasil Peek tidak masuk data publik. Hostage yang berhasil
+diumumkan ke semua pemain dan tetap tampil di roster sampai permainan selesai.
 """
 
 from math import ceil
@@ -24,6 +25,8 @@ class Participant:
     # Keluar di tengah pertandingan: tidak hidup seperti korban eksekusi, tetapi ditandai berbeda.
     left: bool = False
     hostage: bool = False
+    # Malam saat pemain disandera (publik bersama tanda hostage); 0 = belum pernah disandera.
+    hostage_round: int = 0
     gagged: bool = False
     next_peek: int = 1
     last_guard: str | None = None
@@ -283,7 +286,7 @@ class Match:
         player = self.players.get(name)
         return player.skin_id if player else "dexter"
 
-    # HELPER: Hostage menghapus suara, bukan nyawa atau skill malam milik warga.
+    # HELPER: pemain yang masih bisa bertindak (hidup, pertandingan belum selesai); Hostage dicek per aksi.
     def actor(self, name):
         player = self.players.get(name)
         if not player or not player.alive or self.phase == "finished":
@@ -326,6 +329,8 @@ class Match:
             target = self.target(player, target_name)
             if target.role == "hitman":
                 raise ValueError("Tidak bisa menarget rekan Syndicate.")
+            if target.hostage:
+                raise ValueError("Pemain itu sudah disandera.")
             target.gagged = True
             self.next_gag = self.round + 2
             return
@@ -335,6 +340,9 @@ class Match:
         target = self.target(player, target_name, allow_self=ability == "guard")
         if ability == "hostage" and target.role == "hitman":
             raise ValueError("Tidak bisa menarget rekan Syndicate.")
+        # Status Hostage publik: korban lama tidak bisa disandera lagi, jadi malam Syndicate tidak terbuang.
+        if ability == "hostage" and target.hostage:
+            raise ValueError("Pemain itu sudah disandera.")
         if (
             ability == "guard"
             and player.last_guard == target_name
@@ -378,7 +386,9 @@ class Match:
         counts = Counter(choices)
         return next(target for target in choices if counts[target] == max(counts.values()))
 
-    # RESOLUSI MALAM: semua pilihan dibaca bersama, Guard diprioritaskan terhadap Hostage.
+    # RESOLUSI MALAM: semua pilihan dibaca bersama, Guard diprioritaskan terhadap Hostage. Korban yang
+    # berhasil diumumkan ke semua pemain; Hostage gagal (dijaga Guard) atau tanpa pilihan diumumkan sama:
+    # tidak ada yang disandera. Target Hostage yang gagal, Guard, dan Peek tetap rahasia.
     def resolve_night(self):
         guards = set()
         for name, action in self.actions.items():
@@ -394,16 +404,21 @@ class Match:
                 )
                 player.next_peek = self.round + 2
         target = self.syndicate_target()
+        korban = None
         if target is not None:
             self.syndicate_log.append(
                 {"round": self.round, "name": target, "success": target not in guards}
             )
             if target not in guards:
-                self.players[target].hostage = True
-        # Rekap identik untuk semua hasil, termasuk kegagalan atau target yang sudah Hostage.
-        self.events.append(
-            "Malam selesai. Semua aksi telah diselesaikan; identitas dan target tidak diumumkan."
-        )
+                korban = self.players[target]
+                korban.hostage, korban.hostage_round = True, self.round
+        if korban:
+            self.events.append(
+                f"Malam selesai. {self.labels[korban.name]} disandera: tidak bisa chat, vote, atau "
+                "memakai skill sampai permainan selesai."
+            )
+        else:
+            self.events.append("Malam selesai. Malam ini tidak ada yang disandera.")
         self.check_winner()
 
     # RESOLUSI TRIBUNAL: plurality; seri/tanpa suara tidak mengeksekusi siapa pun.
@@ -517,7 +532,8 @@ class Match:
             "civilians_voters": sum(p.alive and not p.hostage for p in civilians),
         }
 
-    # BOT ATURAN: aksi/vote mengikuti validasi yang sama; tidak melihat role atau Hostage lawan.
+    # BOT ATURAN: aksi/vote mengikuti validasi yang sama; tidak melihat role lawan. Korban Hostage (publik)
+    # tidak pernah ditarget: pasti warga dan tidak bisa disandera lagi.
     def run_bots(self):
         flag = {"day": "bot_day_done", "night": "bot_night_done", "tribunal": "bot_vote_done"}.get(
             self.phase
@@ -533,7 +549,7 @@ class Match:
             targets = [
                 other.name
                 for other in self.players.values()
-                if other.alive and other.name != player.name
+                if other.alive and not other.hostage and other.name != player.name
             ]
             self.rng.shuffle(targets)
             if player.role == "hitman":
@@ -672,7 +688,7 @@ class Match:
         hitmen = [p for p in self.players.values() if p.role == "hitman"]
         return sum(p.alive for p in hitmen) if len(hitmen) >= 2 else None
 
-    # SNAPSHOT PRIVAT: roster hanya mengandung alive; status diam orang lain tidak pernah dikirim.
+    # SNAPSHOT PRIVAT: roster publik berisi status hidup, keluar, dan Hostage; Gag orang lain tidak pernah dikirim.
     def snapshot(self, viewer):
         player = self.players[viewer]
         hitman = player.role == "hitman"
@@ -729,10 +745,12 @@ class Match:
                     "skin_id": p.skin_id,
                     # Keluar sudah diumumkan di catatan, jadi tandanya publik (hanya bila benar).
                     **({"left": True} if p.left else {}),
+                    # Hostage diumumkan saat malam selesai, jadi status dan malamnya publik (hanya bila benar).
+                    **({"hostage": True, "hostage_round": p.hostage_round} if p.hostage else {}),
                     **({"metode": self.bot_methods[p.name]} if p.name in self.bot_methods else {}),
                     **({"thinking": True} if p.name in self.bot_berpikir else {}),
                     **({"tahap": self.bot_tahap[p.name]} if p.name in self.bot_tahap else {}),
-                    **({"role": p.role, "hostage": p.hostage, "bot": p.bot} if self.winner else {}),
+                    **({"role": p.role, "bot": p.bot} if self.winner else {}),
                 }
                 for p in self.players.values()
             ],

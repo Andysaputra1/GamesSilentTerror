@@ -137,15 +137,18 @@ class VictoryRulesTests(unittest.TestCase):
         self.assertIsNone(self.game.winner)
         self.assertEqual((self.game.round, self.game.phase), (25, "night"))
 
-    def test_active_snapshot_keeps_other_hostages_private(self):
-        self.game.players["spy"].hostage = True
+    # Hostage publik (diumumkan saat malam selesai); Gag tetap hanya diketahui korbannya.
+    def test_active_snapshot_shows_hostages_but_keeps_gag_private(self):
+        self.game.players["spy"].hostage, self.game.players["spy"].hostage_round = True, 1
         self.game.players["stalker"].gagged = True
         for viewer in self.game.players:
             snapshot = self.game.snapshot(viewer)
             self.assertIsNone(snapshot["result"])
-            self.assertTrue(
-                all(set(p) == {"name", "label", "alive", "skin_id"} for p in snapshot["players"])
-            )
+            for p in snapshot["players"]:
+                sandera = {"hostage", "hostage_round"} if p["name"] == "spy" else set()
+                self.assertEqual(set(p), {"name", "label", "alive", "skin_id"} | sandera)
+            spy = next(p for p in snapshot["players"] if p["name"] == "spy")
+            self.assertEqual((spy["hostage"], spy["hostage_round"]), (True, 1))
             self.assertEqual(snapshot["me"]["hostage"], viewer == "spy")
             self.assertEqual(snapshot["me"]["gagged"], viewer == "stalker")
 

@@ -327,13 +327,13 @@ const PARAMETER = {
   dukungan: 'Pembelaan pemain lain, termasuk klaim bersih dari pengaku Stalker.',
   inkonsistensi: 'Berganti sikap ke target yang sama, atau vote tidak sesuai ucapannya.',
   pengalihan: 'Setelah dituduh, malah menuduh orang lain alih-alih membela diri.',
-  dituduh_korban: 'Pernah dituduh pemain yang kemudian di-Gag atau disandera (jejak aksi Hitman).',
+  dituduh_korban:
+    'Pernah dituduh pemain yang kemudian disandera (diumumkan) atau diduga di-Gag (jejak aksi Hitman).',
   dorong_salah_eksekusi:
     'Ikut mendorong eksekusi warga: vote, ikut menuduh, atau penuduh pertama, dikali kepastian korban warga (1 bila game berlanjut di room satu Hitman atau jumlah Hitman yang diumumkan tetap; selain itu 1 − k/(N − 1)). Tidak dihitung bila korban diketahui Hitman.',
   serang_bersih: 'Menuduh atau vote pemain yang pasti bersih menurut bot.',
   klaim: 'Klaim role bermasalah: bentrok, dibantah, atau hasil Peek palsu.',
-  p_sandera:
-    'Dugaan pemain sedang disandera (tidak aktif sejak malam); tinggi berarti bukan Hitman.',
+  p_sandera: 'Korban Hostage yang diumumkan server (1) atau bukan (0); korban pasti bukan Hitman.',
   diam: 'Belum bicara di ronde ini (0–1 menurut waktu yang lewat).',
   urgensi: 'Makin sedikit warga bebas, makin mendesak (0–1).',
   porsi_fase: 'Bagian fase yang sudah berjalan (0–1).',

@@ -308,17 +308,15 @@ export class Game implements OnInit, OnDestroy {
     return !!game.me.ally_gags?.includes(name);
   }
 
-  // SANDERA: terlihat oleh korban di kartunya sendiri dan oleh Syndicate: korban tim malam ini (satu per
-  // malam: pilihan terbanyak), lalu korban yang berhasil disandera tetap bercap sampai akhir
-  // (me.syndicate_hostages). Di akhir, status dibuka untuk semua.
+  // SANDERA: korban yang berhasil diumumkan ke semua pemain saat malam selesai (players[].hostage) dan
+  // bercap sampai akhir. Selama malam, Syndicate juga melihat korban tim malam ini (satu per malam:
+  // pilihan terbanyak) sebelum diselesaikan.
   isHostage(name: string): boolean {
     const game = this.game;
     if (!game) return false;
-    if (game.winner) return !!game.players.find((player) => player.name === name)?.hostage;
-    if (name === game.me.name) return !!game.me.hostage;
-    if (game.me.role !== 'hitman') return false;
-    if (game.me.syndicate_hostages?.some((h) => h.success && h.name === name)) return true;
-    if (game.phase !== 'night') return false;
+    if (game.players.find((player) => player.name === name)?.hostage) return true;
+    if (name === game.me.name && game.me.hostage) return true;
+    if (game.me.role !== 'hitman' || game.phase !== 'night') return false;
     // Backend lama tanpa syndicate_target: pakai pilihan sendiri.
     const action = game.me.action?.ability === 'hostage' ? game.me.action.target : null;
     return (game.me.syndicate_target ?? action) === name;
@@ -669,7 +667,7 @@ export class Game implements OnInit, OnDestroy {
       return `Status akhir: ${!me.alive ? 'dieksekusi' : me.hostage ? 'hidup sebagai Hostage' : 'masih hidup'}. Hasil menang/kalah mengikuti kubumu.`;
     if (!me.alive) return 'Dieksekusi: kamu menjadi penonton. Hasilmu tetap mengikuti kubumu.';
     if (me.hostage)
-      return 'Hostage: kamu masih hidup, tetapi chat dan voting terkunci sampai pertandingan berakhir. Skill malam tetap tersedia sesuai role dan cooldown. Kamu tetap bagian dari kubu warga.';
+      return 'Hostage: kamu masih hidup, tetapi chat, voting, dan skill malam terkunci sampai pertandingan berakhir. Semua pemain tahu kamu disandera. Kamu tetap bagian dari kubu warga.';
     if (me.gagged)
       return 'Gag Order: chat terkunci sampai siang berikutnya. Voting dan aksi malam tetap boleh dilakukan.';
     if (me.muted) return 'Chat dan voting terkunci untukmu.';
@@ -813,12 +811,19 @@ export class Game implements OnInit, OnDestroy {
 
   // TRANSISI FASE: overlay singkat (malam meredup, pagi terang) setiap kali fase berganti. Dari layar
   // persiapan, tirai tembus pandang menaungi splash yang memudar dan meja yang muncul (cross-fade).
-  // Malam sesudah Tribunal membawa hasil vote (pengumuman publik server), jadi tampil lebih lama.
-  // Malam ronde 1 belum punya hasil Tribunal, jadi lastVerdict kosong dan subjudul biasa yang tampil.
+  // Malam sesudah Tribunal membawa hasil vote dan pagi membawa hasil malam (siapa yang disandera, atau
+  // tidak ada); keduanya pengumuman publik server, jadi tampil lebih lama. Malam ronde 1 belum punya
+  // hasil Tribunal, jadi lastVerdict kosong dan subjudul biasa yang tampil.
   private showTransition(phase: string, fromSplash = false): void {
     const info = this.transitions[phase];
     if (!info) return;
-    const verdict = phase === 'night' && !fromSplash ? this.lastVerdict : '';
+    const verdict = fromSplash
+      ? ''
+      : phase === 'night'
+        ? this.lastVerdict
+        : phase === 'day'
+          ? this.lastNightResult
+          : '';
     this.transition = fromSplash
       ? { phase: 'start', title: 'Ronde 1 dimulai', subtitle: info.subtitle }
       : { phase, ...info, subtitle: verdict || info.subtitle };
@@ -846,6 +851,16 @@ export class Game implements OnInit, OnDestroy {
     const events = this.game?.events ?? [];
     for (let i = events.length - 1; i >= 0; i--)
       if (events[i].startsWith('Tribunal')) return events[i];
+    return '';
+  }
+
+  // Hasil malam terakhir dari server tanpa awalan "Malam selesai." ("X disandera: …" atau
+  // "Malam ini tidak ada yang disandera.").
+  private get lastNightResult(): string {
+    const events = this.game?.events ?? [];
+    for (let i = events.length - 1; i >= 0; i--)
+      if (events[i].startsWith('Malam selesai.'))
+        return events[i].slice('Malam selesai.'.length).trim();
     return '';
   }
 
@@ -1085,8 +1100,12 @@ export class Game implements OnInit, OnDestroy {
   canTarget(name: string): boolean {
     const me = this.game?.me;
     if (!me) return false;
-    // Rekan Syndicate tidak bisa disandera atau dibungkam; vote ke rekan tetap boleh.
-    if (me.can_act && (me.ability === 'hostage' || me.ability === 'gag') && this.isAlly(name))
+    // Rekan Syndicate dan korban Hostage tidak bisa disandera atau dibungkam; vote ke mereka tetap boleh.
+    if (
+      me.can_act &&
+      (me.ability === 'hostage' || me.ability === 'gag') &&
+      (this.isAlly(name) || !!this.game?.players.find((player) => player.name === name)?.hostage)
+    )
       return false;
     if (me.ability === 'guard' && me.can_act) return name !== me.last_guard;
     return name !== me.name;

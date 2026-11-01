@@ -139,6 +139,58 @@ class EngineTests(unittest.TestCase):
         self.assertFalse(self.game.players["civilian"].hostage)
         self.assertEqual(self.game.players["spy"].last_guard, "civilian")
 
+    # Hostage yang berhasil diumumkan ke semua pemain dan menempel di roster sampai akhir.
+    def test_hostage_is_announced_to_everyone_and_stays_on_the_roster(self):
+        self.night()
+        self.game.act("hitman", "hostage", "civilian")
+        self.game.resolve_night()
+        self.assertEqual(
+            self.game.events[-1],
+            "Malam selesai. civilian disandera: tidak bisa chat, vote, atau memakai skill sampai "
+            "permainan selesai.",
+        )
+        self.game.round, self.game.phase = 2, "day"
+        for viewer in self.game.players:
+            roster = {p["name"]: p for p in self.game.snapshot(viewer)["players"]}
+            korban = roster.pop("civilian")
+            self.assertEqual((korban["hostage"], korban["hostage_round"]), (True, 1))
+            self.assertTrue(all("hostage" not in p for p in roster.values()))
+        # Korban lama tidak bisa di-Gag atau disandera lagi.
+        with self.assertRaisesRegex(ValueError, "sudah disandera"):
+            self.game.act("hitman", "gag", "civilian")
+        self.night()
+        with self.assertRaisesRegex(ValueError, "sudah disandera"):
+            self.game.act("hitman", "hostage", "civilian")
+
+    # Hostage gagal (dijaga Guard) dan malam tanpa pilihan diumumkan sama; targetnya tidak dibuka.
+    def test_failed_or_missing_hostage_announces_nobody(self):
+        self.night()
+        self.game.act("hitman", "hostage", "civilian")
+        self.game.act("spy", "guard", "civilian")
+        self.game.resolve_night()
+        self.assertEqual(self.game.events[-1], "Malam selesai. Malam ini tidak ada yang disandera.")
+        self.night()
+        self.game.resolve_night()
+        self.assertEqual(self.game.events[-1], "Malam selesai. Malam ini tidak ada yang disandera.")
+        self.assertTrue(all("hostage" not in p for p in self.game.snapshot("stalker")["players"]))
+
+    # Bot aturan tidak menarget korban Hostage (pasti warga, tidak bisa disandera lagi).
+    def test_rule_bots_never_target_public_hostages(self):
+        names = ["hitman", "spy", "stalker", "civilian", "civilian2", "civilian3"]
+        for seed in range(10):
+            game = Match([], names, now=0, rng=random.Random(seed))
+            for name, player in game.players.items():
+                player.role = name if name in {"hitman", "spy", "stalker"} else "civilian"
+            for name in ("civilian", "civilian2"):
+                game.players[name].hostage = True
+            game.phase = "night"
+            game.run_bots()
+            game.phase = "tribunal"
+            game.run_bots()
+            pilihan = [a["target"] for a in game.actions.values()] + list(game.votes.values())
+            self.assertTrue(pilihan, seed)
+            self.assertFalse({"civilian", "civilian2"} & set(pilihan), seed)
+
     def test_guard_consecutive_nights_but_can_self_guard(self):
         self.night()
         self.game.act("spy", "guard", "spy")
@@ -195,11 +247,13 @@ class EngineTests(unittest.TestCase):
             self.game.vote("civilian", "hitman")
         self.game.tick(self.game.deadline)
         self.assertFalse(self.game.can_chat("civilian"))
+        # Korban Hostage publik untuk semua viewer; aksi dan vote orang lain tetap tidak dikirim.
         for viewer in self.game.players:
             snapshot = self.game.snapshot(viewer)
             for player in snapshot["players"]:
-                self.assertEqual(set(player), {"name", "label", "alive", "skin_id"})
-            self.assertNotIn("civilian", " ".join(snapshot["events"]))
+                sandera = {"hostage", "hostage_round"} if player["name"] == "civilian" else set()
+                self.assertEqual(set(player), {"name", "label", "alive", "skin_id"} | sandera)
+            self.assertIn("civilian disandera", " ".join(snapshot["events"]))
             self.assertNotIn("actions", snapshot)
             self.assertNotIn("votes", snapshot)
 
@@ -481,10 +535,13 @@ class SyndicateTests(unittest.TestCase):
             for phase in ("day", "night", "tribunal"):
                 self.game.phase = phase
                 self.assertEqual(remaining(), expected)
-            # Role korban tetap rahasia; roster lawan tetap nama dan status hidup saja.
+            # Role korban tetap rahasia; roster lawan tetap nama, status hidup, dan Hostage (publik).
             view = self.game.snapshot("spy")
             self.assertTrue(
-                all(set(p) == {"name", "label", "alive", "skin_id"} for p in view["players"])
+                all(
+                    set(p) - {"hostage", "hostage_round"} == {"name", "label", "alive", "skin_id"}
+                    for p in view["players"]
+                )
             )
 
     def test_hitman_count_is_available_during_preparation(self):

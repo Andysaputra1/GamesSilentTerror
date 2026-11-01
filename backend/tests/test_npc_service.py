@@ -51,13 +51,18 @@ class NPCTests(unittest.IsolatedAsyncioTestCase):
             await self.service.turn(self.room.code, self.match, key, npc_context(self.match, name))
 
     def test_context_never_contains_opponents_private_state(self):
-        self.match.players["human"].hostage = True
         self.match.players["ECHO"].intel = [{"secret": "other-player-intel"}]
+        self.match.players["VEIL"].gagged = True
         context = npc_context(self.match, "NOX")
-        self.assertTrue(all(set(p) == {"name", "alive"} for p in context["players"]))
+        self.assertTrue(all(set(p) == {"name", "alive", "hostage"} for p in context["players"]))
         self.assertNotIn("other-player-intel", json.dumps(context))
         self.assertEqual(context["me"]["role"], "hitman")
         self.assertIn("human", context["legal_actions"]["gag"])
+        # Hostage diumumkan publik: terlihat di roster dan tidak lagi menjadi target Gag/Hostage.
+        self.match.players["human"].hostage = True
+        context = npc_context(self.match, "NOX")
+        self.assertTrue(next(p for p in context["players"] if p["name"] == "human")["hostage"])
+        self.assertNotIn("human", context["legal_actions"]["gag"])
 
     def test_hostage_cannot_chat_vote_or_use_night_skill(self):
         self.match.phase = "night"

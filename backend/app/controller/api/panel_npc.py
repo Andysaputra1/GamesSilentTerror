@@ -253,7 +253,7 @@ KODE_ALUR = {
         (G + "otak_fuzzy", "nilai_kecurigaan", [
             ("for sistem, x, y in HIERARKI", "sistem dihitung bertingkat"),
             ("fuzzy(sistem, nilai[x], nilai[y]) / 100", "keluaran 0–100 menjadi 0–1"),
-            ('(1 - b["p_sandera"])', "dikurangi dugaan sedang disandera"),
+            ('(1 - b["p_sandera"])', "nol bila diumumkan disandera"),
         ]),
     ],
     "fl_4": [
@@ -284,7 +284,7 @@ KODE_ALUR = {
             ("BOBOT_BUKTI[k] * float(b[k])", "kontribusi tiap bukti"),
             ('komponen["tekanan"] *= 1 - 0.7', "tekanan diredam oleh dukungan"),
             ("1 - float(np.prod(", "noisy-OR: 1 − Π(1 − kontribusi)"),
-            ('(1 - b["p_sandera"])', "dikurangi dugaan sedang disandera"),
+            ('(1 - b["p_sandera"])', "nol bila diumumkan disandera"),
         ]),
     ],
     "ua_3": [

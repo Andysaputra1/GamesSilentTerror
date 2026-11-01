@@ -72,7 +72,10 @@ export interface MatchView {
     /** Keluar di tengah pertandingan: tidak hidup seperti dieksekusi, tetapi ditampilkan "Keluar". */
     left?: boolean;
     role?: string;
+    /** Disandera: diumumkan ke semua pemain saat malam selesai dan tetap tampil sampai akhir. */
     hostage?: boolean;
+    /** Ronde malam saat pemain disandera (ada bersama `hostage`). */
+    hostage_round?: number;
     skin_id?: string;
   }[];
   messages: GameMessage[];

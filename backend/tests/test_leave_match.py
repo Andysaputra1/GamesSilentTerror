@@ -280,7 +280,7 @@ class LeaveRoomTests(unittest.TestCase):
 
         self.rooms.leave(self.room.code, "alice")
         context = npc_context(self.match, "NOX")
-        self.assertIn({"name": "alice", "alive": False}, context["players"])
+        self.assertIn({"name": "alice", "alive": False, "hostage": False}, context["players"])
         self.assertNotIn("alice", context["legal_actions"]["gag"])
         snapshot = snapshot_berlabel(self.match.snapshot("NOX"), self.match.labels)
         alice = next(p for p in snapshot["players"] if p["name"] == "alice")
@@ -288,7 +288,7 @@ class LeaveRoomTests(unittest.TestCase):
         for modul in (otak_fuzzy, otak_utility, otak_bt):
             with self.subTest(modul=modul.__name__):
                 view = modul.Ingatan("NOX").sinkron_snapshot(snapshot, time.time())
-                self.assertIn({"nama": "alice", "hidup": False}, view["pemain"])
+                self.assertIn({"nama": "alice", "hidup": False, "sandera": None}, view["pemain"])
 
     def test_bot_memory_records_leaver_without_tribunal_blame(self):
         from app.module.npc_brain.generated import otak_bt, otak_fuzzy, otak_utility

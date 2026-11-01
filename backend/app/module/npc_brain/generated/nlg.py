@@ -1,8 +1,8 @@
 """FILE INI DIHASILKAN OTOMATIS oleh scripts/ekspor_otak_npc.py. JANGAN DIEDIT MANUAL.
 
 Sumber : npc_nlg.ipynb
-Sidik  : 4423e4ec9f6e7633
-Dibuat : 2026-10-26 06:27 UTC
+Sidik  : fa8a02b1e22cee6b
+Dibuat : 2026-11-01 06:46 UTC
 
 Perubahan logika bot dilakukan di notebook skripsi, dijalankan ulang sampai semua
 skenario/pengujian lulus, lalu diekspor ulang dengan skrip ini.
@@ -183,11 +183,12 @@ VARIASI = {
         "Aku curiga sama {t}.",
         "Menurutku {t} patut dicurigai.",
     ],
-    # Kata "sandera" dan "tidak vote/chat" condong terbaca menuduh; pembelaan harus datang lebih dulu.
+    # Kata "sandera" condong terbaca menuduh; pembelaan harus datang lebih dulu. Korban Hostage diumumkan server, jadi
+    # statusnya disebut pasti.
     "info_sandera": [
-        "Jangan salah vote, {t} bukan Hitman. Dia korban sandera.",
-        "Aku rasa {t} bukan Hitman, tuduhannya belum ada bukti. Kayaknya dia korban sandera.",
-        "Aku rasa {t} bukan Hitman, dia cuma korban sandera.",
+        "Jangan salah vote, {t} bukan Hitman. Dia sudah disandera.",
+        "{t} bukan Hitman, dia kan sudah disandera. Jangan vote {t}.",
+        "Aku yakin {t} bukan Hitman, dia sudah disandera.",
     ],
     # "X kok diam?" terbaca menuduh; ajakan bicara ditulis sebagai pertanyaan pendapat.
     "ajak_bicara": [
@@ -1035,7 +1036,8 @@ MAKSUD_AKSI = {
     "bela_orang": "Membela {t}: minta pemain lain jangan buru-buru vote {t}.",
     "bela_orang_klaim": "Mengaku sebagai Stalker yang sudah Peek {t} dan hasilnya bukan Hitman, jadi jangan vote {t}.",
     "tuduh": "Menyampaikan kecurigaan pada {t} beserta alasannya, sebagai dugaan (bukan kepastian).",
-    "info_sandera": "Menyampaikan dugaan bahwa {t} kemungkinan disandera, jadi {t} bukan Hitman.",
+    "info_sandera": ("Mengingatkan bahwa {t} sudah disandera (diumumkan ke semua pemain), jadi {t} pasti bukan Hitman; "
+                     "minta pemain lain jangan vote {t}."),
     "ajak_bicara": "Mengajak {t} yang dari tadi diam untuk ikut bicara dan memberi pendapat.",
     "tanya_info": "Bertanya kepada semua pemain siapa yang mereka curigai dan kenapa.",
     "tanya_info_bukti": "Menyampaikan alasan berikut lalu bertanya pendapat pemain lain.",
@@ -1072,7 +1074,7 @@ def buat_prompt(p, konteks, persona, alasan_tolak=None):
     sistem = f"""Kamu menulis satu pesan chat untuk seorang pemain game deduksi sosial "Silent Terror" (mirip Werewolf/Mafia), dalam bahasa Indonesia sehari-hari.
 Isi pesan sudah diputuskan oleh rencana; tugasmu hanya menuliskannya secara wajar seperti manusia yang sedang bermain.
 
-Ringkas aturan game: Hitman (satu atau lebih, tergantung jumlah pemain) bersembunyi di antara warga (Civilian, Spy, Stalker). Siang semua pemain berdiskusi, lalu Tribunal memilih siapa yang dieksekusi (ronde 1 tanpa Tribunal); malam Hitman bisa menyandera (Hostage), Spy bisa menjaga (Guard), dan Stalker bisa melihat role seseorang (Peek).
+Ringkas aturan game: Hitman (satu atau lebih, tergantung jumlah pemain) bersembunyi di antara warga (Civilian, Spy, Stalker). Siang semua pemain berdiskusi, lalu Tribunal memilih siapa yang dieksekusi (ronde 1 tanpa Tribunal); malam Hitman bisa menyandera (Hostage), Spy bisa menjaga (Guard), dan Stalker bisa melihat role seseorang (Peek). Korban Hostage diumumkan ke semua pemain saat malam selesai; Gag, Guard, dan Peek tidak diumumkan.
 
 Aturan menulis:
 1. Tulis paling banyak 2 kalimat pendek (lebih baik 1 kalimat), maksimal {PANJANG_MAKS} karakter, seperti chat game yang diketik cepat, bukan paragraf. Gaya bicara: {PERSONA[persona]['deskripsi']}.

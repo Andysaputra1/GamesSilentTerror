@@ -389,7 +389,7 @@
               @for (player of state.players; track player.name; let i = $index) {
                 @let intip = peekLabel(player.name);
                 @let sandera = player.alive && isHostage(player.name);
-                <!-- Penanda aksi rahasia (Intip, Jaga, Gag, Sandera) hanya dari data privat pemain ini. -->
+                <!-- Penanda Intip, Jaga, dan Gag hanya dari data privat pemain ini; cap Sandera publik. -->
                 <div
                   class="player-card"
                   animate.enter="card-enter"

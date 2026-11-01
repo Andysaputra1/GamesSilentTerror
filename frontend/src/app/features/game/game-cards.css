@@ -1,5 +1,5 @@
-/* Penanda aksi rahasia di kartu pemain: hasil Intip (Stalker), aura Jaga (Spy), label GAG dan cap
-   Sandera (Hitman/korban). Template hanya memasang penanda dari data privat pemain ini.
+/* Penanda di kartu pemain: hasil Intip (Stalker), aura Jaga (Spy), dan label GAG dari data privat pemain
+   ini; cap Sandera publik untuk semua pemain sejak malam korban disandera.
    File sendiri karena budget 12 kB per stylesheet komponen. */
 
 /* INTIP: role di atas karakter seperti judul kartu role di Main; baris sendiri agar wajah tidak tertutup. */

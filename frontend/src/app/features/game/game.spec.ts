@@ -772,6 +772,10 @@ describe('Game', () => {
     let cards = render().querySelectorAll('.player-card');
     expect(component.canTarget('NOX')).toBe(false);
     expect(component.canTarget('bob')).toBe(true);
+    // Korban Hostage yang sudah diumumkan juga tidak bisa di-Gag atau disandera lagi.
+    game.players[2] = { name: 'bob', alive: true, hostage: true, hostage_round: 1 };
+    expect(component.canTarget('bob')).toBe(false);
+    game.players[2] = { name: 'bob', alive: true };
     expect(cards[1].querySelector('.ally-tag')?.textContent).toContain('Rekan');
     expect((cards[1].querySelector('button') as HTMLButtonElement).disabled).toBe(true);
     expect((cards[2].querySelector('button') as HTMLButtonElement).disabled).toBe(false);
@@ -1353,6 +1357,36 @@ describe('Game', () => {
     expect(render().querySelector('.phase-transition')?.textContent).toContain(verdict);
   });
 
+  // HASIL MALAM: tirai pagi membawa pengumuman server (korban Hostage atau tidak ada yang disandera).
+  it('shows the night result on the morning curtain', () => {
+    const state = snapshot();
+    state.game.round = 1;
+    state.game.phase = 'night';
+    const request = vi.spyOn(TestBed.inject(GameService), 'request').mockReturnValue(of(state));
+    component.code = 'ABC123';
+    component.refresh();
+    render();
+    for (const [event, subtitle] of [
+      [
+        'Malam selesai. NOX disandera: tidak bisa chat, vote, atau memakai skill sampai permainan selesai.',
+        'NOX disandera: tidak bisa chat, vote, atau memakai skill sampai permainan selesai.',
+      ],
+      ['Malam selesai. Malam ini tidak ada yang disandera.', 'Malam ini tidak ada yang disandera.'],
+    ]) {
+      const next = snapshot();
+      next.game.round = state.game.round + 1;
+      next.game.phase = 'day';
+      next.game.events = [event, `Ronde ${next.game.round}: diskusi siang dimulai.`];
+      request.mockReturnValue(of(next));
+      component.refresh();
+      expect(component.transition).toEqual(expect.objectContaining({ phase: 'day', subtitle }));
+      // Malam berikutnya, lalu pagi lagi dengan hasil lain.
+      state.game.round = next.game.round;
+      request.mockReturnValue(of(state));
+      component.refresh();
+    }
+  });
+
   // INTIP: hasil Peek di kartu target (di atas karakter), bertahan lintas ronde; hanya layar Stalker.
   it('keeps the Peek result on the target card across rounds, only for the Stalker', () => {
     const game = snapshot().game;
@@ -1462,8 +1496,9 @@ describe('Game', () => {
     expect(render().querySelector('.gag-tag')).toBeNull();
   });
 
-  // SANDERA: cap besar dan kartu gelap hanya untuk Hitman (target malam ini) dan korban (kartunya sendiri).
-  it('stamps the hostage only for the Hitman target and on the victim own card', () => {
+  // SANDERA: selama malam hanya Hitman yang melihat cap pada target tim; setelah malam selesai korban yang
+  // berhasil diumumkan server (players[].hostage) dan bercap untuk semua pemain sampai akhir.
+  it('stamps the night target for the Hitman and the announced hostage for everyone', () => {
     const game = snapshot().game;
     game.players = ['alice', 'NOX', 'bob'].map((name) => ({ name, alive: true }));
     game.phase = 'night';
@@ -1488,38 +1523,48 @@ describe('Game', () => {
     expect(cards[2].querySelector('.stamp-sandera')).toBeNull();
     game.me = { ...game.me, syndicate_target: undefined };
 
-    // Setelah malam tanpa hasil dari server (backend lama tanpa syndicate_hostages): cap hilang.
-    game.phase = 'tribunal';
+    // Malam berakhir tanpa korban (dijaga Guard): server tidak mengumumkan siapa pun, cap hilang.
+    game.phase = 'day';
     game.me.action = null;
     component.target = '';
     expect(render().querySelector('.stamp-sandera')).toBeNull();
 
-    // Korban melihat cap hanya di kartunya sendiri; warga lain tidak tahu siapa yang disandera.
-    game.me = { ...game.me, name: 'bob', role: 'civilian', ability: null, hostage: true };
+    // Korban diumumkan: semua pemain (juga warga) melihat cap di kartu korban saja.
+    game.players = game.players.map((player) =>
+      player.name === 'bob' ? { ...player, hostage: true, hostage_round: 1 } : player,
+    );
+    game.me = { ...game.me, name: 'NOX', role: 'civilian', ability: null };
     cards = render().querySelectorAll('.player-card');
-    expect(cards[2].querySelector('.stamp-sandera')).not.toBeNull();
+    expect(cards[2].querySelector('.stamp-sandera')?.textContent).toBe('Disandera');
+    expect(cards[2].querySelector('.player')?.classList).toContain('held');
     expect(fixture.nativeElement.querySelectorAll('.stamp-sandera').length).toBe(1);
-    game.me = { ...game.me, name: 'NOX', hostage: false };
-    expect(render().querySelector('.stamp-sandera')).toBeNull();
+    // Korban sendiri juga melihatnya di kartunya.
+    game.me = { ...game.me, name: 'bob', hostage: true };
+    expect(
+      render().querySelectorAll('.player-card')[2].querySelector('.stamp-sandera'),
+    ).not.toBeNull();
 
-    // Akhir permainan: server membuka status Hostage untuk semua pemain.
+    // Akhir permainan: cap tetap di korban, role semua pemain dibuka.
     game.phase = 'finished';
     game.winner = 'hitman';
     game.players = game.players.map((player) => ({
       ...player,
       role: player.name === 'alice' ? 'hitman' : 'civilian',
-      hostage: player.name === 'bob',
     }));
     cards = render().querySelectorAll('.player-card');
     expect(cards[2].querySelector('.stamp-sandera')).not.toBeNull();
     expect(fixture.nativeElement.querySelectorAll('.stamp-sandera').length).toBe(1);
   });
 
-  // HASIL SANDERA (hanya Hitman): berhasil → cap tetap sampai akhir; gagal (dijaga Guard) → cap
-  // "Disandera" dicap GAGAL pada siang sesudah malamnya (sesudah tirai siang), lalu memudar lewat CSS.
+  // HASIL SANDERA: berhasil → cap publik tetap sampai akhir; gagal (dijaga Guard) → hanya Syndicate melihat
+  // cap "Disandera" dicap GAGAL pada siang sesudah malamnya (sesudah tirai siang), lalu memudar lewat CSS.
   it('keeps a successful hostage stamp and shows a fading failed stamp for the Syndicate', () => {
     const game = snapshot().game;
-    game.players = ['alice', 'NOX', 'bob'].map((name) => ({ name, alive: true }));
+    game.players = ['alice', 'NOX', 'bob'].map((name) =>
+      name === 'bob'
+        ? { name, alive: true, hostage: true, hostage_round: 1 }
+        : { name, alive: true },
+    );
     game.phase = 'day';
     game.round = 3;
     game.me = {
@@ -1547,9 +1592,11 @@ describe('Game', () => {
     cards = render().querySelectorAll('.player-card');
     expect(cards[1].querySelector('.stamp-gagal')).toBeNull();
     expect(cards[2].querySelector('.stamp-sandera')).not.toBeNull();
-    // Warga tidak pernah menerima data ini, jadi tidak melihat cap apa pun.
+    // Warga melihat cap korban yang diumumkan, tetapi tidak pernah cap gagal (target Hostage gagal rahasia).
     game.phase = 'day';
     game.me = { ...game.me, name: 'alice', role: 'civilian', syndicate_hostages: [] };
-    expect(render().querySelector('.stamp-sandera')).toBeNull();
+    cards = render().querySelectorAll('.player-card');
+    expect(cards[2].querySelector('.stamp-sandera')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('.stamp-gagal')).toBeNull();
   });
 });

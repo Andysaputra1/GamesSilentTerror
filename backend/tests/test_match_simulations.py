@@ -26,9 +26,12 @@ class MatchSimulationTests(unittest.TestCase):
                         for name, player in game.players.items():
                             view = game.snapshot(name)
                             me = view["me"]
+                            # Roster publik: nama dan hidup, plus tanda Hostage yang diumumkan (hanya bila benar).
                             self.assertTrue(
                                 all(
-                                    set(p) == {"name", "label", "alive", "skin_id"}
+                                    set(p) - {"hostage", "hostage_round"}
+                                    == {"name", "label", "alive", "skin_id"}
+                                    and p.get("hostage", False) == game.players[p["name"]].hostage
                                     for p in view["players"]
                                 )
                             )
@@ -43,13 +46,14 @@ class MatchSimulationTests(unittest.TestCase):
                             ability = me["ability"] if me["can_act"] else None
                             if not ability and not me["can_vote"]:
                                 continue
-                            # Hostage/Gag tidak boleh ke rekan Syndicate; vote ke rekan tetap boleh.
+                            # Hostage/Gag tidak boleh ke rekan Syndicate atau korban Hostage; vote tetap boleh.
                             allies = set(me["allies"]) if ability in {"hostage", "gag"} else set()
                             targets = [
                                 p.name
                                 for p in game.players.values()
                                 if p.alive
                                 and p.name not in allies
+                                and not (ability in {"hostage", "gag"} and p.hostage)
                                 and (p.name != name or ability == "guard")
                                 and not (ability == "guard" and p.name == me["last_guard"])
                             ]
