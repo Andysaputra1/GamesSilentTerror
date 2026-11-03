@@ -57,6 +57,23 @@ class SimulasiTests(unittest.TestCase):
         with self.assertRaises(ValueError):  # malam: chat terkunci seperti di room asli
             asyncio.run(self.layanan.jalankan(self.awal["id"], "kirim", "halo", 3))
 
+    # Suara seri: fase berikutnya tidak memundurkan jam simulasi dan tidak macet di Tribunal.
+    def test_seri_tribunal_menambah_waktu_tanpa_memundurkan_jam(self):
+        for _ in range(3):  # siang → malam → siang ronde 2 → Tribunal
+            hasil = asyncio.run(self.layanan.jalankan(self.awal["id"], "fase"))
+        self.assertEqual((hasil["ronde"], hasil["fase"]), (2, "tribunal"))
+        sim = self.layanan.simulasi[self.awal["id"]]
+        sim.match.votes = {"sim_pemain": "NOX", "ECHO": "VEIL"}
+        batas, panjang = sim.match.deadline, sim.match.durations["tribunal"]
+        # Bot yang masih bisa vote boleh memecahkan seri; hanya lompatan pertama yang diamati di sini.
+        hasil = asyncio.run(self.layanan.jalankan(self.awal["id"], "fase"))
+        self.assertEqual(hasil["fase"], "tribunal")
+        self.assertEqual(sim.jam, batas)
+        self.assertEqual((hasil["detik"], hasil["durasi"]), (panjang, panjang + 30))
+        self.assertIn("Suara seri", " ".join(j["message"] for j in hasil["jejak"]))
+        hasil = asyncio.run(self.layanan.jalankan(self.awal["id"], "fase"))
+        self.assertIn(hasil["fase"], {"night", "finished"})
+
     def test_simulasi_terlama_dibuang(self):
         for _ in range(modul.MAKS_SIMULASI):
             self.layanan.mulai("A", ["bt", "bt", "bt"])

@@ -123,7 +123,9 @@ class LeaveEngineTests(unittest.TestCase):
         tally = {row["target"]: row["voters"] for row in view["tribunal_votes"]}
         self.assertEqual((tally["civilian"], tally["hitman"]), ([], ["stalker"]))
         self.game.vote("spy", "civilian2")
-        self.game.tick(self.game.deadline)  # seri: tanpa eksekusi, lanjut ke malam
+        self.game.tick(self.game.deadline)  # seri: waktu ditambah sekali
+        self.assertEqual(self.game.phase, "tribunal")
+        self.game.tick(self.game.deadline)  # masih seri: tanpa eksekusi, lanjut ke malam
         self.assertEqual((self.game.round, self.game.phase, self.game.winner), (1, "night", None))
 
     def test_last_hitman_leaving_ends_the_game_for_the_civilians(self):

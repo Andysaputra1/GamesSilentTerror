@@ -342,6 +342,45 @@
   background: #5f9443;
 }
 
+/* ---------- Chat tim malam: buku catatan tetap terang bagi pemain yang berhak ---------- */
+.match-shell.night .chat-panel.team-open {
+  filter: none;
+}
+.team-chat {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--line);
+}
+.team-chat h3 {
+  margin: 0 0 6px;
+  font: 800 17px/1.1 var(--font-display);
+  color: #8f1f18;
+}
+/* column-reverse: daftar tetap di pesan terbaru tanpa kode gulir. */
+.team-messages {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column-reverse;
+  overflow-y: auto;
+}
+.team-messages > div {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin-bottom: auto; /* pesan yang masih sedikit tetap di atas */
+  padding: 4px 4px 6px 2px;
+}
+.tribunal-extra {
+  margin: 0;
+  color: #8f1f18;
+  font-size: 16px;
+}
+
 /* ---------- Lima detik terakhir: angka besar di tengah, tidak menangkap klik ---------- */
 .final-count {
   position: fixed;

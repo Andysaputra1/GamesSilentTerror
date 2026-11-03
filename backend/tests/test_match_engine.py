@@ -122,7 +122,9 @@ class EngineTests(unittest.TestCase):
             self.assertEqual((self.game.phase, self.game.round), ("tribunal", round_number))
             self.game.vote("spy", "hitman")
             self.game.vote("hitman", "spy")
-            self.game.tick(self.game.deadline)
+            self.game.tick(self.game.deadline)  # seri: waktu ditambah sekali
+            self.assertEqual((self.game.phase, self.game.round), ("tribunal", round_number))
+            self.game.tick(self.game.deadline)  # masih seri: tanpa eksekusi
             self.assertEqual((self.game.phase, self.game.round), ("night", round_number))
             self.game.tick(self.game.deadline)
             self.assertEqual((self.game.phase, self.game.round), ("day", round_number + 1))
@@ -191,19 +193,43 @@ class EngineTests(unittest.TestCase):
             self.assertTrue(pilihan, seed)
             self.assertFalse({"civilian", "civilian2"} & set(pilihan), seed)
 
-    def test_guard_consecutive_nights_but_can_self_guard(self):
+    # Sejak 3 Nov 2026 Spy bebas menjaga siapa pun, termasuk target malam sebelumnya dan diri sendiri.
+    def test_guard_may_repeat_the_same_target_and_self(self):
+        for target in ("civilian", "spy"):
+            self.game.round += 1
+            self.night()
+            self.game.act("spy", "guard", target)
+            self.game.resolve_night()
+            self.game.round += 1
+            self.night()
+            self.assertEqual(self.game.snapshot("spy")["me"]["last_guard"], target)
+            self.game.act("spy", "guard", target)
+            self.assertEqual(self.game.actions["spy"]["target"], target)
+
+    # Guard berulang tetap melindungi target dari Hostage pada malam kedua.
+    def test_repeated_guard_still_blocks_the_hostage(self):
         self.night()
-        self.game.act("spy", "guard", "spy")
-        self.game.resolve_night()
-        self.game.round = 2
-        self.game.actions.clear()
-        with self.assertRaises(ValueError):
-            self.game.act("spy", "guard", "spy")
         self.game.act("spy", "guard", "civilian")
         self.game.resolve_night()
-        self.game.round = 3
-        self.game.actions.clear()
-        self.game.act("spy", "guard", "spy")
+        self.game.round = 2
+        self.night()
+        self.game.act("spy", "guard", "civilian")
+        self.game.act("hitman", "hostage", "civilian")
+        self.game.resolve_night()
+        self.assertFalse(self.game.players["civilian"].hostage)
+        self.assertEqual(self.game.players["spy"].last_guard_round, 2)
+
+    # Cadangan engine memilih dengan aturan bot yang lama: tidak menjaga target yang sama berturut-turut.
+    def test_rule_bot_fallback_does_not_repeat_its_guard_target(self):
+        names = ["hitman", "spy", "stalker", "civilian", "civilian2", "civilian3"]
+        for seed in range(30):
+            game = Match([], names, now=0, rng=random.Random(seed))
+            for name, player in game.players.items():
+                player.role = name if name in {"hitman", "spy", "stalker"} else "civilian"
+            game.round, game.phase = 2, "night"
+            game.players["spy"].last_guard, game.players["spy"].last_guard_round = "stalker", 1
+            game.run_bots()
+            self.assertNotEqual(game.actions["spy"]["target"], "stalker", seed)
 
     def test_peek_private_and_cooldown(self):
         self.night()
@@ -227,6 +253,8 @@ class EngineTests(unittest.TestCase):
         self.game.phase = "tribunal"
         self.game.vote("civilian", "spy")
         self.game.vote("hitman", "civilian")
+        self.game.tick(self.game.deadline)  # seri: waktu Tribunal ditambah, Gag masih berlaku
+        self.assertFalse(self.game.can_chat("civilian"))
         self.game.tick(self.game.deadline)  # Tribunal → malam
         self.game.tick(self.game.deadline)  # malam → siang ronde 2: Gag berakhir
         self.assertEqual(self.game.round, 2)

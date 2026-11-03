@@ -79,6 +79,7 @@ export class Game implements OnInit, OnDestroy {
   game: MatchView | null = null;
   code = '';
   draft = '';
+  teamDraft = '';
   target = '';
   error = '';
   connected = false;
@@ -205,11 +206,13 @@ export class Game implements OnInit, OnDestroy {
   get roleHelp(): Record<string, string> {
     return {
       hitman: this.multiHitman
-        ? 'Malam: pilih satu warga untuk disandera; Syndicate hanya menyandera satu orang per malam (pilihan terbanyak para Hitman). Siang: Gag Order dipakai bersama, lalu jeda satu ronde.'
+        ? 'Malam: pilih satu warga untuk disandera; Syndicate hanya menyandera satu orang per malam (pilihan terbanyak para Hitman), dan rekan bisa berdiskusi lewat chat tim. Siang: Gag Order dipakai bersama, lalu jeda satu ronde.'
         : 'Malam: Hostage satu warga. Siang: Gag Order, lalu lewati satu ronde sebelum memakai lagi.',
       spy:
-        'Malam: Guard satu pemain (boleh diri sendiri). Jangan pilih target sama dua malam berturut-turut.' +
-        ((this.game?.composition?.spy ?? 1) > 1 ? ' Spy lain berjaga sendiri-sendiri.' : ''),
+        'Malam: Guard satu pemain (boleh diri sendiri), boleh target yang sama dengan malam sebelumnya.' +
+        ((this.game?.composition?.spy ?? 1) > 1
+          ? ' Kamu tahu rekan Spy dan pilihan Guard mereka; atur penjagaan lewat chat tim saat malam.'
+          : ''),
       stalker:
         'Malam: Peek identitas satu pemain, sekali setiap dua ronde. Hasil hanya terlihat olehmu.',
       civilian:
@@ -262,7 +265,26 @@ export class Game implements OnInit, OnDestroy {
     return this.allies.includes(name);
   }
 
-  // Target terbanyak dari pilihan rekan; seri → pilihan yang masuk lebih dulu (sama dengan engine).
+  // REKAN SPY: server hanya mengirim daftar ini kepada Spy di room yang sejak awal punya ≥ 2 Spy.
+  get spyAllies(): string[] {
+    return this.game?.me.spy_allies ?? [];
+  }
+
+  isSpyAlly(name: string): boolean {
+    return this.spyAllies.includes(name);
+  }
+
+  // Rekan Spy yang menjaga pemain ini malam ini (penanda di kartu meja).
+  spyPicks(name: string): string[] {
+    const game = this.game;
+    if (!game || game.phase !== 'night') return [];
+    return (game.me.spy_actions ?? [])
+      .filter((action) => action.target === name)
+      .map((action) => action.name);
+  }
+
+  // Target terbanyak dari pilihan rekan; seri → pilihan yang masuk lebih dulu. Korban tim yang sebenarnya
+  // dihitung server (syndicate_target), termasuk aturan seri manusia lawan bot.
   get allyTarget(): string {
     const game = this.game;
     if (!game || game.phase !== 'night') return '';
@@ -404,10 +426,22 @@ export class Game implements OnInit, OnDestroy {
     finished: 'Selesai',
   };
 
+  // SERI: server menambah waktu Tribunal sekali; timer mengikuti deadline baru.
+  readonly tribunalExtraNote =
+    'Suara seri: waktu ditambah sekali. Masih seri saat waktu habis berarti tidak ada eksekusi.';
+
+  get tribunalExtra(): boolean {
+    return this.game?.phase === 'tribunal' && !!this.game.tribunal_extra;
+  }
+
   get chatHint(): string {
     if (!this.game) return '';
     if (this.game.winner) return 'Pertandingan selesai. Riwayat diskusi tetap bisa dibaca.';
-    if (this.game.phase === 'night') return 'Malam: semua chat terkunci.';
+    if (this.game.phase === 'night')
+      return this.game.me.can_team_chat
+        ? 'Malam: diskusi meja terkunci. Chat tim hanya terlihat oleh rekanmu.'
+        : 'Malam: semua chat terkunci.';
+    if (this.tribunalExtra) return this.tribunalExtraNote;
     return 'Baca alibi. Amati siapa yang menjawab, bukan sekadar siapa yang diam.';
   }
 
@@ -565,12 +599,17 @@ export class Game implements OnInit, OnDestroy {
       spy: [
         {
           label: 'Jaga',
-          text: 'Malam: lindungi satu pemain, boleh diri sendiri. Ganti target tiap malam.',
+          text: 'Malam: lindungi satu pemain, boleh diri sendiri dan boleh target yang sama tiap malam.',
         },
       ],
       stalker: [{ label: 'Intip', text: 'Malam: lihat role satu pemain; jeda satu ronde.' }],
     };
-    return [...shared, ...(special[this.game?.me.role ?? ''] ?? [])];
+    const role = this.game?.me.role ?? '';
+    const punyaTim =
+      (role === 'hitman' && this.multiHitman) ||
+      (role === 'spy' && (this.game?.composition?.spy ?? 1) > 1);
+    const tim = { label: 'Chat tim', text: 'Malam: berdiskusi rahasia dengan rekan setim.' };
+    return [...shared, ...(special[role] ?? []), ...(punyaTim ? [tim] : [])];
   }
 
   get preparationTarget(): string {
@@ -976,6 +1015,7 @@ export class Game implements OnInit, OnDestroy {
           const phase = `${this.game.id}/${this.game.round}/${this.game.phase}`;
           if (phase !== this.loadedPhase) {
             this.target = '';
+            this.teamDraft = '';
             this.loadedPhase = phase;
           }
           this.updatePhaseTransition();
@@ -1107,7 +1147,8 @@ export class Game implements OnInit, OnDestroy {
       (this.isAlly(name) || !!this.game?.players.find((player) => player.name === name)?.hostage)
     )
       return false;
-    if (me.ability === 'guard' && me.can_act) return name !== me.last_guard;
+    // Guard boleh ke siapa saja yang hidup, termasuk diri sendiri dan target malam sebelumnya.
+    if (me.ability === 'guard' && me.can_act) return true;
     return name !== me.name;
   }
 
@@ -1122,5 +1163,18 @@ export class Game implements OnInit, OnDestroy {
     this.error = '';
     this.socket?.emit('send_chat', { username: this.game.me.name, message: this.draft.trim() });
     this.draft = '';
+  }
+
+  // CHAT TIM: lewat HTTP dengan token fase, bukan socket ruangan, jadi pesan tidak pernah disiarkan.
+  // Pesan kembali lewat snapshot privat pengirim dan rekan setim.
+  sendTeamMessage(): void {
+    const state = this.game;
+    const message = this.teamDraft.trim();
+    if (!state?.me.can_team_chat || !message || this.busy) return;
+    this.request(
+      { match_id: state.id, round_number: state.round, phase: state.phase, message },
+      'team-chat',
+    );
+    this.teamDraft = '';
   }
 }

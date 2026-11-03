@@ -44,6 +44,8 @@ file saja tidak berarti route tersebut dibuka pada aplikasi utama.
 4. **Permainan:** `GameService` mengirim aksi ke server. `Match` memvalidasi role,
    target, fase, dan cooldown; menyelesaikan malam/Tribunal; kemudian menentukan
    hasil. `snapshot(viewer)` membatasi informasi sesuai pemain yang melihatnya.
+   Chat tim malam memakai `POST /api/rooms/{code}/team-chat`: pesannya hanya di memori
+   `Match` dan `me.team_messages`, sengaja tanpa socket, database, NLU, atau `@traced`.
    Aturan kemenangan dijelaskan lebih lengkap di `GAME_CONCEPT.md`.
 5. **Chat dan AI:** handler socket memeriksa sesi/hak chat, lalu menyimpan dan
    menyiarkan pesan tanpa menganalisisnya. Pada pertandingan, `NPCService`

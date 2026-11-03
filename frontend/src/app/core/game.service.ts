@@ -38,6 +38,8 @@ export interface MatchView {
   phase: 'preparing' | 'day' | 'night' | 'tribunal' | 'finished';
   round: number;
   deadline: number;
+  // Suara seri di Tribunal: waktu sudah ditambah sekali (opsional untuk backend lama).
+  tribunal_extra?: boolean;
   server_time: number;
   winner: 'hitman' | 'civilians' | null;
   // Opsional: backend lama belum mengirimnya.
@@ -110,6 +112,12 @@ export interface MatchView {
     syndicate_target?: string | null;
     // Hanya untuk Hitman: hasil Hostage tim tiap malam (gagal = target dijaga Guard).
     syndicate_hostages?: { round: number; name: string; success: boolean }[];
+    // Hanya untuk Spy di room yang sejak awal punya ≥ 2 Spy: rekan dan pilihan Guard mereka malam ini.
+    spy_allies?: string[];
+    spy_actions?: { name: string; target: string }[];
+    // Chat tim malam: hanya pemain yang berhak, dan hanya pesan kanal timnya sendiri.
+    can_team_chat?: boolean;
+    team_messages?: GameMessage[];
   };
 }
 export interface GameSnapshot {

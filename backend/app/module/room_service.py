@@ -302,6 +302,20 @@ class RoomService:
             match.cancel_action(username)
             return self.state(code, username)
 
+    # CHAT TIM: token fase yang sama dengan play. Sengaja tanpa @traced: jejak aktivitas panel mencatat parameter,
+    # jadi isi pesan rahasia akan ikut tersimpan. Pesan hanya di memori Match, tanpa database, socket, atau NLU.
+    def team_chat(self, code, username, *, match_id, round_number, phase, message):
+        with self.lock:
+            room = self.get(code, username)
+            match = room.match
+            if not match:
+                raise ValueError("Pertandingan belum dimulai.")
+            match.tick()
+            if (match.id, match.round, match.phase) != (match_id, round_number, phase):
+                raise ValueError("Fase sudah berubah sebelum pesanmu terkirim.")
+            match.add_team_message(username, message)
+            return self.state(code, username)
+
     # Semua operasi engine memakai lock yang sama agar request bersamaan tidak menggandakan aksi.
     def state(self, code, username):
         with self.lock:

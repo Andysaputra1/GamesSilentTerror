@@ -380,13 +380,142 @@ describe('Game', () => {
     expect(button.textContent).not.toContain('bob123');
   });
 
-  it('only allows self target for Guard and excludes consecutive target', () => {
+  it('only allows self target for Guard and allows repeating the last target', () => {
     component.game = snapshot().game;
     expect(component.canTarget('alice')).toBe(false);
     component.game.me.ability = 'guard';
     expect(component.canTarget('alice')).toBe(true);
     component.game.me.last_guard = 'alice';
-    expect(component.canTarget('alice')).toBe(false);
+    expect(component.canTarget('alice')).toBe(true);
+    component.game.me.last_guard = 'NOX';
+    expect(component.canTarget('NOX')).toBe(true);
+  });
+
+  // SERI: waktu tambahan dari server tampil sebagai keterangan, dan timer mengikuti deadline baru.
+  it('shows the tie note and follows the extended deadline', () => {
+    const state = snapshot();
+    state.room.match_durations = { day: 120, night: 30, tribunal: 45 };
+    state.game.phase = 'tribunal';
+    state.game.round = 2;
+    state.game.me = { ...state.game.me, role: 'civilian', can_act: false, ability: null };
+    const request = vi.spyOn(TestBed.inject(GameService), 'request').mockReturnValue(of(state));
+    component.code = 'ABC123';
+    component.refresh();
+    fixture.componentRef.changeDetectorRef.markForCheck();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.tribunal-extra')).toBeNull();
+    component.target = 'NOX';
+    const extended = snapshot();
+    extended.room.match_durations = state.room.match_durations;
+    extended.game = {
+      ...state.game,
+      tribunal_extra: true,
+      deadline: 130,
+      server_time: 100,
+    };
+    request.mockReturnValue(of(extended));
+    component.refresh();
+    fixture.componentRef.changeDetectorRef.markForCheck();
+    fixture.detectChanges();
+    expect(component.seconds).toBe(30);
+    expect(component.timerFraction).toBeCloseTo(30 / 45);
+    expect(component.target).toBe('NOX');
+    const note = fixture.nativeElement.querySelector('.tribunal-extra') as HTMLElement;
+    expect(note.textContent).toContain('Suara seri');
+    expect(component.chatHint).toContain('Suara seri');
+    // Penanda fase lain diabaikan.
+    component.game = { ...extended.game, phase: 'night' };
+    expect(component.tribunalExtra).toBe(false);
+  });
+
+  // REKAN SPY: tampil seperti rekan Syndicate, dengan penanda pilihan Guard rekan malam ini.
+  it('shows spy allies and their guard choices only from private data', () => {
+    const state = snapshot();
+    state.game.phase = 'night';
+    state.game.players.push({ name: 'bob', bot: false, alive: true });
+    state.game.me = {
+      ...state.game.me,
+      role: 'spy',
+      ability: 'guard',
+      spy_allies: ['NOX'],
+      spy_actions: [{ name: 'NOX', target: 'bob' }],
+    };
+    component.game = state.game;
+    component.revealRole = true;
+    expect(component.isSpyAlly('NOX')).toBe(true);
+    expect(component.isSpyAlly('bob')).toBe(false);
+    expect(component.isAlly('NOX')).toBe(false);
+    expect(component.spyPicks('bob')).toEqual(['NOX']);
+    fixture.componentRef.changeDetectorRef.markForCheck();
+    fixture.detectChanges();
+    const cards = fixture.nativeElement.querySelectorAll('.player-card');
+    expect((cards[1] as HTMLElement).querySelector('.ally-tag')?.textContent).toContain('Rekan');
+    expect((cards[2] as HTMLElement).querySelector('.ally-pick')?.textContent).toContain('Dijaga');
+    expect(fixture.nativeElement.querySelector('.allies')?.textContent).toContain('Rekan Spy');
+    // Pilihan Guard rekan hanya saat malam; tombol Samakan khusus Hitman tidak muncul untuk Spy.
+    expect(component.allyTarget).toBe('');
+    component.game = { ...state.game, phase: 'day' };
+    expect(component.spyPicks('bob')).toEqual([]);
+  });
+
+  it('shows no spy markers without private spy data', () => {
+    const state = snapshot();
+    state.game.phase = 'night';
+    component.game = state.game;
+    fixture.componentRef.changeDetectorRef.markForCheck();
+    fixture.detectChanges();
+    expect(component.spyAllies).toEqual([]);
+    expect(fixture.nativeElement.querySelector('.ally-pick')).toBeNull();
+  });
+
+  // CHAT TIM: panel hanya bagi yang berhak; pesan lewat HTTP dengan token fase, bukan socket publik.
+  it('offers team chat only to entitled players and sends it with the phase token', () => {
+    const state = snapshot();
+    state.game.phase = 'night';
+    state.game.me = {
+      ...state.game.me,
+      can_chat: false,
+      can_team_chat: true,
+      team_messages: [{ id: 't1', sender: 'NOX', message: 'Sandera bob' }],
+    };
+    component.game = state.game;
+    component.code = 'ABC123';
+    fixture.componentRef.changeDetectorRef.markForCheck();
+    fixture.detectChanges();
+    const panel = fixture.nativeElement.querySelector('.team-chat') as HTMLElement;
+    expect(panel.textContent).toContain('Chat tim Hitman');
+    expect(panel.querySelector('.message p')?.textContent).toBe('Sandera bob');
+    // Pesan tim tidak tercampur ke daftar diskusi meja.
+    expect(fixture.nativeElement.querySelector('.messages')?.textContent).not.toContain(
+      'Sandera bob',
+    );
+    expect(component.chatHint).toContain('Chat tim hanya terlihat oleh rekanmu');
+    const socket = { emit: vi.fn(), disconnect: vi.fn() };
+    (component as unknown as { socket: unknown }).socket = socket;
+    const request = vi.spyOn(TestBed.inject(GameService), 'request').mockReturnValue(of(state));
+    component.teamDraft = '   ';
+    component.sendTeamMessage();
+    expect(request).not.toHaveBeenCalled();
+    component.teamDraft = ' Ikut aku ';
+    component.sendTeamMessage();
+    expect(request).toHaveBeenCalledWith(
+      'ABC123',
+      { match_id: 'match-1', round_number: 1, phase: 'night', message: 'Ikut aku' },
+      'team-chat',
+      10000,
+    );
+    expect(component.teamDraft).toBe('');
+    expect(socket.emit).not.toHaveBeenCalled();
+    // Tanpa hak: tidak ada panel dan tidak ada permintaan.
+    request.mockClear();
+    component.game = { ...state.game, me: { ...state.game.me, can_team_chat: false } };
+    fixture.componentRef.changeDetectorRef.markForCheck();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.team-chat')).toBeNull();
+    expect(component.chatHint).toBe('Malam: semua chat terkunci.');
+    component.teamDraft = 'Halo';
+    component.sendTeamMessage();
+    expect(request).not.toHaveBeenCalled();
   });
 
   it('caps voter badges at four plus overflow, retaining all names in details', () => {
@@ -879,18 +1008,37 @@ describe('Game', () => {
     expect(render().querySelectorAll('.lineup li').length).toBe(2);
   });
 
-  // Room satu Hitman: teks Syndicate ("rekan", "Spy lain") tidak ditampilkan.
+  // Room satu Hitman: teks Syndicate ("rekan", "rekan Spy") tidak ditampilkan.
   it('keeps single-Hitman wording in rooms with one Hitman', () => {
     const game = snapshot().game;
     game.composition = { hitman: 1, spy: 1, stalker: 1, civilian: 2 };
     game.me.role = 'hitman';
     component.game = game;
     expect(component.roleHelp['hitman']).not.toContain('Syndicate');
-    expect(component.roleHelp['spy']).not.toContain('Spy lain');
+    expect(component.roleHelp['spy']).not.toContain('rekan Spy');
 
     game.composition = { hitman: 2, spy: 2, stalker: 1, civilian: 3 };
     expect(component.roleHelp['hitman']).toContain('Syndicate');
-    expect(component.roleHelp['spy']).toContain('Spy lain');
+    expect(component.roleHelp['spy']).toContain('rekan Spy');
+  });
+
+  // Panduan persiapan menyebut chat tim hanya untuk role yang punya rekan di room ini.
+  it('lists team chat in the preparation guide only for roles with teammates', () => {
+    const game = snapshot().game;
+    const labels = () => component.preparationActions.map((action) => action.label);
+    component.game = game;
+    component.revealRole = true;
+    game.composition = { hitman: 1, spy: 1, stalker: 1, civilian: 2 };
+    expect(labels()).not.toContain('Chat tim');
+    game.composition = { hitman: 2, spy: 2, stalker: 1, civilian: 3 };
+    for (const role of ['hitman', 'spy']) {
+      game.me.role = role;
+      expect(labels()).toContain('Chat tim');
+    }
+    for (const role of ['stalker', 'civilian']) {
+      game.me.role = role;
+      expect(labels()).not.toContain('Chat tim');
+    }
   });
 
   // Malam Hitman: rekan yang sudah mati tidak masuk rencana; beda pilihan dengan rekan diberi tahu.

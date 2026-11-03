@@ -106,7 +106,6 @@ def main():
         # Tanpa vote: tidak ada eksekusi, lanjut ke malam.
         print("PASS Gag/Guard/Peek, resolusi buta, cooldown, no-vote, Tribunal ronde kedua", flush=True)
         wait_phase("night", 2)
-        play("spy", "civilian", "guard", expected=400)
         play("stalker", "hitman", "peek", expected=400)
         play("spy", "spy", "guard")
         play("hitman", "civilian", "hostage")

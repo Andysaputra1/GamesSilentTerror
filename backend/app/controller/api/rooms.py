@@ -44,6 +44,13 @@ class CancelActionOption(BaseModel):
     phase: Literal["night"]
 
 
+class TeamChatOption(BaseModel):
+    match_id: str = Field(min_length=1, max_length=40)
+    round_number: int = Field(ge=1)
+    phase: Literal["night"]
+    message: str = Field(min_length=1, max_length=1000)
+
+
 class ReadyOption(BaseModel):
     match_id: str = Field(min_length=1, max_length=40)
 
@@ -124,6 +131,12 @@ def cancel_vote(code: str, body: CancelVoteOption, user=Depends(require_authenti
 # BATAL AKSI MALAM: tarik Hostage/Guard/Peek milik sendiri agar bisa memilih ulang sebelum malam habis.
 def cancel_action(code: str, body: CancelActionOption, user=Depends(require_authenticated_user)):
     return game_result(lambda: room_service.cancel_action(code, user.username, **body.model_dump()))
+
+
+@router.post("/{code}/team-chat")
+# CHAT TIM: pesan rahasia rekan setim saat malam; hanya tersimpan di memori pertandingan.
+def team_chat(code: str, body: TeamChatOption, user=Depends(require_authenticated_user)):
+    return game_result(lambda: room_service.team_chat(code, user.username, **body.model_dump()))
 
 
 @router.post("/{code}/leave")

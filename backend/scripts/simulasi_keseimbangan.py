@@ -53,7 +53,8 @@ def satu_game(argumen):
     otak = {n: MODUL[metode[n]].Ingatan(n) for n in nama}
     label, ilegal, t = {}, 0, 0.0
     while match.phase != "finished" and match.round <= RONDE_MAKS:
-        ronde, fase, durasi = match.round, match.phase, match.durations[match.phase]
+        # Dari deadline, bukan durasi tetap: suara seri menambah waktu Tribunal yang lebih pendek dari satu fase.
+        ronde, fase, durasi = match.round, match.phase, match.deadline - t
         for k in range(1, langkah + 1):
             waktu = t + durasi * k / (langkah + 1)
             for n in sorted(otak):

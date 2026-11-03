@@ -21,6 +21,8 @@ Sudah dapat dimainkan dari awal sampai akhir:
 
 Role: **Hitman** (Hostage/Gag Order), **Spy** (Guard), **Stalker** (Peek), dan **Civilian** (observasi). Korban Hostage tetap hidup tetapi kehilangan semua aksi permanen (chat, voting, dan skill malam). Saat malam selesai korban diumumkan ke semua pemain dan kartunya bercap *Disandera* sampai akhir; bila Hostage dijaga Guard atau tidak ada pilihan, pengumumannya "Malam ini tidak ada yang disandera" (target yang gagal tidak dibuka).
 
+Aturan terbaru (3 November 2026): Guard boleh ke target yang sama berturut-turut; suara seri di Tribunal menambah waktu sekali (30 detik, mode cepat 10 detik), dan bila masih seri tidak ada eksekusi; Spy di room dengan ≥ 2 Spy saling tahu dan melihat pilihan Guard rekan; Hitman dan Spy di room dengan ≥ 2 pemain role itu punya chat tim rahasia saat malam, dengan kanal terpisah. **Angka keseimbangan di GAME_CONCEPT.md belum diukur ulang setelah perubahan ini**, dan logika pilihan bot belum mengikutinya.
+
 Engine backend menjadi sumber kebenaran, bukan browser atau AI. Engine memvalidasi setiap aksi/vote/chat bot; fallback aturan mengisi aksi yang kosong jika otak bot gagal. Baca [aturan, alur kode, dan batas implementasi](GAME_CONCEPT.md) serta [panduan membaca kode](CODE_GUIDE.md).
 
 ## Cara kerja AI
@@ -206,7 +208,7 @@ Database baru tidak berisi akun. Buat akun lewat tombol daftar di halaman login,
 
 Alur mencoba: **Login → Main page → Enter Tribunal → Buat Ruangan / Gabung → + Bot → Mulai Permainan**. Bot mengisi semua kursi kosong sampai kapasitas pilihan host sehingga bisa dicoba sendiri. Tanpa bot, siapkan minimal 4 akun berbeda. Pemilik ruangan menekan Mulai; anggota lain menekan Masuk Permainan ketika game sudah dimulai.
 
-Di game, buka role privatmu. Saat Day, diskusikan alibi; Hitman dapat memilih target Gag. Mulai ronde 2, Tribunal datang setelah Day: pilih kartu tersangka lalu kunci vote. Saat Night, pilih kartu target lalu kunci Hostage/Guard/Peek jika tersedia. Pemain yang tidak bisa bertindak tetap dapat menonton. Setelah selesai, isi survei, lalu kembali ke lobby → Keluar ruangan → Buat ruangan baru (satu ruangan hanya untuk satu pertandingan).
+Di game, buka role privatmu. Saat Day, diskusikan alibi; Hitman dapat memilih target Gag. Mulai ronde 2, Tribunal datang setelah Day: pilih kartu tersangka lalu kunci vote. Bila suara seri saat waktu habis, timer bertambah sekali dan keterangannya muncul di layar. Saat Night, pilih kartu target lalu kunci Hostage/Guard/Peek jika tersedia. Di room 7–10 pemain, Hitman dan Spy manusia mendapat panel chat tim di kolom chat saat Night. Pemain yang tidak bisa bertindak tetap dapat menonton. Setelah selesai, isi survei, lalu kembali ke lobby → Keluar ruangan → Buat ruangan baru (satu ruangan hanya untuk satu pertandingan).
 
 Timer mengikuti jumlah peserta awal. Contoh enam pemain: standar 120/30/75 detik; mode cepat 20/15/15 detik. Empat pemain: standar 80/20/60 detik. Durasi tetap selama pertandingan; rincian ada di GAME_CONCEPT.md. Keputusan atau balasan bot yang baru selesai setelah fase berubah **dibuang, tidak ditampilkan**, agar tidak menerobos malam atau efek bungkam; gunakan durasi standar untuk mencoba chat AI.
 

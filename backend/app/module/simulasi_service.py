@@ -50,10 +50,10 @@ class Simulasi:
 
     def ringkasan(self):
         m = self.match
-        mulai = m.deadline - m.durations.get(m.phase, 0)
+        mulai = m.deadline - m.phase_length()
         return {
             "id": self.id, "ronde": m.round, "fase": m.phase, "pemenang": m.winner,
-            "detik": round(max(0.0, self.jam - mulai), 1), "durasi": m.durations.get(m.phase),
+            "detik": round(max(0.0, self.jam - mulai), 1), "durasi": m.phase_length() or None,
             "bisa_chat": not m.winner and m.can_chat(PEMAIN),
             "pemain": [
                 {"nama": m.labels[p.name], "manusia": not p.bot, "role": p.role, "hidup": p.alive,
@@ -155,17 +155,20 @@ class Simulasi:
         return await self._putaran(detik)
 
     # Lompat ke akhir fase: engine menyelesaikan fase (cadangan aksi bot yang belum memutuskan, hasil malam,
-    # eksekusi Tribunal), lalu semua bot melangkah sekali di awal fase baru.
+    # eksekusi Tribunal), lalu semua bot melangkah sekali di awal fase baru. Suara seri menambah waktu Tribunal:
+    # fase tidak berganti dan jam tetap di titik itu; lompatan berikutnya menyelesaikan Tribunal.
     async def fase(self, detik):
         m = self.match
         if m.winner:
             raise ValueError("Permainan sudah selesai.")
+        sebelum = (m.round, m.phase)
         self.jam = m.deadline
         m.tick(self.jam)
         jejak = self._sistem()
         if m.winner:
             return jejak
-        self.jam = m.deadline - m.durations[m.phase] + MULAI_FASE
+        if (m.round, m.phase) != sebelum:
+            self.jam = m.deadline - m.durations[m.phase] + MULAI_FASE
         return jejak + await self._putaran(0.0)
 
 

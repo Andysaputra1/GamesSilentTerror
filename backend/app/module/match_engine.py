@@ -41,6 +41,12 @@ PREPARATION_MAX_SECONDS = 90
 # AI yang terlambat siap tetap memberi countdown untuk membuka role, dibatasi maksimum tunggu.
 PREPARATION_COUNTDOWN_SECONDS = 10
 
+# Seri di Tribunal menambah waktu sekali per Tribunal (detik); durasi normal tetap di phase_durations.
+TRIBUNAL_EXTRA_SECONDS = 30
+TRIBUNAL_EXTRA_QUICK_SECONDS = 10
+# Pesan chat tim yang disimpan per kanal.
+TEAM_CHAT_LIMIT = 100
+
 # Komposisi role per jumlah peserta: (hitman, spy, stalker); sisanya civilian.
 # Dipilih lewat simulasi keseimbangan semua kursi bot metode campuran, dengan pengumuman jumlah Hitman tersisa
 # (hitman_remaining); data dan alasannya ada di GAME_CONCEPT.md, bagian Ruangan dan role.
@@ -104,6 +110,10 @@ def snapshot_berlabel(snapshot, labels):
     me["allies"] = [nama(x) for x in me["allies"]]
     me["ally_actions"] = [
         {**a, "name": nama(a["name"]), "target": nama(a["target"])} for a in me["ally_actions"]
+    ]
+    me["spy_allies"] = [nama(x) for x in me["spy_allies"]]
+    me["spy_actions"] = [
+        {**a, "name": nama(a["name"]), "target": nama(a["target"])} for a in me["spy_actions"]
     ]
     if me.get("action"):
         me["action"] = {**me["action"], "target": nama(me["action"]["target"])}
@@ -171,10 +181,17 @@ class Match:
         self.bot_tahap: dict[str, str] = {}
         self.phase = "day"
         self.durations = phase_durations(len(names), quick)
+        self.tribunal_extra_seconds = (
+            TRIBUNAL_EXTRA_QUICK_SECONDS if quick else TRIBUNAL_EXTRA_SECONDS
+        )
         now = time.time() if now is None else now
         self.deadline = now + self.durations["day"]
         self.actions = {}
         self.votes = {}
+        # Waktu tambahan seri sudah dipakai pada Tribunal ini (publik); direset tiap Tribunal.
+        self.tribunal_extra = False
+        # Chat tim malam per kanal: rahasia, hanya di memori ini (bukan messages, events, atau database).
+        self.team_messages = {"hitman": [], "spy": []}
         # Gag Order milik Syndicate: satu Gag per siang untuk seluruh tim, cooldown satu ronde penuh.
         self.next_gag = 1
         # Hasil Hostage Syndicate per malam (berhasil = target tidak dijaga Guard); hanya dikirim ke Hitman.
@@ -317,6 +334,44 @@ class Match:
             return []
         return [p.name for p in self.players.values() if p.role == "hitman" and p.name != name]
 
+    # Rekan Spy: Spy lain dalam pertandingan (hidup atau tidak); terisi di room yang sejak awal ≥ 2 Spy.
+    # Terpisah dari allies, karena kode bot membaca allies sebagai rekan Syndicate.
+    def spy_allies(self, name):
+        if self.players[name].role != "spy":
+            return []
+        return [p.name for p in self.players.values() if p.role == "spy" and p.name != name]
+
+    # Kanal chat tim: Hitman atau Spy di room yang sejak awal punya ≥ 2 pemain role itu; selain itu None.
+    def team_channel(self, name):
+        role = self.players[name].role
+        return role if role in self.team_messages and self.composition()[role] >= 2 else None
+
+    # Hak chat tim: hanya saat malam, untuk pemain hidup yang tidak disandera (Hitman tidak bisa disandera).
+    # Gag tidak berpengaruh karena hanya membatasi chat publik. Bot belum mengirim atau membaca chat tim.
+    def can_team_chat(self, name):
+        player = self.players.get(name)
+        return bool(
+            player
+            and not player.bot
+            and player.alive
+            and not player.hostage
+            and self.phase == "night"
+            and self.team_channel(name)
+        )
+
+    # PESAN TIM: hanya untuk rekan setim lewat snapshot; sengaja tidak memakai nomor urut pesan publik,
+    # karena lompatan nomor pada ID chat publik akan memberi tahu warga bahwa ada pesan rahasia.
+    def add_team_message(self, sender, message):
+        if not self.can_team_chat(sender):
+            raise ValueError("Chat tim tidak tersedia untukmu saat ini.")
+        message = message.strip()
+        if not message or len(message) > 1000:
+            raise ValueError("Pesan chat harus berisi 1–1000 karakter.")
+        channel = self.team_channel(sender)
+        record = {"id": uuid4().hex, "sender": sender, "message": message}
+        self.team_messages[channel] = (self.team_messages[channel] + [record])[-TEAM_CHAT_LIMIT:]
+        return record
+
     # AKSI PRIVAT: pilihan malam disimpan, belum diresolusikan sebelum deadline.
     def act(self, name, ability, target_name):
         player = self.actor(name)
@@ -343,12 +398,6 @@ class Match:
         # Status Hostage publik: korban lama tidak bisa disandera lagi, jadi malam Syndicate tidak terbuang.
         if ability == "hostage" and target.hostage:
             raise ValueError("Pemain itu sudah disandera.")
-        if (
-            ability == "guard"
-            and player.last_guard == target_name
-            and player.last_guard_round == self.round - 1
-        ):
-            raise ValueError("Tidak boleh Guard target yang sama dua malam berturut-turut.")
         if ability == "peek" and self.round < player.next_peek:
             raise ValueError("Peek hanya tersedia sekali setiap dua ronde.")
         self.actions[name] = {"ability": ability, "target": target_name}
@@ -376,15 +425,19 @@ class Match:
             raise ValueError("Tidak ada aksi malam yang bisa dibatalkan.")
         del self.actions[name]
 
-    # Satu korban per malam untuk Syndicate: pilihan terbanyak, seri → yang dipilih paling awal.
+    # Satu korban per malam untuk Syndicate: pilihan terbanyak. Seri manusia lawan bot → pilihan manusia;
+    # sesama manusia atau sesama bot → yang dipilih paling awal.
     def syndicate_target(self):
         choices = [
-            action["target"] for action in self.actions.values() if action["ability"] == "hostage"
+            (action["target"], self.players[name].bot)
+            for name, action in self.actions.items()
+            if action["ability"] == "hostage"
         ]
         if not choices:
             return None
-        counts = Counter(choices)
-        return next(target for target in choices if counts[target] == max(counts.values()))
+        counts = Counter(target for target, _ in choices)
+        tied = [choice for choice in choices if counts[choice[0]] == max(counts.values())]
+        return next((target for target, bot in tied if not bot), tied[0][0])
 
     # RESOLUSI MALAM: semua pilihan dibaca bersama, Guard diprioritaskan terhadap Hostage. Korban yang
     # berhasil diumumkan ke semua pemain; Hostage gagal (dijaga Guard) atau tanpa pilihan diumumkan sama:
@@ -421,14 +474,22 @@ class Match:
             self.events.append("Malam selesai. Malam ini tidak ada yang disandera.")
         self.check_winner()
 
+    # Pemimpin suara Tribunal: lebih dari satu berarti seri; kosong berarti tanpa suara.
+    def vote_leaders(self):
+        counts = Counter(self.votes.values())
+        return [name for name, count in counts.items() if count == max(counts.values())]
+
+    # Lama fase berjalan termasuk waktu tambahan seri. Dipakai jadwal bot dan simulasi panel, yang menghitung
+    # waktu dari deadline: dengan durasi saja, deadline yang bertambah membuat fase tampak mundur.
+    def phase_length(self):
+        extra = (
+            self.tribunal_extra_seconds if self.phase == "tribunal" and self.tribunal_extra else 0
+        )
+        return self.durations.get(self.phase, 0) + extra
+
     # RESOLUSI TRIBUNAL: plurality; seri/tanpa suara tidak mengeksekusi siapa pun.
     def resolve_votes(self):
-        counts = Counter(self.votes.values())
-        leaders = (
-            [name for name, count in counts.items() if count == max(counts.values())]
-            if counts
-            else []
-        )
+        leaders = self.vote_leaders()
         if len(leaders) == 1:
             self.players[leaders[0]].alive = False
             self.events.append(
@@ -559,6 +620,10 @@ class Match:
                 leader = self.syndicate_target() if self.phase == "night" else None
                 if leader in targets:
                     targets = [leader] + [name for name in targets if name != leader]
+            if self.phase == "night" and player.last_guard_round == self.round - 1:
+                # Pilihan bot belum berubah: engine membolehkan, tetapi bot tidak menjaga target yang sama
+                # dua malam berturut-turut.
+                targets = [name for name in targets if name != player.last_guard]
             if self.phase == "tribunal":
                 # Stalker hanya memakai intel hasil Peek miliknya sendiri.
                 known = [
@@ -612,10 +677,22 @@ class Match:
             self.run_bots()
         if self.phase == "finished" or now < self.deadline:
             return
+        # SERI DI TRIBUNAL: waktu ditambah sekali untuk saling meyakinkan; suara lama tetap berlaku dan fase
+        # tidak berganti. Masih seri sesudahnya = tanpa eksekusi. Tanpa suara sama sekali bukan seri.
+        if self.phase == "tribunal" and not self.tribunal_extra and len(self.vote_leaders()) >= 2:
+            self.tribunal_extra = True
+            self.deadline = now + self.tribunal_extra_seconds
+            self.events.append(
+                f"Suara seri. Tribunal ditambah {self.tribunal_extra_seconds} detik; "
+                "suara yang sudah masuk tetap berlaku."
+            )
+            self.events = self.events[-40:]
+            return
         # URUTAN: ronde 1 siang → malam (belum ada bahan untuk vote); ronde berikutnya siang → Tribunal → malam.
         if self.phase == "day" and self.round > 1:
             self.phase = "tribunal"
             self.votes = {}
+            self.tribunal_extra = False
             self.events.append("Diskusi selesai. Tribunal dimulai: pilih tersangka.")
         elif self.phase in {"day", "tribunal"}:
             if self.phase == "tribunal":
@@ -692,6 +769,8 @@ class Match:
     def snapshot(self, viewer):
         player = self.players[viewer]
         hitman = player.role == "hitman"
+        spy = player.role == "spy"
+        team_chat = self.can_team_chat(viewer)
         ability = None
         if self.phase == "day" and hitman:
             ability = "gag"
@@ -730,6 +809,7 @@ class Match:
             "phase": self.phase,
             "round": self.round,
             "deadline": self.deadline,
+            "tribunal_extra": self.phase == "tribunal" and self.tribunal_extra,
             "server_time": time.time(),
             "winner": self.winner,
             "events": list(self.events),
@@ -800,6 +880,22 @@ class Match:
                     ]
                     if hitman and self.phase == "night"
                     else []
+                ),
+                # Rekan Spy dan pilihan Guard mereka malam ini; kosong untuk selain Spy dan di room satu Spy.
+                "spy_allies": self.spy_allies(viewer),
+                "spy_actions": (
+                    [
+                        {"name": name, "target": action["target"]}
+                        for name, action in self.actions.items()
+                        if name != viewer and action["ability"] == "guard"
+                    ]
+                    if spy and self.phase == "night"
+                    else []
+                ),
+                # Chat tim malam ini: hanya pemain yang berhak, dan hanya kanal timnya sendiri.
+                "can_team_chat": team_chat,
+                "team_messages": (
+                    list(self.team_messages[self.team_channel(viewer)]) if team_chat else []
                 ),
                 "last_guard": (
                     player.last_guard if player.last_guard_round == self.round - 1 else None

@@ -298,7 +298,7 @@ class NPCService:
                         self.preparing.add(match.id)
                         self._spawn(self.prepare(room.code, match))
                     continue
-                elapsed = match.durations[match.phase] - (match.deadline - now)
+                elapsed = match.phase_length() - (match.deadline - now)
                 bots = sorted(p.name for p in match.players.values() if p.bot and p.alive)
                 for index, name in enumerate(bots):
                     otak = self.runtime.otak_bot(match.id, name)

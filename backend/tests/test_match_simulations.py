@@ -55,7 +55,6 @@ class MatchSimulationTests(unittest.TestCase):
                                 and p.name not in allies
                                 and not (ability in {"hostage", "gag"} and p.hostage)
                                 and (p.name != name or ability == "guard")
-                                and not (ability == "guard" and p.name == me["last_guard"])
                             ]
                             if targets:
                                 target = rng.choice(targets)

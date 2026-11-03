@@ -74,6 +74,11 @@
             Rekan: <b>{{ namaDaftar(allies) }}</b>
           </p>
         }
+        @if (revealRole && spyAllies.length) {
+          <p class="prep-allies">
+            Rekan Spy: <b>{{ namaDaftar(spyAllies) }}</b>
+          </p>
+        }
       </article>
       <article class="paper prep-card prep-actions">
         <span class="prep-number">02 / AKSI</span>
@@ -102,7 +107,7 @@
         <p class="prep-objective">{{ preparationTarget }}</p>
         @if (revealRole) {
           <small
-            >{{ state.me.role === 'hitman' ? 'Pilih warga sebagai target. Sandera menghilangkan suara, bukan nyawa.' : 'Suara terbanyak tunggal dieksekusi. Seri: tidak ada eksekusi.' }}</small
+            >{{ state.me.role === 'hitman' ? 'Pilih warga sebagai target. Sandera menghilangkan suara, bukan nyawa.' : 'Suara terbanyak tunggal dieksekusi. Seri: waktu ditambah sekali; masih seri berarti tidak ada eksekusi.' }}</small
           >
         }
         @if (composition.length) {
@@ -360,6 +365,11 @@
                   Rekan Syndicate: <b>{{ namaDaftar(allies) }}</b>
                 </p>
               }
+              @if (spyAllies.length) {
+                <p class="allies">
+                  Rekan Spy: <b>{{ namaDaftar(spyAllies) }}</b>
+                </p>
+              }
             }
             <!-- Status hanya muncul bila hak chat/vote berubah (tereliminasi, Hostage, Gag) atau di akhir. -->
             @if (
@@ -473,6 +483,9 @@
                           Syndicate, tidak bisa jadi target Hostage atau Gag</span
                         ></span
                       >
+                    } @else if (isSpyAlly(player.name)) {
+                      <!-- Hanya Spy di room ≥ 2 Spy menerima daftar ini dari server. -->
+                      <span class="ally-tag">◆ Rekan<span class="sr-only"> Spy</span></span>
                     }
                     @if (player.alive && isGagged(player.name)) {
                       <span class="gag-tag"
@@ -499,6 +512,13 @@
                       <span class="ally-pick"
                         >◆ Incaran<span class="sr-only">
                           Hostage pilihan rekan: {{ namaDaftar(allyPicks(player.name)) }}</span
+                        ></span
+                      >
+                    }
+                    @if (spyPicks(player.name).length) {
+                      <span class="ally-pick"
+                        >◆ Dijaga<span class="sr-only">
+                          Guard pilihan rekan: {{ namaDaftar(spyPicks(player.name)) }}</span
                         ></span
                       >
                     }
@@ -540,6 +560,9 @@
 
           @if (!state.winner) {
             <section class="action-panel" [attr.data-phase]="state.phase">
+              @if (tribunalExtra) {
+                <p class="tribunal-extra hand" role="status">{{ tribunalExtraNote }}</p>
+              }
               <div class="action-buttons">
                 @if (state.me.can_vote) {
                   <button
@@ -616,7 +639,11 @@
         </section>
 
         <!-- KANAN: buku catatan diskusi. -->
-        <aside class="chat-panel paper" aria-label="Diskusi meja">
+        <aside
+          class="chat-panel paper"
+          [class.team-open]="state.me.can_team_chat"
+          aria-label="Diskusi meja"
+        >
           <header class="chat-head">
             <h2>Diskusi meja</h2>
             <span class="link-dot" [class.online]="connected || !!state.winner">{{
@@ -645,23 +672,62 @@
               </button>
             }
           </div>
-          <form class="composer" (ngSubmit)="sendMessage()">
-            <input
-              name="message"
-              aria-label="Pesan diskusi"
-              [(ngModel)]="draft"
-              maxlength="1000"
-              autocomplete="off"
-              [disabled]="!state.me.can_chat || !connected"
-              [placeholder]="state.me.can_chat ? 'Tulis alibimu…' : 'Chat terkunci'"
-            /><button
-              class="send-button"
-              aria-label="Kirim pesan"
-              [disabled]="!draft.trim() || !state.me.can_chat || !connected"
-            >
-              ➤
-            </button>
-          </form>
+          @if (state.me.can_team_chat) {
+            <!-- CHAT TIM: hanya saat malam bagi pemain yang berhak; pesan datang dari snapshot privat. -->
+            <section class="team-chat" aria-labelledby="team-chat-title">
+              <h3 id="team-chat-title">Chat tim {{ roleNames[state.me.role] }}</h3>
+              <div class="team-messages" aria-live="polite">
+                <div>
+                  @for (chat of state.me.team_messages ?? []; track chat.id) {
+                    <article
+                      class="message"
+                      [class.self]="chat.sender === state.me.name"
+                      [style.--tag]="colorFor(chat.sender)"
+                    >
+                      <small><i aria-hidden="true"></i>{{ nama(chat.sender) }}</small>
+                      <p>{{ chat.message }}</p>
+                    </article>
+                  } @empty {
+                    <p class="hint empty">Belum ada pesan tim.</p>
+                  }
+                </div>
+              </div>
+              <form class="composer" (ngSubmit)="sendTeamMessage()">
+                <input
+                  name="teamMessage"
+                  aria-label="Pesan chat tim"
+                  [(ngModel)]="teamDraft"
+                  maxlength="1000"
+                  autocomplete="off"
+                  placeholder="Tulis ke rekanmu…"
+                /><button
+                  class="send-button"
+                  aria-label="Kirim pesan tim"
+                  [disabled]="!teamDraft.trim() || busy"
+                >
+                  ➤
+                </button>
+              </form>
+            </section>
+          } @else {
+            <form class="composer" (ngSubmit)="sendMessage()">
+              <input
+                name="message"
+                aria-label="Pesan diskusi"
+                [(ngModel)]="draft"
+                maxlength="1000"
+                autocomplete="off"
+                [disabled]="!state.me.can_chat || !connected"
+                [placeholder]="state.me.can_chat ? 'Tulis alibimu…' : 'Chat terkunci'"
+              /><button
+                class="send-button"
+                aria-label="Kirim pesan"
+                [disabled]="!draft.trim() || !state.me.can_chat || !connected"
+              >
+                ➤
+              </button>
+            </form>
+          }
         </aside>
       </div>
 
