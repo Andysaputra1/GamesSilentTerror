@@ -63,8 +63,6 @@ export interface MatchView {
     name: string;
     /** Nama tampilan akun; `name` (username) tetap dipakai untuk aksi dan vote. */
     label?: string;
-    /** Metode otak bot (fuzzy, llm); hanya ada untuk bot setelah persiapan AI. */
-    metode?: string;
     /** Bot sedang menyusun chat (lantai bicara); ditampilkan sebagai awan berpikir. */
     thinking?: boolean;
     /** Tahap langkah terakhir bot: I input diterima, L logika berjalan, O output/aksi selesai. */

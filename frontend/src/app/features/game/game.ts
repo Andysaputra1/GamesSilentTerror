@@ -49,8 +49,6 @@ const TAG_COLORS = [
 ];
 const ROLES = ['hitman', 'spy', 'stalker', 'civilian'];
 const ROLE_REVEAL_READ_MS = 3000;
-// Singkatan metode otak bot di samping namanya: Fuzzy Logic, atau LLM sebagai pembanding.
-const METODE_SINGKAT: Record<string, string> = { fuzzy: 'FL', llm: 'LLM' };
 
 // KOMPONEN: render snapshot privat server; tidak mengacak role atau memutuskan hasil aksi di browser.
 @Component({
@@ -456,13 +454,9 @@ export class Game implements OnInit, OnDestroy {
   }
 
   // Nama tampilan pemain dari snapshot; username tetap dipakai untuk aksi dan vote.
-  // Bot diberi singkatan metode otaknya, mis. "NOX · FL".
   nama(name: string | null | undefined): string {
     if (!name) return '';
-    const player = this.game?.players.find((p) => p.name === name);
-    const label = player?.label ?? name;
-    const metode = player?.metode && (METODE_SINGKAT[player.metode] ?? player.metode.toUpperCase());
-    return metode ? `${label} · ${metode}` : label;
+    return this.game?.players.find((p) => p.name === name)?.label ?? name;
   }
 
   namaDaftar(names: string[]): string {

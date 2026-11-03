@@ -263,12 +263,11 @@ class NPCServiceBrainTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("AI siap", self.match.preparation["detail"])
         rows = self.survey.record_match_bots.call_args.args[0]
         self.assertEqual(len(rows), 5)
-        # Label metode di game = metode yang tercatat untuk survei = otak yang dipasang ke bot.
-        otak = {b: self.runtime.otak_bot(self.match.id, b).metode for b in self.match.bot_methods}
-        self.assertEqual(self.match.bot_methods, {r["bot_name"]: r["method"] for r in rows})
-        self.assertEqual(self.match.bot_methods, otak)
-        tampil = {p["name"]: p.get("metode") for p in self.match.snapshot("human")["players"]}
-        self.assertEqual(tampil, {"human": None, **otak})
+        # Metode yang tercatat untuk survei = otak yang dipasang ke bot; pemain tidak melihatnya.
+        for r in rows:
+            self.assertEqual(r["method"], self.runtime.otak_bot(self.match.id, r["bot_name"]).metode)
+        self.assertEqual(self.match.preparation["detail"], "AI siap: 5 bot.")
+        self.assertTrue(all("metode" not in p for p in self.match.snapshot("human")["players"]))
         self.match.reveal_role("human", now=self.match.preparation["started_at"])
         self.match.tick(self.match.preparation["min_until"])
         self.assertEqual(self.match.phase, "day")

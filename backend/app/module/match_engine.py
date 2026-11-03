@@ -168,8 +168,6 @@ class Match:
         for name, role in zip(names, roles):
             self.players[name] = Participant(name, role, name in bots, skin_id=skins[name])
         self.labels = {name: (labels or {}).get(name, name) for name in names}
-        # Metode otak tiap bot (fuzzy/llm); diisi NPCService saat persiapan, tampil di samping nama.
-        self.bot_methods: dict[str, str] = {}
         self.id = uuid4().hex
         self.round = 1
         self.ai_controlled = (
@@ -828,7 +826,6 @@ class Match:
                     **({"left": True} if p.left else {}),
                     # Hostage diumumkan saat malam selesai, jadi status dan malamnya publik (hanya bila benar).
                     **({"hostage": True, "hostage_round": p.hostage_round} if p.hostage else {}),
-                    **({"metode": self.bot_methods[p.name]} if p.name in self.bot_methods else {}),
                     **({"thinking": True} if p.name in self.bot_berpikir else {}),
                     **({"tahap": self.bot_tahap[p.name]} if p.name in self.bot_tahap else {}),
                     **({"role": p.role, "bot": p.bot} if self.winner else {}),
