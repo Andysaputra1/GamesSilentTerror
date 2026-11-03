@@ -50,14 +50,18 @@ file saja tidak berarti route tersebut dibuka pada aplikasi utama.
 5. **Chat dan AI:** handler socket memeriksa sesi/hak chat, lalu menyimpan dan
    menyiarkan pesan tanpa menganalisisnya. Pada pertandingan, `NPCService`
    mengambil langkah mandiri dari timer untuk setiap bot: snapshot privat ->
-   `backend/app/module/npc_brain` (IndoBERT -> fuzzy/utility/behavior tree hasil ekspor
-   notebook -> NLG tervalidasi) -> aksi/vote engine serta chat. Fase diperiksa ulang
+   `backend/app/module/npc_brain` (IndoBERT -> fuzzy hasil ekspor notebook -> NLG
+   tervalidasi) -> aksi/vote engine serta chat. Fase diperiksa ulang
    sebelum keputusan diterapkan. Vote/aksi langsung diterapkan; chat bot melewati
    "lantai bicara" (`NPCService._ambil_lantai`): paling banyak `LANTAI_MAKS` (3) bot
    menyusun/mengetik bersamaan per pertandingan tanpa rencana kembar (intent + target
    sama), dan rencana yang lebih tua dari chat bot lain dibatalkan lalu diputuskan
    ulang. Mode `NPC_METHOD=llm` mempertahankan jalur lama
-   (satu prompt LLM) sebagai pembanding.
+   (satu prompt LLM) sebagai pembanding. Utility AI dan Behavior Tree diarsipkan di luar
+   repo, di `../arsip_bt_utility_2026-11-03/` (cara menariknya kembali ada di README folder
+   itu). Nilai lama `campuran`, `utility`, dan `bt` di `.env` atau `panel_configuration`
+   dibaca sebagai `fuzzy`, dan jejak lama tetap bisa dibuka di panel. Angka keseimbangan di
+   `GAME_CONCEPT.md` diukur dengan metode campuran, jadi belum berlaku untuk Fuzzy saja.
    Setelah Mulai, `Match` berada di fase `preparing` sampai otak bot siap.
 6. **Logout:** `ProfileMenu` → `SessionService` → endpoint logout. Setelah token
    dicabut atau sudah tidak berlaku, data sesi browser dibersihkan dan pengguna
@@ -66,7 +70,7 @@ file saja tidak berarti route tersebut dibuka pada aplikasi utama.
    menyimpan konfigurasi AI; nilai API key tidak dikirim kembali ke browser.
    Checker per room menampilkan penjelasan setiap langkah bot yang dibuat
    `backend/app/module/npc_brain/penjelasan.py` di `BrainRuntime.langkah` (identitas, parameter,
-   penalaran fuzzy/utility/BT, keputusan) dan dilengkapi hasil engine/NLG di
+   penalaran fuzzy, keputusan) dan dilengkapi hasil engine/NLG di
    `NPCService._trace`. Daftar jejak hanya membawa `ringkas`; penjelasan lengkap
    diambil per jejak lewat `GET /api/panel/checker/{code}/jejak/{id}`.
 

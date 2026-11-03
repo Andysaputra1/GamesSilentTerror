@@ -24,7 +24,7 @@ from app.module.match_engine import (
     Match,
     snapshot_berlabel,
 )
-from app.module.npc_brain.generated import otak_bt, otak_fuzzy, otak_utility
+from app.module.npc_brain.generated import otak_fuzzy
 from app.module.npc_brain.runtime import BrainRuntime
 from app.module.npc_service import NPCService, npc_context, riwayat_nlu
 from app.module.room_service import Room, RoomService
@@ -187,24 +187,23 @@ class BrainExtraTimeTests(unittest.TestCase):
     # Otak hasil ekspor tidak diubah: selama waktu tambahan, porsi fase tetap penuh, bot yang sudah vote
     # tidak memilih lagi, dan keputusan bot lain tetap berjalan.
     def test_brains_keep_deciding_without_moving_votes_already_cast(self):
-        for modul in (otak_fuzzy, otak_utility, otak_bt):
-            game = pertandingan([], ENAM, now=0.0)
-            game.round, game.phase = 2, "tribunal"
-            otak = {nama: modul.Ingatan(nama) for nama in ENAM}
-            for nama, ingatan in otak.items():
-                ingatan.sinkron_snapshot(game.snapshot(nama), 1.0)
-            game.vote("spy", "hitman")
-            game.vote("hitman", "spy")
-            game.npc_decisions = {(2, "tribunal", nama) for nama in ENAM}
-            game.tick(game.deadline)
-            self.assertTrue(game.tribunal_extra, modul.__name__)
-            sekarang = game.deadline - 5
-            for nama, ingatan in otak.items():
-                view = ingatan.sinkron_snapshot(game.snapshot(nama), sekarang)
-                self.assertEqual(modul.porsi_fase(ingatan, view), 1.0)
-                aksi = modul.putuskan(ingatan, view)["npc_decision"]["action"]
-                if nama in ("spy", "hitman"):
-                    self.assertNotEqual(aksi, "vote", (modul.__name__, nama))
+        game = pertandingan([], ENAM, now=0.0)
+        game.round, game.phase = 2, "tribunal"
+        otak = {nama: otak_fuzzy.Ingatan(nama) for nama in ENAM}
+        for nama, ingatan in otak.items():
+            ingatan.sinkron_snapshot(game.snapshot(nama), 1.0)
+        game.vote("spy", "hitman")
+        game.vote("hitman", "spy")
+        game.npc_decisions = {(2, "tribunal", nama) for nama in ENAM}
+        game.tick(game.deadline)
+        self.assertTrue(game.tribunal_extra)
+        sekarang = game.deadline - 5
+        for nama, ingatan in otak.items():
+            view = ingatan.sinkron_snapshot(game.snapshot(nama), sekarang)
+            self.assertEqual(otak_fuzzy.porsi_fase(ingatan, view), 1.0)
+            aksi = otak_fuzzy.putuskan(ingatan, view)["npc_decision"]["action"]
+            if nama in ("spy", "hitman"):
+                self.assertNotEqual(aksi, "vote", nama)
 
 
 class SchedulerExtraTimeTests(unittest.IsolatedAsyncioTestCase):

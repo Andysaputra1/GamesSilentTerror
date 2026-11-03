@@ -4,7 +4,7 @@
   dengan yang diuji di skripsi.
 - Satu NLU (IndoBERT) dipakai bersama semua bot. Hasil anotasi chat publik disimpan (memo)
   karena identik untuk semua bot, dan inferensi model diserialkan agar aman antar-thread.
-- Setiap bot punya ingatan, metode (fuzzy/utility/bt/llm), dan persona sendiri.
+- Setiap bot punya ingatan, metode (fuzzy, atau llm sebagai pembanding), dan persona sendiri.
 - Keputusan dijalankan di satu thread pekerja (logika notebook tidak dirancang paralel);
   penulisan kalimat berjalan di thread terpisah supaya LLM tidak menahan keputusan bot lain.
 """
@@ -15,7 +15,6 @@ import copy
 import importlib
 import json
 import logging
-import random
 import re
 import threading
 import time
@@ -27,7 +26,8 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from app.config.settings import (
-    BACKEND_DIR, JALUR_PENULIS_LAMA, JALUR_PENULIS_NPC, POLA_MODEL_OPENROUTER, PROJECT_DIR, settings,
+    BACKEND_DIR, JALUR_PENULIS_LAMA, JALUR_PENULIS_NPC, METODE_NPC_LAMA, POLA_MODEL_OPENROUTER,
+    PROJECT_DIR, settings,
 )  # fmt: skip
 from app.module.ai_runtime_service import ai_runtime
 from app.module.match_engine import phase_durations
@@ -38,9 +38,8 @@ logger = logging.getLogger("shadow_heist.npc_brain")
 # scikit-fuzzy memanggil np.maximum dengan argumen ketiga posisional; peringatannya tidak memengaruhi hasil.
 warnings.filterwarnings("ignore", category=DeprecationWarning, module=r"skfuzzy(\..*)?")
 
-METODE_MODUL = {"fuzzy": "otak_fuzzy", "utility": "otak_utility", "bt": "otak_bt"}
-URUTAN_CAMPURAN = ("fuzzy", "utility", "bt")
-METODE_VALID = {"campuran", "fuzzy", "utility", "bt", "llm"}
+METODE_MODUL = {"fuzzy": "otak_fuzzy"}
+METODE_VALID = {"fuzzy", "llm"}
 # Nama model di link LLM (Ollama/OpenAI), mis. qwen3:4b-instruct atau qwen3:14b.
 POLA_MODEL_TAUTAN = re.compile(
     r"[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9._-]+)*(?::[A-Za-z0-9._-]+)?"
@@ -199,7 +198,7 @@ class OtakBot:
 
 @dataclass
 class KonfigurasiNPC:
-    metode: str = "campuran"
+    metode: str = "fuzzy"
     penulis: str = "otomatis"
     validasi: bool = True
     # Prioritas rantai penulis; jalur yang tidak tercantum dinonaktifkan.
@@ -305,7 +304,7 @@ class BrainRuntime:
 
     def _muat(self, analysis=None, nlu=None):
         try:
-            self._set(detail="Memuat logika fuzzy, utility AI, dan behavior tree…", progres=0.1)
+            self._set(detail="Memuat logika fuzzy…", progres=0.1)
             for metode, nama in METODE_MODUL.items():
                 self.modul[metode] = importlib.import_module(f"app.module.npc_brain.generated.{nama}")
             self.nlg = importlib.import_module("app.module.npc_brain.generated.nlg")
@@ -442,6 +441,8 @@ class BrainRuntime:
         model_openrouter=None,
         model_tautan=None,
     ):
+        if metode in METODE_NPC_LAMA:  # baris panel_configuration dari sebelum arsip BT dan Utility
+            metode = "fuzzy"
         if metode is not None and metode not in METODE_VALID:
             raise ValueError("Metode NPC tidak dikenal.")
         if penulis is not None and penulis not in PENULIS_VALID:
@@ -536,22 +537,13 @@ class BrainRuntime:
             })  # fmt: skip
         return baris
 
-    # Metode per bot: satu metode untuk semua, atau campuran bergiliran (urutan diacak per pertandingan).
-    def _bagi_metode(self, match_id, bots):
-        metode = self.konfigurasi.metode
-        if metode != "campuran":
-            return {nama: metode for nama in bots}
-        urutan = list(URUTAN_CAMPURAN)
-        random.Random(match_id).shuffle(urutan)
-        return {nama: urutan[i % len(urutan)] for i, nama in enumerate(bots)}
-
     # Sekali per pertandingan: metode, persona, dan ingatan setiap bot.
     def siapkan_pertandingan(self, match, room_code):
         with self.lock:
             if match.id in self.pertandingan:
                 return []
             bots = sorted(p.name for p in match.players.values() if p.bot)
-            otak = self.buat_otak(match, self._bagi_metode(match.id, bots))
+            otak = self.buat_otak(match, {nama: self.konfigurasi.metode for nama in bots})
             self.pertandingan[match.id] = otak
             return [
                 {"match_id": match.id, "room_code": room_code, "bot_name": b.nama,
@@ -652,7 +644,7 @@ class BrainRuntime:
     # itu; keduanya disimpan untuk riwayat panel dan ekspor format dataset (target sebagai {pemain, relasi}).
     def baca_chat(self, riwayat, pengirim, teks, roster):
         mulai = time.perf_counter()
-        modul = next(iter(self.modul.values()))  # anotasi_chat sama di semua modul notebook
+        modul = self.modul["fuzzy"]
         konteks = [
             {"pengirim": c["pengirim"], "teks": c["teks"], "intent": c.get("intent"),
              "target": [{"pemain": t["pemain"], "relasi": t["relasi"]} for t in c.get("target", [])]}

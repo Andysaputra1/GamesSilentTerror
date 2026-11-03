@@ -1,6 +1,8 @@
 # Dipanggil uji-waktu.bat: ukur lama otak NPC di backend lewat simulasi panel (otak, NLU IndoBERT, dan NLG asli,
-# tanpa room/database). Satu bot per metode (fuzzy, utility, behavior tree); setiap chat memanggil satu bot,
+# tanpa room/database). Tiga bot Fuzzy (jumlah minimal simulasi); setiap chat memanggil satu bot,
 # lalu semua bot melangkah. Tiap langkah dicatat per tahap: NLU -> logika -> penjelasan -> NLG (LLM + validasi).
+# Game hanya memakai Fuzzy; Utility AI dan Behavior Tree diarsipkan di ..\arsip_bt_utility_2026-11-03 (di luar repo).
+# Hasil lama (waktu dan keseimbangan) diukur dengan metode campuran, jadi belum berlaku untuk Fuzzy saja.
 # Hasil: tabel di layar + CSV di communicationfolder\uji-waktu-<tanggal>\.
 # Sengaja hanya karakter ASCII: PowerShell 5.1 membaca .ps1 tanpa BOM sebagai ANSI.
 
@@ -9,7 +11,7 @@ param([int] $Putaran = 3)
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'bersama.ps1')
 
-$metode = @('fuzzy', 'utility', 'bt')
+$metode = @('fuzzy', 'fuzzy', 'fuzzy')
 # {0} = nama bot yang dipanggil; dirotasi supaya intent NLU bervariasi (tanya, tuduh, ajak vote, ...).
 $pesan = @(
     '{0}, dari tadi kamu diam aja. Kamu curiga sama siapa?',
@@ -70,7 +72,7 @@ try { Panel POST '/api/panel/logout' -sesi $sesi | Out-Null } catch {}
 
 Write-Host ''
 Write-Host 'Ringkasan per metode (rata-rata / median / maks, ms):' -ForegroundColor Green
-$ringkas = foreach ($m in $metode) {
+$ringkas = foreach ($m in @($metode | Select-Object -Unique)) {
     $semua = @($baris | Where-Object { $_.metode -eq $m })
     $bicara = @($semua | Where-Object { $_.bicara })
     [pscustomobject]@{

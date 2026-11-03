@@ -284,11 +284,13 @@ let checkerRoom = null,
   detailTab = 'proses',
   renderedDetail = ''; // jejak yang sedang tampil: tidak dirender ulang tiap auto-refresh
 const traceDetails = new Map(); // id → jejak lengkap (dengan penjelasan), dimuat saat dibuka
+// Game hanya memakai Fuzzy (dan LLM sebagai pembanding). Utility AI dan Behavior Tree sudah diarsipkan;
+// label, arti parameter, dan tampilan penalarannya tetap ada agar jejak lama di database bisa dibuka.
 const METODE_LABEL = {
   fuzzy: 'Fuzzy Mamdani',
-  utility: 'Utility AI (IAUS)',
-  bt: 'Behavior Tree',
   llm: 'LLM (mode lama)',
+  utility: 'Utility AI (jejak lama)',
+  bt: 'Behavior Tree (jejak lama)',
 };
 // Singkatan metode, sama dengan label nama bot di game.
 const METODE_SINGKAT = { fuzzy: 'FL', utility: 'UA', bt: 'BT', llm: 'LLM' };
@@ -1024,7 +1026,7 @@ function fuzzySystem(s) {
   if (s.catatan) box.append(node('p', s.catatan, 'hint'));
   return box;
 }
-// Jalur Behavior Tree: syarat/aksi yang dievaluasi berurutan dengan status berhasil/gagal.
+// Jalur Behavior Tree pada jejak lama: syarat/aksi yang dievaluasi berurutan dengan status berhasil/gagal.
 function btPath(blok) {
   const box = node('div', undefined, 'bt-path');
   box.append(
@@ -1259,7 +1261,8 @@ const ALUR_AI = {
     proses:
       'Dari chat ber-NLU dan vote dihitung tekanan, dukungan, inkonsistensi, pengalihan, klaim, diam, dll. Hitman juga menilai ancaman; Spy menilai siapa yang perlu di-Guard.',
     keluaran: 'Tabel bukti (lihat tab Parameter).',
-    alasan: 'Ketiga metode memakai bukti yang sama, jadi beda perilaku murni dari cara menalar.',
+    alasan:
+      'Penalaran menerima angka, bukan teks chat, jadi nilainya bisa diperiksa di tab Parameter.',
   },
   fl: {
     metode: 'fuzzy',
@@ -1310,100 +1313,6 @@ const ALUR_AI = {
     keluaran: 'Rencana chat, vote, dan aksi rahasia.',
     alasan: 'Bot tidak menuduh tanpa bukti yang cukup.',
   },
-  ua: {
-    metode: 'utility',
-    judul: 'UA · Utility AI (IAUS)',
-    kode: 'otak_utility.putuskan',
-    tujuan: 'Memberi skor kegunaan setiap pilihan lalu memilih yang terbaik.',
-    proses: 'Bukti → kurva → skor IAUS per pilihan; kecurigaan dari noisy-OR.',
-    keluaran: 'Utilitas 0–1 tiap pilihan dan kecurigaan per pemain.',
-    alasan: 'Mudah menimbang banyak faktor sekaligus, termasuk pilihan untuk diam.',
-  },
-  ua_1: {
-    metode: 'utility',
-    judul: 'Kurva pertimbangan',
-    kode: 'kurva_linear · kurva_logistik',
-    tujuan: 'Bukti menjadi nilai 0–1 yang terasa wajar.',
-    proses: 'Tiap pertimbangan (kecurigaan, urgensi, porsi fase, ...) dilewatkan kurva.',
-    keluaran: 'Nilai pertimbangan 0–1.',
-    alasan: 'Kurva logistik mengabaikan nilai kecil dan cepat menaikkan nilai tinggi.',
-  },
-  ua_2: {
-    metode: 'utility',
-    judul: 'Kecurigaan noisy-OR',
-    kode: 'nilai_kecurigaan (BOBOT_BUKTI)',
-    tujuan: 'Menggabungkan banyak bukti lemah.',
-    proses: 'kecurigaan = 1 − Π(1 − bobot × bukti), lalu dikali (1 − p_sandera).',
-    keluaran: 'Kecurigaan 0–1 per pemain.',
-    alasan: 'Beberapa bukti kecil bersama tetap meyakinkan.',
-  },
-  ua_3: {
-    metode: 'utility',
-    judul: 'Skor IAUS',
-    kode: 'skor_iaus · _nilai_calon',
-    tujuan: 'Memberi skor tiap pilihan.',
-    proses:
-      'Utilitas = bobot × hasil kali pertimbangan, dengan kompensasi jumlah pertimbangan (k).',
-    keluaran: 'Utilitas 0–1 per pilihan chat/vote/aksi.',
-    alasan:
-      'Satu pertimbangan nol membatalkan pilihan; kompensasi menjaga pilihan dengan banyak pertimbangan tetap adil.',
-  },
-  ua_4: {
-    metode: 'utility',
-    judul: 'Pilih utilitas tertinggi',
-    kode: 'keputusan_chat · keputusan_vote · keputusan_aksi',
-    tujuan: 'Memilih aksi terbaik.',
-    proses:
-      'Pilihan tertinggi dipakai bila melebihi UTILITAS_TUNGGU (diam) atau UTILITAS_VOTE_LANGSUNG.',
-    keluaran: 'Rencana chat, vote, dan aksi rahasia.',
-    alasan: 'Diam juga pilihan; bot bergerak hanya bila lebih berguna daripada diam.',
-  },
-  bt: {
-    metode: 'bt',
-    judul: 'BT · Behavior Tree',
-    kode: 'otak_bt.putuskan',
-    tujuan: 'Memilih perilaku lewat pohon prioritas.',
-    proses: 'Bukti → poin bendera merah → pohon Selector/Sequence ditelusuri dari atas.',
-    keluaran: 'Cabang yang berhasil dan rencananya.',
-    alasan: 'Urutan prioritas perilaku terlihat jelas dan mudah diuji.',
-  },
-  bt_1: {
-    metode: 'bt',
-    judul: 'Bendera merah',
-    kode: 'nilai_kecurigaan (BENDERA)',
-    tujuan: 'Bukti menjadi poin.',
-    proses: 'Bendera aktif bila nilai bukti ≥ ambangnya; poin dijumlah, kecurigaan = poin / 5.',
-    keluaran: 'Poin dan kecurigaan per pemain.',
-    alasan: 'Aturan ya/tidak yang jelas.',
-  },
-  bt_2: {
-    metode: 'bt',
-    judul: 'Papan (blackboard)',
-    kode: '_papan(ctx)',
-    tujuan: 'Menyiapkan data untuk pohon.',
-    proses: 'Tersangka, poin, izin chat, fase, dan kandidat dimasukkan ke papan.',
-    keluaran: 'Papan yang dibaca node Kondisi dan Aksi.',
-    alasan: 'Node pohon tetap kecil dan bisa dipakai ulang.',
-  },
-  bt_3: {
-    metode: 'bt',
-    judul: 'Telusuri pohon',
-    kode: 'Selector · Sequence · Kondisi',
-    tujuan: 'Mencari cabang yang berlaku.',
-    proses:
-      'Selector mencoba cabang dari atas sampai satu SUKSES; Sequence berhenti di syarat yang GAGAL.',
-    keluaran: 'Jalur node SUKSES/GAGAL (tab Penalaran).',
-    alasan: 'Prioritas perilaku terlihat dari urutan cabang.',
-  },
-  bt_4: {
-    metode: 'bt',
-    judul: 'Aksi cabang terpilih',
-    kode: 'Aksi (_a_tuduh, _a_vote, _a_aksi)',
-    tujuan: 'Menjalankan aksi di cabang yang berhasil.',
-    proses: 'Node Aksi membuat rencana chat, vote, atau aksi rahasia.',
-    keluaran: 'Rencana chat, vote, dan aksi rahasia.',
-    alasan: 'Satu langkah = satu cabang, sehingga perilaku mudah ditebak.',
-  },
   keputusan: {
     judul: 'Keputusan langkah ini',
     kode: 'rencana_chat · rencana_vote · pertahanan_suara · format_npc · siapkan_nlg',
@@ -1411,7 +1320,8 @@ const ALUR_AI = {
     proses:
       'Rencana chat (intent + target), vote, dan aksi rahasia digabung; vote dijaga agar tidak memecah suara.',
     keluaran: 'npc_decision {action, target} dan rencana kalimat untuk NLG.',
-    alasan: 'Format sama untuk ketiga metode, jadi engine dan NLG tidak perlu tahu metodenya.',
+    alasan:
+      'Format keputusan terpisah dari penalaran, jadi engine dan NLG tidak perlu tahu metodenya.',
   },
   penjelasan: {
     tahap: ['penjelasan'],
@@ -1515,8 +1425,6 @@ const BARIS_ALUR = [
 ];
 const CABANG_ALUR = {
   fuzzy: ['fl', 'fl_1', 'fl_2', 'fl_3', 'fl_4'],
-  utility: ['ua', 'ua_1', 'ua_2', 'ua_3', 'ua_4'],
-  bt: ['bt', 'bt_1', 'bt_2', 'bt_3', 'bt_4'],
 };
 let simProgres = null, // {nama: {tahap, detik}} selama simulasi berjalan
   flowNode = '';
@@ -1525,7 +1433,7 @@ function metodePemain(nama) {
 }
 // Node tempat pemain berada untuk satu tahap live; tahap logika menandai kepala cabang metodenya.
 function nodeTahap(nama, tahap) {
-  if (tahap === 'logika') return { fuzzy: 'fl', utility: 'ua', bt: 'bt' }[metodePemain(nama)];
+  if (tahap === 'logika') return { fuzzy: 'fl' }[metodePemain(nama)];
   return Object.keys(ALUR_AI).find((id) => ALUR_AI[id].tahap?.includes(tahap));
 }
 // Lama tiap node untuk item chat terpilih (ms), dari timings jejak.
@@ -1533,7 +1441,7 @@ function waktuNode(trace) {
   if (!trace) return {};
   if (isHuman(trace)) return { nlu_pesan: trace.nlu?.ms };
   const t = trace.timings || {},
-    kepala = { fuzzy: 'fl', utility: 'ua', bt: 'bt' }[trace.ringkas?.bot?.metode];
+    kepala = { fuzzy: 'fl' }[trace.ringkas?.bot?.metode];
   return {
     sinkron: t.nlu_ms,
     ...(kepala ? { [kepala]: t.logika_ms } : {}),
@@ -1781,45 +1689,12 @@ function renderFlowDetail(trace) {
   }
   tampilkanKode(box, flowNode).catch((error) => notice(error.message));
 }
-// SIMULASI: pertandingan tiruan (admin + bot pilihan) memakai engine, otak, NLU, dan NLG asli di server.
+// SIMULASI: pertandingan tiruan (admin + bot Fuzzy) memakai engine, otak, NLU, dan NLG asli di server.
 // Item chat dan detailnya memakai tampilan yang sama dengan checker room.
-const BOT_SIMULASI = [
-  'NOX',
-  'ECHO',
-  'VEIL',
-  'RAVEN',
-  'ASH',
-  'DUSK',
-  'IRIS',
-  'SAGE',
-  'ONYX',
-  'LARK',
-];
-const PILIHAN_METODE = [
-  ['fuzzy', 'FL · Fuzzy Mamdani'],
-  ['utility', 'UA · Utility AI'],
-  ['bt', 'BT · Behavior Tree'],
-];
 let sim = null,
   simTraces = [],
   simSelected = '',
   simBusy = false;
-// Satu pilihan metode per bot; pilihan lama dipertahankan saat jumlah pemain diubah.
-function renderSimSetup() {
-  const lama = [...$('sim-bots').querySelectorAll('select')].map((s) => s.value);
-  const jumlah = Number($('sim-count').value) - 1;
-  $('sim-bots').replaceChildren(
-    ...BOT_SIMULASI.slice(0, jumlah).map((nama, i) => {
-      const label = node('label', `${nama} memakai`);
-      const select = document.createElement('select');
-      for (const [value, text] of PILIHAN_METODE) select.add(new Option(text, value));
-      select.value = lama[i] || PILIHAN_METODE[i % 3][0];
-      label.append(select);
-      return label;
-    }),
-  );
-}
-renderSimSetup();
 function renderSimStatus() {
   const box = $('sim-status');
   box.hidden = !sim;
@@ -2659,13 +2534,12 @@ $('older-traces').onclick = handle(async () => {
   $('auto-checker').checked = false;
   await checker(true);
 });
-$('sim-count').onchange = renderSimSetup;
 $('sim-setup').onsubmit = handle(async () => {
   const data = await simRequest(
     '/api/panel/simulasi',
     {
       nama: $('sim-name').value.trim() || 'Pemain',
-      metode: [...$('sim-bots').querySelectorAll('select')].map((s) => s.value),
+      metode: Array(Number($('sim-count').value) - 1).fill('fuzzy'), // semua pemain selain kamu
     },
     'Menyiapkan pertandingan…',
   );
@@ -2953,7 +2827,7 @@ function pilihanKustom(select) {
   sinkron();
 }
 document.querySelectorAll('select').forEach(pilihanKustom);
-// <select> yang dibuat belakangan (mis. pilihan metode bot di Simulasi) ikut diganti.
+// <select> yang dibuat belakangan ikut diganti.
 new MutationObserver((perubahan) => {
   for (const p of perubahan)
     for (const n of p.addedNodes)

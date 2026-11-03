@@ -1,1 +1,1 @@
-"""Otak NPC: NLU IndoBERT, penalaran fuzzy/utility/behavior tree, dan NLG hasil ekspor notebook."""
+"""Otak NPC: NLU IndoBERT, penalaran fuzzy, dan NLG hasil ekspor notebook."""

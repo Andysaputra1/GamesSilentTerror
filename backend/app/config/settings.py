@@ -19,6 +19,8 @@ PROJECT_DIR = BACKEND_DIR.parent
 JALUR_PENULIS_NPC = ("openrouter", "tautan")
 # Jalur Claude yang sudah dihapus: diabaikan bila masih ada di .env atau konfigurasi tersimpan.
 JALUR_PENULIS_LAMA = ("claude_bedrock", "claude_api")
+# Metode otak yang sudah diarsipkan: di .env atau konfigurasi tersimpan dibaca sebagai fuzzy.
+METODE_NPC_LAMA = ("campuran", "utility", "bt")
 # penyedia/model (mis. qwen/qwen3-14b); segmen tidak boleh diawali titik agar path URL tetap lurus.
 POLA_MODEL_OPENROUTER = re.compile(r"[a-z0-9][a-z0-9._-]*/[A-Za-z0-9_:-][A-Za-z0-9._:-]*")
 
@@ -78,8 +80,8 @@ class Settings(MySQLSettings):
     intent_model_path: Path = BACKEND_DIR / "artifacts" / "svm" / "intent_classifier.pkl"
 
     # OTAK NPC (hasil ekspor notebook skripsi): metode penalaran, penulis kalimat, dan lokasi IndoBERT.
-    # campuran = bot dalam satu room dibagi bergiliran ke fuzzy, utility, dan behavior tree.
-    npc_method: Literal["campuran", "fuzzy", "utility", "bt", "llm"] = "campuran"
+    # fuzzy = semua bot memakai Fuzzy Mamdani; llm = mode lama satu prompt, sebagai pembanding.
+    npc_method: Literal["fuzzy", "llm"] = "fuzzy"
     # otomatis = rantai penulis LLM (urutan di bawah, bisa diubah di panel), semua gagal → templat;
     # templat = tanpa LLM sama sekali; claude = nilai lama, diperlakukan seperti otomatis.
     npc_writer: Literal["otomatis", "claude", "templat"] = "otomatis"
@@ -92,6 +94,12 @@ class Settings(MySQLSettings):
     npc_target_model_dir: Path | None = None
     npc_nlu_device: Literal["cpu", "cuda"] = "cpu"
     npc_step_seconds: float = Field(default=3.0, ge=1.0, le=30.0)
+
+    @field_validator("npc_method", mode="before")
+    @classmethod
+    # VALIDATOR: .env lama dengan metode yang sudah diarsipkan tetap bisa start, sebagai fuzzy.
+    def archived_method_as_fuzzy(cls, value: object) -> object:
+        return "fuzzy" if value in METODE_NPC_LAMA else value
 
     @field_validator("npc_intent_model_dir", "npc_target_model_dir", mode="before")
     @classmethod

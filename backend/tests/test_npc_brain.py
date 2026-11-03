@@ -32,7 +32,7 @@ class AnalisisKataKunci:
         return "neutral"
 
 
-def runtime_siap(metode="campuran"):
+def runtime_siap(metode="fuzzy"):
     runtime = BrainRuntime()
     runtime.konfigurasi.metode = metode
     runtime.konfigurasi.penulis = "templat"
@@ -49,12 +49,12 @@ class BrainRuntimeTests(unittest.TestCase):
     def tearDownClass(cls):
         cls.runtime.tutup()
 
-    def test_modules_loaded_and_mixed_methods_with_distinct_personas(self):
+    def test_modules_loaded_and_all_bots_fuzzy_with_distinct_personas(self):
         self.assertTrue(self.runtime.ringkasan()["siap"])
         match = Match(["human"], ["NOX", "ECHO", "VEIL", "RAVEN", "ASH"], now=0.0)
         rows = self.runtime.siapkan_pertandingan(match, "ROOM01")
         self.assertEqual({r["bot_name"] for r in rows}, {"NOX", "ECHO", "VEIL", "RAVEN", "ASH"})
-        self.assertEqual({r["method"] for r in rows}, {"fuzzy", "utility", "bt"})
+        self.assertEqual({r["method"] for r in rows}, {"fuzzy"})
         tiga_pertama = [r["persona"] for r in sorted(rows, key=lambda r: r["bot_name"])][:3]
         self.assertEqual(len(set(tiga_pertama)), 3)
         self.assertEqual(self.runtime.siapkan_pertandingan(match, "ROOM01"), [])  # sekali saja
@@ -219,8 +219,7 @@ class BrainRuntimeTests(unittest.TestCase):
                 self.assertEqual(len(otak.ingatan.aksi_bot), jumlah_chat)
                 self.assertEqual(len(otak.riwayat), jumlah_chat)
 
-    # Label metode (BT/UA/FL) harus jujur: setiap keputusan chat/vote/aksi bot dihitung oleh modul metodenya
-    # sendiri, dan fungsi keputusan modul metode lain tidak pernah dipanggil untuk bot itu.
+    # Label metode harus jujur: setiap keputusan chat/vote/aksi bot dihitung oleh modul metodenya sendiri.
     def test_each_bot_is_decided_only_by_its_labelled_method(self):
         dipanggil = {}
         with contextlib.ExitStack() as tumpukan:
@@ -234,14 +233,13 @@ class BrainRuntimeTests(unittest.TestCase):
                     tumpukan.enter_context(patch.object(modul, nama_fungsi, rekam))
             match, _ = self.main_game(seed=11, jumlah=9)
         label = {b: o.metode for b, o in self.runtime.pertandingan[match.id].items()}
-        self.assertEqual(set(label.values()), {"fuzzy", "utility", "bt"})
+        self.assertEqual(set(label.values()), {"fuzzy"})
         self.assertEqual(dipanggil, {bot: {metode} for bot, metode in label.items()})
 
 
 class NPCServiceBrainTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
-        # Behavior tree: bela diri adalah cabang prioritas saat dituduh, jadi hasilnya deterministik.
-        self.runtime = runtime_siap("bt")
+        self.runtime = runtime_siap("fuzzy")
         self.rooms = RoomService()
         self.room = self.rooms.create("human")
         self.rooms.set_bot(self.room.code, "human", True)
@@ -430,13 +428,12 @@ class HostageResultTests(unittest.TestCase):
         game.act("hitman", "hostage", "civilian2")
         game.resolve_night()
         game.round, game.phase = 3, "day"
-        for modul in ("otak_fuzzy", "otak_utility", "otak_bt"):
-            M = importlib.import_module(f"app.module.npc_brain.generated.{modul}")
-            ingatan = M.Ingatan("hitman")
-            view = ingatan.sinkron_snapshot(game.snapshot("hitman"), time.time())
-            tahu = M.pengetahuan_peran(ingatan, view)
-            self.assertEqual(tahu["korban_saya"], {"civilian2"}, modul)
-            self.assertEqual(tahu["dijaga"], {"civilian": 1}, modul)
+        M = importlib.import_module("app.module.npc_brain.generated.otak_fuzzy")
+        ingatan = M.Ingatan("hitman")
+        view = ingatan.sinkron_snapshot(game.snapshot("hitman"), time.time())
+        tahu = M.pengetahuan_peran(ingatan, view)
+        self.assertEqual(tahu["korban_saya"], {"civilian2"})
+        self.assertEqual(tahu["dijaga"], {"civilian": 1})
 
 
 class ExportFreshnessTests(unittest.TestCase):
@@ -448,7 +445,7 @@ class ExportFreshnessTests(unittest.TestCase):
         tercatat = {
             b["modul"]: b["sidik"] for b in json.loads((TUJUAN / "SUMBER.json").read_text())
         }
-        self.assertEqual(set(tercatat), {"otak_fuzzy", "otak_utility", "otak_bt", "nlg"})
+        self.assertEqual(set(tercatat), {"otak_fuzzy", "nlg"})
         # Kepala tiap modul harus cocok dengan SUMBER.json: ekspor parsial atau edit manual ketahuan
         # walau notebook skripsi tidak tersedia di mesin ini.
         for modul, sidik in tercatat.items():

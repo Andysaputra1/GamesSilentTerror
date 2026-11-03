@@ -48,8 +48,9 @@ TRIBUNAL_EXTRA_QUICK_SECONDS = 10
 TEAM_CHAT_LIMIT = 100
 
 # Komposisi role per jumlah peserta: (hitman, spy, stalker); sisanya civilian.
-# Dipilih lewat simulasi keseimbangan semua kursi bot metode campuran, dengan pengumuman jumlah Hitman tersisa
-# (hitman_remaining); data dan alasannya ada di GAME_CONCEPT.md, bagian Ruangan dan role.
+# Dipilih lewat simulasi keseimbangan semua kursi bot metode campuran (sebelum game hanya memakai Fuzzy), dengan
+# pengumuman jumlah Hitman tersisa (hitman_remaining). Angkanya belum diukur ulang untuk Fuzzy saja, jadi belum
+# berlaku untuk game sekarang; data dan alasannya ada di GAME_CONCEPT.md, bagian Ruangan dan role.
 KOMPOSISI_PERAN = {
     4: (1, 1, 1),
     5: (1, 1, 1),
@@ -167,7 +168,7 @@ class Match:
         for name, role in zip(names, roles):
             self.players[name] = Participant(name, role, name in bots, skin_id=skins[name])
         self.labels = {name: (labels or {}).get(name, name) for name in names}
-        # Metode otak tiap bot (fuzzy/utility/bt/llm); diisi NPCService saat persiapan, tampil di samping nama.
+        # Metode otak tiap bot (fuzzy/llm); diisi NPCService saat persiapan, tampil di samping nama.
         self.bot_methods: dict[str, str] = {}
         self.id = uuid4().hex
         self.round = 1

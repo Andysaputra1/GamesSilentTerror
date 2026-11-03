@@ -7,20 +7,6 @@
     "sidik": "96968490688e995a"
   },
   {
-    "modul": "otak_utility",
-    "notebook": "npc_utility_ai.ipynb",
-    "sel": 18,
-    "blok": 139,
-    "sidik": "3a098773ecb3e0cf"
-  },
-  {
-    "modul": "otak_bt",
-    "notebook": "npc_behavior_tree.ipynb",
-    "sel": 20,
-    "blok": 164,
-    "sidik": "91ebd2741d699c23"
-  },
-  {
     "modul": "nlg",
     "notebook": "npc_nlg.ipynb",
     "sel": 11,

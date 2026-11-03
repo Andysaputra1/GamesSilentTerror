@@ -1,8 +1,9 @@
 """Penjelasan keputusan bot untuk panel admin: hasil putuskan() → JSON ringkas yang mudah dibaca.
 
-Isi: identitas bot, parameter masukan (konteks, pengetahuan, tersangka), penalaran sesuai metode
-(Fuzzy Mamdani, Utility AI/IAUS, Behavior Tree), dan keputusan chat/vote/aksi. Dihitung di thread
-keputusan (BrainRuntime.langkah) lalu disimpan di trace checker.
+Isi: identitas bot, parameter masukan (konteks, pengetahuan, tersangka), penalaran Fuzzy Mamdani,
+dan keputusan chat/vote/aksi. Dihitung di thread keputusan (BrainRuntime.langkah) lalu disimpan di
+trace checker. Jejak lama Utility AI dan Behavior Tree sudah tersimpan jadi; panel yang
+menampilkannya.
 
 Penjelasan memuat role bot dan kecurigaannya, jadi hanya untuk panel (require_panel) dan tidak
 pernah dikirim ke pemain. Fungsi publik tidak pernah melempar error ke game: bagian yang gagal
@@ -20,22 +21,19 @@ VERSI = 1
 BATAS_BYTE = 12_000  # ukuran maksimal satu penjelasan (JSON UTF-8)
 MAKS_BARIS = 5  # baris per tabel
 MAKS_ATURAN = 5  # aturan fuzzy yang ditampilkan per sistem
-MAKS_JALUR_BT = 30  # node Behavior Tree per keputusan
 MAKS_DAFTAR = 12  # isi daftar (nama, alasan)
 MAKS_TEKS = 240  # karakter per teks
 MAKS_PROMPT = 2500  # karakter prompt LLM di masukan NLG
 
-# Kolom tabel tersangka: bukti bersama semua metode, lalu nilai antara khas tiap metode.
+# Kolom tabel tersangka: bukti, lalu nilai antara khas metode.
 KOLOM_BUKTI = ["kecurigaan", "tekanan", "dukungan", "inkonsistensi", "pengalihan", "dituduh_korban",
                "dorong_salah_eksekusi", "serang_bersih", "klaim", "p_sandera", "diam"]  # fmt: skip
 KOLOM_METODE = {
     "fuzzy": ["sosial", "perilaku", "jejak", "pribadi", "ucapan", "bukti_keras"],
-    "utility": ["kecurigaan_mentah"],
-    "bt": ["poin", "bendera", "bobot_bukti"],
 }
 KOLOM_HITMAN = ["pemain", "ancaman", "kambing_hitam", "menuduh_saya", "pengaruh", "klaim_peran",
                 "kecurigaan_publik", "dukungan_suara", "p_sandera", "tidak_dijaga", "ancaman_sekarang",
-                "ancaman_langsung", "ancaman_peran", "poin_ancaman", "bendera_ancaman"]  # fmt: skip
+                "ancaman_langsung", "ancaman_peran"]  # fmt: skip
 KOLOM_LINDUNG = [
     "pemain",
     "terancam",
@@ -45,32 +43,20 @@ KOLOM_LINDUNG = [
     "pengaruh",
 ]
 
-# Nama sistem fuzzy / pertimbangan utility untuk aksi rahasia (aksi engine → nama di notebook).
+# Nama sistem fuzzy untuk aksi rahasia (aksi engine → nama di notebook).
 SISTEM_AKSI = {"hostage": "sandera", "guard": "lindung", "peek": "intip", "gag": "gag"}
 
 # Ambang tiap keputusan: (nama konstanta di modul notebook, arti). Nilainya dibaca dari modul.
 AMBANG_CHAT = {
     "fuzzy": [("AMBANG_CHAT", "prioritas minimal agar bot chat")],
-    "utility": [("UTILITAS_TUNGGU", "utilitas diam; chat dikirim bila lebih besar")],
-    "bt": [("POIN_KUAT", "poin tersangka kuat"), ("POIN_TERSANGKA", "poin tersangka"),
-           ("SELISIH_UNGGUL", "selisih bobot bukti agar satu nama unggul")],
-}  # fmt: skip
+}
 AMBANG_AKSI = {
     "fuzzy": [("AMBANG_GAG", "prioritas minimal Gag (aksi lain memilih kandidat terbaik)")],
-    "utility": [
-        ("AMBANG_GAG_UTILITAS", "utilitas minimal Gag (aksi lain memilih kandidat terbaik)")
-    ],
 }
 AMBANG_VOTE = {
     "fuzzy": [("VOTE_LANGSUNG", "kesiapan ≥ nilai ini: vote langsung"),
               ("AMBANG_VOTE", "kesiapan ≥ nilai ini: vote setelah separuh Tribunal"),
               ("VOTE_TUNGGU_FRAKSI", "porsi Tribunal sebelum vote biasa dikunci")],
-    "utility": [("UTILITAS_VOTE_LANGSUNG", "utilitas ≥ nilai ini: vote langsung"),
-                ("VOTE_TUNGGU_FRAKSI", "porsi Tribunal sebelum vote biasa dikunci")],
-    "bt": [("POIN_KUAT", "poin tersangka kuat (vote langsung)"),
-           ("POIN_TERSANGKA", "poin tersangka (vote setelah separuh Tribunal)"),
-           ("URGENSI_KRITIS", "urgensi kesempatan terakhir"),
-           ("VOTE_TUNGGU_FRAKSI", "porsi Tribunal sebelum vote biasa dikunci")],
 }  # fmt: skip
 AMBANG_VOTE_HITMAN = [
     ("VOTE_TUNGGU_FRAKSI", "Hitman menunggu arah suara sampai porsi ini, kecuali terdesak")
@@ -316,60 +302,28 @@ def _blok_kandidat(modul, metode, jejak, rencana, peran, judul, ambang):
     blok = {"judul": judul, "jenis": metode, "hasil": _narasi_rencana(rencana)}
     if rows and ambang:
         blok["ambang"] = _ambang(modul, ambang)
-    if metode == "bt":
-        return {**blok, **_jalur_bt(rows)}
     if not rows:
         return blok
     diam = bool(rencana) and rencana.get("aksi") in ("tunggu", "tidak_bisa")
     if diam:
-        # Rencana diam: yang dijelaskan kandidat terbaik yang kalah dari ambang, bukan baris "tunggu"
-        # pembanding (utility menambahkan baris itu dengan utilitas diam).
-        pesaing = [r for r in rows if r.get("aksi") != "tunggu"] or rows
-        terpilih = max(pesaing, key=lambda r: _angka(_skor(r)) or 0.0)
+        # Rencana diam: yang dijelaskan kandidat terbaik yang kalah dari ambang.
+        terpilih = max(rows, key=lambda r: _angka(r.get("prioritas")) or 0.0)
     else:
         terpilih = next((r for r in rows if _cocok(r, rencana or {})), None) or rows[0]
-    if metode == "fuzzy":
-        blok["kandidat"] = _tabel(rows, ["aksi", "target", "prioritas", "input"])
-        sistem = _sistem_fuzzy(modul, terpilih.get("aksi"), peran)
-        detail = (
-            _detail_fuzzy(modul, sistem, terpilih.get("input") or {}, terpilih.get("prioritas"))
-            if sistem
-            else None
-        )
-        blok["sistem"] = [detail] if detail else []
-    else:
-        bobot = getattr(modul, "PERTIMBANGAN", {})
-        for r in rows:
-            sistem = SISTEM_AKSI.get(r.get("aksi"), r.get("aksi"))
-            nama = f"h_{sistem}" if peran == "hitman" and f"h_{sistem}" in bobot else sistem
-            r["bobot"] = bobot[nama][0] if nama in bobot else None
-        blok["kandidat"] = _tabel(rows, ["aksi", "target", "bobot", "pertimbangan", "utilitas"])
-    skor = _skor(terpilih)
+    blok["kandidat"] = _tabel(rows, ["aksi", "target", "prioritas", "input"])
+    sistem = _sistem_fuzzy(modul, terpilih.get("aksi"), peran)
+    detail = (
+        _detail_fuzzy(modul, sistem, terpilih.get("input") or {}, terpilih.get("prioritas"))
+        if sistem
+        else None
+    )
+    blok["sistem"] = [detail] if detail else []
+    skor = terpilih.get("prioritas")
     if diam and skor is not None:
-        pembanding = next((r for r in rows if r.get("aksi") == "tunggu"), None)
-        batas = f" ≤ utilitas diam {_fmt(_skor(pembanding))}" if pembanding else ""
-        blok["hasil"] += f" (kandidat terbaik {terpilih.get('aksi')} = {_fmt(skor)}{batas})"
+        blok["hasil"] += f" (kandidat terbaik {terpilih.get('aksi')} = {_fmt(skor)})"
     elif skor is not None:
         blok["hasil"] += f" (nilai {_fmt(skor)})"
     return blok
-
-
-# Skor kandidat: prioritas (fuzzy) atau utilitas (utility AI).
-def _skor(r):
-    return r.get("prioritas", r.get("utilitas")) if r else None
-
-
-# Jalur Behavior Tree: setiap node yang dievaluasi beserta statusnya, sampai keputusan.
-def _jalur_bt(rows):
-    if not rows or "node" not in rows[0]:
-        return {}
-    jalur = rows[-MAKS_JALUR_BT:]
-    return {
-        "status_akar": rows[0].get("status_akar"),
-        "jalur": {"kolom": ["node", "jenis", "status"],
-                  "baris": [[r.get("node"), r.get("jenis"), r.get("status")] for r in jalur]},
-        "cabang": next((r.get("node") for r in reversed(rows) if r.get("jenis") == "aksi"), None),
-    }  # fmt: skip
 
 
 # Vote warga metode fuzzy: keyakinan_vote(kecurigaan, keunggulan) → kesiapan_vote(keyakinan, urgensi).
@@ -400,27 +354,17 @@ def _blok_vote(modul, metode, jejak, rencana, peran):
         blok["hasil"] += f" (skor {_fmt(rencana['skor'])})"
     hitman = bool(rows) and "kambing_hitam" in rows[0]
     if hitman:
-        # Hitman: vote ke kambing hitam (logika bersama, nilainya dari metode masing-masing).
+        # Hitman: vote ke kambing hitam.
         blok["kandidat"] = _tabel(
             rows, ["pemain", "kambing_hitam", "kecurigaan_publik", "dukungan_suara"]
         )
         baris = next((r for r in rows if r.get("pemain") == (rencana or {}).get("target")), None)
-        if metode == "fuzzy" and baris is not None:
+        if baris is not None:
             keluaran = (_angka(baris.get("kambing_hitam")) or 0.0) * 100
             detail = _detail_fuzzy(modul, "kambing", baris, keluaran)
             blok["sistem"] = [detail] if detail else []
-        elif metode != "fuzzy":
-            blok["catatan"] = (
-                "Vote Hitman memakai logika bersama semua metode (kambing hitam terbaik); "
-                "nilai kambing_hitam di tabel dihitung metode ini."
-            )
-    elif metode == "fuzzy":
+    else:
         blok.update(_vote_fuzzy(modul, rows))
-    elif metode == "utility":
-        blok["kandidat"] = _tabel(rows, ["pilihan", "kecurigaan", "bukan sandera", "dukungan suara",
-                                         "keunggulan", "utilitas"])  # fmt: skip
-    elif metode == "bt":
-        blok.update(_jalur_bt(rows))
     if blok.get("kandidat") is None:
         blok.pop("kandidat", None)
     if rows:
@@ -435,7 +379,7 @@ def _blok_vote(modul, metode, jejak, rencana, peran):
     return blok
 
 
-# Mengapa tersangka teratas dicurigai: hierarki Mamdani, komponen noisy-OR, atau bendera merah BT.
+# Mengapa tersangka teratas dicurigai: hierarki Mamdani.
 def _blok_kecurigaan(modul, metode, hasil, peran):
     if peran == "hitman":
         return None
@@ -447,46 +391,19 @@ def _blok_kecurigaan(modul, metode, hasil, peran):
             "hasil": f"kecurigaan akhir {_fmt(r.get('kecurigaan'))}"}  # fmt: skip
     if r.get("fakta"):
         blok["hasil"] += f" ({r['fakta']})"
-    if metode == "fuzzy":
-        hierarki = getattr(modul, "HIERARKI", [])
-        blok["hierarki"] = {
-            "kolom": ["sistem", "input 1", "nilai 1", "input 2", "nilai 2", "keluaran"],
-            "baris": [[s, x, _nilai(r.get(x)), y, _nilai(r.get(y)),
-                       _nilai(r.get("kecurigaan_mentah") if s == "kecurigaan" else r.get(s))]
-                      for s, x, y in hierarki],
-        }  # fmt: skip
-        mentah = _angka(r.get("kecurigaan_mentah"))
-        detail = _detail_fuzzy(modul, "kecurigaan", r, None if mentah is None else mentah * 100)
-        blok["sistem"] = [detail] if detail else []
-        blok["catatan"] = (
-            "Keluaran sistem dibagi 100; kecurigaan akhir = kecurigaan_mentah × (1 − p_sandera)."
-        )
-    elif metode == "utility":
-        bobot = getattr(modul, "BOBOT_BUKTI", {})
-        blok["komponen"] = {
-            "kolom": ["bukti", "nilai", "bobot", "kontribusi"],
-            "baris": [
-                [k, _nilai(r.get(k)), _nilai(b), _nilai(r.get(f"u_{k}"))] for k, b in bobot.items()
-            ],
-        }
-        blok["catatan"] = (
-            "Noisy-OR: kecurigaan_mentah = 1 − Π(1 − kontribusi); akhir = mentah × (1 − p_sandera)."
-        )
-    elif metode == "bt":
-        bendera = []
-        for nama, fungsi, ambang, poin in getattr(modul, "BENDERA", []):
-            try:
-                nilai = _angka(fungsi(r))
-            except Exception:  # kolom hilang: bendera tidak bisa dinilai
-                nilai = None
-            bendera.append(
-                [nama, _nilai(nilai), ambang, poin, bool(nilai is not None and nilai >= ambang)]
-            )
-        blok["bendera"] = {
-            "kolom": ["bendera", "nilai", "ambang", "poin", "aktif"],
-            "baris": bendera,
-        }
-        blok["catatan"] = f"Total poin {_nilai(r.get('poin'))}; kecurigaan = poin / 5 (maks 1)."
+    hierarki = getattr(modul, "HIERARKI", [])
+    blok["hierarki"] = {
+        "kolom": ["sistem", "input 1", "nilai 1", "input 2", "nilai 2", "keluaran"],
+        "baris": [[s, x, _nilai(r.get(x)), y, _nilai(r.get(y)),
+                   _nilai(r.get("kecurigaan_mentah") if s == "kecurigaan" else r.get(s))]
+                  for s, x, y in hierarki],
+    }  # fmt: skip
+    mentah = _angka(r.get("kecurigaan_mentah"))
+    detail = _detail_fuzzy(modul, "kecurigaan", r, None if mentah is None else mentah * 100)
+    blok["sistem"] = [detail] if detail else []
+    blok["catatan"] = (
+        "Keluaran sistem dibagi 100; kecurigaan akhir = kecurigaan_mentah × (1 − p_sandera)."
+    )
     return blok
 
 
@@ -506,22 +423,18 @@ def ukuran(data):
     return len(json.dumps(data, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
 
 
-# Potong tabel/aturan secara rekursif: baris tabel dan daftar aturan menjadi n, jalur BT menjadi m terakhir.
-def _pangkas(obj, n, m):
+# Potong tabel/aturan secara rekursif: baris tabel dan daftar aturan menjadi n.
+def _pangkas(obj, n):
     if isinstance(obj, dict):
         if isinstance(obj.get("baris"), list):
-            obj["baris"] = (
-                obj["baris"][-m:]
-                if obj.get("kolom") == ["node", "jenis", "status"]
-                else obj["baris"][:n]
-            )
+            obj["baris"] = obj["baris"][:n]
         if isinstance(obj.get("aturan"), list):
             obj["aturan"] = obj["aturan"][:n]
         for nilai in obj.values():
-            _pangkas(nilai, n, m)
+            _pangkas(nilai, n)
     elif isinstance(obj, list):
         for nilai in obj:
-            _pangkas(nilai, n, m)
+            _pangkas(nilai, n)
 
 
 # Pastikan penjelasan ≤ BATAS_BYTE: pangkas bertahap, lalu sisakan identitas, keputusan, dan narasi.
@@ -529,7 +442,7 @@ def batasi(penjelasan):
     if ukuran(penjelasan) <= BATAS_BYTE:
         return penjelasan
     catatan = penjelasan.setdefault("catatan", [])
-    _pangkas(penjelasan, 3, 12)
+    _pangkas(penjelasan, 3)
     catatan.append("Tabel dan aturan dipangkas agar trace tetap kecil.")
     if ukuran(penjelasan) <= BATAS_BYTE:
         return penjelasan

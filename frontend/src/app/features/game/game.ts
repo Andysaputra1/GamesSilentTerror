@@ -49,8 +49,8 @@ const TAG_COLORS = [
 ];
 const ROLES = ['hitman', 'spy', 'stalker', 'civilian'];
 const ROLE_REVEAL_READ_MS = 3000;
-// Singkatan metode otak bot di samping namanya: Behavior Tree, Utility AI, Fuzzy Logic.
-const METODE_SINGKAT: Record<string, string> = { bt: 'BT', utility: 'UA', fuzzy: 'FL', llm: 'LLM' };
+// Singkatan metode otak bot di samping namanya: Fuzzy Logic, atau LLM sebagai pembanding.
+const METODE_SINGKAT: Record<string, string> = { fuzzy: 'FL', llm: 'LLM' };
 
 // KOMPONEN: render snapshot privat server; tidak mengacak role atau memutuskan hasil aksi di browser.
 @Component({

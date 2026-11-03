@@ -33,9 +33,11 @@ Semua AI ada di **otak bot** (NPC yang ikut bermain). Chat manusia hanya diotori
 | --- | --- | --- |
 | **IndoBERT** (2 model: intent + target) | NLU otak bot: membaca chat publik menjadi intent (menuduh, membela, dll.) dan siapa yang dituju | Setiap kali bot mengambil langkah, untuk chat terbaru di ruangan (satu model dipakai bersama semua bot, hasilnya di-cache per pesan) |
 | **IndoBERT** (validasi ulang) | Memastikan kalimat yang ditulis bot memang terbaca sesuai rencana (misalnya benar-benar menuduh X) | Setiap kali bot akan mengirim chat, sebelum kalimat dikirim (`NPC_VALIDATE_NLG=true`) |
-| **Fuzzy / Utility AI / Behavior Tree** | Penalaran bot: memilih tuduhan, pembelaan, vote, dan skill malam | Setiap langkah bot. `NPC_METHOD=campuran` membagi metode antar bot dalam satu pertandingan; metode tiap bot dicatat di tabel `match_bots` |
+| **Fuzzy Mamdani** | Penalaran bot: memilih tuduhan, pembelaan, vote, dan skill malam | Setiap langkah bot, untuk semua bot (`NPC_METHOD=fuzzy`); metode tiap bot dicatat di tabel `match_bots` |
 | **NLG** (rantai penulis LLM atau templat) | Mengubah rencana bot menjadi kalimat | Saat bot memutuskan bicara. Jalur LLM yang gagal dilewati; tanpa jalur yang hidup, bot memakai templat |
 | **LLM mode lama** (`NPC_METHOD=llm`) | Bot yang sepenuhnya digerakkan LLM, sebagai pembanding | Hanya bila mode ini dipilih |
+
+Game hanya memakai otak Fuzzy. Utility AI dan Behavior Tree diarsipkan di luar repo, di `../arsip_bt_utility_2026-11-03/` (isi dan cara menariknya kembali ada di README folder itu). Angka keseimbangan di `GAME_CONCEPT.md` diukur dengan metode campuran, jadi belum berlaku untuk Fuzzy saja.
 
 Tanpa model IndoBERT, bot tetap bermain dengan NLU cadangan (SVM + nama yang disebut) yang kualitasnya lebih rendah; sumber NLU tercatat di trace dan terlihat di panel menu **Otak NPC**.
 
@@ -85,7 +87,7 @@ File `.pkl` sengaja diabaikan Git dan **tidak tersedia hanya dengan clone reposi
 
 Tanpa model SVM, pesan pemain masih bisa diteruskan dan bot tetap bermain, tetapi analisis intent pesan manusia tidak tersedia, dan NLU cadangan bot (dipakai bila IndoBERT tidak ada) hanya menghasilkan intent netral. Lihat [panduan artifact SVM](backend/artifacts/svm/README.md).
 
-### 4. Siapkan otak NPC (IndoBERT + fuzzy/utility/behavior tree + NLG)
+### 4. Siapkan otak NPC (IndoBERT + fuzzy + NLG)
 
 Bot memakai logika notebook skripsi (`training/prethesis/ai_2_dataset_baru`). Kode logikanya sudah ada di `backend/app/module/npc_brain/generated/` (hasil ekspor, jangan diedit manual). Yang perlu disalin hanyalah dua folder model IndoBERT (±440 MB masing-masing, diabaikan Git):
 
@@ -96,7 +98,7 @@ backend/artifacts/indobert/target/   ← models/target_classifier/target_classif
 
 Folder target harus memuat `pair_builder.json` dan `ambang_target.json` hasil `nlu_target.ipynb`. Pada mesin pengembang yang menyimpan repo skripsi di `a_skripsi/training/prethesis`, backend juga menemukan model di sana secara otomatis.
 
-Pengaturan di `.env` (lihat `.env.example`): `NPC_METHOD` (`campuran`, `fuzzy`, `utility`, `bt`, atau `llm` untuk mode lama), `NPC_WRITER` (`otomatis` atau `templat`), `NPC_WRITER_ORDER` (prioritas rantai penulis: `openrouter`, `tautan`), dan `NPC_OPENROUTER_MODEL`. Hanya dua LLM yang dipakai: OpenRouter dan LLM sendiri lewat link (Ollama di Docker yang dibuka lewat tunnel, lihat `ai-docker/`). Key OpenRouter dan link diambil dari panel **Konfigurasi AI**. Metode, urutan rantai, model OpenRouter, dan model link bisa diubah dari panel **Otak NPC** (tombol **Tes koneksi semua prioritas** memeriksa semua jalur).
+Pengaturan di `.env` (lihat `.env.example`): `NPC_METHOD` (`fuzzy`, atau `llm` untuk mode lama; nilai lama `campuran`, `utility`, dan `bt` dibaca sebagai `fuzzy`), `NPC_WRITER` (`otomatis` atau `templat`), `NPC_WRITER_ORDER` (prioritas rantai penulis: `openrouter`, `tautan`), dan `NPC_OPENROUTER_MODEL`. Hanya dua LLM yang dipakai: OpenRouter dan LLM sendiri lewat link (Ollama di Docker yang dibuka lewat tunnel, lihat `ai-docker/`). Key OpenRouter dan link diambil dari panel **Konfigurasi AI**. Metode, urutan rantai, model OpenRouter, dan model link bisa diubah dari panel **Otak NPC** (tombol **Tes koneksi semua prioritas** memeriksa semua jalur).
 
 Setelah mengubah logika bot di notebook, jalankan ulang notebook sampai skenario/pengujiannya lulus, lalu ekspor ulang:
 
@@ -350,7 +352,7 @@ ai-docker/            LLM penulis kalimat bot (Qwen3 4B/14B) di laptop + tunnel 
 docker-compose.yml    Service development dan volume
 ```
 
-Alur chat manusia: **pesan → otorisasi → validasi ulang fase/hak chat → penyimpanan MySQL → broadcast**. Secara terpisah, timer menjalankan bot: **snapshot privat → IndoBERT (baca chat) → fuzzy/utility/behavior tree → NLG → validasi IndoBERT → aksi/vote/chat** (mode `llm` lama tetap tersedia). Analisis lama SVM → agresivitas → fuzzy 2 input dan balasan NOX sudah dihapus; model SVM hanya dipakai sebagai NLU cadangan bila IndoBERT tidak ada.
+Alur chat manusia: **pesan → otorisasi → validasi ulang fase/hak chat → penyimpanan MySQL → broadcast**. Secara terpisah, timer menjalankan bot: **snapshot privat → IndoBERT (baca chat) → fuzzy → NLG → validasi IndoBERT → aksi/vote/chat** (mode `llm` lama tetap tersedia). Analisis lama SVM → agresivitas → fuzzy 2 input dan balasan NOX sudah dihapus; model SVM hanya dipakai sebagai NLU cadangan bila IndoBERT tidak ada.
 
 Dengan container aplikasi sudah berjalan:
 

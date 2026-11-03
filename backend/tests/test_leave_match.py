@@ -278,7 +278,7 @@ class LeaveRoomTests(unittest.TestCase):
         self.assertNotIn(self.room.code, self.rooms.rooms)
 
     def test_npc_views_show_the_left_player_as_not_alive(self):
-        from app.module.npc_brain.generated import otak_bt, otak_fuzzy, otak_utility
+        from app.module.npc_brain.generated import otak_fuzzy
 
         self.rooms.leave(self.room.code, "alice")
         context = npc_context(self.match, "NOX")
@@ -287,29 +287,25 @@ class LeaveRoomTests(unittest.TestCase):
         snapshot = snapshot_berlabel(self.match.snapshot("NOX"), self.match.labels)
         alice = next(p for p in snapshot["players"] if p["name"] == "alice")
         self.assertEqual((alice["alive"], alice["left"]), (False, True))
-        for modul in (otak_fuzzy, otak_utility, otak_bt):
-            with self.subTest(modul=modul.__name__):
-                view = modul.Ingatan("NOX").sinkron_snapshot(snapshot, time.time())
-                self.assertIn({"nama": "alice", "hidup": False, "sandera": None}, view["pemain"])
+        view = otak_fuzzy.Ingatan("NOX").sinkron_snapshot(snapshot, time.time())
+        self.assertIn({"nama": "alice", "hidup": False, "sandera": None}, view["pemain"])
 
     def test_bot_memory_records_leaver_without_tribunal_blame(self):
-        from app.module.npc_brain.generated import otak_bt, otak_fuzzy, otak_utility
+        from app.module.npc_brain.generated import otak_fuzzy
 
         sebelum = snapshot_berlabel(self.match.snapshot("ECHO"), self.match.labels)
         self.rooms.leave(self.room.code, "alice")
         sesudah = snapshot_berlabel(self.match.snapshot("ECHO"), self.match.labels)
-        for modul in (otak_fuzzy, otak_utility, otak_bt):
-            with self.subTest(modul=modul.__name__):
-                ingatan = modul.Ingatan("ECHO")
-                ingatan.sinkron_snapshot(sebelum, time.time())
-                view = ingatan.sinkron_snapshot(sesudah, time.time())
-                # Keluar bukan eksekusi Tribunal: tidak ada bukti "mendorong eksekusi warga" untuk siapa pun.
-                self.assertEqual(ingatan.eksekusi, [])
-                self.assertEqual(ingatan.keluar, [{"ronde": 1, "pemain": "alice", "hitman": None}])
-                tabel, _ = modul.hitung_bukti(ingatan, view)
-                self.assertTrue((tabel["dorong_salah_eksekusi"] == 0).all())
-                # Room 1 Hitman dan game berlanjut: yang keluar pasti bukan Hitman.
-                self.assertIn("alice", modul.pengetahuan_peran(ingatan, view)["bersih"])
+        ingatan = otak_fuzzy.Ingatan("ECHO")
+        ingatan.sinkron_snapshot(sebelum, time.time())
+        view = ingatan.sinkron_snapshot(sesudah, time.time())
+        # Keluar bukan eksekusi Tribunal: tidak ada bukti "mendorong eksekusi warga" untuk siapa pun.
+        self.assertEqual(ingatan.eksekusi, [])
+        self.assertEqual(ingatan.keluar, [{"ronde": 1, "pemain": "alice", "hitman": None}])
+        tabel, _ = otak_fuzzy.hitung_bukti(ingatan, view)
+        self.assertTrue((tabel["dorong_salah_eksekusi"] == 0).all())
+        # Room 1 Hitman dan game berlanjut: yang keluar pasti bukan Hitman.
+        self.assertIn("alice", otak_fuzzy.pengetahuan_peran(ingatan, view)["bersih"])
 
     def test_http_leave_returns_left_twice_and_rejects_outsiders(self):
         app = FastAPI()

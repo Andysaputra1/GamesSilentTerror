@@ -54,7 +54,7 @@ async def lifespan(_: FastAPI):
     else:
         logger.error("Koneksi awal MySQL gagal.")
 
-    # Otak NPC (IndoBERT + fuzzy/utility/BT + NLG) dimuat di latar agar server langsung melayani.
+    # Otak NPC (IndoBERT + fuzzy + NLG) dimuat di latar agar server langsung melayani.
     brain_runtime.mulai_memuat(analysis_service)
 
     # Timer server tidak bergantung pada tab pemain atau kecepatan respons LLM.

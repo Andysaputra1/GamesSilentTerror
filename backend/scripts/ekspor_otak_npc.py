@@ -1,10 +1,10 @@
 """Ekspor otak NPC dari notebook skripsi ke modul backend.
 
 Kode bot di game harus SAMA dengan kode yang diuji di notebook. Skrip ini membaca
-notebook `npc_fuzzy`, `npc_utility_ai`, `npc_behavior_tree`, dan `npc_nlg`, lalu
-menyalin hanya definisi (import, konstanta, fungsi, kelas) ke
-`app/module/npc_brain/generated/`. Demo, print, grafik, skenario, pengujian, dan
-pemuatan model di tingkat modul dibuang.
+notebook `npc_fuzzy` dan `npc_nlg`, lalu menyalin hanya definisi (import, konstanta,
+fungsi, kelas) ke `app/module/npc_brain/generated/`. Demo, print, grafik, skenario,
+pengujian, dan pemuatan model di tingkat modul dibuang. Notebook Utility AI dan
+Behavior Tree tidak diekspor lagi sejak game hanya memakai Fuzzy.
 
 Pemakaian (dari folder backend):
     python scripts/ekspor_otak_npc.py --notebook-dir ../../training/prethesis/ai_2_dataset_baru
@@ -27,8 +27,6 @@ DEFAULT_NOTEBOOK_DIR = BACKEND_DIR.parents[1] / "training" / "prethesis" / "ai_2
 # Notebook NPC: semua sel kode sebelum bagian skenario adalah persepsi, NLG payload, penalaran, dan inti.
 NOTEBOOK_NPC = {
     "otak_fuzzy": "npc_fuzzy.ipynb",
-    "otak_utility": "npc_utility_ai.ipynb",
-    "otak_bt": "npc_behavior_tree.ipynb",
 }
 BATAS_NPC = "## Skenario Permainan"
 

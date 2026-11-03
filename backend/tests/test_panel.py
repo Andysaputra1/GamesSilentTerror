@@ -72,10 +72,6 @@ class PanelTests(unittest.TestCase):
             ("arsitektur", "Arsitektur Sistem Silent Terror"),
             ("kode-fuzzy", "Kode Fuzzy Logic"),
             ("diagram-alir-fuzzy", "Diagram Alir Fuzzy Logic"),
-            ("kode-utility", "Kode Utility AI"),
-            ("diagram-alir-utility", "Diagram Alir Utility AI"),
-            ("kode-bt", "Kode Behavior Tree"),
-            ("diagram-alir-bt", "Diagram Alir Behavior Tree"),
             ("kode-nlu-intent", "Kode NLU Intent"),
             ("kode-nlu-target", "Kode NLU Target"),
             ("diagram-alir-nlu", "Diagram Alir NLU"),
@@ -89,6 +85,9 @@ class PanelTests(unittest.TestCase):
             )
         self.assertEqual(self.client.get("/panel/dokumen/..%2Fpanel%2Fpanel.js").status_code, 404)
         self.assertEqual(self.client.get("/panel/dokumen/lain").status_code, 422)
+        # Dokumen metode yang diarsipkan keluar dari daftar, bukan menjadi 500 karena berkasnya hilang.
+        for nama in ("kode-utility", "diagram-alir-utility", "kode-bt", "diagram-alir-bt"):
+            self.assertEqual(self.client.get(f"/panel/dokumen/{nama}").status_code, 422)
 
     def test_wrong_password_does_not_access_database(self):
         hashed = base64.b64encode(hash_password("fixture-password").encode()).decode()

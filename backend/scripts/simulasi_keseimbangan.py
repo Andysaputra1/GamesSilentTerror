@@ -1,7 +1,7 @@
 """Simulasi keseimbangan komposisi role dengan aturan engine terbaru.
 
-Semua kursi bot otak hasil ekspor notebook, metode campuran bergiliran (seperti NPC_METHOD=campuran), label NLU
-sempurna dari rencana pengirim, LANGKAH keputusan per fase, engine Match asli. Sama dengan metode di GAME_CONCEPT.
+Semua kursi bot otak Fuzzy hasil ekspor notebook (seperti NPC_METHOD=fuzzy), label NLU sempurna dari rencana
+pengirim, LANGKAH keputusan per fase, engine Match asli. Angka lama di GAME_CONCEPT diukur dengan metode campuran.
 
 Pemakaian (dari folder backend, Python dengan numpy + pandas, mis. venv prethesis):
     python scripts/simulasi_keseimbangan.py . 200 6 "7:2/2/1" "8:2/2/1"
@@ -19,7 +19,6 @@ sys.path.insert(0, str(BACKEND))
 from app.module import match_engine  # noqa: E402
 
 NAMA = ["NOX", "ECHO", "VEIL", "RAVEN", "ASH", "DUSK", "IRIS", "SAGE", "ONYX", "LARK"]
-URUTAN_CAMPURAN = ("fuzzy", "utility", "bt")
 RONDE_MAKS = 30
 
 
@@ -31,7 +30,7 @@ def muat(nama):
     return modul
 
 
-MODUL = {"fuzzy": muat("otak_fuzzy"), "utility": muat("otak_utility"), "bt": muat("otak_bt")}
+modul = muat("otak_fuzzy")
 
 
 def label_rencana(rencana):
@@ -47,10 +46,7 @@ def satu_game(argumen):
     nama = NAMA[:jumlah]
     match = match_engine.Match([], nama, rng=random.Random(rng.random()), now=0.0)
     match.npc_decisions = set()
-    urutan = list(URUTAN_CAMPURAN)
-    rng.shuffle(urutan)
-    metode = {n: urutan[i % 3] for i, n in enumerate(sorted(nama))}
-    otak = {n: MODUL[metode[n]].Ingatan(n) for n in nama}
+    otak = {n: modul.Ingatan(n) for n in nama}
     label, ilegal, t = {}, 0, 0.0
     while match.phase != "finished" and match.round <= RONDE_MAKS:
         # Dari deadline, bukan durasi tetap: suara seri menambah waktu Tribunal yang lebih pendek dari satu fase.
@@ -60,7 +56,7 @@ def satu_game(argumen):
             for n in sorted(otak):
                 if not match.players[n].alive or match.phase == "finished":
                     continue
-                ingatan, modul = otak[n], MODUL[metode[n]]
+                ingatan = otak[n]
                 view = ingatan.sinkron_snapshot(match.snapshot(n), waktu)
                 for c in ingatan.chat:
                     if "intent" not in c:

@@ -339,10 +339,8 @@ describe('Game', () => {
     expect(component.nama('tamu')).toBe('tamu'); // snapshot lama tanpa label
     state.game.players[1].metode = 'fuzzy';
     expect(component.nama('NOX')).toBe('NOX · FL');
-    state.game.players[1].metode = 'utility';
-    expect(component.nama('NOX')).toBe('NOX · UA');
-    state.game.players[1].metode = 'bt';
-    expect(component.nama('NOX')).toBe('NOX · BT');
+    state.game.players[1].metode = 'llm';
+    expect(component.nama('NOX')).toBe('NOX · LLM');
     component.target = 'NOX';
     const request = vi.spyOn(TestBed.inject(GameService), 'request').mockReturnValue(of(state));
     component.act();

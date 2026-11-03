@@ -902,8 +902,8 @@ class DisplayNameTests(unittest.TestCase):
     def test_snapshot_shows_bot_method_only_for_bots(self):
         match = Match(["alice", "budi", "citra"], ["NOX", "ECHO"])
         self.assertTrue(all("metode" not in p for p in match.snapshot("alice")["players"]))
-        match.bot_methods = {"NOX": "fuzzy", "ECHO": "bt"}
+        match.bot_methods = {"NOX": "fuzzy", "ECHO": "llm"}
         metode = {p["name"]: p.get("metode") for p in match.snapshot("alice")["players"]}
         self.assertEqual(
-            metode, {"alice": None, "budi": None, "citra": None, "NOX": "fuzzy", "ECHO": "bt"}
+            metode, {"alice": None, "budi": None, "citra": None, "NOX": "fuzzy", "ECHO": "llm"}
         )

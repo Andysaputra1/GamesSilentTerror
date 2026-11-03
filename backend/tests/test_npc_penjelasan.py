@@ -1,5 +1,5 @@
-"""Penjelasan keputusan bot untuk panel checker: isi per metode, toleransi data rusak, batas ukuran,
-penyimpanan di trace, dan akses hanya lewat panel admin.
+"""Penjelasan keputusan bot untuk panel checker: isi penalaran fuzzy, toleransi data rusak, batas ukuran,
+penyimpanan di trace, jejak lama metode yang sudah diarsipkan, dan akses hanya lewat panel admin.
 
 Otak memakai modul hasil ekspor notebook dengan NLU pengganti (tanpa IndoBERT), sama seperti
 tests/test_npc_brain.py.
@@ -71,10 +71,9 @@ class PenjelasanMetodeTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.langkah = {}
-        for metode in ("fuzzy", "utility", "bt"):
-            runtime = runtime_siap(metode)
-            cls.langkah[metode] = kumpulkan(runtime)
-            runtime.tutup()
+        runtime = runtime_siap("fuzzy")
+        cls.langkah["fuzzy"] = kumpulkan(runtime)
+        runtime.tutup()
 
     def test_every_trace_is_small_serializable_and_matches_the_engine_decision(self):
         for metode, langkah in self.langkah.items():
@@ -107,23 +106,6 @@ class PenjelasanMetodeTests(unittest.TestCase):
             self.assertGreater(kekuatan, 0)
         self.assertIn("keyakinan_vote", {s["nama"] for s in sistem})
         self.assertTrue(any(b.get("hierarki") for b in blok))
-
-    def test_utility_shows_considerations_weights_and_noisy_or_components(self):
-        blok = blok_penalaran(self.langkah["utility"])
-        kolom = [b["kandidat"]["kolom"] for b in blok if b.get("kandidat")]
-        self.assertIn(["aksi", "target", "bobot", "pertimbangan", "utilitas"], kolom)
-        self.assertTrue(any("utilitas" in k and "pilihan" in k for k in kolom))  # vote vs abstain
-        self.assertTrue(any(b.get("komponen") for b in blok))
-
-    def test_behavior_tree_shows_the_evaluated_path_and_red_flags(self):
-        blok = blok_penalaran(self.langkah["bt"])
-        jalur = [b for b in blok if b.get("jalur")]
-        self.assertTrue(jalur)
-        for b in jalur:
-            self.assertIn(b["status_akar"], {"SUKSES", "GAGAL", "BERJALAN"})
-            self.assertEqual(b["jalur"]["kolom"], ["node", "jenis", "status"])
-            self.assertEqual(b["jalur"]["baris"][-1][1], "aksi")  # jalur berakhir di aksi terpilih
-        self.assertTrue(any(b.get("bendera") for b in blok))
 
     def test_role_specific_tables_for_hitman_and_spy(self):
         semua = [p for langkah in self.langkah.values() for *_, p in langkah]
@@ -173,7 +155,7 @@ class PenjelasanToleransiTests(unittest.TestCase):
             def to_dict(self, *_):
                 raise RuntimeError("rusak")
 
-        bot = SimpleNamespace(nama="NOX", metode="utility", persona="kalem", peran="spy", langkah=2)
+        bot = SimpleNamespace(nama="NOX", metode="fuzzy", persona="kalem", peran="spy", langkah=2)
         p = jelaskan(bot, None, {"saya": {"nama": "NOX", "role": "spy"}}, {"tabel": TabelRusak()})
         self.assertIsNone(p["tersangka"])
         self.assertTrue(any("tersangka" in c for c in p["catatan"]))
@@ -206,9 +188,9 @@ class PenjelasanToleransiTests(unittest.TestCase):
     def test_oversized_explanations_are_trimmed_below_the_limit(self):
         besar = {"kolom": ["pemain", "catatan"], "baris": [[f"P{i}", "x" * 200] for i in range(80)]}
         p = {"versi": 1, "bot": {"nama": "NOX"}, "catatan": [], "tersangka": besar,
-             "penalaran": {"chat": {"judul": "Chat", "jenis": "bt", "hasil": "tuduh",
-                                    "jalur": {"kolom": ["node", "jenis", "status"],
-                                              "baris": [["n" * 150, "kondisi", "GAGAL"]] * 80}}}}  # fmt: skip
+             "penalaran": {"chat": {"judul": "Chat", "jenis": "fuzzy", "hasil": "tuduh",
+                                    "kandidat": {"kolom": ["aksi", "target", "prioritas"],
+                                                 "baris": [["n" * 150, "ECHO", 50]] * 80}}}}  # fmt: skip
         hasil = batasi(p)
         self.assertLessEqual(ukuran(hasil), BATAS_BYTE)
         self.assertTrue(hasil["catatan"])
@@ -227,7 +209,7 @@ class CheckerPenjelasanTests(unittest.TestCase):
         )
 
     def test_room_summary_uses_live_match_then_traces_then_archive(self):
-        runtime = runtime_siap("campuran")
+        runtime = runtime_siap("fuzzy")
         rooms = RoomService()
         room = rooms.create("human")
         rooms.set_bot(room.code, "human", True)
@@ -238,6 +220,7 @@ class CheckerPenjelasanTests(unittest.TestCase):
             patch("app.module.npc_brain.runtime.brain_runtime", runtime),
         ):
             live = CheckerService().ringkasan_room(room.code)
+            # Jejak lama boleh memuat metode yang sudah diarsipkan.
             jejak = [{"sender": "NOX", "provider": "otak:bt", "model": "persona:gaul"},
                      {"ringkas": {"bot": {"nama": "ECHO", "role": "spy", "metode": "fuzzy",
                                           "persona": "kalem"}}}]  # fmt: skip
@@ -247,7 +230,7 @@ class CheckerPenjelasanTests(unittest.TestCase):
         runtime.tutup()
         self.assertEqual(live["status"], "live")
         self.assertEqual(sum(live["komposisi"].values()), len(room.match.players))
-        self.assertEqual({b["metode"] for b in live["bot"]}, {"fuzzy", "utility", "bt"})
+        self.assertEqual({b["metode"] for b in live["bot"]}, {"fuzzy"})
         self.assertTrue(all(b["persona"] and b["status"] == "aktif" for b in live["bot"]))
         self.assertEqual(dari_jejak["sumber_bot"], "jejak")
         self.assertEqual(
@@ -260,7 +243,7 @@ class CheckerPenjelasanTests(unittest.TestCase):
 
 class NPCServicePenjelasanTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
-        self.runtime = runtime_siap("bt")
+        self.runtime = runtime_siap("fuzzy")
         self.rooms = RoomService()
         self.room = self.rooms.create("human")
         self.rooms.set_bot(self.room.code, "human", True)
@@ -289,10 +272,10 @@ class NPCServicePenjelasanTests(unittest.IsolatedAsyncioTestCase):
             await self.service.brain_turn(self.room.code, self.match, otak)
         trace = checker_service.list(self.room.code, penjelasan=True)[0]
         p = trace["penjelasan"]
-        self.assertEqual((p["bot"]["nama"], p["bot"]["metode"]), ("NOX", "bt"))
+        self.assertEqual((p["bot"]["nama"], p["bot"]["metode"]), ("NOX", "fuzzy"))
         self.assertEqual(p["nlg"]["status"], "terkirim")
         self.assertEqual(p["nlg"]["teks"], self.match.messages[-1]["message"])
-        self.assertEqual(p["penalaran"]["chat"]["cabang"], "bela_diri")
+        self.assertEqual(p["keputusan"]["chat"]["aksi"], "bela_diri")
         self.assertIn("chat bela_diri → NOX", trace["ringkas"]["keputusan"])
         stored = self.persistence.record_trace.call_args.args[0]
         self.assertLessEqual(len(json.dumps(stored["penjelasan"]).encode()), BATAS_BYTE)
@@ -309,7 +292,9 @@ class PanelCheckerEndpointTests(unittest.TestCase):
         self.require_panel = require_panel
         self.code = f"PJ{random.randrange(10**6):06d}"
         self.trace = checker_service.begin(self.code, "NOX", "vote")
-        self.trace.update(penjelasan={"bot": {"nama": "NOX", "role": "hitman"}},
+        # Metode "bt": jejak lama dari sebelum Behavior Tree diarsipkan harus tetap bisa dibuka.
+        self.trace.update(penjelasan={"bot": {"nama": "NOX", "role": "hitman", "metode": "bt"},
+                                      "penalaran": {"chat": {"jenis": "bt", "cabang": "tuduh"}}},
                           ringkas={"bot": {"nama": "NOX", "role": "hitman", "metode": "bt"}})  # fmt: skip
 
     def test_checker_requires_panel_session(self):
@@ -328,6 +313,8 @@ class PanelCheckerEndpointTests(unittest.TestCase):
         self.assertEqual(data["room"]["sumber_bot"], "jejak")
         detail = self.client.get(f"/api/panel/checker/{self.code}/jejak/{self.trace['id']}").json()
         self.assertEqual(detail["penjelasan"]["bot"]["role"], "hitman")
+        self.assertEqual(data["room"]["bot"][0]["metode"], "bt")
+        self.assertEqual(detail["penjelasan"]["penalaran"]["chat"]["cabang"], "tuduh")
         stored = json.dumps({"id": "a" * 32, "penjelasan": {"bot": {"nama": "ECHO"}}})
         with patch("app.controller.api.panel.transaction", return_value=stored):
             arsip = self.client.get(f"/api/panel/checker/{self.code}/jejak/{'a' * 32}")

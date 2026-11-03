@@ -74,7 +74,7 @@ services:
       AUTH_SESSION_HOURS: '${AUTH_SESSION_HOURS:-24}'
       CORS_ORIGINS: '${CORS_ORIGINS:-http://localhost:4200,http://127.0.0.1:4200}'
       # Otak NPC: model IndoBERT dibaca dari backend/artifacts/indobert/{intent,target}.
-      NPC_METHOD: '${NPC_METHOD:-campuran}'
+      NPC_METHOD: '${NPC_METHOD:-fuzzy}'
       NPC_WRITER: '${NPC_WRITER:-otomatis}'
       NPC_WRITER_ORDER: '${NPC_WRITER_ORDER:-openrouter,tautan}'
       NPC_OPENROUTER_MODEL: '${NPC_OPENROUTER_MODEL:-}'

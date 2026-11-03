@@ -19,12 +19,14 @@ Dua model disiapkan. Model yang dipakai bot dipilih di panel → **Otak NPC** �
 | --- | --- |
 | `jalankan.bat` | Nyalakan semuanya, tunggu model siap, uji link dari internet, lalu kirim link + token ke backend |
 | `lihat-link.bat` | Tampilkan link dan token yang sedang aktif (tanpa menyalakan ulang), lalu kirim lagi ke backend |
-| `uji-waktu.bat` | Ukur lama NLU → logika (fuzzy, utility AI, behavior tree) → NLG/LLM per bot lewat simulasi panel; CSV di `communicationfolder/uji-waktu-<tanggal>/` |
+| `uji-waktu.bat` | Ukur lama NLU → logika fuzzy → NLG/LLM per bot lewat simulasi panel; CSV di `communicationfolder/uji-waktu-<tanggal>/` |
 | `hentikan.bat` | Matikan LLM dan tunnel (model tetap tersimpan) |
 | `docker-compose.yml` | `ollama`, `model` (unduh sekali), `gerbang`, `tunnel` |
 | `docker-compose.gpu.yml` | Tambahan GPU NVIDIA, dipakai otomatis bila `nvidia-smi` ada |
 | `gerbang.conf.template` | Hanya `/api/tags`, `/api/show`, `/api/chat`, `/api/version` dengan token yang benar |
 | `.env` | Dibuat otomatis: `LLM_TOKEN` acak, `LLM_MODELS`, dan login panel (`PANEL_USERNAME`, password terenkripsi DPAPI). Opsional `BACKEND_URL` (bawaan `https://backendthesis.andylabs.site`). Tidak masuk Git |
+
+Game hanya memakai otak Fuzzy; Utility AI dan Behavior Tree diarsipkan di luar repo, di `../arsip_bt_utility_2026-11-03/`. Hasil lama `uji-waktu.bat` dan angka keseimbangan di `GAME_CONCEPT.md` diukur dengan metode campuran, jadi belum berlaku untuk Fuzzy saja.
 
 ## Pemakaian
 

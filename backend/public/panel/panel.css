@@ -475,7 +475,7 @@ dialog form button { width: 100%; }
 a.metric { color: inherit; text-decoration: none; }
 a.metric:hover, a.metric:focus-visible { border-color: #baf578; }
 a.metric .hint { display: block; margin-top: 6px; }
-/* DOKUMEN: kartu dikelompokkan per bagian (gambaran, NLU, tiap metode bot). */
+/* DOKUMEN: kartu dikelompokkan per bagian (gambaran, NLU, otak bot). */
 .doc-section { margin-top: 26px; padding-top: 18px; border-top: 1px solid #22303f; }
 .doc-section:first-of-type { margin-top: 10px; padding-top: 0; border-top: 0; }
 .doc-section h3 { margin: 0 0 4px; color: #e7eef7; }
@@ -671,8 +671,6 @@ body > footer {
 .chat-system { align-self: center; margin: 4px 0; font-size: 11px; color: #f6d79c; text-align: center; }
 .chat-input { display: flex; gap: 8px; margin-top: 10px; }
 .chat-input input { flex: 1; min-width: 0; }
-.sim-bots { display: flex; flex-wrap: wrap; gap: 10px; flex-basis: 100%; }
-.sim-bots label { min-width: 170px; }
 .sim-actions { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; margin-top: 10px; }
 .sim-actions label { max-width: 230px; }
 .process-steps { margin: 6px 0 12px; padding-left: 0; list-style: none; display: grid; gap: 8px; }
@@ -686,7 +684,7 @@ body > footer {
 .flow { display: grid; justify-items: center; gap: 4px; padding: 14px; background: #0a121d; border: 1px solid #253249; border-radius: 10px; margin-bottom: 12px; }
 .flow > .hint { justify-self: stretch; margin: 0 0 6px; }
 .flow-row { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px; }
-.flow-branch { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; width: 100%; }
+.flow-branch { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; width: 100%; }
 .flow-lane { display: grid; justify-items: stretch; gap: 4px; padding: 8px; border: 1px dashed #334055; border-radius: 9px; }
 .flow-arrow { color: #5f7088; font-size: 13px; line-height: 1; text-align: center; }
 .flow-node { display: grid; gap: 3px; min-width: 120px; max-width: 220px; padding: 7px 10px; background: #192333; border: 1px solid #303e52; border-radius: 8px; color: #e1eaf6; text-align: left; font-size: 12px; }
@@ -698,7 +696,7 @@ body > footer {
 .flow-redup { opacity: 0.4; }
 .flow-bots { display: flex; flex-wrap: wrap; gap: 4px; }
 #flow-detail { margin-bottom: 18px; }
-@media (max-width: 700px) { .flow-branch { grid-template-columns: 1fr; } .flow-node { min-width: 0; max-width: none; } }
+@media (max-width: 700px) { .flow-node { min-width: 0; max-width: none; } }
 
 /* Kode asli di detail kotak flowchart. */
 .kode-fungsi { margin: 12px 0; border: 1px solid #293546; border-radius: 9px; background: #0e1724; min-width: 0; }

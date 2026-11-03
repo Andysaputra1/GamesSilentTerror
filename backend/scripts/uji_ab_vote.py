@@ -1,8 +1,8 @@
 """Uji A/B kebijakan vote saat bukti lemah (PAKSA_VOTE_BUKTI_LEMAH) dengan aturan engine terbaru.
 
-Semua kursi bot memakai SATU metode (otak hasil ekspor notebook), komposisi engine, label NLU sempurna, LANGKAH
-keputusan per fase, seed sama untuk kedua kebijakan. Keluaran: win rate warga ± CI95 dan akurasi vote warga (porsi
-suara warga yang mengenai Hitman). Dasar kebijakan per metode di notebook (bagian Kebijakan Vote saat Bukti Lemah).
+Semua kursi bot memakai otak Fuzzy hasil ekspor notebook, komposisi engine, label NLU sempurna, LANGKAH keputusan
+per fase, seed sama untuk kedua kebijakan. Keluaran: win rate warga ± CI95 dan akurasi vote warga (porsi suara warga
+yang mengenai Hitman). Dasar kebijakan di notebook (bagian Kebijakan Vote saat Bukti Lemah).
 
 Pemakaian (dari folder backend, Python dengan numpy + pandas + skfuzzy, mis. venv prethesis):
     python scripts/uji_ab_vote.py . 200 6 [jumlah_pemain=6]
@@ -31,7 +31,7 @@ def muat(nama):
     return modul
 
 
-MODUL = {"fuzzy": muat("otak_fuzzy"), "utility": muat("otak_utility"), "bt": muat("otak_bt")}
+MODUL = {"fuzzy": muat("otak_fuzzy")}
 
 
 def label_rencana(rencana):

@@ -1,4 +1,4 @@
-"""NPC independen: otak hasil notebook skripsi (NLU IndoBERT → fuzzy/utility/behavior tree → NLG).
+"""NPC independen: otak hasil notebook skripsi (NLU IndoBERT → fuzzy → NLG).
 
 Setiap bot memakai ingatan, metode, dan persona sendiri. Mode lama "llm" (satu prompt LLM
 memutuskan aksi dan pesan) tetap tersedia sebagai pembanding lewat pengaturan NPC_METHOD.

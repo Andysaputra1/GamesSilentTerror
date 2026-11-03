@@ -16,6 +16,13 @@ class KodeAlurTests(unittest.TestCase):
         blok = panel[panel.index("const ALUR_AI = {") : panel.index("const BARIS_ALUR")]
         self.assertEqual(set(re.findall(r"^  (\w+): \{$", blok, re.M)), set(KODE_ALUR))
 
+    def test_metode_arsip_tidak_punya_kotak_atau_kode(self):
+        for node in ("ua", "ua_1", "ua_2", "ua_3", "ua_4", "bt", "bt_1", "bt_2", "bt_3", "bt_4"):
+            with self.subTest(node=node), self.assertRaises(KeyError):
+                kode_node(node)
+        modul = {m for daftar in KODE_ALUR.values() for m, _, _ in daftar}
+        self.assertFalse({m for m in modul if m.endswith(("otak_bt", "otak_utility"))})
+
     def test_setiap_potongan_ditemukan_dan_penandanya_cocok(self):
         for node in KODE_ALUR:
             for potongan in kode_node(node):
@@ -25,14 +32,15 @@ class KodeAlurTests(unittest.TestCase):
                     self.assertTrue(potongan["berkas"].startswith("backend/"))
 
     def test_parameter_output_dan_baris_inti_ditandai(self):
-        skor = kode_node("ua_3")[0]
-        self.assertEqual(skor["nama"], "otak_utility.skor_iaus")
-        self.assertEqual([p["nama"] for p in skor["parameter"]], ["nilai", "bobot"])
-        self.assertEqual(skor["parameter"][1]["bawaan"], "1.0")
-        jenis = {b["teks"].strip(): b["jenis"] for b in skor["baris"]}
-        self.assertEqual(jenis["def skor_iaus(nilai, bobot=1.0):"], "param")
-        self.assertEqual(jenis["return bobot * skor"], "output")
-        self.assertEqual(jenis["modifikasi = 1 - 1 / len(nilai)"], "inti")
+        langkah = kode_node("sinkron")[0]
+        self.assertEqual(langkah["nama"], "runtime.BrainRuntime.langkah")
+        self.assertEqual([p["nama"] for p in langkah["parameter"]],
+                         ["bot", "snapshot", "sekarang", "selalu_jelaskan", "lapor"])  # fmt: skip
+        self.assertEqual(langkah["parameter"][3]["bawaan"], "False")
+        self.assertEqual(langkah["baris"][0]["jenis"], "param")
+        jenis = {b["teks"].strip(): b["jenis"] for b in langkah["baris"]}
+        self.assertEqual(jenis["return view, hasil, konteks"], "output")
+        self.assertEqual(jenis["hasil = modul.putuskan(bot.ingatan, view)"], "inti")
         # Fungsi ber-lru_cache dan konstanta modul juga terbaca dari sumber aslinya.
         nama = {p["nama"]: p for p in kode_node("fl_3")}
         self.assertIn(

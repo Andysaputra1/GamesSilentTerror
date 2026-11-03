@@ -163,7 +163,7 @@ test('NPC brain menu shows the writer chain, reorders it, and saves method and p
     nlu: 'indobert',
     penulis: 'openrouter',
     model_penulis: 'anthropic/claude-opus-5.5',
-    metode: 'campuran',
+    metode: 'fuzzy',
     penulis_diminta: 'otomatis',
     validasi: true,
     penulis_aktif: true,
@@ -177,7 +177,7 @@ test('NPC brain menu shows the writer chain, reorders it, and saves method and p
     pertandingan_aktif: 2,
   };
   const pilihan = {
-    metode: { campuran: 'Campuran', fuzzy: 'Fuzzy', utility: 'Utility', bt: 'BT', llm: 'LLM' },
+    metode: { fuzzy: 'Fuzzy', llm: 'LLM' },
     penulis: { otomatis: 'Rantai LLM', templat: 'Templat' },
     jalur_penulis: {
       openrouter: { label: 'OpenRouter', sumber: 'API key di menu Konfigurasi AI' },
@@ -210,7 +210,7 @@ test('NPC brain menu shows the writer chain, reorders it, and saves method and p
     doc.querySelector('#npc-status').textContent,
     /OpenRouter \(anthropic\/claude-opus-5.5\)/,
   );
-  assert.equal(doc.querySelector('#npc-method').value, 'campuran');
+  assert.equal(doc.querySelector('#npc-method').value, 'fuzzy');
   const rows = () => [...doc.querySelectorAll('#npc-chain li')];
   assert.deepEqual(
     rows().map((row) => row.querySelector('strong').textContent),
@@ -231,7 +231,7 @@ test('NPC brain menu shows the writer chain, reorders it, and saves method and p
     box.onchange();
   };
   toggle('LLM sendiri');
-  doc.querySelector('#npc-method').value = 'bt';
+  doc.querySelector('#npc-method').value = 'llm';
   doc.querySelector('#npc-method').dispatchEvent(new w.Event('change'));
   doc.querySelector('#npc-openrouter-model').value = ' anthropic/claude-sonnet-5.5 ';
   doc.querySelector('#npc-openrouter-model').dispatchEvent(new w.Event('input'));
@@ -246,7 +246,7 @@ test('NPC brain menu shows the writer chain, reorders it, and saves method and p
   assert.ok(refreshes.length > 0);
   refreshes.splice(0).forEach((refresh) => refresh());
   await settle();
-  assert.equal(doc.querySelector('#npc-method').value, 'bt');
+  assert.equal(doc.querySelector('#npc-method').value, 'llm');
   assert.equal(doc.querySelector('#npc-openrouter-model').value, ' anthropic/claude-sonnet-5.5 ');
   assert.equal(doc.querySelector('#npc-link-model').value, 'qwen3:4b-instruct');
   assert.equal(rows()[0].querySelector('strong').textContent, '1. OpenRouter');
@@ -256,14 +256,14 @@ test('NPC brain menu shows the writer chain, reorders it, and saves method and p
   assert.match(doc.querySelector('#notice').textContent, /Simpan perubahan dulu/);
   await doc.querySelector('#npc-form').onsubmit({ preventDefault() {} });
   assert.deepEqual(saved, {
-    metode: 'bt',
+    metode: 'llm',
     penulis: 'otomatis',
     validasi: true,
     urutan_penulis: ['openrouter'],
     model_openrouter: 'anthropic/claude-sonnet-5.5',
     model_tautan: 'qwen3:4b-instruct',
   });
-  assert.equal(doc.querySelector('#npc-method').value, 'bt');
+  assert.equal(doc.querySelector('#npc-method').value, 'llm');
   await doc.querySelector('#check-writers').onclick({ preventDefault() {} });
   assert.equal(checked, 1);
   assert.equal(doc.querySelector('#check-writers').disabled, true);
@@ -295,7 +295,10 @@ test('survey menu renders questions as text and edits scale meaning from the pan
       return response({
         questions: [question],
         distribution: [{ question_id: 3, value_number: 5, n: 2 }],
-        per_method: [{ question_id: 3, method: 'fuzzy', n: 2, rata: 5 }],
+        per_method: [
+          { question_id: 3, method: 'fuzzy', n: 2, rata: 5 },
+          { question_id: 3, method: 'campuran', n: 4, rata: 3.5 }, // data lama
+        ],
         text_answers: [],
       });
     if (path === '/api/panel/survey/questions/3' && options.method === 'PUT') {
@@ -311,6 +314,7 @@ test('survey menu renders questions as text and edits scale meaning from the pan
   assert.match(rows.textContent, /1 = Bosan · 6 = Seru/);
   assert.match(rows.textContent, /rata-rata 5.00/);
   assert.match(w.document.querySelector('#survey-method-rows').textContent, /fuzzy/);
+  assert.match(w.document.querySelector('#survey-method-rows').textContent, /campuran/);
   rows.querySelector('button').click();
   assert.equal(w.document.querySelector('#survey-editor-box').open, true);
   w.document.querySelector('#survey-label-max').value = 'Seru sekali';
@@ -470,6 +474,142 @@ test('checker room shows bots, filters per bot, and explains decisions as text',
   assert.equal(w.document.querySelectorAll('#traces .trace').length, 3);
 });
 
+test('jejak lama Utility AI dan Behavior Tree tetap terbuka walau metodenya sudah diarsipkan', async (t) => {
+  const bot = (nama, metode) => ({
+    nama,
+    role: 'spy',
+    metode,
+    persona: 'santai',
+    ronde: 2,
+    fase: 'day',
+  });
+  const jejak = (id, nama, metode) => ({
+    id: id.repeat(32),
+    created_at: '2026-10-20T10:00:00+00:00',
+    sender: nama,
+    message: 'wait',
+    stage: 'npc_brain',
+    provider: `otak:${metode}`,
+    ringkas: { bot: bot(nama, metode), keputusan: ['chat tuduh → VEIL'] },
+  });
+  const nox = jejak('a', 'NOX', 'utility');
+  const echo = jejak('b', 'ECHO', 'bt');
+  const room = {
+    kode: 'LAMA01',
+    status: 'arsip',
+    ronde: 2,
+    fase: 'finished',
+    manusia: 1,
+    bot: [
+      { ...bot('NOX', 'utility'), status: 'aktif' },
+      { ...bot('ECHO', 'bt'), status: 'aktif' },
+    ],
+  };
+  const penjelasan = {
+    [nox.id]: {
+      bot: bot('NOX', 'utility'),
+      keputusan: { chat: { kirim: true, aksi: 'tuduh', target: 'VEIL', alasan: ['x'] } },
+      tersangka: {
+        judul: 'Tersangka',
+        kolom: ['pemain', 'kecurigaan_mentah'],
+        baris: [['VEIL', 0.5]],
+      },
+      penalaran: {
+        kecurigaan: {
+          judul: 'Kecurigaan',
+          hasil: 'kecurigaan akhir 0.50',
+          komponen: {
+            kolom: ['bukti', 'nilai', 'bobot', 'kontribusi'],
+            baris: [['tekanan', 1, 0.5, 0.5]],
+          },
+          catatan: 'Noisy-OR',
+        },
+        chat: {
+          judul: 'Chat',
+          jenis: 'utility',
+          hasil: 'tuduh → VEIL (nilai 0.70)',
+          kandidat: {
+            kolom: ['aksi', 'target', 'bobot', 'pertimbangan', 'utilitas'],
+            baris: [['tuduh', 'VEIL', 1, 'kecurigaan=0.70', 0.7]],
+          },
+          ambang: [['UTILITAS_TUNGGU', 0.3, 'utilitas diam']],
+        },
+      },
+      engine: { action: 'wait', target: null, ditolak: null },
+      nlg: { status: 'tidak ada chat', keterangan: 'x' },
+    },
+    [echo.id]: {
+      bot: bot('ECHO', 'bt'),
+      keputusan: {},
+      penalaran: {
+        kecurigaan: {
+          judul: 'Kecurigaan',
+          hasil: 'kecurigaan akhir 0.60',
+          bendera: {
+            kolom: ['bendera', 'nilai', 'ambang', 'poin', 'aktif'],
+            baris: [['tekanan', 0.6, 0.5, 2, true]],
+          },
+          catatan: 'Total poin 3',
+        },
+        chat: {
+          judul: 'Chat',
+          jenis: 'bt',
+          hasil: 'tuduh → VEIL',
+          status_akar: 'SUKSES',
+          cabang: 'tuduh (kuat)',
+          jalur: {
+            kolom: ['node', 'jenis', 'status'],
+            baris: [['tuduh (kuat)', 'aksi', 'SUKSES']],
+          },
+        },
+      },
+      engine: { action: 'wait', target: null, ditolak: null },
+      nlg: { status: 'tidak ada chat', keterangan: 'x' },
+    },
+  };
+  const w = setup(t, (path) => {
+    if (path.startsWith('/api/panel/rooms'))
+      return response({ rooms: [{ room_code: 'LAMA01', message_count: 1, live: false }] });
+    if (path === '/api/panel/checker/LAMA01')
+      return response({ traces: [nox, echo], events: [], room, has_more: false });
+    const id = path.split('/jejak/')[1];
+    return id
+      ? response({
+          ...jejak(id[0], id[0] === 'a' ? 'NOX' : 'ECHO', id[0] === 'a' ? 'utility' : 'bt'),
+          penjelasan: penjelasan[id],
+        })
+      : undefined;
+  });
+  await login(w);
+  const doc = w.document;
+  // Legenda tetap menjelaskan metode lama, dengan tanda jejak lama.
+  assert.match(doc.querySelector('#checker-legend').textContent, /Utility AI \(jejak lama\)/);
+  assert.match(doc.querySelector('#checker-legend').textContent, /Behavior Tree \(jejak lama\)/);
+  await doc.querySelector('[data-menu=checker]').onclick({ preventDefault() {} });
+  const select = doc.querySelector('#checker-room');
+  select.value = 'LAMA01';
+  await select.onchange({ preventDefault() {} });
+  await settle();
+  const summary = doc.querySelector('#room-summary');
+  const detail = doc.querySelector('#trace-detail');
+  assert.match(summary.textContent, /Utility AI \(jejak lama\)/);
+  assert.match(summary.textContent, /Behavior Tree \(jejak lama\)/);
+  const tab = (judul) =>
+    [...detail.querySelectorAll('.decision-tab')].find((b) => b.textContent.startsWith(judul));
+  [...summary.querySelectorAll('.room-bot')].find((b) => b.textContent === 'NOX').click();
+  await settle();
+  tab('Penalaran Utility AI').click();
+  assert.match(detail.textContent, /Komponen noisy-OR/);
+  assert.match(detail.textContent, /kecurigaan=0\.70/);
+  assert.match(detail.textContent, /UTILITAS_TUNGGU/);
+  [...summary.querySelectorAll('.room-bot')].find((b) => b.textContent === 'ECHO').click();
+  await settle();
+  tab('Penalaran Behavior Tree').click();
+  assert.match(detail.textContent, /Bendera merah/);
+  assert.match(detail.textContent, /aksi terpilih: tuduh \(kuat\)/);
+  assert.match(detail.textContent, /✓Aksi: tuduh \(kuat\)/);
+});
+
 test('simulation shows chat with NLU, live bot positions on the flowchart, and node explanations', async (t) => {
   const evil = '<img src=x onerror=alert(1)>';
   const bot = (nama, metode, role) => ({
@@ -483,8 +623,8 @@ test('simulation shows chat with NLU, live bot positions on the flowchart, and n
   const pemain = [
     { nama: 'Andy', manusia: true, role: 'civilian', status: 'aktif' },
     { ...bot('NOX', 'fuzzy', 'hitman'), manusia: false, status: 'aktif' },
-    { ...bot('ECHO', 'utility', 'spy'), manusia: false, status: 'aktif' },
-    { ...bot('VEIL', 'bt', 'stalker'), manusia: false, status: 'aktif' },
+    { ...bot('ECHO', 'fuzzy', 'spy'), manusia: false, status: 'aktif' },
+    { ...bot('VEIL', 'fuzzy', 'stalker'), manusia: false, status: 'aktif' },
   ];
   const ringkasan = { id: 'sim1', ronde: 1, fase: 'day', pemenang: null, detik: 2, durasi: 80 };
   const human = {
@@ -525,15 +665,16 @@ test('simulation shows chat with NLU, live bot positions on the flowchart, and n
     sender: 'ECHO',
     message: 'wait',
     stage: 'npc_brain',
-    provider: 'otak:utility',
+    provider: 'otak:fuzzy',
     duration_ms: 20,
-    ringkas: { bot: bot('ECHO', 'utility', 'spy'), keputusan: [] },
-    penjelasan: { bot: bot('ECHO', 'utility', 'spy'), nlg: { status: 'tidak ada chat' } },
+    ringkas: { bot: bot('ECHO', 'fuzzy', 'spy'), keputusan: [] },
+    penjelasan: { bot: bot('ECHO', 'fuzzy', 'spy'), nlg: { status: 'tidak ada chat' } },
   };
-  let release;
+  let release, mulai;
   const reply = new Promise((resolve) => (release = resolve));
-  const w = setup(t, async (path) => {
-    if (path === '/api/panel/simulasi')
+  const w = setup(t, async (path, options) => {
+    if (path === '/api/panel/simulasi') {
+      mulai = JSON.parse(options.body);
       return response({
         ...ringkasan,
         bisa_chat: true,
@@ -542,6 +683,7 @@ test('simulation shows chat with NLU, live bot positions on the flowchart, and n
           { id: 's'.repeat(32), sender: 'SISTEM', message: 'Permainan dimulai.', stage: 'sistem' },
         ],
       });
+    }
     if (path === '/api/panel/simulasi/sim1/progres')
       return response({
         berjalan: true,
@@ -589,13 +731,12 @@ test('simulation shows chat with NLU, live bot positions on the flowchart, and n
   await login(w);
   const doc = w.document;
   await doc.querySelector('[data-menu=simulasi]').onclick({ preventDefault() {} });
-  assert.equal(doc.querySelectorAll('#sim-bots select').length, 4); // 5 pemain = kamu + 4 bot
-  doc.querySelector('#sim-count').value = '4';
-  doc.querySelector('#sim-count').onchange();
-  assert.equal(doc.querySelectorAll('#sim-bots select').length, 3);
+  assert.equal(doc.querySelector('#sim-bots'), null); // tidak ada lagi pilihan metode per bot
+  doc.querySelector('#sim-count').value = '4'; // 4 pemain = kamu + 3 bot
   await doc.querySelector('#sim-setup').onsubmit({ preventDefault() {} });
+  assert.deepEqual(mulai.metode, ['fuzzy', 'fuzzy', 'fuzzy']);
   assert.match(doc.querySelector('#sim-chat').textContent, /Permainan dimulai/);
-  assert.match(doc.querySelector('#sim-status').textContent, /Utility AI/);
+  assert.match(doc.querySelector('#sim-status').textContent, /Fuzzy Mamdani/);
   doc.querySelector('#sim-message').value = human.message;
   const pending = doc.querySelector('#sim-form').onsubmit({ preventDefault() {} });
   await new Promise((resolve) => setTimeout(resolve, 550)); // satu polling progres
@@ -625,7 +766,11 @@ test('simulation shows chat with NLU, live bot positions on the flowchart, and n
   const kotak = (judul) =>
     [...doc.querySelectorAll('.flow-node')].find((b) => b.textContent.includes(judul));
   assert.match(kotak('LLM menulis').textContent, /1\.90 dtk/);
-  assert.ok(kotak('UA · Utility AI').classList.contains('flow-redup'));
+  assert.equal(kotak('FL · Fuzzy Mamdani').classList.contains('flow-redup'), false);
+  assert.match(kotak('FL · Fuzzy Mamdani').textContent, /14\.0 ms/);
+  assert.ok(kotak('Cadangan templat').classList.contains('flow-redup')); // kalimat dari LLM
+  assert.equal(kotak('UA · Utility AI'), undefined);
+  assert.equal(kotak('BT · Behavior Tree'), undefined);
   kotak('LLM menulis').click();
   const info = doc.querySelector('#flow-detail').textContent;
   assert.match(info, /Output yang diharapkan/);
@@ -660,23 +805,13 @@ test('menu dokumen membuka semua dokumen sistem, AI, dan NLU di tab baru', async
       '/panel/dokumen/kode-nlu-target',
       '/panel/dokumen/diagram-alir-fuzzy',
       '/panel/dokumen/kode-fuzzy',
-      '/panel/dokumen/diagram-alir-utility',
-      '/panel/dokumen/kode-utility',
-      '/panel/dokumen/diagram-alir-bt',
-      '/panel/dokumen/kode-bt',
     ],
   );
   assert.ok(links.every((a) => a.target === '_blank' && a.rel === 'noopener'));
-  // Dokumen dikelompokkan per bagian: gambaran sistem, NLU, lalu satu bagian per metode bot.
+  // Dokumen dikelompokkan per bagian: gambaran sistem, NLU, lalu otak bot Fuzzy.
   assert.deepEqual(
     [...doc.querySelectorAll('#menu-dokumen .doc-section h3')].map((h) => h.textContent),
-    [
-      '1. Gambaran sistem',
-      '2. NLU: bot membaca chat (IndoBERT)',
-      '3. Otak bot: Fuzzy Logic',
-      '4. Otak bot: Utility AI',
-      '5. Otak bot: Behavior Tree',
-    ],
+    ['1. Gambaran sistem', '2. NLU: bot membaca chat (IndoBERT)', '3. Otak bot: Fuzzy Logic'],
   );
 });
 

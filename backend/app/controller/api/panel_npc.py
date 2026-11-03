@@ -24,10 +24,7 @@ router = APIRouter(tags=["panel-npc"], route_class=SafeValidationRoute)
 
 PILIHAN = {
     "metode": {
-        "campuran": "Campuran (bot dibagi bergiliran: fuzzy, utility, behavior tree)",
         "fuzzy": "Fuzzy Logic Mamdani",
-        "utility": "Utility AI",
-        "bt": "Behavior Tree",
         "llm": "LLM murni (mode lama, pembanding)",
     },
     "penulis": {
@@ -46,7 +43,7 @@ PILIHAN = {
 
 
 class NPCConfig(BaseModel):
-    metode: Literal["campuran", "fuzzy", "utility", "bt", "llm"]
+    metode: Literal["fuzzy", "llm"]
     penulis: Literal["otomatis", "claude", "templat"]  # "claude" = nilai lama, sama dengan otomatis
     validasi: bool = True
     # None = pertahankan urutan/model yang tersimpan (klien panel lama).
@@ -90,7 +87,7 @@ def npc_check_writers(token=Depends(require_panel)):
 class SimulasiBaru(BaseModel):
     nama: str = Field(default="Pemain", min_length=1, max_length=40)
     # Metode tiap bot, urut NOX, ECHO, ... (3–9 bot: 4–10 pemain bersama admin).
-    metode: list[Literal["fuzzy", "utility", "bt"]] = Field(min_length=3, max_length=9)
+    metode: list[Literal["fuzzy"]] = Field(min_length=3, max_length=9)
 
 
 class SimulasiAksi(BaseModel):
@@ -263,86 +260,6 @@ KODE_ALUR = {
             ("< AMBANG_CHAT", "di bawah ambang: diam"),
         ]),
         (G + "otak_fuzzy", "AMBANG_CHAT", []),
-    ],
-    "ua": [
-        (G + "otak_utility", "putuskan", [
-            ("hitung_bukti(ingatan, view)", "bukti tiap pemain (sama dengan fuzzy)"),
-            ("nilai_kecurigaan(tabel)", "kecurigaan noisy-OR"),
-            ("keputusan_chat(ctx)", "utilitas chat"),
-            ("keputusan_vote(ctx)", "utilitas vote"),
-            ("keputusan_aksi(ctx)", "utilitas aksi rahasia"),
-        ]),
-    ],
-    "ua_1": [
-        (G + "otak_utility", "kurva_linear", [("np.clip", "dibatasi 0–1")]),
-        (G + "otak_utility", "kurva_logistik", [("math.exp", "kurva S: nilai kecil diredam")]),
-        (G + "otak_utility", "PERTIMBANGAN", []),
-    ],
-    "ua_2": [
-        (G + "otak_utility", "BOBOT_BUKTI", []),
-        (G + "otak_utility", "nilai_kecurigaan", [
-            ("BOBOT_BUKTI[k] * float(b[k])", "kontribusi tiap bukti"),
-            ('komponen["tekanan"] *= 1 - 0.7', "tekanan diredam oleh dukungan"),
-            ("1 - float(np.prod(", "noisy-OR: 1 − Π(1 − kontribusi)"),
-            ('(1 - b["p_sandera"])', "nol bila diumumkan disandera"),
-        ]),
-    ],
-    "ua_3": [
-        (G + "otak_utility", "skor_iaus", [
-            ("modifikasi = 1 - 1 / len(nilai)", "faktor kompensasi IAUS"),
-            ("skor *= n + (1 - n) * modifikasi * n", "perkalian pertimbangan dengan kompensasi"),
-        ]),
-        (G + "otak_utility", "_nilai_calon", [
-            ('kurva(c["input"])', "pertimbangan lewat kurva"),
-            ("skor_iaus(", "utilitas kandidat"),
-        ]),
-    ],
-    "ua_4": [
-        (G + "otak_utility", "keputusan_chat", [
-            ("_nilai_calon(calon_chat(ctx))", "semua kandidat chat dinilai"),
-            ('"utilitas": UTILITAS_TUNGGU', "diam ikut dibandingkan"),
-            ("<= UTILITAS_TUNGGU", "tidak lebih berguna dari diam: tunggu"),
-        ]),
-        (G + "otak_utility", "UTILITAS_TUNGGU", []),
-    ],
-    "bt": [
-        (G + "otak_bt", "putuskan", [
-            ("hitung_bukti(ingatan, view)", "bukti tiap pemain (sama dengan fuzzy)"),
-            ("nilai_kecurigaan(tabel)", "poin bendera merah"),
-            ("keputusan_chat(ctx)", "pohon chat"),
-            ("keputusan_vote(ctx)", "pohon vote"),
-            ("keputusan_aksi(ctx)", "pohon aksi rahasia"),
-        ]),
-    ],
-    "bt_1": [
-        (G + "otak_bt", "BENDERA", []),
-        (G + "otak_bt", "nilai_kecurigaan", [
-            ("fungsi(b) >= ambang", "bendera aktif bila bukti ≥ ambangnya"),
-            ("poin = sum(", "poin bendera dijumlah"),
-            ("poin / 5", "kecurigaan = poin / 5"),
-        ]),
-    ],
-    "bt_2": [
-        (G + "otak_bt", "_papan", [
-            ("urutan_bt(", "urutan tersangka"),
-            ("calon_chat(ctx)", "kandidat chat"),
-            ('"jejak": []', "jalur node dicatat di sini"),
-        ]),
-    ],
-    "bt_3": [
-        (G + "otak_bt", "Selector", [("if status != Status.GAGAL", "berhenti di anak pertama yang tidak gagal")]),
-        (G + "otak_bt", "Sequence", [("if status != Status.SUKSES", "berhenti di syarat yang gagal")]),
-        (G + "otak_bt", "Kondisi", [('papan["jejak"].append', "dicatat untuk tab Penalaran")]),
-        (G + "otak_bt", "POHON_CHAT", [
-            ('Sequence("Bela diri"', "dicoba lebih dulu: membela diri"),
-            ('Sequence("Tuduh tersangka kuat"', "tersangka ≥ 3 poin"),
-            ('Aksi("tunggu", lambda', "cabang terakhir: diam"),
-        ]),
-        (G + "otak_bt", "keputusan_chat", [(".tick(papan)", "pohon dijalankan dari akar")]),
-    ],
-    "bt_4": [
-        (G + "otak_bt", "Aksi", [('papan["hasil"] = self.fungsi(papan)', "aksi membuat rencana")]),
-        (G + "otak_bt", "_a_tuduh", [("rencana_chat(", "rencana tuduh")]),
     ],
     "keputusan": [
         (G + "otak_fuzzy", "rencana_chat", []),
