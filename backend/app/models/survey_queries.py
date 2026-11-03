@@ -101,6 +101,29 @@ def record_match_bot(database: Session, row: dict) -> None:
     )
 
 
+# QUERY DELETE: kosongkan jawaban beserta arsip peserta. Tanpa arsip ikut terhapus, pertandingan lama
+# muncul lagi sebagai survei tertunda karena jawabannya sudah tidak ada (lihat pending_surveys).
+def clear_responses(database: Session) -> int:
+    deleted = database.execute(text("DELETE FROM survey_responses")).rowcount
+    database.execute(text("DELETE FROM match_participants"))
+    return deleted
+
+
+# QUERY COUNT: jumlah jawaban satu pertanyaan.
+def count_question_answers(database: Session, question_id: int) -> int:
+    return int(
+        database.execute(
+            text("SELECT COUNT(*) FROM survey_responses WHERE question_id = :id"),
+            {"id": question_id},
+        ).scalar_one()
+    )
+
+
+# QUERY DELETE: hapus satu pertanyaan; service memastikan belum ada jawaban yang merujuknya.
+def delete_question(database: Session, question_id: int) -> None:
+    database.execute(text("DELETE FROM survey_questions WHERE id = :id"), {"id": question_id})
+
+
 # QUERY RINGKASAN: jumlah, rata-rata, dan sebaran nilai per pertanyaan, serta rata-rata per metode bot.
 # Setiap jawaban dihitung sekali: pertandingan yang semua botnya satu metode masuk ke metode itu,
 # pertandingan dengan beberapa metode masuk kelompok "campuran" (tidak dibagi ke tiap metode).

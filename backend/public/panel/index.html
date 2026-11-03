@@ -211,7 +211,8 @@
               <h2>Survei akhir pertandingan</h2>
               <p>
                 Atur pertanyaan, jenis jawaban, skala, dan arti nilai terkecil/terbesar. Pertanyaan
-                tidak dihapus agar jawaban lama tetap utuh; nonaktifkan bila tidak dipakai.
+                yang masih punya jawaban tidak bisa dihapus; nonaktifkan, atau bersihkan jawabannya
+                dulu.
               </p>
             </div>
             <button id="download-survey">&darr; Download jawaban (CSV)</button>
@@ -232,6 +233,19 @@
               <tbody id="survey-rows"></tbody>
             </table>
           </div>
+          <details id="survey-clean-box" class="create-user">
+            <summary>Bersihkan jawaban survei</summary>
+            <p class="hint">
+              Semua jawaban dan pengingat survei pertandingan lama dihapus permanen dan tidak bisa
+              dikembalikan. Download CSV dulu bila masih perlu. Pertanyaan tidak ikut terhapus.
+            </p>
+            <label
+              >Ketik BERSIHKAN untuk mengonfirmasi<input
+                id="survey-clean-confirm"
+                autocomplete="off"
+            /></label>
+            <button id="survey-clean" type="button" class="danger">Hapus semua jawaban</button>
+          </details>
           <details id="survey-editor-box" class="create-user">
             <summary id="survey-editor-title">+ Tambah pertanyaan</summary>
             <form id="survey-form" class="form-grid">

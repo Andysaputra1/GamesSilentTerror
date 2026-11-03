@@ -324,6 +324,52 @@ test('survey menu renders questions as text and edits scale meaning from the pan
   assert.equal(w.document.querySelector('#survey-editor-box').open, false);
 });
 
+test('survey menu deletes answers only after typed confirmation and a question after confirm', async (t) => {
+  const question = {
+    id: 3,
+    code: 'lama',
+    prompt: 'Pertanyaan lama',
+    kind: 'text',
+    scale_min: 1,
+    scale_max: 6,
+    label_min: null,
+    label_max: null,
+    options: [],
+    required: false,
+    active: true,
+    position: 10,
+  };
+  const deleted = [];
+  const w = setup(t, (path, options) => {
+    if (path === '/api/panel/survey/summary')
+      return response({ questions: [question], distribution: [], per_method: [], text_answers: [] });
+    if (options.method === 'DELETE') {
+      deleted.push(path);
+      return response({ deleted: 72 });
+    }
+    return undefined;
+  });
+  await login(w);
+  await w.document.querySelector('[data-menu=survey]').onclick({ preventDefault() {} });
+  const clean = w.document.querySelector('#survey-clean');
+  const confirmation = w.document.querySelector('#survey-clean-confirm');
+  confirmation.value = 'bersihkan';
+  await clean.onclick({ preventDefault() {} });
+  assert.deepEqual(deleted, []);
+  confirmation.value = 'BERSIHKAN';
+  await clean.onclick({ preventDefault() {} });
+  assert.deepEqual(deleted, ['/api/panel/survey/responses']);
+  assert.equal(confirmation.value, '');
+  deleted.length = 0;
+  const remove = () => w.document.querySelector('#survey-rows button.danger');
+  w.confirm = () => false;
+  await remove().onclick({ preventDefault() {} });
+  assert.deepEqual(deleted, []);
+  w.confirm = () => true;
+  await remove().onclick({ preventDefault() {} });
+  assert.deepEqual(deleted, ['/api/panel/survey/questions/3']);
+});
+
 test('checker room shows bots, filters per bot, and explains decisions as text', async (t) => {
   const evil = '<img src=x onerror=alert(1)>';
   const bot = (nama, role, metode, fase) => ({

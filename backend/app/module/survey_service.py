@@ -326,7 +326,7 @@ class SurveyService:
 
         return {"id": PersistenceService._run(operation), **question}
 
-    # PANEL: ubah pertanyaan; tidak ada penghapusan agar jawaban lama tetap utuh.
+    # PANEL: ubah pertanyaan; jawaban lama tetap memakai salinan pertanyaan saat dijawab.
     def update_question(self, question_id, data):
         question = validate_question(data)
 
@@ -342,6 +342,25 @@ class SurveyService:
 
         PersistenceService._run(operation)
         return {"id": question_id, **question}
+
+    # PANEL: hapus permanen semua jawaban dan arsip peserta; pertanyaan tetap ada.
+    def clear_responses(self):
+        deleted = PersistenceService._run(queries.clear_responses)
+        logger.warning("Panel menghapus %s jawaban survei.", deleted)
+        return {"deleted": deleted}
+
+    # PANEL: hapus pertanyaan yang belum punya jawaban. Yang masih punya ditolak, karena pemain yang
+    # jawabannya habis terhapus akan diminta mengisi lagi survei pertandingan lamanya.
+    def delete_question(self, question_id):
+        def operation(database):
+            existing = queries.list_questions(database, active_only=False)
+            if not any(item["id"] == question_id for item in existing):
+                raise LookupError("Pertanyaan tidak ditemukan.")
+            if queries.count_question_answers(database, question_id):
+                raise ValueError("Pertanyaan ini masih punya jawaban. Bersihkan jawaban dulu.")
+            queries.delete_question(database, question_id)
+
+        PersistenceService._run(operation)
 
     # PANEL: ringkasan jawaban per pertanyaan dan per metode bot.
     def summary(self):

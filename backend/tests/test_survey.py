@@ -65,6 +65,17 @@ class FakeQueries:
     def record_match_bot(self, db, row):
         self.bots.append(row)
 
+    def clear_responses(self, db):
+        deleted = len(self.answers)
+        self.answers, self.participants = [], []
+        return deleted
+
+    def count_question_answers(self, db, question_id):
+        return sum(a["question_id"] == question_id for a in self.answers)
+
+    def delete_question(self, db, question_id):
+        self.questions = [q for q in self.questions if q["id"] != question_id]
+
     # Tabel match_participants tiruan (arsip peserta pertandingan selesai).
     def record_participants(self, db, rows):
         for row in rows:
@@ -303,6 +314,20 @@ class SurveyServiceTests(unittest.TestCase):
         self.service.update_question(1, {**question(1), "code": "q1", "active": False})
         self.assertNotIn(1, [q["id"] for q in self.fake.list_questions(None)])
 
+    # Membersihkan jawaban juga menghapus arsip peserta, supaya pertandingan lama tidak diminta diisi lagi.
+    def test_panel_clears_answers_and_reminders_before_a_question_can_be_deleted(self):
+        self.fake.answers = [{"match_id": "lama", "username": "alice", "question_id": 1}]
+        self.fake.participants = [{"match_id": "lama", "username": "alice", "room_code": "ABC123"}]
+        with self.assertRaises(ValueError):
+            self.service.delete_question(1)
+        self.assertIn(1, [q["id"] for q in self.fake.list_questions(None)])
+        self.assertEqual(self.service.clear_responses(), {"deleted": 1})
+        self.assertEqual(self.fake.pending_surveys(None, "alice"), [])
+        self.service.delete_question(1)
+        self.assertNotIn(1, [q["id"] for q in self.fake.list_questions(None)])
+        with self.assertRaises(LookupError):
+            self.service.delete_question(1)
+
 
 class SurveyExportTests(unittest.TestCase):
     def setUp(self):
@@ -327,6 +352,45 @@ class SurveyExportTests(unittest.TestCase):
         self.assertEqual(header, "created_at,match_id,room_code,username,role,team,outcome,code,"
                                  "prompt,value_number,value_text,bots")  # fmt: skip
         self.assertIn(",Saran untuk game?,,=1+1 seru banget 👍,NOX:fuzzy:santai", line)
+
+    def test_delete_endpoints_need_panel_login_and_map_errors(self):
+        tanpa_login = FastAPI()
+        tanpa_login.include_router(router)
+        with patch("app.controller.api.survey.survey_service") as service:
+            for path in ("/api/panel/survey/responses", "/api/panel/survey/questions/1"):
+                self.assertEqual(TestClient(tanpa_login).delete(path).status_code, 401)
+            service.clear_responses.assert_not_called()
+            service.delete_question.assert_not_called()
+            service.clear_responses.return_value = {"deleted": 3}
+            self.assertEqual(self.client.delete("/api/panel/survey/responses").json(), {"deleted": 3})
+            self.assertEqual(self.client.delete("/api/panel/survey/questions/1").status_code, 204)
+            service.delete_question.side_effect = ValueError("masih punya jawaban")
+            self.assertEqual(self.client.delete("/api/panel/survey/questions/1").status_code, 400)
+            service.delete_question.side_effect = LookupError("tidak ada")
+            self.assertEqual(self.client.delete("/api/panel/survey/questions/9").status_code, 404)
+
+
+class SurveyCleanSqlTests(unittest.TestCase):
+    """SQL pembersihan dijalankan sungguhan (SQLite)."""
+
+    def test_clear_keeps_questions_and_delete_removes_only_one_question(self):
+        engine = create_engine("sqlite://")
+        with Session(engine) as database:
+            for table in ("survey_questions (id INT)", "survey_responses (question_id INT)",
+                          "match_participants (match_id TEXT)"):  # fmt: skip
+                database.execute(text(f"CREATE TABLE {table}"))
+            database.execute(text("INSERT INTO survey_questions VALUES (1), (2)"))
+            database.execute(text("INSERT INTO survey_responses VALUES (1), (1), (2)"))
+            database.execute(text("INSERT INTO match_participants VALUES ('m1')"))
+            self.assertEqual(survey_queries.count_question_answers(database, 1), 2)
+            self.assertEqual(survey_queries.clear_responses(database), 3)
+            for table, expected in (("survey_responses", 0), ("match_participants", 0),
+                                    ("survey_questions", 2)):  # fmt: skip
+                count = database.execute(text(f"SELECT COUNT(*) FROM {table}")).scalar_one()
+                self.assertEqual(count, expected)
+            survey_queries.delete_question(database, 1)
+            ids = database.execute(text("SELECT id FROM survey_questions")).scalars().all()
+            self.assertEqual(ids, [2])
 
 
 class SurveySummarySqlTests(unittest.TestCase):

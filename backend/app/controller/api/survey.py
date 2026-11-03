@@ -93,9 +93,21 @@ def panel_create_question(body: Question, token=Depends(require_panel)):
 
 
 @router.put("/api/panel/survey/questions/{question_id}")
-# PANEL: ubah pertanyaan atau nonaktifkan (tidak ada hapus agar data lama tetap utuh).
+# PANEL: ubah pertanyaan atau nonaktifkan.
 def panel_update_question(question_id: int, body: Question, token=Depends(require_panel)):
     return survey_call(lambda: survey_service.update_question(question_id, body.model_dump()))
+
+
+@router.delete("/api/panel/survey/questions/{question_id}", status_code=204)
+# PANEL: hapus pertanyaan yang belum punya jawaban.
+def panel_delete_question(question_id: int, token=Depends(require_panel)):
+    survey_call(lambda: survey_service.delete_question(question_id))
+
+
+@router.delete("/api/panel/survey/responses")
+# PANEL: hapus permanen semua jawaban dan pengingat survei pertandingan lama.
+def panel_clear_responses(token=Depends(require_panel)):
+    return survey_call(survey_service.clear_responses)
 
 
 @router.get("/api/panel/survey/summary")

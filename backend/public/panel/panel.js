@@ -2172,8 +2172,17 @@ async function loadSurvey() {
       toggle.onclick = handle(() =>
         saveSurvey({ ...question, active: !question.active }, question.id),
       );
+      const remove = node('button', 'Hapus', 'danger');
+      remove.type = 'button';
+      remove.onclick = handle(async () => {
+        if (!window.confirm(`Hapus pertanyaan "${question.prompt}" secara permanen?`)) return;
+        await request(`/api/panel/survey/questions/${question.id}`, undefined, 'DELETE');
+        if ($('survey-id').value === String(question.id)) resetSurveyForm();
+        notice('Pertanyaan survei dihapus.');
+        await loadSurvey();
+      });
       const actions = node('td');
-      actions.append(edit, ' ', toggle);
+      actions.append(edit, ' ', toggle, ' ', remove);
       const tr = document.createElement('tr');
       tr.append(
         node('td', String(question.position)),
@@ -2666,6 +2675,15 @@ $('survey-form').onsubmit = handle(async () => {
   }
 });
 $('cancel-survey').onclick = resetSurveyForm;
+$('survey-clean').onclick = handle(async () => {
+  if ($('survey-clean-confirm').value.trim() !== 'BERSIHKAN')
+    throw new Error('Ketik BERSIHKAN dengan tepat untuk menghapus semua jawaban survei.');
+  const data = await request('/api/panel/survey/responses', undefined, 'DELETE');
+  $('survey-clean-confirm').value = '';
+  $('survey-clean-box').open = false;
+  notice(`${data.deleted} jawaban survei dihapus.`);
+  await loadSurvey();
+});
 $('download-survey').onclick = handle(async () => {
   $('download-survey').disabled = true;
   try {
