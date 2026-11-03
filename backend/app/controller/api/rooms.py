@@ -1,4 +1,4 @@
-"""Authenticated create/join/inspect lobby endpoints."""
+"""Endpoint room untuk pengguna yang sudah login: lobby dan perintah selama pertandingan."""
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -63,10 +63,10 @@ class PlayOption(BaseModel):
     ability: Literal["gag", "hostage", "guard", "peek"] | None = None
 
 
-# Adapter error bersama untuk operasi game yang sudah menghasilkan snapshot privat.
-def game_result(operation):
+# Adapter error bersama untuk perintah game yang sudah menghasilkan snapshot privat.
+def _jalankan_perintah_game(perintah):
     try:
-        return operation()
+        return perintah()
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
 
@@ -88,68 +88,82 @@ def current(user=Depends(require_authenticated_user)):
 @router.post("/{code}/skip-discussion")
 # PERSETUJUAN: bukan vote Tribunal, tidak bergantung pada status bungkam.
 def skip(code: str, body: SkipOption, user=Depends(require_authenticated_user)):
-    return game_result(lambda: room_service.skip(code, user.username, **body.model_dump()))
+    return _jalankan_perintah_game(
+        lambda: room_service.skip(code, user.username, **body.model_dump())
+    )
 
 
 @router.post("/{code}/start")
 # START: otorisasi host dan jumlah peserta dilakukan di RoomService.
 def start(code: str, body: StartOption, user=Depends(require_authenticated_user)):
-    return game_result(lambda: room_service.start(code, user.username, body.quick))
+    return _jalankan_perintah_game(lambda: room_service.start(code, user.username, body.quick))
 
 
 @router.post("/{code}/ready")
 # SIAP: manusia menandai sudah membaca panduan; ronde 1 tetap menunggu AI siap.
 def ready(code: str, body: ReadyOption, user=Depends(require_authenticated_user)):
-    return game_result(lambda: room_service.ready(code, user.username, match_id=body.match_id))
+    return _jalankan_perintah_game(
+        lambda: room_service.ready(code, user.username, match_id=body.match_id)
+    )
 
 
 @router.post("/{code}/reveal")
-# BUKA KARTU: manusia sudah melihat role-nya; ronde 1 menunggu semua (dibatasi waktu).
+# BUKA KARTU: manusia sudah melihat role-nya; ronde 1 tetap mengikuti hitung mundur.
 def reveal(code: str, body: ReadyOption, user=Depends(require_authenticated_user)):
-    return game_result(lambda: room_service.reveal(code, user.username, match_id=body.match_id))
+    return _jalankan_perintah_game(
+        lambda: room_service.reveal(code, user.username, match_id=body.match_id)
+    )
 
 
 @router.get("/{code}/game")
 # SNAPSHOT: hanya data publik dan informasi privat akun yang meminta.
 def state(code: str, user=Depends(require_authenticated_user)):
-    return game_result(lambda: room_service.state(code, user.username))
+    return _jalankan_perintah_game(lambda: room_service.state(code, user.username))
 
 
 @router.post("/{code}/play")
 # COMMAND: validasi bentuk payload, lalu service mengunci aksi/vote atomik.
 def play(code: str, body: PlayOption, user=Depends(require_authenticated_user)):
-    return game_result(lambda: room_service.play(code, user.username, **body.model_dump()))
+    return _jalankan_perintah_game(
+        lambda: room_service.play(code, user.username, **body.model_dump())
+    )
 
 
 @router.post("/{code}/cancel-vote")
 # BATAL VOTE: tarik suara Tribunal milik sendiri agar bisa memilih ulang sebelum waktu habis.
 def cancel_vote(code: str, body: CancelVoteOption, user=Depends(require_authenticated_user)):
-    return game_result(lambda: room_service.cancel_vote(code, user.username, **body.model_dump()))
+    return _jalankan_perintah_game(
+        lambda: room_service.cancel_vote(code, user.username, **body.model_dump())
+    )
 
 
 @router.post("/{code}/cancel-action")
 # BATAL AKSI MALAM: tarik Hostage/Guard/Peek milik sendiri agar bisa memilih ulang sebelum malam habis.
 def cancel_action(code: str, body: CancelActionOption, user=Depends(require_authenticated_user)):
-    return game_result(lambda: room_service.cancel_action(code, user.username, **body.model_dump()))
+    return _jalankan_perintah_game(
+        lambda: room_service.cancel_action(code, user.username, **body.model_dump())
+    )
 
 
 @router.post("/{code}/team-chat")
 # CHAT TIM: pesan rahasia rekan setim saat malam; hanya tersimpan di memori pertandingan.
 def team_chat(code: str, body: TeamChatOption, user=Depends(require_authenticated_user)):
-    return game_result(lambda: room_service.team_chat(code, user.username, **body.model_dump()))
+    return _jalankan_perintah_game(
+        lambda: room_service.team_chat(code, user.username, **body.model_dump())
+    )
 
 
 @router.post("/{code}/leave")
 # LEAVE: keluar saat pertandingan aktif = tereliminasi seperti dieksekusi (`left`); idempoten.
 def leave(code: str, user=Depends(require_authenticated_user)):
-    game_result(lambda: room_service.leave(code, user.username))
+    _jalankan_perintah_game(lambda: room_service.leave(code, user.username))
     return {"left": True}
 
 
-# HELPER CONTROLLER: jalankan operasi lobby, buat snapshot, dan ubah ValueError menjadi HTTP 400.
-def result(operation):
+# HELPER CONTROLLER: jalankan perintah lobby, buat snapshot, dan ubah ValueError menjadi HTTP 400.
+def _jalankan_perintah_lobby(perintah):
     try:
-        return room_service.snapshot(operation())
+        return room_service.snapshot(perintah())
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
 
@@ -157,8 +171,9 @@ def result(operation):
 @router.post("")
 # CONTROLLER: buat ruangan untuk pengguna yang sudah login dan kembalikan kode serta roster.
 def create(body: CreateRoom = CreateRoom(), user=Depends(require_authenticated_user)):
-    def create_archived():
+    def buat_room_terarsip():
         with room_service.lock:
+            # Kode acak bisa sudah terpakai di arsip lama: buang room itu lalu coba kode lain.
             for _ in range(10):
                 room = room_service.create(user.username, capacity=body.capacity)
                 try:
@@ -170,25 +185,25 @@ def create(body: CreateRoom = CreateRoom(), user=Depends(require_authenticated_u
                 room_service.rooms.pop(room.code, None)
             raise HTTPException(503, "Kode ruangan belum tersedia. Coba lagi.")
 
-    return result(create_archived)
+    return _jalankan_perintah_lobby(buat_room_terarsip)
 
 
 @router.post("/join")
 # CONTROLLER: tambahkan pengguna yang login ke ruangan berdasarkan kode dari request.
 def join(body: JoinRoom, user=Depends(require_authenticated_user)):
-    return result(lambda: room_service.join(body.code, user.username))
+    return _jalankan_perintah_lobby(lambda: room_service.join(body.code, user.username))
 
 
 @router.get("/{code}")
 # CONTROLLER: ambil snapshot ruangan setelah service memeriksa keanggotaan pengguna.
 def details(code: str, user=Depends(require_authenticated_user)):
-    return result(lambda: room_service.get(code, user.username))
+    return _jalankan_perintah_lobby(lambda: room_service.get(code, user.username))
 
 
 @router.post("/{code}/bot")
-# CONTROLLER: minta service mengubah pilihan NOX; hanya pembuat ruangan yang diizinkan.
+# CONTROLLER: minta service mengubah pilihan bot; hanya pembuat ruangan yang diizinkan.
 def bot(code: str, body: BotOption, user=Depends(require_authenticated_user)):
-    return result(lambda: room_service.set_bot(code, user.username, body.enabled))
+    return _jalankan_perintah_lobby(lambda: room_service.set_bot(code, user.username, body.enabled))
 
 
 # Tutup endpoint checker publik lama; data analisis hanya tersedia lewat panel.

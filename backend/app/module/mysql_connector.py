@@ -1,4 +1,4 @@
-"""Shared MySQL pool and transaction sessions for parameterized raw SQL."""
+"""Pool MySQL bersama dan sesi transaksi untuk SQL mentah berparameter."""
 
 from sqlalchemy import create_engine, text, event
 from sqlalchemy.exc import SQLAlchemyError
@@ -25,12 +25,11 @@ if engine.dialect.name == "mysql":
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
 
 
-# HEALTH CHECK: jalankan SELECT 1 untuk mengecek koneksi tanpa mengubah data.
+# HEALTH CHECK: jalankan SELECT 1 tanpa mengubah data; dipakai startup dan controller health.
 def database_is_ready() -> bool:
-    """Read-only connectivity probe shared by startup and health controller."""
     try:
-        with engine.connect() as connection:
-            connection.execute(text("SELECT 1"))
+        with engine.connect() as koneksi:
+            koneksi.execute(text("SELECT 1"))
         return True
     except SQLAlchemyError:
         return False

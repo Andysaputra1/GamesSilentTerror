@@ -148,7 +148,7 @@ class DisplayNameRoomTests(unittest.TestCase):
         rooms = RoomService()
         profil = {"alice": ("dexter", "Alice Wonder"), "bob": ("jenny", "Alice Wonder")}
         with patch.object(
-            RoomService, "_fetch_profiles", lambda self, names: {n: profil[n] for n in names}
+            RoomService, "_ambil_profil_akun", lambda self, names: {n: profil[n] for n in names}
         ):
             room = rooms.create("alice")
             rooms.join(room.code, "bob")

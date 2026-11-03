@@ -1,4 +1,4 @@
-"""Bounded, live debug traces. No secrets; restart clears this diagnostic history."""
+"""Jejak debug live yang dibatasi ukurannya. Tanpa rahasia; restart menghapus riwayat ini."""
 
 from collections import Counter, deque
 from copy import deepcopy
@@ -36,27 +36,32 @@ class CheckerService:
 
     # METHOD TRACE: buat jejak pesan baru; 100 jejak terbaru per ruangan, MAKS_ROOM_LIVE ruangan terbaru.
     def begin(self, code, sender, message):
-        trace = jejak_baru(code, sender, message)
-        jejak = self.rooms.pop(code, None) or deque(maxlen=100)
-        self.rooms[code] = jejak  # dipindah ke paling baru (dict menjaga urutan masuk)
-        jejak.appendleft(trace)
+        jejak = jejak_baru(code, sender, message)
+        jejak_room = self.rooms.pop(code, None) or deque(maxlen=100)
+        self.rooms[code] = jejak_room  # dipindah ke paling baru (dict menjaga urutan masuk)
+        jejak_room.appendleft(jejak)
         while len(self.rooms) > MAKS_ROOM_LIVE:
             del self.rooms[next(iter(self.rooms))]
-        return trace
+        return jejak
 
     # METHOD READ-ONLY: kembalikan salinan mendalam riwayat supaya pemanggil tidak mengubah trace internal.
     # `penjelasan` (role dan penalaran bot) hanya disertakan untuk panel admin yang memintanya; tanpa itu,
     # penjelasan yang besar tidak ikut disalin (daftar jejak di-refresh tiap 5 detik).
     def list(self, code, penjelasan=False):
-        traces = list(self.rooms.get(code, []))
+        jejak_room = list(self.rooms.get(code, []))
         if penjelasan:
-            return deepcopy(traces)
-        return [deepcopy({k: v for k, v in t.items() if k != "penjelasan"}) for t in traces]
+            return deepcopy(jejak_room)
+        return [
+            deepcopy({kunci: isi for kunci, isi in jejak.items() if kunci != "penjelasan"})
+            for jejak in jejak_room
+        ]
 
     # Satu jejak lengkap (dengan penjelasan) dari buffer live; None jika sudah tidak ada.
     def cari(self, code, trace_id):
-        trace = next((t for t in self.rooms.get(code, []) if t.get("id") == trace_id), None)
-        return deepcopy(trace) if trace is not None else None
+        ditemukan = next(
+            (jejak for jejak in self.rooms.get(code, []) if jejak.get("id") == trace_id), None
+        )
+        return deepcopy(ditemukan) if ditemukan is not None else None
 
     # RINGKASAN ROOM (panel): status pertandingan, komposisi role, dan identitas setiap bot.
     # Bot diambil dari pertandingan live, lalu dari penjelasan di jejak, lalu tabel match_bots (arsip).
@@ -66,63 +71,63 @@ class CheckerService:
 
         ringkasan = {"kode": code, "status": "arsip", "match_id": None, "fase": None, "ronde": None,
                      "pemenang": None, "komposisi": None, "manusia": None, "bot": [], "sumber_bot": None}  # fmt: skip
+
+        # Sumber 1: pertandingan live.
         with room_service.lock:
             room = room_service.rooms.get(code)
-            match = room.match if room else None
-            if room is not None and match is None:
+            pertandingan = room.match if room else None
+            if room is not None and pertandingan is None:
                 ringkasan["status"] = "lobby"
-            if match is not None:
+            if pertandingan is not None:
+                semua_peserta = pertandingan.players.values()
                 ringkasan.update(
-                    status="selesai" if match.winner else "live", match_id=match.id,
-                    fase=match.phase, ronde=match.round, pemenang=match.winner,
-                    komposisi=dict(Counter(p.role for p in match.players.values())),
-                    manusia=sum(not p.bot for p in match.players.values()),
+                    status="selesai" if pertandingan.winner else "live", match_id=pertandingan.id,
+                    fase=pertandingan.phase, ronde=pertandingan.round, pemenang=pertandingan.winner,
+                    komposisi=dict(Counter(peserta.role for peserta in semua_peserta)),
+                    manusia=sum(not peserta.bot for peserta in semua_peserta),
                 )  # fmt: skip
-                for p in sorted(match.players.values(), key=lambda p: p.name):
-                    if not p.bot:
+                for peserta in sorted(semua_peserta, key=lambda peserta: peserta.name):
+                    if not peserta.bot:
                         continue
-                    otak = brain_runtime.otak_bot(match.id, p.name)
+                    otak = brain_runtime.otak_bot(pertandingan.id, peserta.name)
+                    if not peserta.alive:
+                        status = "dieksekusi"
+                    elif peserta.hostage:
+                        status = "disandera"
+                    else:
+                        status = "dibungkam" if peserta.gagged else "aktif"
                     ringkasan["bot"].append({
-                        "nama": p.name, "role": p.role, "status": _status_pemain(p),
+                        "nama": peserta.name, "role": peserta.role, "status": status,
                         "metode": getattr(otak, "metode", None), "persona": getattr(otak, "persona", None),
                         "langkah": getattr(otak, "langkah", 0),
                     })  # fmt: skip
                 ringkasan["sumber_bot"] = "live"
+
+        # Sumber 2: jejak terbaru (ringkasan penjelasan, atau provider "otak:<metode>" pada jejak lama).
         if not ringkasan["bot"]:
-            ringkasan["bot"] = _bot_dari_jejak(traces)
+            bot_per_nama = {}
+            for jejak in traces:  # terbaru lebih dulu
+                identitas = (jejak.get("ringkas") or jejak.get("penjelasan") or {}).get("bot") or {}
+                provider, model = jejak.get("provider") or "", jejak.get("model") or ""
+                nama = identitas.get("nama") or (
+                    jejak.get("sender") if provider.startswith("otak:") else None
+                )
+                if not nama or nama in bot_per_nama:
+                    continue
+                bot_per_nama[nama] = {
+                    "nama": nama, "role": identitas.get("role"), "status": None,
+                    "metode": identitas.get("metode") or provider.removeprefix("otak:") or None,
+                    "persona": identitas.get("persona") or model.removeprefix("persona:") or None,
+                    "langkah": identitas.get("langkah"),
+                }  # fmt: skip
+            ringkasan["bot"] = sorted(bot_per_nama.values(), key=lambda bot: bot["nama"])
             ringkasan["sumber_bot"] = "jejak" if ringkasan["bot"] else None
+
+        # Sumber 3: arsip tabel match_bots.
         if not ringkasan["bot"]:
             ringkasan["bot"] = _bot_arsip(code)
             ringkasan["sumber_bot"] = "match_bots" if ringkasan["bot"] else None
         return ringkasan
-
-
-def _status_pemain(player):
-    if not player.alive:
-        return "dieksekusi"
-    if player.hostage:
-        return "disandera"
-    return "dibungkam" if player.gagged else "aktif"
-
-
-# Identitas bot dari jejak terbaru (ringkasan penjelasan, atau provider "otak:<metode>" pada jejak lama).
-def _bot_dari_jejak(traces):
-    bot = {}
-    for trace in traces:  # terbaru lebih dulu
-        identitas = (trace.get("ringkas") or trace.get("penjelasan") or {}).get("bot") or {}
-        provider, model = trace.get("provider") or "", trace.get("model") or ""
-        nama = identitas.get("nama") or (
-            trace.get("sender") if provider.startswith("otak:") else None
-        )
-        if not nama or nama in bot:
-            continue
-        bot[nama] = {
-            "nama": nama, "role": identitas.get("role"), "status": None,
-            "metode": identitas.get("metode") or provider.removeprefix("otak:") or None,
-            "persona": identitas.get("persona") or model.removeprefix("persona:") or None,
-            "langkah": identitas.get("langkah"),
-        }  # fmt: skip
-    return sorted(bot.values(), key=lambda b: b["nama"])
 
 
 # Arsip metode/persona/role bot pertandingan terakhir room (migrasi V7); gagal → daftar kosong.
@@ -131,8 +136,8 @@ def _bot_arsip(code):
 
     from app.module.persistence_service import PersistenceError, PersistenceService
 
-    def baca(db):
-        return db.execute(
+    def baca_baris_bot(database):
+        return database.execute(
             text("""
             SELECT match_id, bot_name, method, persona, role FROM match_bots
             WHERE room_code=:code ORDER BY created_at DESC, bot_name LIMIT 20
@@ -141,14 +146,15 @@ def _bot_arsip(code):
         ).mappings().all()  # fmt: skip
 
     try:
-        rows = PersistenceService._run(baca)
+        daftar_baris = PersistenceService._run(baca_baris_bot)
     except PersistenceError:
         return []
-    terakhir = rows[0]["match_id"] if rows else None
+    id_pertandingan_terakhir = daftar_baris[0]["match_id"] if daftar_baris else None
     return [
-        {"nama": r["bot_name"], "role": r["role"], "status": None, "metode": r["method"],
-         "persona": r["persona"], "langkah": None}
-        for r in sorted(rows, key=lambda r: r["bot_name"]) if r["match_id"] == terakhir
+        {"nama": baris["bot_name"], "role": baris["role"], "status": None, "metode": baris["method"],
+         "persona": baris["persona"], "langkah": None}
+        for baris in sorted(daftar_baris, key=lambda baris: baris["bot_name"])
+        if baris["match_id"] == id_pertandingan_terakhir
     ]  # fmt: skip
 
 

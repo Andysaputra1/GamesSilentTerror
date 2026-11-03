@@ -1,7 +1,9 @@
-"""Game persistence use cases. SQL stays in models; each action is atomic."""
+"""Penyimpanan data game. Sebagian besar SQL ada di models; setiap aksi satu transaksi."""
 
 from __future__ import annotations
+import json
 import logging
+from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.config.settings import settings
@@ -12,7 +14,7 @@ logger = logging.getLogger("shadow_heist.persistence")
 
 
 class PersistenceError(RuntimeError):
-    """A game transaction could not be committed."""
+    """Transaksi game gagal disimpan."""
 
 
 class PersistenceService:
@@ -22,23 +24,23 @@ class PersistenceService:
 
     @staticmethod
     # STATIC METHOD TRANSAKSI: jalankan callback dengan commit/rollback otomatis dan terjemahkan error SQL.
-    def _run(operation):
+    def _run(operasi):
         try:
             with SessionLocal.begin() as database:
-                return operation(database)
+                return operasi(database)
         except SQLAlchemyError as error:
-            # Do not log SQL parameters: they may contain private chat content.
+            # Parameter SQL tidak dicatat karena bisa memuat isi chat privat.
             logger.error("Game database transaction failed (%s).", type(error).__name__)
             raise PersistenceError("Data game gagal disimpan ke database.") from error
 
     # HELPER TRANSAKSI: pastikan ruangan dan pemain tersedia, lalu kembalikan kedua ID-nya.
-    def _player(self, database, username):
-        room_id = queries.ensure_room(database, self.room_code)
-        return room_id, queries.ensure_player(database, room_id, username)
+    def _pastikan_room_dan_pemain(self, database, username):
+        id_room = queries.ensure_room(database, self.room_code)
+        return id_room, queries.ensure_player(database, id_room, username)
 
     # SERVICE PENYIMPANAN: pastikan pemain terdaftar dalam ruangan melalui satu transaksi.
     def ensure_player(self, username: str) -> None:
-        self._run(lambda db: self._player(db, username))
+        self._run(lambda database: self._pastikan_room_dan_pemain(database, username))
 
     # SERVICE CHAT SOCKET: simpan pesan pemain, status pemain, dan konteks fase dalam satu transaksi.
     def record_player_message(
@@ -50,49 +52,44 @@ class PersistenceService:
         context: dict | None = None,
     ) -> int:
         # CALLBACK TRANSAKSI: pastikan pemain ada, perbarui status, simpan pesan, lalu kembalikan ID pesan.
-        def operation(database):
-            room_id, player_id = self._player(database, username)
+        def simpan_pesan_pemain(database):
+            id_room, id_pemain = self._pastikan_room_dan_pemain(database, username)
             if status is not None:
-                queries.update_player_status(database, player_id, status)
-            message_id = queries.insert_message(
+                queries.update_player_status(database, id_pemain, status)
+            id_pesan = queries.insert_message(
                 database,
-                room_id=room_id,
-                player_id=player_id,
+                room_id=id_room,
+                player_id=id_pemain,
                 username=username,
                 message=message,
             )
             if context is not None:
                 queries.set_message_context(
-                    database, message_id, sender_kind="human", context=context
+                    database, id_pesan, sender_kind="human", context=context
                 )
-            return message_id
+            return id_pesan
 
-        return self._run(operation)
+        return self._run(simpan_pesan_pemain)
 
     # Arsipkan ruangan baru beserta pemiliknya sebelum dipakai bermain.
     def archive_new_room(self, username):
-        from sqlalchemy import text
-
         # Simpan ruangan dan pemiliknya dalam satu transaksi agar arsip tidak setengah jadi.
-        def operation(db):
-            inserted = db.execute(
+        def simpan_room_baru(database):
+            jumlah_baris_baru = database.execute(
                 text("INSERT IGNORE INTO game_sessions(room_code,phase) VALUES(:code,'lobby')"),
                 {"code": self.room_code},
             ).rowcount
-            if not inserted:
+            if not jumlah_baris_baru:
                 return False
-            self._player(db, username)
+            self._pastikan_room_dan_pemain(database, username)
             return True
 
-        return self._run(operation)
+        return self._run(simpan_room_baru)
 
     # Simpan jejak checker sebagai arsip analisis ruangan.
     def record_trace(self, trace):
-        import json
-        from sqlalchemy import text
-
         self._run(
-            lambda db: db.execute(
+            lambda database: database.execute(
                 text("""
             INSERT INTO checker_traces(id,room_code,trace) VALUES(:id,:room,:trace)
             ON DUPLICATE KEY UPDATE trace=:trace
@@ -103,11 +100,8 @@ class PersistenceService:
 
     # Bacaan NLU (intent, target) satu pesan untuk riwayat chat panel (kolom migrasi V9).
     def record_nlu(self, message_id, nlu):
-        import json
-        from sqlalchemy import text
-
         self._run(
-            lambda db: db.execute(
+            lambda database: database.execute(
                 text("UPDATE chat_messages SET nlu=:nlu WHERE id=:id"),
                 {"id": message_id, "nlu": json.dumps(nlu, ensure_ascii=False)},
             )
@@ -116,38 +110,38 @@ class PersistenceService:
     # Simpan pesan bot beserta konteks fase (dan ID pesan yang dijawab, bila ada).
     def record_bot_message(self, *, username, message, context, reply_to_id=None):
         # Simpan pesan bot lalu tautkan konteks fase dan pesan manusia yang dibalas.
-        def operation(db):
-            room_id = queries.ensure_room(db, self.room_code)
-            message_id = queries.insert_message(
-                db,
-                room_id=room_id,
+        def simpan_pesan_bot(database):
+            id_room = queries.ensure_room(database, self.room_code)
+            id_pesan = queries.insert_message(
+                database,
+                room_id=id_room,
                 player_id=None,
                 username=username,
                 message=message,
             )
             queries.set_message_context(
-                db, message_id, sender_kind="bot", context=context, reply_to_id=reply_to_id
+                database, id_pesan, sender_kind="bot", context=context, reply_to_id=reply_to_id
             )
-            return message_id
+            return id_pesan
 
-        return self._run(operation)
+        return self._run(simpan_pesan_bot)
 
     # SERVICE PENYIMPANAN: ubah status pemain secara transaksional, bukan keputusan aturan permainan.
     def update_player_status(self, *, username: str, status: str) -> None:
         # CALLBACK TRANSAKSI: pastikan pemain ada lalu perbarui statusnya.
-        def operation(database):
-            _, player_id = self._player(database, username)
-            queries.update_player_status(database, player_id, status)
+        def simpan_status_pemain(database):
+            _, id_pemain = self._pastikan_room_dan_pemain(database, username)
+            queries.update_player_status(database, id_pemain, status)
 
-        self._run(operation)
+        self._run(simpan_status_pemain)
 
     # SERVICE PENYIMPANAN: simpan nama fase ruangan; fungsi ini tidak menjalankan timer/voting.
     def set_phase(self, phase: str) -> None:
         # CALLBACK TRANSAKSI: pastikan ruangan ada lalu simpan fase yang diminta.
-        def operation(database):
+        def simpan_fase(database):
             queries.set_phase(database, queries.ensure_room(database, self.room_code), phase)
 
-        self._run(operation)
+        self._run(simpan_fase)
 
 
 persistence_service = PersistenceService()

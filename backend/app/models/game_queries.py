@@ -1,4 +1,4 @@
-"""Game SQL functions. Related writes share a transaction supplied by the service."""
+"""Fungsi SQL game. Penulisan yang saling terkait memakai satu transaksi dari service."""
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -23,21 +23,21 @@ def ensure_room(database: Session, room_code: str) -> int:
 
 # QUERY UPSERT: pastikan pemain tercatat sekali dalam ruangan, lalu kembalikan ID pemain.
 def ensure_player(database: Session, room_id: int, username: str) -> int:
-    params = {"room_id": room_id, "username": username}
+    nilai_sql = {"room_id": room_id, "username": username}
     database.execute(
         text("""
         INSERT INTO players (game_session_id, username, display_name, role, status)
         VALUES (:room_id, :username, :username, 'civilian', 'active')
         ON DUPLICATE KEY UPDATE id = id
     """),
-        params,
+        nilai_sql,
     )
     return int(
         database.execute(
             text("""
         SELECT id FROM players WHERE game_session_id = :room_id AND username = :username
     """),
-            params,
+            nilai_sql,
         ).scalar_one()
     )
 
@@ -60,13 +60,13 @@ def insert_message(
     username: str,
     message: str,
 ) -> int:
-    sql = text("""
+    perintah_sql = text("""
         INSERT INTO chat_messages (game_session_id, player_id, sender_name, message)
         VALUES (:room_id, :player_id, :username, :message)
     """)
     return int(
         database.execute(
-            sql,
+            perintah_sql,
             {
                 "room_id": room_id,
                 "player_id": player_id,

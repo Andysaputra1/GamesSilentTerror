@@ -11,34 +11,25 @@ from uuid import uuid4
 
 
 # Redaksi field rahasia dan batasi ukuran/nesting data sebelum masuk jejak aktivitas.
-def safe(value, depth=0):
-    # Pertahanan tambahan: header/credential tidak boleh menjadi field log.
-    if depth > 5:
+def _saring_data_jejak(nilai, kedalaman=0):
+    if kedalaman > 5:
         return "[truncated]"
-    if isinstance(value, dict):
+    if isinstance(nilai, dict):
+        # Field berisi kata ini tidak boleh masuk log: header dan credential.
+        kata_rahasia = ("password", "token", "authorization", "cookie", "api_key", "secret")
         return {
-            str(k): (
+            str(kunci): (
                 "[REDACTED]"
-                if any(
-                    word in str(k).lower()
-                    for word in [
-                        "password",
-                        "token",
-                        "authorization",
-                        "cookie",
-                        "api_key",
-                        "secret",
-                    ]
-                )
-                else safe(v, depth + 1)
+                if any(kata in str(kunci).lower() for kata in kata_rahasia)
+                else _saring_data_jejak(isi, kedalaman + 1)
             )
-            for k, v in list(value.items())[:50]
+            for kunci, isi in list(nilai.items())[:50]
         }
-    if isinstance(value, (list, tuple)):
-        return [safe(v, depth + 1) for v in value[:50]]
-    if value is None or isinstance(value, (bool, int, float)):
-        return value
-    return str(value)[:4000]
+    if isinstance(nilai, (list, tuple)):
+        return [_saring_data_jejak(isi, kedalaman + 1) for isi in nilai[:50]]
+    if nilai is None or isinstance(nilai, (bool, int, float)):
+        return nilai
+    return str(nilai)[:4000]
 
 
 class ActivityService:
@@ -59,67 +50,73 @@ class ActivityService:
         duration_ms=None,
         call_id=None,
     ):
-        event = {
+        catatan = {
             "id": uuid4().hex,
             "call_id": call_id,
             "at": datetime.now(timezone.utc).isoformat(),
             "room": room,
             "function": function,
-            "params": safe(params or {}),
+            "params": _saring_data_jejak(params or {}),
             "status": status,
-            "result": safe(result),
+            "result": _saring_data_jejak(result),
             "duration_ms": duration_ms,
         }
         with self.lock:
-            self.events.appendleft(event)
+            self.events.appendleft(catatan)
 
     # Kembalikan salinan maksimal 200 event agar pemanggil tidak mengubah arsip.
     def list(self, code=None):
         with self.lock:
-            return deepcopy([e for e in self.events if code is None or e["room"] == code][:200])
+            return deepcopy(
+                [catatan for catatan in self.events if code is None or catatan["room"] == code][
+                    :200
+                ]
+            )
 
 
 activity = ActivityService()
 
 
-# Bungkus command ruangan dengan pencatatan awal, hasil, error, dan durasi.
-def traced(function):
-    # Decorator merekam command room, tanpa spam polling snapshot/health.
-    @wraps(function)
-    def wrapped(*args, **kwargs):
-        params = dict(signature(function).bind(*args, **kwargs).arguments)
-        params.pop("self", None)
-        code = params.get("code")
-        call_id = uuid4().hex
-        start = perf_counter()
-        activity.record(code, function.__qualname__, params, status="running", call_id=call_id)
+# Bungkus command ruangan dengan pencatatan awal, hasil, error, dan durasi; polling tidak dibungkus.
+def traced(fungsi):
+    @wraps(fungsi)
+    def fungsi_tercatat(*args, **kwargs):
+        parameter = dict(signature(fungsi).bind(*args, **kwargs).arguments)
+        parameter.pop("self", None)
+        kode_room = parameter.get("code")
+        id_panggilan = uuid4().hex
+        waktu_mulai = perf_counter()
+        activity.record(
+            kode_room, fungsi.__qualname__, parameter, status="running", call_id=id_panggilan
+        )
         try:
-            result = function(*args, **kwargs)
+            hasil = fungsi(*args, **kwargs)
         except Exception as error:
             activity.record(
-                code,
-                function.__qualname__,
-                params,
+                kode_room,
+                fungsi.__qualname__,
+                parameter,
                 status="error",
                 result=type(error).__name__,
-                duration_ms=round((perf_counter() - start) * 1000, 2),
-                call_id=call_id,
+                duration_ms=round((perf_counter() - waktu_mulai) * 1000, 2),
+                call_id=id_panggilan,
             )
             raise
-        code = code or getattr(result, "code", None)
-        if isinstance(result, dict):
-            code = code or result.get("code")
-            summary = {"phase": result.get("game", result).get("phase"), "ok": True}
+        # Command create tidak menerima kode room; kodenya baru diketahui dari hasil.
+        kode_room = kode_room or getattr(hasil, "code", None)
+        if isinstance(hasil, dict):
+            kode_room = kode_room or hasil.get("code")
+            ringkasan = {"phase": hasil.get("game", hasil).get("phase"), "ok": True}
         else:
-            summary = {"ok": True}
+            ringkasan = {"ok": True}
         activity.record(
-            code,
-            function.__qualname__,
-            params,
-            result=summary,
-            duration_ms=round((perf_counter() - start) * 1000, 2),
-            call_id=call_id,
+            kode_room,
+            fungsi.__qualname__,
+            parameter,
+            result=ringkasan,
+            duration_ms=round((perf_counter() - waktu_mulai) * 1000, 2),
+            call_id=id_panggilan,
         )
-        return result
+        return hasil
 
-    return wrapped
+    return fungsi_tercatat

@@ -49,8 +49,8 @@ TEAM_CHAT_LIMIT = 100
 
 # Komposisi role per jumlah peserta: (hitman, spy, stalker); sisanya civilian.
 # Dipilih lewat simulasi keseimbangan semua kursi bot metode campuran (sebelum game hanya memakai Fuzzy), dengan
-# pengumuman jumlah Hitman tersisa (hitman_remaining). Angkanya belum diukur ulang untuk Fuzzy saja, jadi belum
-# berlaku untuk game sekarang; data dan alasannya ada di GAME_CONCEPT.md, bagian Ruangan dan role.
+# pengumuman jumlah Hitman tersisa (hitman_remaining). Hasil ukur itu belum diulang untuk Fuzzy saja, jadi
+# belum tentu berlaku untuk game sekarang; data dan alasannya ada di GAME_CONCEPT.md, bagian Ruangan dan role.
 KOMPOSISI_PERAN = {
     4: (1, 1, 1),
     5: (1, 1, 1),
@@ -78,66 +78,77 @@ def phase_durations(count, quick=False):
 # Nama yang tampil di game = nama tampilan akun; username tetap ID engine. Nama yang bentrok (sesama
 # pemain, beda huruf besar/kecil saja, atau sama dengan nama bot) diberi penanda "(username)".
 def label_unik(nama_tampilan, bots=()):
-    nama = {u: (d or "").strip() or u for u, d in nama_tampilan.items()}
-    jumlah = Counter(d.casefold() for d in nama.values())
-    nama_bot = {b.casefold() for b in bots}
-    labels = {
-        u: d if jumlah[d.casefold()] == 1 and d.casefold() not in nama_bot else f"{d} ({u})"
-        for u, d in nama.items()
+    nama_bersih = {
+        username: (nama or "").strip() or username for username, nama in nama_tampilan.items()
     }
-    return labels | {b: b for b in bots}
+    jumlah_nama = Counter(nama.casefold() for nama in nama_bersih.values())
+    nama_bot = {bot.casefold() for bot in bots}
+    labels = {
+        username: (
+            nama
+            if jumlah_nama[nama.casefold()] == 1 and nama.casefold() not in nama_bot
+            else f"{nama} ({username})"
+        )
+        for username, nama in nama_bersih.items()
+    }
+    return labels | {bot: bot for bot in bots}
 
 
 # Salinan snapshot untuk otak bot: semua username diganti label, sehingga bot membaca dan menyebut nama yang
 # sama dengan yang dilihat dan diketik pemain manusia. Target keputusan bot diterjemahkan balik lewat
 # Match.username().
 def snapshot_berlabel(snapshot, labels):
-    def nama(n):
-        return labels.get(n, n) if n else n
+    def ke_label(nama):
+        return labels.get(nama, nama) if nama else nama
 
-    s = copy.deepcopy(snapshot)
-    for p in s["players"]:
-        p["name"] = nama(p["name"])
-    for m in s["messages"]:
-        m["sender"] = nama(m["sender"])
-    for v in s["tribunal_votes"]:
-        v["target"], v["voters"] = nama(v["target"]), [nama(x) for x in v["voters"]]
-    me = s["me"]
-    me["name"], me["vote"], me["last_guard"] = (
-        nama(me["name"]),
-        nama(me["vote"]),
-        nama(me["last_guard"]),
-    )
-    me["allies"] = [nama(x) for x in me["allies"]]
-    me["ally_actions"] = [
-        {**a, "name": nama(a["name"]), "target": nama(a["target"])} for a in me["ally_actions"]
+    salinan = copy.deepcopy(snapshot)
+    for pemain in salinan["players"]:
+        pemain["name"] = ke_label(pemain["name"])
+    for pesan in salinan["messages"]:
+        pesan["sender"] = ke_label(pesan["sender"])
+    for suara in salinan["tribunal_votes"]:
+        suara["target"] = ke_label(suara["target"])
+        suara["voters"] = [ke_label(nama) for nama in suara["voters"]]
+    saya = salinan["me"]
+    saya["name"] = ke_label(saya["name"])
+    saya["vote"] = ke_label(saya["vote"])
+    saya["last_guard"] = ke_label(saya["last_guard"])
+    saya["allies"] = [ke_label(nama) for nama in saya["allies"]]
+    saya["ally_actions"] = [
+        {**aksi, "name": ke_label(aksi["name"]), "target": ke_label(aksi["target"])}
+        for aksi in saya["ally_actions"]
     ]
-    me["spy_allies"] = [nama(x) for x in me["spy_allies"]]
-    me["spy_actions"] = [
-        {**a, "name": nama(a["name"]), "target": nama(a["target"])} for a in me["spy_actions"]
+    saya["spy_allies"] = [ke_label(nama) for nama in saya["spy_allies"]]
+    saya["spy_actions"] = [
+        {**aksi, "name": ke_label(aksi["name"]), "target": ke_label(aksi["target"])}
+        for aksi in saya["spy_actions"]
     ]
-    if me.get("action"):
-        me["action"] = {**me["action"], "target": nama(me["action"]["target"])}
-    me["intel"] = [{**x, "name": nama(x["name"])} for x in me["intel"]]
-    me["syndicate_hostages"] = [{**x, "name": nama(x["name"])} for x in me["syndicate_hostages"]]
-    return s
+    if saya.get("action"):
+        saya["action"] = {**saya["action"], "target": ke_label(saya["action"]["target"])}
+    saya["intel"] = [{**data, "name": ke_label(data["name"])} for data in saya["intel"]]
+    saya["syndicate_hostages"] = [
+        {**data, "name": ke_label(data["name"])} for data in saya["syndicate_hostages"]
+    ]
+    return salinan
 
 
 # Avatar pertandingan: manusia (urutan masuk ruangan) memakai skin pilihannya, bot memakai skin tetapnya.
 # Skin yang sudah dipakai pemain sebelumnya diganti skin yang masih kosong; setelah keenam skin
 # terpakai (lebih dari 6 peserta), skin boleh kembar.
 def assign_skins(humans, bots, skin_map=None):
-    taken = set()
-    skins = {}
-    for name in list(humans) + list(bots):
-        if name in bots:
-            wanted = SKIN_BY_BOT.get(name, ALL_SKINS[0])
+    skin_terpakai = set()
+    skin_peserta = {}
+    for nama in list(humans) + list(bots):
+        if nama in bots:
+            skin_diminta = SKIN_BY_BOT.get(nama, ALL_SKINS[0])
         else:
-            wanted = (skin_map or {}).get(name, "dexter")
-        free = [skin for skin in ALL_SKINS if skin not in taken]
-        skins[name] = free[0] if wanted in taken and free else wanted
-        taken.add(skins[name])
-    return skins
+            skin_diminta = (skin_map or {}).get(nama, "dexter")
+        skin_kosong = [skin for skin in ALL_SKINS if skin not in skin_terpakai]
+        skin_peserta[nama] = (
+            skin_kosong[0] if skin_diminta in skin_terpakai and skin_kosong else skin_diminta
+        )
+        skin_terpakai.add(skin_peserta[nama])
+    return skin_peserta
 
 
 class Match:
@@ -155,31 +166,32 @@ class Match:
         skin_map: dict[str, str] | None = None,
         labels: dict[str, str] | None = None,
     ):
-        names = list(humans) + list(bots)
-        if not 4 <= len(names) <= 10 or len(set(names)) != len(names):
+        semua_nama = list(humans) + list(bots)
+        if not 4 <= len(semua_nama) <= 10 or len(set(semua_nama)) != len(semua_nama):
             raise ValueError("Permainan membutuhkan 4–10 identitas berbeda.")
         self.rng = rng or random.SystemRandom()
-        hitman, spy, stalker = KOMPOSISI_PERAN[len(names)]
-        roles = ["hitman"] * hitman + ["spy"] * spy + ["stalker"] * stalker
-        roles += ["civilian"] * (len(names) - len(roles))
-        self.rng.shuffle(roles)
+        jumlah_hitman, jumlah_spy, jumlah_stalker = KOMPOSISI_PERAN[len(semua_nama)]
+        daftar_role = (
+            ["hitman"] * jumlah_hitman + ["spy"] * jumlah_spy + ["stalker"] * jumlah_stalker
+        )
+        daftar_role += ["civilian"] * (len(semua_nama) - len(daftar_role))
+        self.rng.shuffle(daftar_role)
         self.players = {}
-        skins = assign_skins(humans, bots, skin_map)
-        for name, role in zip(names, roles):
-            self.players[name] = Participant(name, role, name in bots, skin_id=skins[name])
-        self.labels = {name: (labels or {}).get(name, name) for name in names}
+        skin_peserta = assign_skins(humans, bots, skin_map)
+        for nama, role in zip(semua_nama, daftar_role):
+            self.players[nama] = Participant(nama, role, nama in bots, skin_id=skin_peserta[nama])
+        self.labels = {nama: (labels or {}).get(nama, nama) for nama in semua_nama}
         self.id = uuid4().hex
         self.round = 1
-        self.ai_controlled = (
-            False  # Diaktifkan RoomService; unit engine tetap dapat diuji tanpa jaringan.
-        )
+        # Diaktifkan RoomService; unit engine tetap dapat diuji tanpa jaringan.
+        self.ai_controlled = False
         self.npc_decisions = set()
         # Bot yang sedang menyusun chat (lantai bicara NPCService); tampil sebagai awan "berpikir".
         self.bot_berpikir: set[str] = set()
         # Tahap langkah terakhir tiap bot (NPCService): I input diterima, L logika berjalan, O output selesai.
         self.bot_tahap: dict[str, str] = {}
         self.phase = "day"
-        self.durations = phase_durations(len(names), quick)
+        self.durations = phase_durations(len(semua_nama), quick)
         self.tribunal_extra_seconds = (
             TRIBUNAL_EXTRA_QUICK_SECONDS if quick else TRIBUNAL_EXTRA_SECONDS
         )
@@ -240,16 +252,16 @@ class Match:
 
     # PERSIAPAN: persetujuan "Siap" hanya dari manusia; tidak berarti AI boleh dilewati.
     def ready_consent(self, name, now=None):
-        player = self.players.get(name)
-        if self.phase != "preparing" or not player or player.bot:
+        pemain = self.players.get(name)
+        if self.phase != "preparing" or not pemain or pemain.bot:
             raise ValueError("Tombol siap hanya tersedia untuk pemain manusia saat persiapan.")
         self.ready_consents.add(name)
         self.try_begin(time.time() if now is None else now)
 
     # PERSIAPAN: catat kartu yang dibuka; pembukaan tidak mempercepat countdown.
     def reveal_role(self, name, now=None):
-        player = self.players.get(name)
-        if self.phase != "preparing" or not player or player.bot:
+        pemain = self.players.get(name)
+        if self.phase != "preparing" or not pemain or pemain.bot:
             raise ValueError("Kartu role dibuka hanya oleh pemain manusia saat persiapan.")
         self.revealed.add(name)
         self.try_begin(time.time() if now is None else now)
@@ -257,29 +269,29 @@ class Match:
     # Manusia yang belum membuka kartu role (pemain yang sudah keluar tidak ditunggu).
     def unrevealed(self):
         return [
-            p.name
-            for p in self.players.values()
-            if not p.bot and p.alive and p.name not in self.revealed
+            peserta.name
+            for peserta in self.players.values()
+            if not peserta.bot and peserta.alive and peserta.name not in self.revealed
         ]
 
-    # Jadwal bersama: minimal 40 detik, countdown AI siap, dan batas maksimum tunggu.
-    def _start_at(self):
-        prep = self.preparation
-        if not prep["ready"]:
+    # Jadwal bersama: minimal waktu baca, countdown setelah AI siap, dan batas maksimum tunggu.
+    def _hitung_waktu_mulai(self):
+        persiapan = self.preparation
+        if not persiapan["ready"]:
             return None
         return min(
             self.deadline,
-            max(prep["min_until"], prep["ready_at"] + PREPARATION_COUNTDOWN_SECONDS),
+            max(persiapan["min_until"], persiapan["ready_at"] + PREPARATION_COUNTDOWN_SECONDS),
         )
 
     # Mulai sesuai countdown; UI membuka kartu otomatis lima detik sebelum mulai.
     # Tombol Siap maupun pembukaan kartu terakhir tidak melewati waktu baca minimum.
     def try_begin(self, now=None):
-        start_at = self._start_at() if self.phase == "preparing" else None
-        if start_at is None:
+        waktu_mulai = self._hitung_waktu_mulai() if self.phase == "preparing" else None
+        if waktu_mulai is None:
             return False
         now = time.time() if now is None else now
-        if now >= start_at:
+        if now >= waktu_mulai:
             self.begin(now)
             return True
         return False
@@ -299,46 +311,54 @@ class Match:
 
     # GETTER: ambil skin_id pemain, aman dipanggil dari luar Match.
     def get_skin(self, name: str) -> str:
-        player = self.players.get(name)
-        return player.skin_id if player else "dexter"
+        pemain = self.players.get(name)
+        return pemain.skin_id if pemain else "dexter"
 
     # HELPER: pemain yang masih bisa bertindak (hidup, pertandingan belum selesai); Hostage dicek per aksi.
     def actor(self, name):
-        player = self.players.get(name)
-        if not player or not player.alive or self.phase == "finished":
+        pemain = self.players.get(name)
+        if not pemain or not pemain.alive or self.phase == "finished":
             raise ValueError("Kamu tidak dapat melakukan aksi ini.")
-        return player
+        return pemain
 
     # VALIDASI CHAT: Gag/Hostage/kematian dan fase malam ditegakkan di backend.
     def can_chat(self, name):
-        player = self.players.get(name)
+        pemain = self.players.get(name)
         return bool(
-            player
-            and player.alive
-            and not player.hostage
-            and not player.gagged
+            pemain
+            and pemain.alive
+            and not pemain.hostage
+            and not pemain.gagged
             and self.phase in {"day", "tribunal"}
         )
 
     # VALIDASI TARGET: tidak boleh memilih pemain mati atau identitas di luar pertandingan.
     def target(self, actor, name, *, allow_self=False):
-        target = self.players.get(name)
-        if not target or not target.alive or (name == actor.name and not allow_self):
+        pemain_target = self.players.get(name)
+        if not pemain_target or not pemain_target.alive or (name == actor.name and not allow_self):
             raise ValueError("Target tidak valid.")
-        return target
+        return pemain_target
 
     # Rekan Syndicate: Hitman lain dalam pertandingan (hidup atau sudah dieksekusi).
     def allies(self, name):
         if self.players[name].role != "hitman":
             return []
-        return [p.name for p in self.players.values() if p.role == "hitman" and p.name != name]
+        return [
+            peserta.name
+            for peserta in self.players.values()
+            if peserta.role == "hitman" and peserta.name != name
+        ]
 
     # Rekan Spy: Spy lain dalam pertandingan (hidup atau tidak); terisi di room yang sejak awal ≥ 2 Spy.
     # Terpisah dari allies, karena kode bot membaca allies sebagai rekan Syndicate.
     def spy_allies(self, name):
         if self.players[name].role != "spy":
             return []
-        return [p.name for p in self.players.values() if p.role == "spy" and p.name != name]
+        return [
+            peserta.name
+            for peserta in self.players.values()
+            if peserta.role == "spy" and peserta.name != name
+        ]
 
     # Kanal chat tim: Hitman atau Spy di room yang sejak awal punya ≥ 2 pemain role itu; selain itu None.
     def team_channel(self, name):
@@ -348,12 +368,12 @@ class Match:
     # Hak chat tim: hanya saat malam, untuk pemain hidup yang tidak disandera (Hitman tidak bisa disandera).
     # Gag tidak berpengaruh karena hanya membatasi chat publik. Bot belum mengirim atau membaca chat tim.
     def can_team_chat(self, name):
-        player = self.players.get(name)
+        pemain = self.players.get(name)
         return bool(
-            player
-            and not player.bot
-            and player.alive
-            and not player.hostage
+            pemain
+            and not pemain.bot
+            and pemain.alive
+            and not pemain.hostage
             and self.phase == "night"
             and self.team_channel(name)
         )
@@ -366,103 +386,123 @@ class Match:
         message = message.strip()
         if not message or len(message) > 1000:
             raise ValueError("Pesan chat harus berisi 1–1000 karakter.")
-        channel = self.team_channel(sender)
-        record = {"id": uuid4().hex, "sender": sender, "message": message}
-        self.team_messages[channel] = (self.team_messages[channel] + [record])[-TEAM_CHAT_LIMIT:]
-        return record
+        kanal = self.team_channel(sender)
+        pesan_tim = {"id": uuid4().hex, "sender": sender, "message": message}
+        self.team_messages[kanal] = (self.team_messages[kanal] + [pesan_tim])[-TEAM_CHAT_LIMIT:]
+        return pesan_tim
 
     # AKSI PRIVAT: pilihan malam disimpan, belum diresolusikan sebelum deadline.
     def act(self, name, ability, target_name):
-        player = self.actor(name)
+        pemain = self.actor(name)
         # Hostage kehilangan semua aksi: chat, vote, dan skill malam.
-        if player.hostage:
+        if pemain.hostage:
             raise ValueError("Pemain yang disandera tidak dapat melakukan aksi.")
         if ability == "gag":
-            if self.phase != "day" or player.role != "hitman" or self.round < self.next_gag:
+            if self.phase != "day" or pemain.role != "hitman" or self.round < self.next_gag:
                 raise ValueError("Gag Order belum tersedia.")
-            target = self.target(player, target_name)
-            if target.role == "hitman":
+            pemain_target = self.target(pemain, target_name)
+            if pemain_target.role == "hitman":
                 raise ValueError("Tidak bisa menarget rekan Syndicate.")
-            if target.hostage:
+            if pemain_target.hostage:
                 raise ValueError("Pemain itu sudah disandera.")
-            target.gagged = True
+            pemain_target.gagged = True
             self.next_gag = self.round + 2
             return
-        expected = NIGHT_ABILITY.get(player.role)
-        if expected is None or self.phase != "night" or ability != expected or name in self.actions:
+        kemampuan_malam = NIGHT_ABILITY.get(pemain.role)
+        if (
+            kemampuan_malam is None
+            or self.phase != "night"
+            or ability != kemampuan_malam
+            or name in self.actions
+        ):
             raise ValueError("Aksi malam tidak tersedia atau sudah dikunci.")
-        target = self.target(player, target_name, allow_self=ability == "guard")
-        if ability == "hostage" and target.role == "hitman":
+        pemain_target = self.target(pemain, target_name, allow_self=ability == "guard")
+        if ability == "hostage" and pemain_target.role == "hitman":
             raise ValueError("Tidak bisa menarget rekan Syndicate.")
         # Status Hostage publik: korban lama tidak bisa disandera lagi, jadi malam Syndicate tidak terbuang.
-        if ability == "hostage" and target.hostage:
+        if ability == "hostage" and pemain_target.hostage:
             raise ValueError("Pemain itu sudah disandera.")
-        if ability == "peek" and self.round < player.next_peek:
+        if ability == "peek" and self.round < pemain.next_peek:
             raise ValueError("Peek hanya tersedia sekali setiap dua ronde.")
         self.actions[name] = {"ability": ability, "target": target_name}
 
     # VOTE: satu pilihan per pemain; hanya Hostage/kematian yang mencabut suara, bukan Gag Order.
     def vote(self, name, target_name):
-        player = self.actor(name)
-        if self.phase != "tribunal" or player.hostage or name in self.votes:
+        pemain = self.actor(name)
+        if self.phase != "tribunal" or pemain.hostage or name in self.votes:
             raise ValueError("Voting tidak tersedia atau pilihan sudah dikunci.")
-        self.target(player, target_name)
+        self.target(pemain, target_name)
         self.votes[name] = target_name
 
     # BATAL VOTE: selama Tribunal suara boleh ditarik lalu dipilih ulang; yang dihitung suara saat waktu habis.
     def cancel_vote(self, name):
-        player = self.actor(name)
-        if self.phase != "tribunal" or player.hostage or name not in self.votes:
+        pemain = self.actor(name)
+        if self.phase != "tribunal" or pemain.hostage or name not in self.votes:
             raise ValueError("Tidak ada suara yang bisa dibatalkan.")
         del self.votes[name]
 
     # BATAL AKSI MALAM: Hostage/Guard/Peek boleh ditarik lalu dipilih ulang selama malam; yang diresolusikan
     # pilihan saat waktu habis. Gag Order tidak ikut: efeknya langsung (target dibungkam, cooldown jalan).
     def cancel_action(self, name):
-        player = self.actor(name)
-        if self.phase != "night" or player.hostage or name not in self.actions:
+        pemain = self.actor(name)
+        if self.phase != "night" or pemain.hostage or name not in self.actions:
             raise ValueError("Tidak ada aksi malam yang bisa dibatalkan.")
         del self.actions[name]
 
     # Satu korban per malam untuk Syndicate: pilihan terbanyak. Seri manusia lawan bot → pilihan manusia;
     # sesama manusia atau sesama bot → yang dipilih paling awal.
     def syndicate_target(self):
-        choices = [
-            (action["target"], self.players[name].bot)
-            for name, action in self.actions.items()
-            if action["ability"] == "hostage"
+        pilihan_hostage = [
+            (aksi["target"], self.players[nama].bot)
+            for nama, aksi in self.actions.items()
+            if aksi["ability"] == "hostage"
         ]
-        if not choices:
+        if not pilihan_hostage:
             return None
-        counts = Counter(target for target, _ in choices)
-        tied = [choice for choice in choices if counts[choice[0]] == max(counts.values())]
-        return next((target for target, bot in tied if not bot), tied[0][0])
+        jumlah_pilihan = Counter(target for target, _ in pilihan_hostage)
+        pilihan_teratas = [
+            pilihan
+            for pilihan in pilihan_hostage
+            if jumlah_pilihan[pilihan[0]] == max(jumlah_pilihan.values())
+        ]
+        return next(
+            (target for target, dari_bot in pilihan_teratas if not dari_bot),
+            pilihan_teratas[0][0],
+        )
 
     # RESOLUSI MALAM: semua pilihan dibaca bersama, Guard diprioritaskan terhadap Hostage. Korban yang
     # berhasil diumumkan ke semua pemain; Hostage gagal (dijaga Guard) atau tanpa pilihan diumumkan sama:
     # tidak ada yang disandera. Target Hostage yang gagal, Guard, dan Peek tetap rahasia.
     def resolve_night(self):
-        guards = set()
-        for name, action in self.actions.items():
-            player = self.players[name]
-            target = action["target"]
-            if action["ability"] == "guard":
-                guards.add(target)
-                player.last_guard = target
-                player.last_guard_round = self.round
-            elif action["ability"] == "peek":
-                player.intel.append(
-                    {"round": self.round, "name": target, "role": self.players[target].role}
+        target_dijaga = set()
+        for nama, aksi in self.actions.items():
+            pemain = self.players[nama]
+            nama_target = aksi["target"]
+            if aksi["ability"] == "guard":
+                target_dijaga.add(nama_target)
+                pemain.last_guard = nama_target
+                pemain.last_guard_round = self.round
+            elif aksi["ability"] == "peek":
+                pemain.intel.append(
+                    {
+                        "round": self.round,
+                        "name": nama_target,
+                        "role": self.players[nama_target].role,
+                    }
                 )
-                player.next_peek = self.round + 2
-        target = self.syndicate_target()
+                pemain.next_peek = self.round + 2
+        target_hostage = self.syndicate_target()
         korban = None
-        if target is not None:
+        if target_hostage is not None:
             self.syndicate_log.append(
-                {"round": self.round, "name": target, "success": target not in guards}
+                {
+                    "round": self.round,
+                    "name": target_hostage,
+                    "success": target_hostage not in target_dijaga,
+                }
             )
-            if target not in guards:
-                korban = self.players[target]
+            if target_hostage not in target_dijaga:
+                korban = self.players[target_hostage]
                 korban.hostage, korban.hostage_round = True, self.round
         if korban:
             self.events.append(
@@ -475,24 +515,24 @@ class Match:
 
     # Pemimpin suara Tribunal: lebih dari satu berarti seri; kosong berarti tanpa suara.
     def vote_leaders(self):
-        counts = Counter(self.votes.values())
-        return [name for name, count in counts.items() if count == max(counts.values())]
+        jumlah_suara = Counter(self.votes.values())
+        return [nama for nama, suara in jumlah_suara.items() if suara == max(jumlah_suara.values())]
 
     # Lama fase berjalan termasuk waktu tambahan seri. Dipakai jadwal bot dan simulasi panel, yang menghitung
     # waktu dari deadline: dengan durasi saja, deadline yang bertambah membuat fase tampak mundur.
     def phase_length(self):
-        extra = (
+        waktu_tambahan = (
             self.tribunal_extra_seconds if self.phase == "tribunal" and self.tribunal_extra else 0
         )
-        return self.durations.get(self.phase, 0) + extra
+        return self.durations.get(self.phase, 0) + waktu_tambahan
 
     # RESOLUSI TRIBUNAL: plurality; seri/tanpa suara tidak mengeksekusi siapa pun.
     def resolve_votes(self):
-        leaders = self.vote_leaders()
-        if len(leaders) == 1:
-            self.players[leaders[0]].alive = False
+        pemimpin_suara = self.vote_leaders()
+        if len(pemimpin_suara) == 1:
+            self.players[pemimpin_suara[0]].alive = False
             self.events.append(
-                f"Tribunal mengeksekusi {self.labels[leaders[0]]}.{self._catatan_tersingkir()}"
+                f"Tribunal mengeksekusi {self.labels[pemimpin_suara[0]]}.{self._catatan_tersingkir()}"
             )
         else:
             self.events.append("Tribunal berakhir tanpa eksekusi: suara seri atau tidak ada suara.")
@@ -500,27 +540,39 @@ class Match:
 
     # Akhiran pengumuman eksekusi/keluar: Hitman tersisa (room ≥ 2 Hitman) dan kerahasiaan role.
     def _catatan_tersingkir(self):
-        remaining = self.hitman_remaining()
-        count = "" if remaining is None else f" Hitman tersisa: {remaining}."
+        hitman_tersisa = self.hitman_remaining()
+        catatan_jumlah = "" if hitman_tersisa is None else f" Hitman tersisa: {hitman_tersisa}."
         # Hitman terakhir yang tersingkir langsung mengakhiri permainan dan membuka semua role.
-        terakhir = not any(p.alive for p in self.players.values() if p.role == "hitman")
-        rahasia = "" if terakhir else " Role tetap dirahasiakan sampai permainan selesai."
-        return count + rahasia
+        hitman_habis = not any(
+            peserta.alive for peserta in self.players.values() if peserta.role == "hitman"
+        )
+        catatan_rahasia = (
+            "" if hitman_habis else " Role tetap dirahasiakan sampai permainan selesai."
+        )
+        return catatan_jumlah + catatan_rahasia
 
     # KELUAR DI TENGAH PERTANDINGAN: sama dengan dieksekusi (tidak hidup, tanpa chat/vote/aksi,
     # hasil tetap mengikuti kubu), tetapi ditandai `left` agar roster dan catatan membedakannya.
     # Role tetap rahasia seperti eksekusi. Pemain yang sudah mati atau match selesai tidak berubah.
     def leave(self, name, now=None):
-        player = self.players.get(name)
-        if not player or player.bot:
+        pemain = self.players.get(name)
+        if not pemain or pemain.bot:
             raise ValueError("Hanya pemain manusia di pertandingan ini yang dapat keluar.")
-        if not player.alive or self.winner:
+        if not pemain.alive or self.winner:
             return False
-        player.alive, player.left = False, True
+        pemain.alive, pemain.left = False, True
         # Suara dan aksi milik pemain ini dibuang. Pilihan orang lain yang menargetkannya juga
         # dibuang karena target harus hidup (sama seperti korban eksekusi); mereka boleh memilih ulang.
-        self.votes = {v: t for v, t in self.votes.items() if name not in (v, t)}
-        self.actions = {a: x for a, x in self.actions.items() if name not in (a, x["target"])}
+        self.votes = {
+            pemilih: target
+            for pemilih, target in self.votes.items()
+            if name not in (pemilih, target)
+        }
+        self.actions = {
+            pelaku: aksi
+            for pelaku, aksi in self.actions.items()
+            if name not in (pelaku, aksi["target"])
+        }
         self.skip_consents.discard(name)
         self.ready_consents.discard(name)
         self.events.append(
@@ -542,34 +594,42 @@ class Match:
         self.winner = winner
         self.winner_reason = reason
         self.phase = "finished"
-        label = {
+        pengumuman_kubu = {
             "civilians": "Kubu warga menang.",
             "hitman": "Hitman menang.",
         }[winner]
-        self.events.append(f"{label} {explanation}")
+        self.events.append(f"{pengumuman_kubu} {explanation}")
 
     # Warga menang jika semua Hitman dieksekusi; Syndicate menang ketika warga bebas tidak lagi
     # lebih banyak dari Hitman yang hidup (suara warga tidak bisa lagi mengalahkan suara Hitman).
     def check_winner(self):
         if self.winner:
             return
-        hitmen = [p for p in self.players.values() if p.role == "hitman"]
-        alive_hitmen = sum(p.alive for p in hitmen)
-        survivors = [p for p in self.players.values() if p.role != "hitman" and p.alive]
-        if not alive_hitmen:
-            executed = "Semua Hitman" if len(hitmen) > 1 else "Hitman"
+        semua_hitman = [peserta for peserta in self.players.values() if peserta.role == "hitman"]
+        jumlah_hitman_hidup = sum(peserta.alive for peserta in semua_hitman)
+        warga_hidup = [
+            peserta
+            for peserta in self.players.values()
+            if peserta.role != "hitman" and peserta.alive
+        ]
+        if not jumlah_hitman_hidup:
+            sebutan_hitman = "Semua Hitman" if len(semua_hitman) > 1 else "Hitman"
             # Hitman yang keluar tersingkir seperti dieksekusi; alasan hasil tetap hitman_executed.
-            cara = "dieksekusi oleh Tribunal"
-            if any(p.left for p in hitmen):
-                cara = "keluar dari permainan" if all(p.left for p in hitmen) else "tersingkir"
-            self.finish("civilians", "hitman_executed", f"{executed} {cara}.")
-        elif not survivors:
+            cara_tersingkir = "dieksekusi oleh Tribunal"
+            if any(peserta.left for peserta in semua_hitman):
+                cara_tersingkir = (
+                    "keluar dari permainan"
+                    if all(peserta.left for peserta in semua_hitman)
+                    else "tersingkir"
+                )
+            self.finish("civilians", "hitman_executed", f"{sebutan_hitman} {cara_tersingkir}.")
+        elif not warga_hidup:
             self.finish("hitman", "no_civilians_alive", "Tidak ada warga yang masih hidup.")
-        elif all(p.hostage for p in survivors):
+        elif all(peserta.hostage for peserta in warga_hidup):
             self.finish(
                 "hitman", "all_survivors_hostage", "Semua warga yang masih hidup telah disandera."
             )
-        elif sum(not p.hostage for p in survivors) <= alive_hitmen:
+        elif sum(not peserta.hostage for peserta in warga_hidup) <= jumlah_hitman_hidup:
             self.finish(
                 "hitman",
                 "vote_control",
@@ -580,85 +640,99 @@ class Match:
         """Ringkasan hanya setelah selesai; korban tetap bagian dari kubu warga."""
         if not self.winner:
             return None
-        team = "hitman" if self.players[viewer].role == "hitman" else "civilians"
-        civilians = [p for p in self.players.values() if p.role != "hitman"]
+        kubu = "hitman" if self.players[viewer].role == "hitman" else "civilians"
+        semua_warga = [peserta for peserta in self.players.values() if peserta.role != "hitman"]
         return {
             "reason": self.winner_reason,
-            "team": team,
-            "outcome": "won" if team == self.winner else "lost",
-            "civilians_alive": sum(p.alive for p in civilians),
-            "civilians_hostage": sum(p.alive and p.hostage for p in civilians),
-            "civilians_eliminated": sum(not p.alive for p in civilians),
-            "civilians_voters": sum(p.alive and not p.hostage for p in civilians),
+            "team": kubu,
+            "outcome": "won" if kubu == self.winner else "lost",
+            "civilians_alive": sum(warga.alive for warga in semua_warga),
+            "civilians_hostage": sum(warga.alive and warga.hostage for warga in semua_warga),
+            "civilians_eliminated": sum(not warga.alive for warga in semua_warga),
+            "civilians_voters": sum(warga.alive and not warga.hostage for warga in semua_warga),
         }
 
     # BOT ATURAN: aksi/vote mengikuti validasi yang sama; tidak melihat role lawan. Korban Hostage (publik)
     # tidak pernah ditarget: pasti warga dan tidak bisa disandera lagi.
     def run_bots(self):
-        flag = {"day": "bot_day_done", "night": "bot_night_done", "tribunal": "bot_vote_done"}.get(
-            self.phase
-        )
-        if not flag or getattr(self, flag):
+        # INPUT: fase yang punya aksi bot; tiap fase hanya dijalankan sekali per ronde.
+        penanda_selesai = {
+            "day": "bot_day_done",
+            "night": "bot_night_done",
+            "tribunal": "bot_vote_done",
+        }.get(self.phase)
+        if not penanda_selesai or getattr(self, penanda_selesai):
             return
-        setattr(self, flag, True)
-        for player in self.players.values():
-            if not player.bot or not player.alive or player.hostage:
+        setattr(self, penanda_selesai, True)
+        for pemain in self.players.values():
+            if not pemain.bot or not pemain.alive or pemain.hostage:
                 continue
-            if (self.round, self.phase, player.name) in self.npc_decisions:
+            if (self.round, self.phase, pemain.name) in self.npc_decisions:
                 continue
-            targets = [
-                other.name
-                for other in self.players.values()
-                if other.alive and not other.hostage and other.name != player.name
+
+            # PROSES: susun urutan target. Pengacakan ini memakai rng pertandingan, jadi urutannya
+            # menentukan hasil simulasi ber-seed.
+            daftar_target = [
+                peserta.name
+                for peserta in self.players.values()
+                if peserta.alive and not peserta.hostage and peserta.name != pemain.name
             ]
-            self.rng.shuffle(targets)
-            if player.role == "hitman":
+            self.rng.shuffle(daftar_target)
+            if pemain.role == "hitman":
                 # Syndicate: rekan tidak pernah ditarget, dan Hostage mengikuti target rekan bila ada.
-                allies = set(self.allies(player.name))
-                targets = [name for name in targets if name not in allies]
-                leader = self.syndicate_target() if self.phase == "night" else None
-                if leader in targets:
-                    targets = [leader] + [name for name in targets if name != leader]
-            if self.phase == "night" and player.last_guard_round == self.round - 1:
+                rekan = set(self.allies(pemain.name))
+                daftar_target = [nama for nama in daftar_target if nama not in rekan]
+                target_tim = self.syndicate_target() if self.phase == "night" else None
+                if target_tim in daftar_target:
+                    daftar_target = [target_tim] + [
+                        nama for nama in daftar_target if nama != target_tim
+                    ]
+            if self.phase == "night" and pemain.last_guard_round == self.round - 1:
                 # Pilihan bot belum berubah: engine membolehkan, tetapi bot tidak menjaga target yang sama
                 # dua malam berturut-turut.
-                targets = [name for name in targets if name != player.last_guard]
+                daftar_target = [nama for nama in daftar_target if nama != pemain.last_guard]
             if self.phase == "tribunal":
                 # Stalker hanya memakai intel hasil Peek miliknya sendiri.
-                known = [
-                    item["name"]
-                    for item in player.intel
-                    if item["role"] == "hitman" and item["name"] in targets
+                hitman_diketahui = [
+                    data["name"]
+                    for data in pemain.intel
+                    if data["role"] == "hitman" and data["name"] in daftar_target
                 ]
-                targets = known + [name for name in targets if name not in known]
-            for target in targets:
+                daftar_target = hitman_diketahui + [
+                    nama for nama in daftar_target if nama not in hitman_diketahui
+                ]
+
+            # OUTPUT: target pertama yang lolos validasi engine menjadi aksi atau vote bot.
+            for nama_target in daftar_target:
                 try:
                     if self.phase == "tribunal":
-                        self.vote(player.name, target)
+                        self.vote(pemain.name, nama_target)
                     else:
-                        ability = "gag" if self.phase == "day" else NIGHT_ABILITY.get(player.role)
-                        self.act(player.name, ability, target)
+                        kemampuan = "gag" if self.phase == "day" else NIGHT_ABILITY.get(pemain.role)
+                        self.act(pemain.name, kemampuan, nama_target)
                     break
                 except ValueError:
                     continue
 
     # SKIP DISKUSI: hanya manusia hidup; status bungkam tidak memengaruhi hak persetujuan.
     def skip_discussion(self, name, *, now=None):
-        player = self.players.get(name)
-        if self.phase != "day" or not player or player.bot or not player.alive:
+        pemain = self.players.get(name)
+        if self.phase != "day" or not pemain or pemain.bot or not pemain.alive:
             raise ValueError("Persetujuan skip hanya untuk pemain manusia hidup saat siang.")
         self.skip_consents.add(name)
         self._skip_jika_lengkap(now)
 
     # Siang berakhir bila semua manusia hidup sudah setuju (dicek ulang saat ada pemain keluar).
-    def _skip_jika_lengkap(self, now=None):
-        required = {p.name for p in self.players.values() if not p.bot and p.alive}
-        if self.phase == "day" and required and required <= self.skip_consents:
+    def _skip_jika_lengkap(self, waktu_sekarang=None):
+        manusia_hidup = {
+            peserta.name for peserta in self.players.values() if not peserta.bot and peserta.alive
+        }
+        if self.phase == "day" and manusia_hidup and manusia_hidup <= self.skip_consents:
             # Gunakan transisi yang sama dengan timer, termasuk kesempatan aksi bot.
-            now = time.time() if now is None else now
+            waktu_sekarang = time.time() if waktu_sekarang is None else waktu_sekarang
             self.events.append("Semua pemain manusia menyetujui akhir diskusi.")
-            self.deadline = now
-            self.tick(now)
+            self.deadline = waktu_sekarang
+            self.tick(waktu_sekarang)
 
     # TIMER SERVER: maju satu fase saat deadline; tetap berjalan walaupun semua tab ditutup.
     def tick(self, now=None):
@@ -666,8 +740,8 @@ class Match:
         if self.phase == "preparing":
             # Batas tunggu habis: mulai dengan cadangan bawaan daripada menahan pemain selamanya.
             if now >= self.deadline:
-                cadangan = "AI belum siap penuh; permainan dimulai dengan bot cadangan."
-                self.begin(now, None if self.preparation["ready"] else cadangan)
+                pesan_cadangan = "AI belum siap penuh; permainan dimulai dengan bot cadangan."
+                self.begin(now, None if self.preparation["ready"] else pesan_cadangan)
             else:
                 self.try_begin(now)
             return
@@ -707,8 +781,8 @@ class Match:
                 self.phase = "day"
                 self.skip_consents.clear()
                 self.bot_day_done = self.bot_night_done = self.bot_vote_done = False
-                for player in self.players.values():
-                    player.gagged = False
+                for peserta in self.players.values():
+                    peserta.gagged = False
                 self.events.append(f"Ronde {self.round}: diskusi siang dimulai.")
         if not self.winner:
             self.deadline = now + self.durations[self.phase]
@@ -719,89 +793,96 @@ class Match:
         # ID diawali nomor urut: otak bot mengurutkan chat dengan waktu terima lalu ID, jadi chat yang
         # terbaca dalam satu langkah tetap kronologis (UUID murni membuat urutannya acak).
         self.jumlah_pesan += 1
-        record = {
+        pesan = {
             "id": f"{self.jumlah_pesan:06d}{uuid4().hex[:10]}",
             "sender": sender,
             "message": message,
         }
-        self.messages.append(record)
+        self.messages.append(pesan)
         self.messages = self.messages[-100:]
-        return record
+        return pesan
 
     # Data layar persiapan: progres AI, hitung mundur mulai, jumlah manusia yang sudah siap dan sudah membuka kartu.
     def preparation_view(self, viewer):
-        now = time.time()
-        prep = self.preparation
-        unrevealed = self.unrevealed()
-        starts_at = self._start_at()
+        waktu_sekarang = time.time()
+        persiapan = self.preparation
+        belum_buka_kartu = self.unrevealed()
+        waktu_mulai = self._hitung_waktu_mulai()
         return {
-            "ready": prep["ready"],
-            "detail": prep["detail"],
-            "progress": round(prep["progress"], 2),
-            "starts_in": max(0, ceil(starts_at - now)) if starts_at else None,
-            "max_wait": max(0, ceil(self.deadline - now)),
+            "ready": persiapan["ready"],
+            "detail": persiapan["detail"],
+            "progress": round(persiapan["progress"], 2),
+            "starts_in": max(0, ceil(waktu_mulai - waktu_sekarang)) if waktu_mulai else None,
+            "max_wait": max(0, ceil(self.deadline - waktu_sekarang)),
             "agreed": len(self.ready_consents),
-            "required": sum(not p.bot and p.alive for p in self.players.values()),
+            "required": sum(not peserta.bot and peserta.alive for peserta in self.players.values()),
             "consented": viewer in self.ready_consents,
-            "bots": sum(p.bot for p in self.players.values()),
-            "elapsed": max(0, int(now - prep["started_at"])),
+            "bots": sum(peserta.bot for peserta in self.players.values()),
+            "elapsed": max(0, int(waktu_sekarang - persiapan["started_at"])),
             "revealed": viewer in self.revealed,
-            "unrevealed": len(unrevealed),
+            "unrevealed": len(belum_buka_kartu),
         }
 
     # Username dari label (target keputusan bot); nama yang bukan label dikembalikan apa adanya.
     def username(self, label):
-        return next((u for u, nama in self.labels.items() if nama == label), label)
+        return next((username for username, nama in self.labels.items() if nama == label), label)
 
     # Jumlah tiap role sejak awal pertandingan; publik untuk semua pemain (siapa pemegangnya tetap rahasia).
     def composition(self):
-        counts = Counter(p.role for p in self.players.values())
-        return {role: counts[role] for role in ("hitman", "spy", "stalker", "civilian")}
+        jumlah_role = Counter(peserta.role for peserta in self.players.values())
+        return {role: jumlah_role[role] for role in ("hitman", "spy", "stalker", "civilian")}
 
     # Room dengan ≥ 2 Hitman mengumumkan Hitman yang masih hidup (berubah saat eksekusi/keluar).
     # Room 1 Hitman: None, karena warga sudah tahu dari game yang selesai atau berlanjut.
     def hitman_remaining(self):
-        hitmen = [p for p in self.players.values() if p.role == "hitman"]
-        return sum(p.alive for p in hitmen) if len(hitmen) >= 2 else None
+        semua_hitman = [peserta for peserta in self.players.values() if peserta.role == "hitman"]
+        return sum(peserta.alive for peserta in semua_hitman) if len(semua_hitman) >= 2 else None
 
     # SNAPSHOT PRIVAT: roster publik berisi status hidup, keluar, dan Hostage; Gag orang lain tidak pernah dikirim.
     def snapshot(self, viewer):
-        player = self.players[viewer]
-        hitman = player.role == "hitman"
-        spy = player.role == "spy"
-        team_chat = self.can_team_chat(viewer)
-        ability = None
-        if self.phase == "day" and hitman:
-            ability = "gag"
+        # INPUT: role dan hak aksi pemain yang meminta snapshot.
+        pemain = self.players[viewer]
+        adalah_hitman = pemain.role == "hitman"
+        adalah_spy = pemain.role == "spy"
+        boleh_chat_tim = self.can_team_chat(viewer)
+        kemampuan = None
+        if self.phase == "day" and adalah_hitman:
+            kemampuan = "gag"
         elif self.phase == "night":
-            ability = NIGHT_ABILITY.get(player.role)
-        can_act = bool(ability and player.alive and not player.hostage and not self.winner)
-        if ability == "gag":
-            can_act &= self.round >= self.next_gag
-        elif ability:
-            can_act &= viewer not in self.actions and (
-                ability != "peek" or self.round >= player.next_peek
+            kemampuan = NIGHT_ABILITY.get(pemain.role)
+        bisa_beraksi = bool(kemampuan and pemain.alive and not pemain.hostage and not self.winner)
+        if kemampuan == "gag":
+            bisa_beraksi &= self.round >= self.next_gag
+        elif kemampuan:
+            bisa_beraksi &= viewer not in self.actions and (
+                kemampuan != "peek" or self.round >= pemain.next_peek
             )
+
+        # OUTPUT: data publik pertandingan, lalu data privat pemain ini di `me`.
         return {
             # Vote yang sudah dikirim terbuka saat Tribunal, tanpa daftar hak vote/status bungkam.
             "tribunal_votes": (
                 [
                     {
-                        "target": name,
-                        "voters": [voter for voter, target in self.votes.items() if target == name],
+                        "target": nama,
+                        "voters": [
+                            pemilih for pemilih, target in self.votes.items() if target == nama
+                        ],
                     }
-                    for name in self.players
+                    for nama in self.players
                 ]
                 if self.phase == "tribunal"
                 else []
             ),
             "discussion_skip": {
                 "agreed": len(self.skip_consents) if self.phase == "day" else 0,
-                "required": sum(not p.bot and p.alive for p in self.players.values()),
+                "required": sum(
+                    not peserta.bot and peserta.alive for peserta in self.players.values()
+                ),
                 "consented": viewer in self.skip_consents if self.phase == "day" else False,
                 "can_consent": self.phase == "day"
-                and not player.bot
-                and player.alive
+                and not pemain.bot
+                and pemain.alive
                 and viewer not in self.skip_consents,
             },
             "id": self.id,
@@ -818,86 +899,98 @@ class Match:
             "hitman_remaining": self.hitman_remaining(),
             "players": [
                 {
-                    "name": p.name,
-                    "label": self.labels[p.name],
-                    "alive": p.alive,
-                    "skin_id": p.skin_id,
+                    "name": peserta.name,
+                    "label": self.labels[peserta.name],
+                    "alive": peserta.alive,
+                    "skin_id": peserta.skin_id,
                     # Keluar sudah diumumkan di catatan, jadi tandanya publik (hanya bila benar).
-                    **({"left": True} if p.left else {}),
+                    **({"left": True} if peserta.left else {}),
                     # Hostage diumumkan saat malam selesai, jadi status dan malamnya publik (hanya bila benar).
-                    **({"hostage": True, "hostage_round": p.hostage_round} if p.hostage else {}),
-                    **({"thinking": True} if p.name in self.bot_berpikir else {}),
-                    **({"tahap": self.bot_tahap[p.name]} if p.name in self.bot_tahap else {}),
-                    **({"role": p.role, "bot": p.bot} if self.winner else {}),
+                    **(
+                        {"hostage": True, "hostage_round": peserta.hostage_round}
+                        if peserta.hostage
+                        else {}
+                    ),
+                    **({"thinking": True} if peserta.name in self.bot_berpikir else {}),
+                    **(
+                        {"tahap": self.bot_tahap[peserta.name]}
+                        if peserta.name in self.bot_tahap
+                        else {}
+                    ),
+                    **({"role": peserta.role, "bot": peserta.bot} if self.winner else {}),
                 }
-                for p in self.players.values()
+                for peserta in self.players.values()
             ],
             "messages": list(self.messages),
             "me": {
                 "name": viewer,
-                "role": player.role,
-                "alive": player.alive,
-                "hostage": player.hostage,
-                "gagged": player.gagged,
-                "muted": player.hostage or player.gagged,
+                "role": pemain.role,
+                "alive": pemain.alive,
+                "hostage": pemain.hostage,
+                "gagged": pemain.gagged,
+                "muted": pemain.hostage or pemain.gagged,
                 "can_chat": self.can_chat(viewer),
                 "can_vote": self.phase == "tribunal"
-                and player.alive
-                and not player.hostage
+                and pemain.alive
+                and not pemain.hostage
                 and viewer not in self.votes,
                 "can_cancel_vote": self.phase == "tribunal"
-                and player.alive
-                and not player.hostage
+                and pemain.alive
+                and not pemain.hostage
                 and viewer in self.votes,
                 "vote": self.votes.get(viewer),
-                "ability": ability,
-                "can_act": bool(can_act),
+                "ability": kemampuan,
+                "can_act": bool(bisa_beraksi),
                 "action": self.actions.get(viewer) if self.phase == "night" else None,
                 "can_cancel_action": self.phase == "night"
-                and player.alive
-                and not player.hostage
+                and pemain.alive
+                and not pemain.hostage
                 and viewer in self.actions,
                 # Cooldown Gag bersama hanya untuk Syndicate; warga tidak boleh tahu kapan Gag dipakai.
-                "next_gag": self.next_gag if hitman else 1,
-                "next_peek": player.next_peek,
+                "next_gag": self.next_gag if adalah_hitman else 1,
+                "next_peek": pemain.next_peek,
                 "allies": self.allies(viewer),
-                # Korban Hostage tim malam ini (pilihan terbanyak, seri → yang paling awal), hanya untuk Syndicate.
+                # Korban Hostage tim malam ini (aturan seri: lihat syndicate_target), hanya untuk Syndicate.
                 "syndicate_target": (
-                    self.syndicate_target() if hitman and self.phase == "night" else None
+                    self.syndicate_target() if adalah_hitman and self.phase == "night" else None
                 ),
                 # Hasil Hostage tim tiap malam (gagal = dijaga Guard), hanya untuk Syndicate.
-                "syndicate_hostages": list(self.syndicate_log) if hitman else [],
+                "syndicate_hostages": list(self.syndicate_log) if adalah_hitman else [],
                 # Target Gag ronde ini (Gag dipakai bersama Syndicate); warga hanya tahu status dirinya sendiri.
-                "ally_gags": [p.name for p in self.players.values() if p.gagged] if hitman else [],
+                "ally_gags": (
+                    [peserta.name for peserta in self.players.values() if peserta.gagged]
+                    if adalah_hitman
+                    else []
+                ),
                 # Pilihan Hostage rekan malam ini agar Syndicate bisa sepakat satu target.
                 "ally_actions": (
                     [
-                        {"name": name, "target": action["target"]}
-                        for name, action in self.actions.items()
-                        if name != viewer and action["ability"] == "hostage"
+                        {"name": nama, "target": aksi["target"]}
+                        for nama, aksi in self.actions.items()
+                        if nama != viewer and aksi["ability"] == "hostage"
                     ]
-                    if hitman and self.phase == "night"
+                    if adalah_hitman and self.phase == "night"
                     else []
                 ),
                 # Rekan Spy dan pilihan Guard mereka malam ini; kosong untuk selain Spy dan di room satu Spy.
                 "spy_allies": self.spy_allies(viewer),
                 "spy_actions": (
                     [
-                        {"name": name, "target": action["target"]}
-                        for name, action in self.actions.items()
-                        if name != viewer and action["ability"] == "guard"
+                        {"name": nama, "target": aksi["target"]}
+                        for nama, aksi in self.actions.items()
+                        if nama != viewer and aksi["ability"] == "guard"
                     ]
-                    if spy and self.phase == "night"
+                    if adalah_spy and self.phase == "night"
                     else []
                 ),
                 # Chat tim malam ini: hanya pemain yang berhak, dan hanya kanal timnya sendiri.
-                "can_team_chat": team_chat,
+                "can_team_chat": boleh_chat_tim,
                 "team_messages": (
-                    list(self.team_messages[self.team_channel(viewer)]) if team_chat else []
+                    list(self.team_messages[self.team_channel(viewer)]) if boleh_chat_tim else []
                 ),
                 "last_guard": (
-                    player.last_guard if player.last_guard_round == self.round - 1 else None
+                    pemain.last_guard if pemain.last_guard_round == self.round - 1 else None
                 ),
-                "intel": list(player.intel),
+                "intel": list(pemain.intel),
             },
         }

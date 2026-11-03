@@ -1,4 +1,4 @@
-"""Socket.IO event controllers and their short-lived game state."""
+"""Controller event Socket.IO beserta status game jangka pendeknya."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ logger = logging.getLogger("shadow_heist.socket")
 
 
 class SocketGameController:
-    """Chat room-scoped; engine di memori, pesan dicatat ke MySQL."""
+    """Chat per ruangan; engine di memori, pesan dicatat ke MySQL. `sid` = ID koneksi Socket.IO."""
 
     # CONSTRUCTOR: simpan dependensi dan pemetaan socket → akun, ruangan, dan token login.
     def __init__(
@@ -40,74 +40,76 @@ class SocketGameController:
 
     async def emit_room(self, event, data, *, to):
         """Cabut penerima lama sebelum broadcast, termasuk socket pasif setelah logout/leave."""
-        for sid, code in list(self.socket_rooms.items()):
-            if code != to:
+        for sid, kode_room in list(self.socket_rooms.items()):
+            if kode_room != to:
                 continue
             username = self.socket_players.get(sid)
             try:
-                room_service.get(code, username)
+                room_service.get(kode_room, username)
                 if sid in self.socket_tokens:
-                    user = auth_service.user_for_token(self.socket_tokens[sid])
-                    if user.username != username:
+                    akun = auth_service.user_for_token(self.socket_tokens[sid])
+                    if akun.username != username:
                         raise ValueError("Identitas sesi berubah.")
             except (ValueError, SessionValidationError, AuthenticationPersistenceError):
-                await self.sio.leave_room(sid, code)
+                await self.sio.leave_room(sid, kode_room)
         await self.sio.emit(event, data, to=to)
 
     # Cocokkan identitas dengan sesi login socket dan pastikan masih anggota ruangan. Hasil: kode ruangan.
-    def _verify_socket(self, sid: str, username: str) -> str:
-        authenticated_username = self.socket_players.get(sid)
-        normalized_username = username.strip()
-        if authenticated_username is None:
+    def _verifikasi_socket(self, sid: str, username: str) -> str:
+        username_sesi = self.socket_players.get(sid)
+        username_dikirim = username.strip()
+        if username_sesi is None:
             raise ValueError("Login diperlukan sebelum masuk ke game.")
-        if normalized_username != authenticated_username:
+        if username_dikirim != username_sesi:
             raise ValueError("Identitas pemain tidak sesuai dengan sesi login.")
 
         # Token handshake diperiksa lagi supaya logout/expiry mencabut akses chat.
         if sid in self.socket_tokens:
             try:
-                user = auth_service.user_for_token(self.socket_tokens[sid])
-                if user.username != authenticated_username:
+                akun = auth_service.user_for_token(self.socket_tokens[sid])
+                if akun.username != username_sesi:
                     raise ValueError("Sesi login berubah. Silakan sambungkan ulang.")
             except (SessionValidationError, AuthenticationPersistenceError) as error:
                 raise ValueError("Sesi login berakhir. Silakan login ulang.") from error
 
-        code = self.socket_rooms[sid]
-        room_service.get(code, authenticated_username)
-        return code
+        kode_room = self.socket_rooms[sid]
+        room_service.get(kode_room, username_sesi)
+        return kode_room
 
     # METHOD ASYNC: verifikasi socket, catat pemain di arsip, gabungkan ke kanal ruangan, lalu siarkan roster.
     async def register_player_socket(self, sid: str, username: str) -> None:
-        code = self._verify_socket(sid, username)
-        name = username.strip()
-        PersistenceService(code).ensure_player(name)
-        await self.sio.enter_room(sid, code)
+        kode_room = self._verifikasi_socket(sid, username)
+        username_bersih = username.strip()
+        PersistenceService(kode_room).ensure_player(username_bersih)
+        await self.sio.enter_room(sid, kode_room)
         await self.emit_room(
-            "room_state", room_service.snapshot(room_service.get(code, name)), to=code
+            "room_state",
+            room_service.snapshot(room_service.get(kode_room, username_bersih)),
+            to=kode_room,
         )
 
     # EVENT CONNECT: periksa token login dan akses ruangan sebelum mencatat identitas socket.
     async def connect(self, sid: str, environ: dict[str, Any], auth: Any = None) -> None:
         token = str(auth.get("token", "")) if isinstance(auth, dict) else ""
         try:
-            user = auth_service.user_for_token(token)
+            akun = auth_service.user_for_token(token)
         except (SessionValidationError, AuthenticationPersistenceError) as error:
             raise socketio.exceptions.ConnectionRefusedError("Login diperlukan.") from error
         try:
-            code = str(auth.get("room_code", ""))
-            room_service.get(code, user.username)
+            kode_room = str(auth.get("room_code", ""))
+            room_service.get(kode_room, akun.username)
         except (SessionValidationError, AuthenticationPersistenceError, ValueError) as error:
             logger.info("Koneksi Socket ditolak untuk %s: %s", sid, error)
             raise socketio.exceptions.ConnectionRefusedError("Ruangan tidak valid.") from error
 
-        self.socket_players[sid] = user.username
+        self.socket_players[sid] = akun.username
         self.socket_tokens[sid] = token
-        self.socket_rooms[sid] = code.strip().upper()
+        self.socket_rooms[sid] = kode_room.strip().upper()
         await self.sio.enter_room(sid, self.socket_rooms[sid])
         logger.info("Pemain terkoneksi ke Socket: %s", sid)
         await self.sio.emit(
             "server_ready",
-            {"message": f"Python game server siap, {user.display_name}."},
+            {"message": f"Python game server siap, {akun.display_name}."},
             to=sid,
         )
 
@@ -129,56 +131,57 @@ class SocketGameController:
 
     # EVENT CHAT ASYNC: validasi pesan, catat checker dan MySQL, lalu kirim hanya ke ruangan terkait.
     async def send_chat(self, sid: str, data: dict[str, Any]) -> None:
-        started = perf_counter()
-        holder = {}
+        waktu_mulai = perf_counter()
+        # Wadah agar jejak tetap terbaca di finally walaupun _send_chat berhenti di tengah jalan.
+        wadah_jejak = {}
         try:
-            await self._send_chat(sid, data, holder)
+            await self._send_chat(sid, data, wadah_jejak)
         finally:
-            trace = holder.get("trace")
-            if trace:
-                trace["duration_ms"] = round((perf_counter() - started) * 1000, 2)
+            jejak = wadah_jejak.get("trace")
+            if jejak:
+                jejak["duration_ms"] = round((perf_counter() - waktu_mulai) * 1000, 2)
                 try:
-                    PersistenceService(trace["room_code"]).record_trace(trace)
+                    PersistenceService(jejak["room_code"]).record_trace(jejak)
                 except PersistenceError:
                     logger.error(
-                        "Checker archive could not be saved for room %s", trace["room_code"]
+                        "Checker archive could not be saved for room %s", jejak["room_code"]
                     )
 
     # Validasi sesi dan hak chat, simpan pesan, lalu broadcast. Setelah itu IndoBERT membaca pesan sekali
     # (tahap 5) untuk checker dan riwayat chat; hasilnya masuk memo NLU sehingga bot memakainya di langkah
     # NPCService berikutnya tanpa menghitung ulang. Handler ini tidak membalas pesan.
-    async def _send_chat(self, sid: str, data: dict[str, Any], holder) -> None:
+    async def _send_chat(self, sid: str, data: dict[str, Any], wadah_jejak) -> None:
         # TAHAP 1: terima event send_chat; validasi isi pesan dan identitas sesi.
         try:
             if not isinstance(data, dict) or not isinstance(data.get("message"), str):
                 raise ValueError("Format pesan tidak valid.")
-            sender = str(data.get("username", "")).strip()
-            message = str(data.get("message", "")).strip()
-            if not message or len(message) > 1000:
+            pengirim = str(data.get("username", "")).strip()
+            pesan = str(data.get("message", "")).strip()
+            if not pesan or len(pesan) > 1000:
                 raise ValueError("Pesan chat harus berisi 1–1000 karakter.")
             # Socket sudah masuk kanal ruangan saat connect; pemain dicatat di transaksi pesan (tahap 3).
-            self._verify_socket(sid, sender)
+            self._verifikasi_socket(sid, pengirim)
         except ValueError as error:
             await self.sio.emit("system_alert", {"msg": str(error)}, to=sid)
             return
 
-        code = self.socket_rooms[sid]
-        room = room_service.get(code, sender)
+        kode_room = self.socket_rooms[sid]
+        room = room_service.get(kode_room, pengirim)
         # TAHAP 2: engine mengotorisasi pesan sebelum disimpan atau ditampilkan.
-        blocked = False
+        chat_terkunci = False
         with room_service.lock:
-            match = room.match
-            if match:
-                match.tick()
-                blocked = not match.can_chat(sender)
-                phase_token = (match.id, match.round, match.phase)
+            pertandingan = room.match
+            if pertandingan:
+                pertandingan.tick()
+                chat_terkunci = not pertandingan.can_chat(pengirim)
+                token_fase = (pertandingan.id, pertandingan.round, pertandingan.phase)
             else:
-                phase_token = None
-        if blocked:
+                token_fase = None
+        if chat_terkunci:
             activity.record(
-                code,
+                kode_room,
                 "Match.can_chat",
-                {"username": sender},
+                {"username": pengirim},
                 status="rejected",
                 result={"allowed": False},
             )
@@ -186,70 +189,72 @@ class SocketGameController:
                 "system_alert", {"msg": "Chat terkunci untukmu pada fase ini."}, to=sid
             )
             return
-        trace = checker_service.begin(code, sender, message)
-        holder["trace"] = trace
-        trace["match_id"] = phase_token[0] if phase_token else None
+        jejak = checker_service.begin(kode_room, pengirim, pesan)
+        wadah_jejak["trace"] = jejak
+        jejak["match_id"] = token_fase[0] if token_fase else None
         activity.record(
-            code,
+            kode_room,
             "SocketGameController.send_chat",
-            {"username": sender, "message": message},
+            {"username": pengirim, "message": pesan},
             status="received",
-            call_id=trace["id"],
+            call_id=jejak["id"],
         )
 
-        context = (
-            {"match_id": phase_token[0], "round_number": phase_token[1], "phase": phase_token[2]}
-            if phase_token
+        konteks = (
+            {"match_id": token_fase[0], "round_number": token_fase[1], "phase": token_fase[2]}
+            if token_fase
             else {"phase": "lobby"}
         )
-        accepted = {"sender": sender, "message": message}
+        pesan_diterima = {"sender": pengirim, "message": pesan}
         try:
             # TAHAP 3: simpan pesan. Aksi/skip HTTP bisa berjalan bersamaan, jadi periksa ulang dan
             # commit di lock yang sama supaya Gag atau fase baru tidak diterobos.
-            with measure(trace, "persistence_ms"), room_service.lock:
-                current_room = room_service.get(code, sender)
-                if current_room is not room or current_room.match is not match:
+            with measure(jejak, "persistence_ms"), room_service.lock:
+                room_terkini = room_service.get(kode_room, pengirim)
+                if room_terkini is not room or room_terkini.match is not pertandingan:
                     raise ValueError("Ruangan sudah berubah. Kirim ulang pada fase yang sesuai.")
-                if match:
-                    match.tick()
-                    if phase_token != (match.id, match.round, match.phase) or not match.can_chat(
-                        sender
-                    ):
+                if pertandingan:
+                    pertandingan.tick()
+                    if token_fase != (
+                        pertandingan.id,
+                        pertandingan.round,
+                        pertandingan.phase,
+                    ) or not pertandingan.can_chat(pengirim):
                         raise ValueError(
                             "Chat terkunci atau fase sudah berubah. Pesan tidak dikirim."
                         )
-                trace["message_id"] = PersistenceService(code).record_player_message(
-                    username=sender,
-                    message=message,
+                jejak["message_id"] = PersistenceService(kode_room).record_player_message(
+                    username=pengirim,
+                    message=pesan,
                     status="active",  # Gag/Hostage ditegakkan Match.can_chat, bukan status arsip
-                    context=context,
+                    context=konteks,
                 )
-                if match:
-                    accepted = match.add_message(sender, message)
+                if pertandingan:
+                    pesan_diterima = pertandingan.add_message(pengirim, pesan)
             activity.record(
-                code,
+                kode_room,
                 "PersistenceService.record_player_message",
-                {"username": sender},
-                result={"message_id": trace["message_id"]},
-                call_id=trace["id"],
+                {"username": pengirim},
+                result={"message_id": jejak["message_id"]},
+                call_id=jejak["id"],
             )
         except ValueError as error:
-            trace.update(stage="discarded_state_changed", error=str(error))
+            jejak.update(stage="discarded_state_changed", error=str(error))
             await self.sio.emit("system_alert", {"msg": str(error)}, to=sid)
             return
         except PersistenceError as error:
-            trace.update(stage="persistence_error", error=str(error))
+            jejak.update(stage="persistence_error", error=str(error))
             await self.sio.emit("system_alert", {"msg": str(error)}, to=sid)
             return
         # TAHAP 4: kirim pesan ke semua anggota ruangan.
-        with measure(trace, "broadcast_ms"):
-            await self.emit_room("receive_chat", accepted, to=code)
-        trace["stage"] = "delivered"
+        with measure(jejak, "broadcast_ms"):
+            await self.emit_room("receive_chat", pesan_diterima, to=kode_room)
+        jejak["stage"] = "delivered"
         # TAHAP 5: catat bacaan IndoBERT (intent, target) untuk checker dan riwayat chat panel.
-        if match:
-            with measure(trace, "nlu_ms"):
-                trace["nlu"] = await catat_nlu(
-                    match, sender, message, trace["message_id"], room_code=code
+        if pertandingan:
+            with measure(jejak, "nlu_ms"):
+                jejak["nlu"] = await catat_nlu(
+                    pertandingan, pengirim, pesan, jejak["message_id"], room_code=kode_room
                 )
 
     # KOMPATIBILITAS: aksi memakai endpoint terautentikasi dengan token fase, bukan event lama.
@@ -268,12 +273,11 @@ def register_socket_handlers(
     sio: socketio.AsyncServer,
     persistence: PersistenceService,
 ) -> SocketGameController:
-    """Attach event handlers and return the controller for application wiring."""
-    controller = SocketGameController(sio, persistence)
-    sio.on("connect", controller.connect)
-    sio.on("disconnect", controller.disconnect)
-    sio.on("register_player", controller.register_player)
-    sio.on("send_chat", controller.send_chat)
-    sio.on("use_gag_order", controller.use_gag_order)
-    sio.on("start_tribunal", controller.start_tribunal)
-    return controller
+    pengendali = SocketGameController(sio, persistence)
+    sio.on("connect", pengendali.connect)
+    sio.on("disconnect", pengendali.disconnect)
+    sio.on("register_player", pengendali.register_player)
+    sio.on("send_chat", pengendali.send_chat)
+    sio.on("use_gag_order", pengendali.use_gag_order)
+    sio.on("start_tribunal", pengendali.start_tribunal)
+    return pengendali
