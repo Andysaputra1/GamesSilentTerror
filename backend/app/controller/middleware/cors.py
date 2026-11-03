@@ -1,4 +1,4 @@
-"""Register HTTP cross-origin policy using application configuration."""
+"""Pasang kebijakan lintas origin HTTP sesuai konfigurasi aplikasi."""
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config.settings import settings
 
 
-# FUNCTION SETUP: pasang kebijakan origin, method, dan header untuk request lintas origin dari browser.
+# Pasang kebijakan origin, method, dan header untuk request lintas origin dari browser.
 def configure_cors(app: FastAPI) -> None:
     app.add_middleware(
         CORSMiddleware,

@@ -40,9 +40,9 @@ class CreateUserRequest(UpdateProfileRequest, ResetPasswordRequest):
 
 
 # Ubah error layanan menjadi respons yang aman tanpa detail SQL atau kredensial.
-def user_result(operation):
+def _jalankan_operasi_user(operasi):
     try:
-        return operation()
+        return operasi()
     except users.UserNotFound as error:
         raise HTTPException(404, str(error)) from error
     except ValueError as error:
@@ -54,28 +54,32 @@ def user_result(operation):
 # Cari username/nama tampilan dengan cursor ID agar seluruh tabel tidak dimuat sekaligus.
 @router.get("")
 def list_users(after_id: int = Query(0, ge=0), search: str = Query("", max_length=100)):
-    return user_result(lambda: users.list_users(after_id, search.strip()))
+    return _jalankan_operasi_user(lambda: users.list_users(after_id, search.strip()))
 
 
 # Tambah akun lokal dengan nama pilihan admin; akun Google hanya dibuat lewat login Google asli.
 @router.post("", status_code=201)
 def create_user(body: CreateUserRequest):
-    return user_result(lambda: users.create_user(body.username, body.display_name, body.password))
+    return _jalankan_operasi_user(
+        lambda: users.create_user(body.username, body.display_name, body.password)
+    )
 
 
 # Edit nama dan username akun lokal maupun Google; role admin tidak bisa diubah lewat endpoint ini.
 @router.post("/{user_id}/profile")
 def update_user(user_id: int, body: UpdateProfileRequest):
-    return user_result(lambda: users.update_user(user_id, body.display_name, body.username))
+    return _jalankan_operasi_user(
+        lambda: users.update_user(user_id, body.display_name, body.username)
+    )
 
 
 # Admin boleh mereset password akun lokal; semua sesi lama langsung dicabut.
 @router.post("/{user_id}/password", status_code=204)
 def reset_password(user_id: int, body: ResetPasswordRequest):
-    user_result(lambda: users.reset_password(user_id, body.password))
+    _jalankan_operasi_user(lambda: users.reset_password(user_id, body.password))
 
 
 # Konfirmasi username terikat pada ID target; riwayat chat dan analisis tetap tersedia.
 @router.post("/{user_id}/delete", status_code=204)
 def delete_user(user_id: int, body: DeleteUserRequest):
-    user_result(lambda: users.delete_user(user_id, body.confirm_username))
+    _jalankan_operasi_user(lambda: users.delete_user(user_id, body.confirm_username))

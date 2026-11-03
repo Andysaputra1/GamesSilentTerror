@@ -1,4 +1,4 @@
-"""Authentication HTTP controllers, account registration, and Google identity verification."""
+"""Controller HTTP untuk login, pendaftaran akun, dan verifikasi identitas Google."""
 
 from collections import OrderedDict
 from datetime import timedelta, timezone
@@ -14,10 +14,12 @@ from google.oauth2 import id_token
 from sqlalchemy.exc import IntegrityError
 
 from app.controller.middleware.auth import require_authenticated_user
-from app.schemas.auth import AuthenticatedUserResponse, LoginRequest, LoginResponse
 from app.schemas.auth import (
-    RegisterRequest,
+    AuthenticatedUserResponse,
     GoogleLoginRequest,
+    LoginRequest,
+    LoginResponse,
+    RegisterRequest,
     UpdateProfileRequest,
     UpdateSkinRequest,
 )
@@ -30,46 +32,52 @@ from app.module.auth_service import (
     AuthenticationPersistenceError,
     LoginResult,
     auth_service,
-    _token_hash,
-    _utc_now,
+    _hash_token,
+    _waktu_utc_sekarang,
 )
 from app.module.password_service import hash_password
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
-_bearer_scheme = HTTPBearer(auto_error=False)
+_skema_bearer = HTTPBearer(auto_error=False)
 
 
-@router.post("/login", response_model=LoginResponse, dependencies=[Depends(limit_auth)])
-# CONTROLLER LOGIN: minta service memeriksa akun dan membuat sesi; kembalikan token atau error HTTP.
-def login(request: LoginRequest) -> LoginResponse:
-    """Create a short-lived opaque session after validating credentials."""
-    try:
-        result = auth_service.login(username=request.username, password=request.password)
-    except AuthenticationError as error:
-        raise HTTPException(status_code=401, detail=str(error)) from error
-    except AuthenticationPersistenceError as error:
-        raise HTTPException(status_code=503, detail=str(error)) from error
-    return LoginResponse(
-        access_token=result.access_token,
-        expires_at=result.expires_at,
-        user=AuthenticatedUserResponse(
-            username=result.user.username,
-            display_name=result.user.display_name,
-            skin_id=result.user.skin_id,
-        ),
-    )
-
-
-@router.get("/me", response_model=AuthenticatedUserResponse)
-# CONTROLLER PROFIL: kembalikan username dan nama tampilan pengguna yang sudah lolos autentikasi.
-def current_user(
-    user: AuthenticatedUser = Depends(require_authenticated_user),
-) -> AuthenticatedUserResponse:
+# Data pengguna yang boleh dikirim ke klien.
+def _buat_respons_pengguna(user: AuthenticatedUser) -> AuthenticatedUserResponse:
     return AuthenticatedUserResponse(
         username=user.username,
         display_name=user.display_name,
         skin_id=user.skin_id,
     )
+
+
+# Bentuk respons yang sama untuk login, pendaftaran, dan login Google.
+def _buat_respons_login(hasil_login: LoginResult) -> LoginResponse:
+    return LoginResponse(
+        access_token=hasil_login.access_token,
+        expires_at=hasil_login.expires_at,
+        user=_buat_respons_pengguna(hasil_login.user),
+    )
+
+
+# Minta service memeriksa akun dan membuat sesi; kembalikan token atau error HTTP.
+@router.post("/login", response_model=LoginResponse, dependencies=[Depends(limit_auth)])
+def login(body: LoginRequest) -> LoginResponse:
+    """Create a short-lived opaque session after validating credentials."""
+    try:
+        hasil_login = auth_service.login(username=body.username, password=body.password)
+    except AuthenticationError as error:
+        raise HTTPException(status_code=401, detail=str(error)) from error
+    except AuthenticationPersistenceError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+    return _buat_respons_login(hasil_login)
+
+
+# Kembalikan username dan nama tampilan pengguna yang sudah lolos autentikasi.
+@router.get("/me", response_model=AuthenticatedUserResponse)
+def current_user(
+    user: AuthenticatedUser = Depends(require_authenticated_user),
+) -> AuthenticatedUserResponse:
+    return _buat_respons_pengguna(user)
 
 
 # Akun yang diubah berasal dari bearer token; username baru tidak dapat memilih akun lain.
@@ -81,20 +89,16 @@ def update_profile(
 ) -> AuthenticatedUserResponse:
     response.headers["Cache-Control"] = "no-store"
     try:
-        updated = auth_service.update_profile(user, body.display_name, body.username)
+        pengguna_terbaru = auth_service.update_profile(user, body.display_name, body.username)
     except ValueError as error:
         raise HTTPException(409, str(error)) from error
     except AuthenticationPersistenceError as error:
         raise HTTPException(503, "Nama belum berhasil disimpan. Coba lagi nanti.") from error
-    return AuthenticatedUserResponse(
-        username=updated.username,
-        display_name=updated.display_name,
-        skin_id=updated.skin_id,
-    )
+    return _buat_respons_pengguna(pengguna_terbaru)
 
 
+# Ubah skin pilihan dari token autentikasi; user tidak bisa mengubah skin user lain.
 @router.put("/skin")
-# CONTROLLER: ubah skin preference dari token autentikasi; user tidak bisa mengubah skin user lain.
 def update_skin(
     body: UpdateSkinRequest,
     user: AuthenticatedUser = Depends(require_authenticated_user),
@@ -108,37 +112,29 @@ def update_skin(
     return {"skin_id": skin_id}
 
 
+# Cabut sesi bearer yang diberikan; error database diterjemahkan menjadi HTTP 503.
 @router.post("/logout", status_code=204)
-# CONTROLLER LOGOUT: cabut sesi bearer yang diberikan; error database diterjemahkan menjadi HTTP 503.
 def logout(
-    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
+    kredensial: HTTPAuthorizationCredentials | None = Depends(_skema_bearer),
 ) -> None:
-    if credentials is not None and credentials.scheme.lower() == "bearer":
+    if kredensial is not None and kredensial.scheme.lower() == "bearer":
         try:
-            auth_service.logout(credentials.credentials)
+            auth_service.logout(kredensial.credentials)
         except AuthenticationPersistenceError as error:
             raise HTTPException(status_code=503, detail=str(error)) from error
 
 
-def account_response(operation):
-    """Terjemahkan kegagalan tanpa memuat password/token dalam detail error."""
+# Terjemahkan kegagalan tanpa memuat password/token dalam detail error.
+def _jalankan_operasi_akun(operasi):
     try:
-        result = operation()
+        hasil_login = operasi()
     except AccountConflict as error:
         raise HTTPException(409, str(error)) from error
     except AuthenticationError as error:
         raise HTTPException(401, str(error)) from error
     except AuthenticationPersistenceError as error:
         raise HTTPException(503, str(error)) from error
-    return LoginResponse(
-        access_token=result.access_token,
-        expires_at=result.expires_at,
-        user=AuthenticatedUserResponse(
-            username=result.user.username,
-            display_name=result.user.display_name,
-            skin_id=result.user.skin_id,
-        ),
-    )
+    return _buat_respons_login(hasil_login)
 
 
 # Daftarkan akun dan terbitkan sesi; respons autentikasi tidak boleh di-cache.
@@ -147,7 +143,7 @@ def account_response(operation):
 )
 def register(body: RegisterRequest, response: Response):
     response.headers["Cache-Control"] = "no-store"
-    return account_response(lambda: register_account(body))
+    return _jalankan_operasi_akun(lambda: register_account(body))
 
 
 # Kirim client ID publik agar browser dapat menyiapkan tombol Google.
@@ -179,31 +175,33 @@ def validate_google_origin(request):
 def google_login(body: GoogleLoginRequest, request: Request, response: Response):
     validate_google_origin(request)
     response.headers["Cache-Control"] = "no-store"
-    return account_response(lambda: google_account(verify_google(body.credential, body.nonce)))
+    return _jalankan_operasi_akun(
+        lambda: google_account(verify_google(body.credential, body.nonce))
+    )
 
 
-# AKUN: registrasi dan identitas federasi. Tidak pernah menggabungkan akun berdasarkan email.
+# Registrasi dan identitas federasi tidak pernah menggabungkan akun berdasarkan email.
 class AccountConflict(ValueError):
     """Username/email sudah dipakai; jangan mengubah akun lama."""
 
 
-def issue_session(database, account):
+def issue_session(database, akun):
     """Buat sesi aplikasi biasa; token Google tidak disimpan."""
-    if not account["is_active"]:
+    if not akun["is_active"]:
         raise AuthenticationError("Akun tidak aktif.")
     token = secrets.token_urlsafe(32)
-    expires = _utc_now() + timedelta(hours=settings.auth_session_hours)
+    waktu_kedaluwarsa = _waktu_utc_sekarang() + timedelta(hours=settings.auth_session_hours)
     auth_queries.create_session(
-        database, user_id=account["id"], token_hash=_token_hash(token), expires_at=expires
+        database, user_id=akun["id"], token_hash=_hash_token(token), expires_at=waktu_kedaluwarsa
     )
     return LoginResult(
         token,
-        expires.replace(tzinfo=timezone.utc),
+        waktu_kedaluwarsa.replace(tzinfo=timezone.utc),
         AuthenticatedUser(
-            account["id"],
-            account["username"],
-            account["display_name"],
-            account.get("skin_id") or "dexter",
+            akun["id"],
+            akun["username"],
+            akun["display_name"],
+            akun.get("skin_id") or "dexter",
         ),
     )
 
@@ -216,26 +214,27 @@ def register_account(body):
         validate_username(body.username)
     except ValueError as error:
         raise AccountConflict("Username tidak tersedia.") from error
-    password_hash = hash_password(body.password)
+    hash_tersimpan = hash_password(body.password)
+    nama_tampilan = body.display_name or body.username
 
     # Kerjakan perubahan akun dan penerbitan sesi dalam transaksi yang sama.
-    def operation(database):
+    def simpan_akun_lalu_buat_sesi(database):
         try:
-            user_id = auth_queries.create_account(
+            id_akun = auth_queries.create_account(
                 database,
                 username=body.username,
-                display_name=body.display_name or body.username,
-                password_hash=password_hash,
+                display_name=nama_tampilan,
+                password_hash=hash_tersimpan,
             )
             # Konfirmasi email di form hanya pencocokan, bukan bukti kepemilikan.
             if body.email:
-                auth_queries.create_identity(database, user_id, str(body.email).lower())
+                auth_queries.create_identity(database, id_akun, str(body.email).lower())
             return issue_session(
                 database,
                 {
-                    "id": user_id,
+                    "id": id_akun,
                     "username": body.username,
-                    "display_name": body.display_name or body.username,
+                    "display_name": nama_tampilan,
                     "is_active": True,
                 },
             )
@@ -243,33 +242,36 @@ def register_account(body):
             database.rollback()
             raise AccountConflict("Username atau email sudah digunakan. Silakan login.") from error
 
-    return auth_service._transaction(operation)
+    return auth_service._jalankan_transaksi(simpan_akun_lalu_buat_sesi)
 
 
-def google_account(claims):
+def google_account(klaim):
     """Google sub adalah identitas utama. Email yang sama tidak otomatis mengambil alih akun."""
 
     # Kerjakan perubahan akun dan penerbitan sesi dalam transaksi yang sama.
-    def operation(database):
-        account = auth_queries.account_by_google_subject(database, claims["sub"])
-        if account:
+    def cari_atau_buat_akun_lalu_buat_sesi(database):
+        akun = auth_queries.account_by_google_subject(database, klaim["sub"])
+        if akun:
             # Pertahankan nama profil pilihan pengguna saat login Google berikutnya.
-            return issue_session(database, account)
+            return issue_session(database, akun)
         try:
             # Username tidak berasal dari email dan tidak dapat bertabrakan dengan admin.
-            username = "google_" + secrets.token_hex(8)
+            username_acak = "google_" + secrets.token_hex(8)
             # Akun baru memakai nama dari identitas Google yang sudah diverifikasi.
-            display_name = str(claims.get("name") or "Detective")[:100]
-            user_id = auth_queries.create_account(
-                database, username=username, display_name=display_name, password_hash="google_only"
+            nama_tampilan = str(klaim.get("name") or "Detective")[:100]
+            id_akun = auth_queries.create_account(
+                database,
+                username=username_acak,
+                display_name=nama_tampilan,
+                password_hash="google_only",
             )
-            auth_queries.create_identity(database, user_id, claims["email"].lower(), claims["sub"])
+            auth_queries.create_identity(database, id_akun, klaim["email"].lower(), klaim["sub"])
             return issue_session(
                 database,
                 {
-                    "id": user_id,
-                    "username": username,
-                    "display_name": display_name,
+                    "id": id_akun,
+                    "username": username_acak,
+                    "display_name": nama_tampilan,
                     "is_active": True,
                 },
             )
@@ -279,10 +281,10 @@ def google_account(claims):
                 "Email sudah terdaftar. Gunakan metode login awal; penautan akun belum tersedia."
             ) from error
 
-    return auth_service._transaction(operation)
+    return auth_service._jalankan_transaksi(cari_atau_buat_akun_lalu_buat_sesi)
 
 
-# LOGIN GOOGLE: verifikasi ID token Google + nonce sekali pakai, bukan sekadar decode JWT.
+# Login Google memverifikasi ID token + nonce sekali pakai, bukan sekadar decode JWT.
 class NonceStore:
     # Siapkan penyimpanan nonce sekali pakai dengan lock lintas thread.
     def __init__(self):
@@ -292,12 +294,16 @@ class NonceStore:
     # Bersihkan nonce lama lalu buat challenge acak yang berlaku lima menit.
     def issue(self):
         with self.lock:
-            now = time.monotonic()
-            self.values = OrderedDict((k, v) for k, v in self.values.items() if v > now)
+            waktu_sekarang = time.monotonic()
+            self.values = OrderedDict(
+                (nonce_lama, batas_waktu)
+                for nonce_lama, batas_waktu in self.values.items()
+                if batas_waktu > waktu_sekarang
+            )
             if len(self.values) >= 1000:
                 self.values.popitem(last=False)
             nonce = secrets.token_urlsafe(32)
-            self.values[nonce] = now + 300
+            self.values[nonce] = waktu_sekarang + 300
             return nonce
 
     # Ambil dan hapus nonce sekaligus; nonce kedaluwarsa atau berulang ditolak.
@@ -323,19 +329,19 @@ def verify_google(credential, nonce):
     if not nonces.consume(nonce):
         raise AuthenticationError("Percobaan login kedaluwarsa. Muat ulang halaman.")
     try:
-        claims = id_token.verify_oauth2_token(
+        klaim = id_token.verify_oauth2_token(
             credential, BoundedGoogleRequest(), settings.google_client_id
         )
         if (
-            claims.get("nonce") != nonce
-            or not claims.get("sub")
-            or len(str(claims["sub"])) > 255
-            or claims.get("email_verified") is not True
-            or not isinstance(claims.get("email"), str)
-            or len(claims["email"]) > 254
+            klaim.get("nonce") != nonce
+            or not klaim.get("sub")
+            or len(str(klaim["sub"])) > 255
+            or klaim.get("email_verified") is not True
+            or not isinstance(klaim.get("email"), str)
+            or len(klaim["email"]) > 254
         ):
             raise ValueError("Invalid Google identity")
-        return claims
+        return klaim
     except (ValueError, TypeError) as error:
         raise AuthenticationError("Identitas Google tidak valid. Coba login ulang.") from error
     except TransportError as error:

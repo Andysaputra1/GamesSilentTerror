@@ -9,31 +9,39 @@ from app.module.mysql_connector import SessionLocal
 from app.module.password_service import hash_password
 
 
-# COMMAND: password dibaca tersembunyi, di-hash, lalu INSERT tanpa mengubah akun lama.
+# Buat satu akun pemain dari baris perintah tanpa mengubah akun lama.
 def main():
-    parser = argparse.ArgumentParser(description="Buat akun pemain untuk multiplayer lokal.")
-    parser.add_argument("username")
-    parser.add_argument("--name", default=None)
-    args = parser.parse_args()
-    if not re.fullmatch(r"[A-Za-z0-9_-]{1,32}", args.username):
-        parser.error("Username 1-32 huruf/angka/underscore/tanda minus.")
-    display_name = args.name or args.username
-    if len(display_name) > 100:
-        parser.error("Nama tampilan maksimal 100 karakter.")
+    pengurai_argumen = argparse.ArgumentParser(
+        description="Buat akun pemain untuk multiplayer lokal."
+    )
+    pengurai_argumen.add_argument("username")
+    pengurai_argumen.add_argument("--name", default=None)
+    argumen = pengurai_argumen.parse_args()
+
+    # INPUT: username dan nama dari baris perintah, password diketik tersembunyi dua kali
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,32}", argumen.username):
+        pengurai_argumen.error("Username 1-32 huruf/angka/underscore/tanda minus.")
+    nama_tampilan = argumen.name or argumen.username
+    if len(nama_tampilan) > 100:
+        pengurai_argumen.error("Nama tampilan maksimal 100 karakter.")
     password = getpass("Password (minimal 8 karakter): ")
     if not 8 <= len(password) <= 256 or password != getpass("Ulangi password: "):
-        parser.error("Password harus 8-256 karakter dan konfirmasi harus sama.")
+        pengurai_argumen.error("Password harus 8-256 karakter dan konfirmasi harus sama.")
+
+    # PROSES: hash password lalu INSERT; username yang sudah ada ditolak constraint unik
     try:
         with SessionLocal.begin() as database:
             create_account(
                 database,
-                username=args.username,
-                display_name=display_name,
+                username=argumen.username,
+                display_name=nama_tampilan,
                 password_hash=hash_password(password),
             )
     except IntegrityError:
-        parser.error("Username sudah digunakan; akun lama tidak diubah.")
-    print(f"Akun {args.username} siap dipakai login.")
+        pengurai_argumen.error("Username sudah digunakan; akun lama tidak diubah.")
+
+    # OUTPUT: beri tahu admin bahwa akun siap dipakai
+    print(f"Akun {argumen.username} siap dipakai login.")
 
 
 if __name__ == "__main__":

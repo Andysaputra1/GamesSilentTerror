@@ -1,4 +1,4 @@
-"""Shared HTTP-controller dependencies."""
+"""Dependency bersama untuk controller HTTP."""
 
 from fastapi import HTTPException, Security
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -10,18 +10,17 @@ from app.module.auth_service import (
     auth_service,
 )
 
-_bearer_scheme = HTTPBearer(auto_error=False)
+_skema_bearer = HTTPBearer(auto_error=False)
 
 
-# DEPENDENCY AUTH: validasi bearer token lewat service sebelum endpoint dijalankan; gagal menjadi HTTP 401/503.
+# Validasi bearer token lewat service sebelum endpoint dijalankan; gagal menjadi HTTP 401/503.
 def require_authenticated_user(
-    credentials: HTTPAuthorizationCredentials | None = Security(_bearer_scheme),
+    kredensial: HTTPAuthorizationCredentials | None = Security(_skema_bearer),
 ) -> AuthenticatedUser:
-    """Validate the bearer token before accessing a protected API route."""
-    if credentials is None or credentials.scheme.lower() != "bearer":
+    if kredensial is None or kredensial.scheme.lower() != "bearer":
         raise HTTPException(status_code=401, detail="Login diperlukan.")
     try:
-        return auth_service.user_for_token(credentials.credentials)
+        return auth_service.user_for_token(kredensial.credentials)
     except SessionValidationError as error:
         raise HTTPException(status_code=401, detail=str(error)) from error
     except AuthenticationPersistenceError as error:

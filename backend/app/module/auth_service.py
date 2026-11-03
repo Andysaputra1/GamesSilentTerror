@@ -1,4 +1,4 @@
-"""Authentication use cases backed by opaque, revocable MySQL sessions."""
+"""Layanan login dan sesi: token buram yang disimpan di MySQL dan bisa dicabut."""
 
 from __future__ import annotations
 
@@ -20,15 +20,15 @@ logger = logging.getLogger("shadow_heist.auth")
 
 
 class AuthenticationError(RuntimeError):
-    """Login failed without revealing whether an account exists."""
+    """Login gagal tanpa mengungkap apakah akunnya ada."""
 
 
 class SessionValidationError(RuntimeError):
-    """Bearer token is missing, expired, or revoked."""
+    """Token bearer kosong, kedaluwarsa, atau sudah dicabut."""
 
 
 class AuthenticationPersistenceError(RuntimeError):
-    """The authentication database transaction failed."""
+    """Transaksi database autentikasi gagal."""
 
 
 @dataclass(frozen=True)
@@ -46,28 +46,27 @@ class LoginResult:
     user: AuthenticatedUser
 
 
-# HELPER: hash token menggunakan SHA-256 agar database tidak menyimpan token sesi dalam bentuk asli.
-def _token_hash(token: str) -> str:
+# Hash SHA-256 agar database tidak menyimpan token sesi dalam bentuk asli.
+def _hash_token(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
-# HELPER WAKTU: hasilkan waktu UTC tanpa metadata zona agar sesuai kolom DATETIME MySQL.
-def _utc_now() -> datetime:
-    # MySQL DATETIME is timezone-naive. Keep every value in UTC.
+# Waktu UTC tanpa metadata zona, karena kolom DATETIME MySQL tidak menyimpan zona waktu.
+def _waktu_utc_sekarang() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class AuthService:
-    """Validates credentials and creates/revokes database-backed sessions."""
+    """Memeriksa kredensial serta membuat dan mencabut sesi di database."""
 
+    # Jalankan operasi database: commit bila sukses, rollback saat error SQL, lalu tutup sesi.
     @staticmethod
-    # STATIC METHOD: jalankan operasi database, commit jika sukses, rollback saat error SQL, lalu tutup sesi.
-    def _transaction(operation):
+    def _jalankan_transaksi(operasi):
         database = SessionLocal()
         try:
-            result = operation(database)
+            hasil = operasi(database)
             database.commit()
-            return result
+            return hasil
         except SQLAlchemyError as error:
             database.rollback()
             logger.error("Authentication database transaction failed (%s).", type(error).__name__)
@@ -75,62 +74,64 @@ class AuthService:
         finally:
             database.close()
 
-    # SERVICE LOGIN: normalisasi username, verifikasi akun/password, dan buat sesi login dengan masa berlaku.
+    # Normalisasi username, verifikasi akun dan password, lalu buat sesi dengan masa berlaku.
     def login(self, *, username: str, password: str) -> LoginResult:
-        normalized_username = username.strip()
+        username_bersih = username.strip()
 
-        # CALLBACK TRANSAKSI LOGIN: ambil akun, verifikasi password, lalu simpan hash token baru dan kembalikan sesi.
-        def operation(database: Session) -> LoginResult:
-            account = auth_queries.account_by_login(database, normalized_username)
+        # Hanya hash token yang disimpan; token asli dikembalikan sekali ini ke klien.
+        def periksa_akun_lalu_buat_sesi(database: Session) -> LoginResult:
+            akun = auth_queries.account_by_login(database, username_bersih)
             if (
-                account is None
-                or not account["is_active"]
-                or not verify_password(password, account["password_hash"])
+                akun is None
+                or not akun["is_active"]
+                or not verify_password(password, akun["password_hash"])
             ):
                 raise AuthenticationError("Username atau password tidak valid.")
 
             token = secrets.token_urlsafe(32)
-            expires_at = _utc_now() + timedelta(hours=settings.auth_session_hours)
+            waktu_kedaluwarsa = _waktu_utc_sekarang() + timedelta(hours=settings.auth_session_hours)
             auth_queries.create_session(
                 database,
-                user_id=account["id"],
-                token_hash=_token_hash(token),
-                expires_at=expires_at,
+                user_id=akun["id"],
+                token_hash=_hash_token(token),
+                expires_at=waktu_kedaluwarsa,
             )
             return LoginResult(
                 access_token=token,
-                expires_at=expires_at.replace(tzinfo=timezone.utc),
+                expires_at=waktu_kedaluwarsa.replace(tzinfo=timezone.utc),
                 user=AuthenticatedUser(
-                    id=account["id"],
-                    username=account["username"],
-                    display_name=account["display_name"],
-                    skin_id=account["skin_id"],
+                    id=akun["id"],
+                    username=akun["username"],
+                    display_name=akun["display_name"],
+                    skin_id=akun["skin_id"],
                 ),
             )
 
-        return self._transaction(operation)
+        return self._jalankan_transaksi(periksa_akun_lalu_buat_sesi)
 
-    # SERVICE AUTH: cari akun aktif untuk token yang belum kedaluwarsa; sesi tidak valid ditolak.
+    # Cari akun aktif untuk token yang belum kedaluwarsa; sesi tidak valid ditolak.
     def user_for_token(self, token: str) -> AuthenticatedUser:
         if not token.strip():
             raise SessionValidationError("Sesi login tidak ditemukan.")
 
         database = SessionLocal()
         try:
-            row = auth_queries.account_for_token(database, _token_hash(token), _utc_now())
+            akun = auth_queries.account_for_token(
+                database, _hash_token(token), _waktu_utc_sekarang()
+            )
         except SQLAlchemyError as error:
             logger.error("Session database query failed (%s).", type(error).__name__)
             raise AuthenticationPersistenceError("Layanan login sedang tidak tersedia.") from error
         finally:
             database.close()
 
-        if row is None:
+        if akun is None:
             raise SessionValidationError("Sesi login sudah tidak valid.")
         return AuthenticatedUser(
-            id=row["id"],
-            username=row["username"],
-            display_name=row["display_name"],
-            skin_id=row["skin_id"],
+            id=akun["id"],
+            username=akun["username"],
+            display_name=akun["display_name"],
+            skin_id=akun["skin_id"],
         )
 
     # Username hanya boleh berganti di luar ruangan; token tetap terkait ID akun yang sama.
@@ -139,51 +140,51 @@ class AuthService:
     ) -> AuthenticatedUser:
         from app.module.room_service import room_service
 
-        selected_username = username or user.username
-        changing_username = selected_username != user.username
-        if changing_username:
+        username_terpilih = username or user.username
+        username_berubah = username_terpilih != user.username
+        if username_berubah:
+            # Impor lambat: user_management_service mengimpor modul ini.
             from app.module.user_management_service import validate_username
 
-            validate_username(selected_username)
+            validate_username(username_terpilih)
 
         # Nama dan username harus disimpan bersama; benturan username membatalkan seluruh perubahan.
-        def operation(database):
-            if changing_username:
+        def simpan_nama_dan_username(database):
+            if username_berubah:
                 try:
-                    auth_queries.update_username(database, user.id, selected_username)
+                    auth_queries.update_username(database, user.id, username_terpilih)
                 except IntegrityError as error:
                     raise ValueError("Username sudah digunakan. Pilih username lain.") from error
             auth_queries.update_display_name(database, user.id, display_name)
 
         with room_service.lock:
-            if changing_username and room_service.current(user.username):
+            if username_berubah and room_service.current(user.username):
                 raise ValueError("Keluar dari ruangan terlebih dahulu sebelum mengganti username.")
-            self._transaction(operation)
-        return AuthenticatedUser(user.id, selected_username, display_name, user.skin_id)
+            self._jalankan_transaksi(simpan_nama_dan_username)
+        return AuthenticatedUser(user.id, username_terpilih, display_name, user.skin_id)
 
-    # SERVICE: ubah skin preference pengguna; validasi daftar skin yang diizinkan.
+    # Ubah skin pilihan pengguna; hanya skin dalam daftar yang diizinkan.
     def update_skin(self, user: AuthenticatedUser, skin_id: str) -> str:
         from app.module.skin_constants import ALL_SKINS
 
         if skin_id not in ALL_SKINS:
             raise ValueError(f"Skin tidak valid. Pilihan: {', '.join(ALL_SKINS)}")
 
-        def operation(database):
+        def simpan_skin(database):
             auth_queries.update_skin(database, user.id, skin_id)
 
-        self._transaction(operation)
+        self._jalankan_transaksi(simpan_skin)
         return skin_id
 
-    # SERVICE LOGOUT: cabut token melalui transaksi database; token kosong tidak memerlukan operasi.
+    # Cabut token lewat transaksi database; token kosong tidak memerlukan operasi.
     def logout(self, token: str) -> None:
         if not token.strip():
             return
 
-        # CALLBACK TRANSAKSI LOGOUT: hapus sesi yang cocok dengan hash token dalam transaksi pemanggil.
-        def operation(database: Session) -> None:
-            auth_queries.delete_session(database, _token_hash(token))
+        def hapus_sesi(database: Session) -> None:
+            auth_queries.delete_session(database, _hash_token(token))
 
-        self._transaction(operation)
+        self._jalankan_transaksi(hapus_sesi)
 
 
 auth_service = AuthService()

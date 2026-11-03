@@ -26,32 +26,33 @@ def validate_username(username):
 # Buat akun lokal; password disimpan sebagai hash, tidak pernah dikembalikan ke panel.
 def create_user(username, display_name, password):
     validate_username(username)
-    encoded = hash_password(password)
+    hash_tersimpan = hash_password(password)
 
     # Constraint unik menangani dua admin yang membuat username sama secara bersamaan.
-    def operation(database):
+    def simpan_akun_baru(database):
         try:
-            user_id = auth_queries.create_account(
-                database, username=username, display_name=display_name, password_hash=encoded
+            id_akun_baru = auth_queries.create_account(
+                database, username=username, display_name=display_name, password_hash=hash_tersimpan
             )
         except IntegrityError as error:
             raise ValueError("Username sudah digunakan.") from error
-        return account_for_management(database, user_id)
+        return account_for_management(database, id_akun_baru)
 
-    return auth_service._transaction(operation)
+    return auth_service._jalankan_transaksi(simpan_akun_baru)
 
 
 # Edit identitas berdasarkan ID; arsip pengirim lama dan identitas Google tetap dipertahankan.
 def update_user(user_id, display_name, username=None):
-    def operation(database):
-        account = account_for_management(database, user_id)
-        selected = username or account["username"]
-        if selected != account["username"]:
-            validate_username(selected)
-            if room_service.current(account["username"]):
+    def simpan_perubahan_profil(database):
+        akun = account_for_management(database, user_id)
+        username_terpilih = username or akun["username"]
+        # Ganti username hanya di luar ruangan; sesi lama akun ini ikut dicabut.
+        if username_terpilih != akun["username"]:
+            validate_username(username_terpilih)
+            if room_service.current(akun["username"]):
                 raise ValueError("User harus keluar dari ruangan sebelum username diganti.")
             try:
-                auth_queries.update_username(database, user_id, selected)
+                auth_queries.update_username(database, user_id, username_terpilih)
             except IntegrityError as error:
                 raise ValueError("Username sudah digunakan.") from error
             database.execute(text("DELETE FROM auth_sessions WHERE user_id=:id"), {"id": user_id})
@@ -59,12 +60,12 @@ def update_user(user_id, display_name, username=None):
         return account_for_management(database, user_id)
 
     with room_service.lock:
-        return auth_service._transaction(operation)
+        return auth_service._jalankan_transaksi(simpan_perubahan_profil)
 
 
 # Baca akun terkini di dalam transaksi; password hanya dipakai menentukan metode login.
 def account_for_management(database, user_id):
-    row = (
+    akun = (
         database.execute(
             text("""
             SELECT u.id, u.username, u.display_name,
@@ -78,15 +79,15 @@ def account_for_management(database, user_id):
         .mappings()
         .one_or_none()
     )
-    if row is None:
+    if akun is None:
         raise UserNotFound("Akun tidak ditemukan atau sudah dihapus.")
-    return dict(row)
+    return dict(akun)
 
 
 # Daftar akun berhalaman tidak pernah mengirim hash password, token, atau Google subject.
 def list_users(after_id=0, search=""):
-    def read(database):
-        rows = (
+    def baca_satu_halaman(database):
+        baris_akun = (
             database.execute(
                 text("""
                 SELECT u.id, u.username, u.display_name, u.is_active,
@@ -101,20 +102,22 @@ def list_users(after_id=0, search=""):
             .mappings()
             .all()
         )
+        # Baris ke-51 hanya penanda masih ada halaman berikutnya; yang dikirim paling banyak 50.
+        halaman = baris_akun[:50]
         return {
-            "users": [dict(row) for row in rows[:50]],
-            "has_more": len(rows) > 50,
-            "next_after_id": rows[min(len(rows), 50) - 1]["id"] if rows else after_id,
+            "users": [dict(baris) for baris in halaman],
+            "has_more": len(baris_akun) > 50,
+            "next_after_id": halaman[-1]["id"] if halaman else after_id,
         }
 
-    return auth_service._transaction(read)
+    return auth_service._jalankan_transaksi(baca_satu_halaman)
 
 
 # Ganti hash dan cabut semua sesi secara atomik; akun Google tidak memiliki password aplikasi.
 def reset_password(user_id, password):
-    def operation(database):
-        account = account_for_management(database, user_id)
-        if account["login_method"] == "google":
+    def simpan_password_baru(database):
+        akun = account_for_management(database, user_id)
+        if akun["login_method"] == "google":
             raise ValueError("Akun Google tidak dapat diubah password-nya di aplikasi ini.")
         database.execute(
             text("UPDATE user_accounts SET password_hash = :password WHERE id = :id"),
@@ -122,16 +125,16 @@ def reset_password(user_id, password):
         )
         database.execute(text("DELETE FROM auth_sessions WHERE user_id = :id"), {"id": user_id})
 
-    auth_service._transaction(operation)
+    auth_service._jalankan_transaksi(simpan_password_baru)
 
 
 # Hapus hanya data autentikasi; jangan DELETE players, chat_messages, ai_analyses, atau checker_traces.
 def delete_user(user_id, confirm_username):
-    def operation(database):
-        account = account_for_management(database, user_id)
-        if account["username"] != confirm_username:
+    def hapus_data_autentikasi(database):
+        akun = account_for_management(database, user_id)
+        if akun["username"] != confirm_username:
             raise ValueError("Konfirmasi username tidak cocok. Perbarui daftar akun dan coba lagi.")
-        if room_service.current(account["username"]):
+        if room_service.current(akun["username"]):
             raise ValueError(
                 "User masih berada di ruangan. Minta user keluar dahulu sebelum menghapus akun."
             )
@@ -142,4 +145,4 @@ def delete_user(user_id, confirm_username):
         database.execute(text("DELETE FROM user_accounts WHERE id = :id"), {"id": user_id})
 
     with room_service.lock:
-        auth_service._transaction(operation)
+        auth_service._jalankan_transaksi(hapus_data_autentikasi)

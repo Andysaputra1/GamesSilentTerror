@@ -1,4 +1,4 @@
-"""Validation and response contracts for player login."""
+"""Kontrak validasi dan respons untuk login pemain."""
 
 from datetime import datetime
 import unicodedata
@@ -31,12 +31,12 @@ class UpdateProfileRequest(BaseModel):
     # Rapikan tepi nama dan tolak karakter kontrol sebelum validasi panjang dijalankan.
     @field_validator("display_name", mode="before")
     @classmethod
-    def clean_display_name(cls, value):
-        if isinstance(value, str):
-            if any(unicodedata.category(char) in {"Cc", "Cf", "Cs"} for char in value):
+    def clean_display_name(cls, nilai):
+        if isinstance(nilai, str):
+            if any(unicodedata.category(karakter) in {"Cc", "Cf", "Cs"} for karakter in nilai):
                 raise ValueError("Nama tidak boleh mengandung karakter kontrol.")
-            return value.strip()
-        return value
+            return nilai.strip()
+        return nilai
 
 
 class RegisterRequest(UpdateProfileRequest):

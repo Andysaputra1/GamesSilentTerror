@@ -8,14 +8,14 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 from app.controller.api.auth import router
-from app.controller.middleware.auth_limits import _attempts
+from app.controller.middleware.auth_limits import _riwayat_percobaan
 from app.config.settings import settings
 from app.controller.api.auth import nonces
 
 
 class AccountTests(unittest.TestCase):
     def setUp(self):
-        _attempts.clear()
+        _riwayat_percobaan.clear()
         self.engine = create_engine(
             "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
         )
@@ -55,7 +55,7 @@ class AccountTests(unittest.TestCase):
         self.client.close()
         self.session_patch.stop()
         self.engine.dispose()
-        _attempts.clear()
+        _riwayat_percobaan.clear()
 
     def register(self, **changes):
         return self.client.post("/api/auth/register", json={**self.body, **changes})
