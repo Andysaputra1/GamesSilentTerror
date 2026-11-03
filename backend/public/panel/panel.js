@@ -1,63 +1,65 @@
 'use strict';
 // Ambil elemen panel berdasarkan ID.
 const $ = (id) => document.getElementById(id);
-let historyVersion = 0;
-let usersAfter = 0,
-  usersVersion = 0,
-  selectedUser = null,
-  userSaving = false;
+// Riwayat chat: versi request (jawaban filter lama diabaikan) dan id pesan terakhir yang sudah tampil.
+let versiRiwayat = 0,
+  idRiwayatTerakhir = 0;
+// Manajemen user: id akun terakhir yang sudah tampil, versi request, akun di editor, dan status simpan.
+let idAkunTerakhir = 0,
+  versiAkun = 0,
+  akunTerpilih = null,
+  sedangMenyimpanAkun = false;
 let keyAvailability = { default: false, custom: false };
 let token = '',
   menu = 'ai',
-  historyAfter = 0,
   traceBefore = null,
   traces = [],
   selectedTrace = '',
   busy = false,
   generation = 0;
 // Tampilkan pesan status sebagai teks agar isi dinamis tidak dianggap HTML.
-const notice = (text) => {
-  $('notice').textContent = text;
+const notice = (pesan) => {
+  $('notice').textContent = pesan;
   clearTimeout(notice.timer);
   notice.timer = setTimeout(() => {
     $('notice').textContent = '';
   }, 8000);
 };
 // Kirim request panel dan hapus sesi lokal jika server menyatakan token tidak valid.
-async function request(path, body, method = 'GET') {
-  const epoch = generation;
-  const response = await fetch(path, {
-    method,
+async function request(alamat, isi, metode = 'GET') {
+  const generasiAwal = generation;
+  const respons = await fetch(alamat, {
+    method: metode,
     cache: 'no-store',
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: body ? JSON.stringify(body) : undefined,
+    body: isi ? JSON.stringify(isi) : undefined,
     // Uji AI dan cek rantai penulis menunggu provider; simulasi menunggu otak + LLM beberapa bot.
     signal: AbortSignal.timeout(
-      /\/simulasi/.test(path) ? 180000 : /\/(test-ai|cek-penulis)$/.test(path) ? 60000 : 15000,
+      /\/simulasi/.test(alamat) ? 180000 : /\/(test-ai|cek-penulis)$/.test(alamat) ? 60000 : 15000,
     ),
   });
-  if (epoch !== generation) throw new Error('Sesi telah berubah. Respons lama diabaikan.');
-  if (response.status === 204) return {};
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    if (response.status === 401 && token) clearSession();
+  if (generasiAwal !== generation) throw new Error('Sesi telah berubah. Respons lama diabaikan.');
+  if (respons.status === 204) return {};
+  const hasil = await respons.json().catch(() => ({}));
+  if (!respons.ok) {
+    if (respons.status === 401 && token) clearSession();
     throw new Error(
-      typeof data.detail === 'string'
-        ? data.detail
+      typeof hasil.detail === 'string'
+        ? hasil.detail
         : 'Permintaan gagal. Periksa isian dan coba lagi.',
     );
   }
-  return data;
+  return hasil;
 }
 // Buang token, rahasia form, dan data panel; abaikan respons dari sesi sebelumnya.
 function clearSession() {
   $('create-user-form').reset();
-  usersVersion++;
+  versiAkun++;
   $('user-rows').replaceChildren();
-  closeUserEditor();
+  tutupEditorAkun();
   $('api-key').value = '';
   generation++;
   token = '';
@@ -85,11 +87,12 @@ function clearSession() {
   $('npc-status').replaceChildren();
   $('survey-rows').replaceChildren();
   $('survey-method-rows').replaceChildren();
-  resetSurveyForm();
-  historyVersion++;
+  kosongkanFormSurvei();
+  versiRiwayat++;
   traces = [];
 }
 
+// Buat elemen dengan isi teks biasa, sehingga data dari server tidak pernah menjadi HTML.
 function node(tag, text, className = '') {
   const element = document.createElement(tag);
   if (text !== undefined) element.textContent = text;
@@ -249,33 +252,33 @@ function markConfigDraft() {
 $('config-form').addEventListener('input', markConfigDraft);
 $('config-form').addEventListener('change', markConfigDraft);
 // Ambil seluruh halaman ruangan dan pertahankan pilihan filter pengguna.
-async function loadRooms() {
-  const rooms = [];
-  let after = 0;
+async function muatDaftarRuangan() {
+  const daftarRuangan = [];
+  let idTerakhir = 0;
   for (;;) {
-    const data = await request(`/api/panel/rooms?after_id=${after}`);
-    rooms.push(...data.rooms);
-    if (!data.has_more) break;
-    after = data.next_after_id;
+    const halaman = await request(`/api/panel/rooms?after_id=${idTerakhir}`);
+    daftarRuangan.push(...halaman.rooms);
+    if (!halaman.has_more) break;
+    idTerakhir = halaman.next_after_id;
   }
   // API berhalaman urut id naik; pilihan ditampilkan dari ruangan terbaru.
-  rooms.sort((a, b) => b.id - a.id);
-  for (const id of ['checker-room', 'history-room']) {
-    const select = $(id),
-      current = select.value;
-    select.replaceChildren(
-      new Option(id === 'history-room' ? 'Semua ruangan' : 'Pilih ruangan', ''),
+  daftarRuangan.sort((a, b) => b.id - a.id);
+  for (const idPilihan of ['checker-room', 'history-room']) {
+    const pilihan = $(idPilihan),
+      nilaiSekarang = pilihan.value;
+    pilihan.replaceChildren(
+      new Option(idPilihan === 'history-room' ? 'Semua ruangan' : 'Pilih ruangan', ''),
     );
-    for (const room of rooms)
-      select.add(
+    for (const ruangan of daftarRuangan)
+      pilihan.add(
         new Option(
-          `${room.room_code} | ${tanggal(room.created_at)} | ${room.message_count} pesan${room.live ? ' | aktif' : ''}`,
-          room.room_code,
+          `${ruangan.room_code} | ${tanggal(ruangan.created_at)} | ${ruangan.message_count} pesan${ruangan.live ? ' | aktif' : ''}`,
+          ruangan.room_code,
         ),
       );
-    select.value = current;
+    pilihan.value = nilaiSekarang;
   }
-  return rooms;
+  return daftarRuangan;
 }
 // CHECKER ROOM: ringkasan room, linimasa jejak per bot, dan kartu penjelasan keputusan otak.
 // Semua isi dari server ditulis lewat textContent/Option, tidak pernah sebagai HTML.
@@ -1824,64 +1827,82 @@ async function simAksi(aksi, label, isi = '') {
   terimaSim(data, (jejak) => jejak.find(isHuman));
 }
 // Validasi urutan tanggal dan susun parameter untuk riwayat serta ekspor CSV.
-function historyQuery() {
-  const from = $('date-from').value,
-    to = $('date-to').value;
-  if (from && to && from > to)
+function susunFilterRiwayat() {
+  const tanggalAwal = $('date-from').value,
+    tanggalAkhir = $('date-to').value;
+  if (tanggalAwal && tanggalAkhir && tanggalAwal > tanggalAkhir)
     throw new Error('Tanggal awal harus sebelum atau sama dengan tanggal akhir.');
-  const q = new URLSearchParams();
-  if (from) q.set('date_from', from);
-  if (to) q.set('date_to', to);
-  if ($('history-room').value) q.set('room_code', $('history-room').value);
-  q.set('sender_kind', $('history-sender').value);
-  q.set('urut', $('history-order').value);
-  return q;
+  const filter = new URLSearchParams();
+  if (tanggalAwal) filter.set('date_from', tanggalAwal);
+  if (tanggalAkhir) filter.set('date_to', tanggalAkhir);
+  if ($('history-room').value) filter.set('room_code', $('history-room').value);
+  filter.set('sender_kind', $('history-sender').value);
+  filter.set('urut', $('history-order').value);
+  return filter;
 }
 // Muat halaman riwayat dan abaikan respons dari sesi atau filter yang sudah berubah.
-async function history(reset = true) {
-  const q = historyQuery(),
-    epoch = generation;
-  if (reset) {
-    historyVersion++;
-    historyAfter = 0;
+async function muatRiwayat(dariAwal = true) {
+  const filter = susunFilterRiwayat(),
+    generasiAwal = generation;
+  if (dariAwal) {
+    versiRiwayat++;
+    idRiwayatTerakhir = 0;
     $('history-rows').replaceChildren();
   }
-  const version = historyVersion;
-  // historyAfter = id terakhir halaman sebelumnya; urut "baru" melanjutkan ke pesan yang lebih lama.
-  if (q.get('urut') === 'baru') {
-    if (historyAfter) q.set('before_id', String(historyAfter));
-  } else q.set('after_id', String(historyAfter));
-  const data = await request(`/api/panel/history?${q}`);
-  if (epoch !== generation || !token || version !== historyVersion) return;
-  for (const row of data.messages) {
-    const tr = document.createElement('tr');
-    const date = new Date(row.created_at.endsWith('Z') ? row.created_at : row.created_at + 'Z');
-    for (const value of [
-      `#${row.id}
-${date.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}`,
-      `${row.room_code || '-'}
-Ronde ${row.round_number ?? '-'} | ${row.phase || 'legacy'}`,
-      `${row.sender_name}
-${row.sender_kind}`,
-      row.message,
+  const versiRequest = versiRiwayat;
+  // idRiwayatTerakhir = id terakhir halaman sebelumnya; urut "baru" melanjutkan ke pesan yang lebih lama.
+  if (filter.get('urut') === 'baru') {
+    if (idRiwayatTerakhir) filter.set('before_id', String(idRiwayatTerakhir));
+  } else filter.set('after_id', String(idRiwayatTerakhir));
+  const halaman = await request(`/api/panel/history?${filter}`);
+  if (generasiAwal !== generation || !token || versiRequest !== versiRiwayat) return;
+  for (const pesan of halaman.messages) {
+    const baris = document.createElement('tr');
+    const waktuKirim = new Date(
+      pesan.created_at.endsWith('Z') ? pesan.created_at : pesan.created_at + 'Z',
+    );
+    for (const isiSel of [
+      `#${pesan.id}\n${waktuKirim.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}`,
+      `${pesan.room_code || '-'}\nRonde ${pesan.round_number ?? '-'} | ${pesan.phase || 'legacy'}`,
+      `${pesan.sender_name}\n${pesan.sender_kind}`,
+      pesan.message,
     ]) {
-      const td = document.createElement('td');
-      td.textContent = value;
-      tr.append(td);
+      const sel = document.createElement('td');
+      sel.textContent = isiSel;
+      baris.append(sel);
     }
-    tr.append(node('td', nluTeks(row.nlu)), konteksSel(row.nlu));
-    $('history-rows').append(tr);
+    baris.append(node('td', nluTeks(pesan.nlu)), konteksSel(pesan.nlu));
+    $('history-rows').append(baris);
   }
-  historyAfter = data.next_after_id;
-  $('more-history').hidden = !data.has_more;
+  idRiwayatTerakhir = halaman.next_after_id;
+  $('more-history').hidden = !halaman.has_more;
   $('history-empty').hidden = $('history-rows').children.length > 0;
 }
+// Unduh CSV panel lewat request bertoken, lalu simpan sebagai berkas di browser.
+async function unduhCsv(alamat, namaBerkas, pesanGagal) {
+  const respons = await fetch(alamat, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  });
+  if (!respons.ok) {
+    if (respons.status === 401) clearSession();
+    throw new Error(pesanGagal);
+  }
+  const alamatBerkas = URL.createObjectURL(await respons.blob()),
+    tautan = document.createElement('a');
+  tautan.href = alamatBerkas;
+  tautan.download = namaBerkas;
+  document.body.append(tautan);
+  tautan.click();
+  tautan.remove();
+  setTimeout(() => URL.revokeObjectURL(alamatBerkas), 60000);
+}
 // Bungkus event async agar submit tidak me-reload halaman dan error tampil di panel.
-function handle(fn) {
+function handle(tugas) {
   return async (event) => {
     if (event) event.preventDefault();
     try {
-      await fn(event);
+      await tugas(event);
     } catch (error) {
       notice(error.message);
     }
@@ -1890,18 +1911,18 @@ function handle(fn) {
 $('login-form').onsubmit = handle(async () => {
   $('login-button').disabled = true;
   try {
-    const data = await request(
+    const sesi = await request(
       '/api/panel/login',
       { username: $('username').value, password: $('password').value },
       'POST',
     );
-    token = data.access_token;
+    token = sesi.access_token;
     await loadConfig();
-    await loadRooms();
+    await muatDaftarRuangan();
     $('login-view').hidden = true;
     $('workspace').hidden = false;
     $('logout').hidden = false;
-    await selectMenu('ai');
+    await bukaMenu('ai');
     notice('Login administrator berhasil.');
   } catch (error) {
     if (token) await request('/api/panel/logout', null, 'POST').catch(() => {});
@@ -1913,21 +1934,21 @@ $('login-form').onsubmit = handle(async () => {
   }
 });
 // Ganti menu aktif lalu muat data yang dibutuhkan halaman tujuan.
-async function selectMenu(name) {
-  menu = name;
-  for (const b of document.querySelectorAll('[data-menu]')) {
-    if (b.dataset.menu === name) b.setAttribute('aria-current', 'page');
-    else b.removeAttribute('aria-current');
+async function bukaMenu(namaMenu) {
+  menu = namaMenu;
+  for (const tombol of document.querySelectorAll('[data-menu]')) {
+    if (tombol.dataset.menu === namaMenu) tombol.setAttribute('aria-current', 'page');
+    else tombol.removeAttribute('aria-current');
   }
   for (const id of ['ai', 'checker', 'history', 'users', 'npc', 'survey', 'simulasi', 'dokumen'])
-    $('menu-' + id).hidden = id !== name;
-  if (name === 'checker' || name === 'history') await loadRooms();
-  if (name === 'checker') await checker();
-  if (name === 'history') await history();
-  if (name === 'users') await loadUsers();
-  if (name === 'npc') await loadNpc();
-  if (name === 'survey') await loadSurvey();
-  if (name === 'simulasi') renderSim();
+    $('menu-' + id).hidden = id !== namaMenu;
+  if (namaMenu === 'checker' || namaMenu === 'history') await muatDaftarRuangan();
+  if (namaMenu === 'checker') await checker();
+  if (namaMenu === 'history') await muatRiwayat();
+  if (namaMenu === 'users') await muatDaftarAkun();
+  if (namaMenu === 'npc') await loadNpc();
+  if (namaMenu === 'survey') await muatSurvei();
+  if (namaMenu === 'simulasi') renderSim();
 }
 
 // OTAK NPC: isi pilihan dari server agar panel tidak perlu tahu daftar metode.
@@ -2128,202 +2149,188 @@ async function loadNpc(options) {
 }
 
 // SURVEI: pertanyaan, jenis, skala, dan arti skala sepenuhnya diatur dari panel.
-const KIND_LABEL = {
+const LABEL_JENIS_PERTANYAAN = {
   stars: 'Bintang',
   scale: 'Skala angka',
   choice: 'Pilihan ganda',
   text: 'Teks bebas',
 };
-function surveyScale(question) {
-  if (question.kind === 'stars' || question.kind === 'scale')
-    return `${KIND_LABEL[question.kind]} ${question.scale_min}–${question.scale_max}`;
-  if (question.kind === 'choice') return `${KIND_LABEL.choice}: ${question.options.join(' / ')}`;
-  return KIND_LABEL.text;
-}
-async function loadSurvey() {
-  const epoch = generation;
-  const data = await request('/api/panel/survey/summary');
-  if (!token || epoch !== generation) return;
-  const distribution = {};
-  for (const row of data.distribution) (distribution[row.question_id] ??= []).push(row);
-  const texts = Object.fromEntries(data.text_answers.map((row) => [row.question_id, row.n]));
+async function muatSurvei() {
+  // INPUT: ringkasan dari server; jawaban untuk sesi lama diabaikan
+  const generasiAwal = generation;
+  const ringkasan = await request('/api/panel/survey/summary');
+  if (!token || generasiAwal !== generation) return;
+
+  // PROSES: kelompokkan sebaran nilai dan jumlah jawaban teks per pertanyaan
+  const sebaranNilai = {};
+  for (const baris of ringkasan.distribution) (sebaranNilai[baris.question_id] ??= []).push(baris);
+  const jumlahJawabanTeks = Object.fromEntries(
+    ringkasan.text_answers.map((baris) => [baris.question_id, baris.n]),
+  );
+
+  // OUTPUT: satu baris tabel per pertanyaan, lalu tabel rata-rata per metode bot
   $('survey-rows').replaceChildren(
-    ...data.questions.map((question) => {
-      const rows = distribution[question.id] ?? [];
-      const total = rows.reduce((sum, row) => sum + row.n, 0);
-      const mean = total
-        ? rows.reduce((sum, row) => sum + row.n * row.value_number, 0) / total
+    ...ringkasan.questions.map((pertanyaan) => {
+      const nilaiPertanyaan = sebaranNilai[pertanyaan.id] ?? [];
+      const totalJawaban = nilaiPertanyaan.reduce((jumlah, baris) => jumlah + baris.n, 0);
+      const rataRata = totalJawaban
+        ? nilaiPertanyaan.reduce((jumlah, baris) => jumlah + baris.n * baris.value_number, 0) /
+          totalJawaban
         : null;
-      const result =
-        question.kind === 'text' || question.kind === 'choice'
-          ? `${texts[question.id] ?? 0} jawaban`
-          : total
-            ? `${total} jawaban · rata-rata ${mean.toFixed(2)}`
+      const hasilJawaban =
+        pertanyaan.kind === 'text' || pertanyaan.kind === 'choice'
+          ? `${jumlahJawabanTeks[pertanyaan.id] ?? 0} jawaban`
+          : totalJawaban
+            ? `${totalJawaban} jawaban · rata-rata ${rataRata.toFixed(2)}`
             : 'Belum ada';
-      const meaning =
-        question.label_min || question.label_max
-          ? `${question.scale_min} = ${question.label_min ?? '—'} · ${question.scale_max} = ${question.label_max ?? '—'}`
+      const artiSkala =
+        pertanyaan.label_min || pertanyaan.label_max
+          ? `${pertanyaan.scale_min} = ${pertanyaan.label_min ?? '—'} · ${pertanyaan.scale_max} = ${pertanyaan.label_max ?? '—'}`
           : '—';
-      const edit = node('button', 'Edit', 'secondary');
-      edit.type = 'button';
-      edit.onclick = () => editSurvey(question);
-      const toggle = node('button', question.active ? 'Nonaktifkan' : 'Aktifkan', 'secondary');
-      toggle.type = 'button';
-      toggle.onclick = handle(() =>
-        saveSurvey({ ...question, active: !question.active }, question.id),
+      let jenisDanSkala = LABEL_JENIS_PERTANYAAN.text;
+      if (pertanyaan.kind === 'stars' || pertanyaan.kind === 'scale')
+        jenisDanSkala = `${LABEL_JENIS_PERTANYAAN[pertanyaan.kind]} ${pertanyaan.scale_min}–${pertanyaan.scale_max}`;
+      else if (pertanyaan.kind === 'choice')
+        jenisDanSkala = `${LABEL_JENIS_PERTANYAAN.choice}: ${pertanyaan.options.join(' / ')}`;
+
+      const tombolEdit = node('button', 'Edit', 'secondary');
+      tombolEdit.type = 'button';
+      // Isi form dari data pertanyaan untuk diedit.
+      tombolEdit.onclick = () => {
+        $('survey-id').value = String(pertanyaan.id);
+        $('survey-code').value = pertanyaan.code;
+        $('survey-position').value = String(pertanyaan.position);
+        $('survey-prompt').value = pertanyaan.prompt;
+        $('survey-kind').value = pertanyaan.kind;
+        $('survey-min').value = String(pertanyaan.scale_min);
+        $('survey-max').value = String(pertanyaan.scale_max);
+        $('survey-label-min').value = pertanyaan.label_min ?? '';
+        $('survey-label-max').value = pertanyaan.label_max ?? '';
+        $('survey-options').value = pertanyaan.options.join('\n');
+        $('survey-required').checked = pertanyaan.required;
+        $('survey-active').checked = pertanyaan.active;
+        $('survey-editor-title').textContent = 'Edit pertanyaan: ' + pertanyaan.code;
+        $('survey-editor-box').open = true;
+      };
+      const tombolStatus = node(
+        'button',
+        pertanyaan.active ? 'Nonaktifkan' : 'Aktifkan',
+        'secondary',
       );
-      const remove = node('button', 'Hapus', 'danger');
-      remove.type = 'button';
-      remove.onclick = handle(async () => {
-        if (!window.confirm(`Hapus pertanyaan "${question.prompt}" secara permanen?`)) return;
-        await request(`/api/panel/survey/questions/${question.id}`, undefined, 'DELETE');
-        if ($('survey-id').value === String(question.id)) resetSurveyForm();
+      tombolStatus.type = 'button';
+      tombolStatus.onclick = handle(() =>
+        simpanPertanyaanSurvei({ ...pertanyaan, active: !pertanyaan.active }, pertanyaan.id),
+      );
+      const tombolHapus = node('button', 'Hapus', 'danger');
+      tombolHapus.type = 'button';
+      tombolHapus.onclick = handle(async () => {
+        if (!window.confirm(`Hapus pertanyaan "${pertanyaan.prompt}" secara permanen?`)) return;
+        await request(`/api/panel/survey/questions/${pertanyaan.id}`, undefined, 'DELETE');
+        if ($('survey-id').value === String(pertanyaan.id)) kosongkanFormSurvei();
         notice('Pertanyaan survei dihapus.');
-        await loadSurvey();
+        await muatSurvei();
       });
-      const actions = node('td');
-      actions.append(edit, ' ', toggle, ' ', remove);
-      const tr = document.createElement('tr');
-      tr.append(
-        node('td', String(question.position)),
-        node('td', question.prompt + (question.required ? '' : ' (opsional)')),
-        node('td', surveyScale(question)),
-        node('td', meaning),
-        node('td', question.active ? 'Aktif' : 'Nonaktif'),
-        node('td', result),
-        actions,
+      const selAksi = node('td');
+      selAksi.append(tombolEdit, ' ', tombolStatus, ' ', tombolHapus);
+
+      const barisTabel = document.createElement('tr');
+      barisTabel.append(
+        node('td', String(pertanyaan.position)),
+        node('td', pertanyaan.prompt + (pertanyaan.required ? '' : ' (opsional)')),
+        node('td', jenisDanSkala),
+        node('td', artiSkala),
+        node('td', pertanyaan.active ? 'Aktif' : 'Nonaktif'),
+        node('td', hasilJawaban),
+        selAksi,
       );
-      return tr;
+      return barisTabel;
     }),
   );
-  const prompts = Object.fromEntries(data.questions.map((q) => [q.id, q.prompt]));
+  const teksPertanyaan = Object.fromEntries(
+    ringkasan.questions.map((pertanyaan) => [pertanyaan.id, pertanyaan.prompt]),
+  );
   $('survey-method-rows').replaceChildren(
-    ...data.per_method.map((row) => {
-      const tr = document.createElement('tr');
-      tr.append(
-        node('td', prompts[row.question_id] ?? String(row.question_id)),
-        node('td', row.method),
-        node('td', String(row.n)),
-        node('td', row.rata == null ? '—' : row.rata.toFixed(2)),
+    ...ringkasan.per_method.map((baris) => {
+      const barisTabel = document.createElement('tr');
+      barisTabel.append(
+        node('td', teksPertanyaan[baris.question_id] ?? String(baris.question_id)),
+        node('td', baris.method),
+        node('td', String(baris.n)),
+        node('td', baris.rata == null ? '—' : baris.rata.toFixed(2)),
       );
-      return tr;
+      return barisTabel;
     }),
   );
 }
-// Isi form dari data pertanyaan untuk diedit.
-function editSurvey(question) {
-  $('survey-id').value = String(question.id);
-  $('survey-code').value = question.code;
-  $('survey-position').value = String(question.position);
-  $('survey-prompt').value = question.prompt;
-  $('survey-kind').value = question.kind;
-  $('survey-min').value = String(question.scale_min);
-  $('survey-max').value = String(question.scale_max);
-  $('survey-label-min').value = question.label_min ?? '';
-  $('survey-label-max').value = question.label_max ?? '';
-  $('survey-options').value = question.options.join('\n');
-  $('survey-required').checked = question.required;
-  $('survey-active').checked = question.active;
-  $('survey-editor-title').textContent = 'Edit pertanyaan: ' + question.code;
-  $('survey-editor-box').open = true;
-}
-function resetSurveyForm() {
+function kosongkanFormSurvei() {
   $('survey-form').reset();
   $('survey-id').value = '';
   $('survey-editor-title').textContent = '+ Tambah pertanyaan';
   $('survey-editor-box').open = false;
 }
-function surveyPayload() {
-  return {
-    code: $('survey-code').value.trim().toLowerCase(),
-    prompt: $('survey-prompt').value.trim(),
-    kind: $('survey-kind').value,
-    scale_min: Number($('survey-min').value),
-    scale_max: Number($('survey-max').value),
-    label_min: $('survey-label-min').value.trim() || null,
-    label_max: $('survey-label-max').value.trim() || null,
-    options: $('survey-options')
-      .value.split('\n')
-      .map((item) => item.trim())
-      .filter(Boolean),
-    required: $('survey-required').checked,
-    active: $('survey-active').checked,
-    position: Number($('survey-position').value) || 0,
-  };
-}
-async function saveSurvey(body, id) {
-  if (id) await request(`/api/panel/survey/questions/${id}`, body, 'PUT');
-  else await request('/api/panel/survey/questions', body, 'POST');
+async function simpanPertanyaanSurvei(pertanyaan, idPertanyaan) {
+  if (idPertanyaan) await request(`/api/panel/survey/questions/${idPertanyaan}`, pertanyaan, 'PUT');
+  else await request('/api/panel/survey/questions', pertanyaan, 'POST');
   notice('Pertanyaan survei tersimpan. Pemain melihat versi terbaru di pertandingan berikutnya.');
-  resetSurveyForm();
-  await loadSurvey();
+  kosongkanFormSurvei();
+  await muatSurvei();
 }
 
 // Muat daftar akun tanpa rahasia; versi request mencegah hasil filter lama menimpa pencarian baru.
-async function loadUsers(reset = true) {
-  const epoch = generation;
-  if (reset) {
-    usersVersion++;
-    usersAfter = 0;
+async function muatDaftarAkun(dariAwal = true) {
+  const generasiAwal = generation;
+  if (dariAwal) {
+    versiAkun++;
+    idAkunTerakhir = 0;
     $('user-rows').replaceChildren();
   }
-  const version = usersVersion;
-  const query = new URLSearchParams({
-    after_id: String(usersAfter),
+  const versiRequest = versiAkun;
+  const filter = new URLSearchParams({
+    after_id: String(idAkunTerakhir),
     search: $('user-search').value.trim(),
   });
-  const data = await request('/api/panel/users?' + query);
-  if (!token || epoch !== generation || version !== usersVersion) return;
-  for (const user of data.users) {
-    const row = document.createElement('tr');
-    for (const [label, value] of [
-      ['Username', user.username],
-      ['Nama tampilan', user.display_name],
-      ['Login', user.login_method === 'google' ? 'Google' : 'Password'],
+  const halaman = await request('/api/panel/users?' + filter);
+  if (!token || generasiAwal !== generation || versiRequest !== versiAkun) return;
+  for (const akun of halaman.users) {
+    const barisTabel = document.createElement('tr');
+    for (const [label, nilai] of [
+      ['Username', akun.username],
+      ['Nama tampilan', akun.display_name],
+      ['Login', akun.login_method === 'google' ? 'Google' : 'Password'],
     ]) {
-      const cell = document.createElement('td');
-      cell.dataset.label = label;
-      if (label === 'Login') cell.append(node('span', value, 'login-method'));
-      else cell.textContent = value;
-      row.append(cell);
+      const sel = document.createElement('td');
+      sel.dataset.label = label;
+      if (label === 'Login') sel.append(node('span', nilai, 'login-method'));
+      else sel.textContent = nilai;
+      barisTabel.append(sel);
     }
-    const actions = document.createElement('td');
-    actions.dataset.label = 'Aksi';
-    const actionGroup = node('div', undefined, 'user-actions');
-    const editButton = document.createElement('button');
-    editButton.className = 'secondary';
-    editButton.textContent = 'Edit user';
-    editButton.onclick = () => openUserEditor(user, 'profile');
-    actionGroup.append(editButton);
-    if (user.login_method !== 'google') {
-      const passwordButton = document.createElement('button');
-      passwordButton.className = 'secondary';
-      passwordButton.textContent = 'Ubah password';
-      passwordButton.onclick = () => openUserEditor(user, 'password');
-      actionGroup.append(passwordButton);
-    } else {
-      const note = document.createElement('small');
-      note.textContent = 'Password dikelola Google. ';
-      note.className = 'google-password-note';
-      actionGroup.append(note);
-    }
-    const deleteButton = document.createElement('button');
-    deleteButton.className = 'danger';
-    deleteButton.textContent = 'Hapus akun';
-    deleteButton.onclick = () => openUserEditor(user, 'delete');
-    actionGroup.append(deleteButton);
-    actions.append(actionGroup);
-    row.append(actions);
-    $('user-rows').append(row);
+    const buatTombolAksi = (teksTombol, kelasCss, tindakan) => {
+      const tombol = node('button', teksTombol, kelasCss);
+      tombol.onclick = () => bukaEditorAkun(akun, tindakan);
+      return tombol;
+    };
+    const selAksi = document.createElement('td');
+    selAksi.dataset.label = 'Aksi';
+    const kelompokAksi = node('div', undefined, 'user-actions');
+    kelompokAksi.append(
+      buatTombolAksi('Edit user', 'secondary', 'profile'),
+      akun.login_method !== 'google'
+        ? buatTombolAksi('Ubah password', 'secondary', 'password')
+        : node('small', 'Password dikelola Google. ', 'google-password-note'),
+      buatTombolAksi('Hapus akun', 'danger', 'delete'),
+    );
+    selAksi.append(kelompokAksi);
+    barisTabel.append(selAksi);
+    $('user-rows').append(barisTabel);
   }
-  usersAfter = data.next_after_id;
-  $('more-users').hidden = !data.has_more;
+  idAkunTerakhir = halaman.next_after_id;
+  $('more-users').hidden = !halaman.has_more;
   $('users-empty').hidden = $('user-rows').children.length > 0;
 }
 
 // Bersihkan password/draft konfirmasi setiap editor ditutup atau sesi panel berakhir.
-function closeUserEditor() {
-  selectedUser = null;
+function tutupEditorAkun() {
+  akunTerpilih = null;
   if ($('user-editor').open) $('user-editor').close();
   $('user-editor').hidden = true;
   $('user-password-form').reset();
@@ -2332,104 +2339,111 @@ function closeUserEditor() {
 }
 
 // Target disimpan sebagai ID; nama target ditampilkan sebelum admin mengonfirmasi tindakan.
-function openUserEditor(user, action) {
-  if (userSaving) return;
-  closeUserEditor();
-  selectedUser = user;
+function bukaEditorAkun(akun, tindakan) {
+  if (sedangMenyimpanAkun) return;
+  tutupEditorAkun();
+  akunTerpilih = akun;
   $('user-editor').hidden = false;
   $('user-editor-title').textContent =
-    (action === 'profile'
-      ? 'Edit user: '
-      : action === 'password'
-        ? 'Ubah password: '
-        : 'Hapus akun: ') + user.username;
-  $('user-profile-form').hidden = action !== 'profile';
-  $('edit-user-username').value = user.username;
-  $('edit-user-display-name').value = user.display_name;
-  $('user-password-form').hidden = action !== 'password';
-  $('user-delete-form').hidden = action !== 'delete';
+    { profile: 'Edit user: ', password: 'Ubah password: ', delete: 'Hapus akun: ' }[tindakan] +
+    akun.username;
+  $('user-profile-form').hidden = tindakan !== 'profile';
+  $('edit-user-username').value = akun.username;
+  $('edit-user-display-name').value = akun.display_name;
+  $('user-password-form').hidden = tindakan !== 'password';
+  $('user-delete-form').hidden = tindakan !== 'delete';
   $('user-editor').showModal();
-  (action === 'profile'
-    ? $('edit-user-username')
-    : action === 'password'
-      ? $('user-new-password')
-      : $('user-delete-confirmation')
+  $(
+    {
+      profile: 'edit-user-username',
+      password: 'user-new-password',
+      delete: 'user-delete-confirmation',
+    }[tindakan],
   ).focus();
 }
 
 // Cegah klik ganda dan pergantian target selama mutasi akun sedang berlangsung.
-async function changeUser(action) {
-  if (!selectedUser || userSaving) return;
-  const target = selectedUser;
-  const epoch = generation;
-  let body;
-  if (action === 'profile') {
-    body = {
+async function simpanPerubahanAkun(tindakan) {
+  if (!akunTerpilih || sedangMenyimpanAkun) return;
+  const akun = akunTerpilih;
+  const generasiAwal = generation;
+  const tombolEditor = [
+    'save-user-profile',
+    'save-user-password',
+    'delete-user',
+    'cancel-user-edit',
+  ];
+
+  // INPUT: isi request menurut tindakan; form yang tidak valid ditolak sebelum dikirim
+  let isiRequest;
+  if (tindakan === 'profile') {
+    isiRequest = {
       username: $('edit-user-username').value.trim(),
       display_name: $('edit-user-display-name').value.trim(),
     };
-  } else if (action === 'password') {
-    if (target.login_method === 'google')
-      throw new Error('Password akun Google dikelola di Google.');
+  } else if (tindakan === 'password') {
+    if (akun.login_method === 'google') throw new Error('Password akun Google dikelola di Google.');
     if ($('user-new-password').value !== $('user-password-confirmation').value)
       throw new Error('Konfirmasi password tidak cocok.');
-    body = {
+    isiRequest = {
       password: $('user-new-password').value,
       password_confirmation: $('user-password-confirmation').value,
     };
   } else {
-    if ($('user-delete-confirmation').value !== target.username)
+    if ($('user-delete-confirmation').value !== akun.username)
       throw new Error('Ketik username target dengan tepat untuk menghapus akun.');
-    body = { confirm_username: $('user-delete-confirmation').value };
+    isiRequest = { confirm_username: $('user-delete-confirmation').value };
   }
-  userSaving = true;
-  for (const id of ['save-user-profile', 'save-user-password', 'delete-user', 'cancel-user-edit'])
-    $(id).disabled = true;
+
+  // PROSES: kunci editor selama request berjalan; password selalu dibersihkan sesudahnya
+  sedangMenyimpanAkun = true;
+  for (const id of tombolEditor) $(id).disabled = true;
   try {
-    await request(`/api/panel/users/${target.id}/${action}`, body, 'POST');
-    if (!token || epoch !== generation) return;
-    closeUserEditor();
+    await request(`/api/panel/users/${akun.id}/${tindakan}`, isiRequest, 'POST');
+    if (!token || generasiAwal !== generation) return;
+
+    // OUTPUT: editor ditutup, hasil diumumkan, dan daftar akun dimuat ulang
+    tutupEditorAkun();
     notice(
-      action === 'profile'
-        ? 'Data user disimpan. Jika username berubah, user perlu login ulang.'
-        : action === 'password'
-          ? 'Password diganti. Semua sesi user dicabut; user perlu login ulang.'
-          : 'Akun dihapus. Riwayat chat dan analisis tetap tersimpan.',
+      {
+        profile: 'Data user disimpan. Jika username berubah, user perlu login ulang.',
+        password: 'Password diganti. Semua sesi user dicabut; user perlu login ulang.',
+        delete: 'Akun dihapus. Riwayat chat dan analisis tetap tersimpan.',
+      }[tindakan],
     );
-    await loadUsers();
+    await muatDaftarAkun();
   } finally {
     $('user-new-password').value = '';
     $('user-password-confirmation').value = '';
-    userSaving = false;
-    for (const id of ['save-user-profile', 'save-user-password', 'delete-user', 'cancel-user-edit'])
-      $(id).disabled = false;
+    sedangMenyimpanAkun = false;
+    for (const id of tombolEditor) $(id).disabled = false;
   }
 }
 
-$('user-search-form').onsubmit = handle(() => loadUsers());
+$('user-search-form').onsubmit = handle(() => muatDaftarAkun());
 $('more-users').onclick = handle(async () => {
   $('more-users').disabled = true;
   try {
-    await loadUsers(false);
+    await muatDaftarAkun(false);
   } finally {
     $('more-users').disabled = false;
   }
 });
-$('cancel-user-edit').onclick = closeUserEditor;
+$('cancel-user-edit').onclick = tutupEditorAkun;
 $('user-editor').addEventListener('cancel', (event) => {
   event.preventDefault();
-  if (!userSaving) closeUserEditor();
+  if (!sedangMenyimpanAkun) tutupEditorAkun();
 });
-$('user-profile-form').onsubmit = handle(() => changeUser('profile'));
-$('user-password-form').onsubmit = handle(() => changeUser('password'));
-$('user-delete-form').onsubmit = handle(() => changeUser('delete'));
+$('user-profile-form').onsubmit = handle(() => simpanPerubahanAkun('profile'));
+$('user-password-form').onsubmit = handle(() => simpanPerubahanAkun('password'));
+$('user-delete-form').onsubmit = handle(() => simpanPerubahanAkun('delete'));
 
 // Buat akun tanpa login sebagai pemain; rahasia form selalu dibersihkan setelah request.
 $('create-user-form').onsubmit = handle(async () => {
   if ($('create-user-button').disabled) return;
   if ($('create-password').value !== $('create-password-confirmation').value)
     throw new Error('Konfirmasi password tidak cocok.');
-  const epoch = generation;
+  const generasiAwal = generation;
   $('create-user-button').disabled = true;
   try {
     await request(
@@ -2442,21 +2456,21 @@ $('create-user-form').onsubmit = handle(async () => {
       },
       'POST',
     );
-    if (!token || epoch !== generation) return;
+    if (!token || generasiAwal !== generation) return;
     $('create-user-form').reset();
     $('user-search').value = '';
     notice(
       'User berhasil ditambahkan. Pemain dapat login menggunakan username dan password tersebut.',
     );
-    await loadUsers();
+    await muatDaftarAkun();
   } finally {
     $('create-password').value = '';
     $('create-password-confirmation').value = '';
     $('create-user-button').disabled = false;
   }
 });
-for (const b of document.querySelectorAll('[data-menu]'))
-  b.onclick = handle(() => selectMenu(b.dataset.menu));
+for (const tombol of document.querySelectorAll('[data-menu]'))
+  tombol.onclick = handle(() => bukaMenu(tombol.dataset.menu));
 $('provider').onchange = providerView;
 $('key-source').onchange = () => {
   $('api-key').value = '';
@@ -2527,7 +2541,7 @@ $('probe-form').onsubmit = handle(async () => {
   }
 });
 $('refresh-checker').onclick = handle(async () => {
-  await loadRooms();
+  await muatDaftarRuangan();
   await checker();
 });
 $('checker-room').onchange = handle(() => {
@@ -2580,11 +2594,11 @@ $('sim-form').onsubmit = handle(async () => {
 });
 $('sim-run').onclick = handle(() => simAksi('jalan', 'Bot melangkah…'));
 $('sim-phase').onclick = handle(() => simAksi('fase', 'Menyelesaikan fase…'));
-$('history-filter').onsubmit = handle(() => history());
+$('history-filter').onsubmit = handle(() => muatRiwayat());
 $('more-history').onclick = handle(async () => {
   $('more-history').disabled = true;
   try {
-    await history(false);
+    await muatRiwayat(false);
   } finally {
     $('more-history').disabled = false;
   }
@@ -2592,22 +2606,11 @@ $('more-history').onclick = handle(async () => {
 $('download').onclick = handle(async () => {
   $('download').disabled = true;
   try {
-    const response = await fetch(`/api/panel/history.csv?${historyQuery()}`, {
-      headers: { Authorization: `Bearer ${token}` },
-      cache: 'no-store',
-    });
-    if (!response.ok) {
-      if (response.status === 401) clearSession();
-      throw new Error('Download gagal. Periksa login dan koneksi database.');
-    }
-    const url = URL.createObjectURL(await response.blob()),
-      a = document.createElement('a');
-    a.href = url;
-    a.download = 'riwayat-chat.csv';
-    document.body.append(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    await unduhCsv(
+      `/api/panel/history.csv?${susunFilterRiwayat()}`,
+      'riwayat-chat.csv',
+      'Download gagal. Periksa login dan koneksi database.',
+    );
     notice('CSV sesuai filter tanggal, ruangan, dan pengirim berhasil diunduh.');
   } finally {
     $('download').disabled = false;
@@ -2669,40 +2672,47 @@ $('check-writers').onclick = handle(async () => {
 $('survey-form').onsubmit = handle(async () => {
   $('save-survey').disabled = true;
   try {
-    await saveSurvey(surveyPayload(), Number($('survey-id').value) || null);
+    await simpanPertanyaanSurvei(
+      {
+        code: $('survey-code').value.trim().toLowerCase(),
+        prompt: $('survey-prompt').value.trim(),
+        kind: $('survey-kind').value,
+        scale_min: Number($('survey-min').value),
+        scale_max: Number($('survey-max').value),
+        label_min: $('survey-label-min').value.trim() || null,
+        label_max: $('survey-label-max').value.trim() || null,
+        options: $('survey-options')
+          .value.split('\n')
+          .map((pilihan) => pilihan.trim())
+          .filter(Boolean),
+        required: $('survey-required').checked,
+        active: $('survey-active').checked,
+        position: Number($('survey-position').value) || 0,
+      },
+      Number($('survey-id').value) || null,
+    );
   } finally {
     $('save-survey').disabled = false;
   }
 });
-$('cancel-survey').onclick = resetSurveyForm;
+$('cancel-survey').onclick = kosongkanFormSurvei;
 $('survey-clean').onclick = handle(async () => {
   if ($('survey-clean-confirm').value.trim() !== 'BERSIHKAN')
     throw new Error('Ketik BERSIHKAN dengan tepat untuk menghapus semua jawaban survei.');
-  const data = await request('/api/panel/survey/responses', undefined, 'DELETE');
+  const hasil = await request('/api/panel/survey/responses', undefined, 'DELETE');
   $('survey-clean-confirm').value = '';
   $('survey-clean-box').open = false;
-  notice(`${data.deleted} jawaban survei dihapus.`);
-  await loadSurvey();
+  notice(`${hasil.deleted} jawaban survei dihapus.`);
+  await muatSurvei();
 });
 $('download-survey').onclick = handle(async () => {
   $('download-survey').disabled = true;
   try {
-    const response = await fetch('/api/panel/survey/responses.csv', {
-      headers: { Authorization: `Bearer ${token}` },
-      cache: 'no-store',
-    });
-    if (!response.ok) {
-      if (response.status === 401) clearSession();
-      throw new Error('Download gagal. Periksa login dan migrasi V7.');
-    }
-    const url = URL.createObjectURL(await response.blob()),
-      a = document.createElement('a');
-    a.href = url;
-    a.download = 'survei-silent-terror.csv';
-    document.body.append(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    await unduhCsv(
+      '/api/panel/survey/responses.csv',
+      'survei-silent-terror.csv',
+      'Download gagal. Periksa login dan migrasi V7.',
+    );
     notice('Jawaban survei berhasil diunduh.');
   } finally {
     $('download-survey').disabled = false;
@@ -2727,7 +2737,7 @@ setInterval(() => {
 // disembunyikan, jadi nilai form, event change, dan kode lain yang membaca/menyetel .value tidak berubah.
 // Daftar dibangun ulang saat opsi, nilai, atau status nonaktif berubah; keyboard: panah, Enter/Spasi, Esc, Tab.
 const PILIH_PROTO = Object.getOwnPropertyDescriptors(HTMLSelectElement.prototype);
-function pilihanKustom(select) {
+function pasangPilihanKustom(select) {
   if (select.dataset.kustom) return;
   select.dataset.kustom = '1';
   const wadah = node('div', undefined, 'pilih');
@@ -2739,10 +2749,11 @@ function pilihanKustom(select) {
   daftar.setAttribute('role', 'listbox');
   daftar.hidden = true;
   const label = select.closest('label');
+  // Judul untuk pembaca layar: teks langsung di dalam <label>, tanpa elemen anaknya.
   const judul = label
     ? [...label.childNodes]
-        .filter((n) => n.nodeType === 3)
-        .map((n) => n.textContent)
+        .filter((simpul) => simpul.nodeType === 3)
+        .map((simpul) => simpul.textContent)
         .join(' ')
         .trim()
     : '';
@@ -2760,14 +2771,14 @@ function pilihanKustom(select) {
     tombol.setAttribute('aria-label', `${judul ? `${judul}: ` : ''}${tombol.textContent}`);
     tombol.disabled = select.disabled;
     daftar.replaceChildren(
-      ...[...select.options].map((o) => {
-        const li = node('li', o.text, 'pilih-opsi');
-        li.setAttribute('role', 'option');
-        li.setAttribute('aria-selected', String(o.selected));
-        if (o.disabled) li.setAttribute('aria-disabled', 'true');
-        li.tabIndex = -1;
-        li.dataset.value = o.value;
-        return li;
+      ...[...select.options].map((opsi) => {
+        const itemOpsi = node('li', opsi.text, 'pilih-opsi');
+        itemOpsi.setAttribute('role', 'option');
+        itemOpsi.setAttribute('aria-selected', String(opsi.selected));
+        if (opsi.disabled) itemOpsi.setAttribute('aria-disabled', 'true');
+        itemOpsi.tabIndex = -1;
+        itemOpsi.dataset.value = opsi.value;
+        return itemOpsi;
       }),
     );
   };
@@ -2784,10 +2795,10 @@ function pilihanKustom(select) {
     tombol.setAttribute('aria-expanded', 'true');
     (daftar.querySelector('[aria-selected="true"]') || daftar.firstElementChild)?.focus();
   };
-  const pilih = (li) => {
-    if (!li || li.getAttribute('aria-disabled')) return;
-    const berubah = select.value !== li.dataset.value;
-    select.value = li.dataset.value;
+  const pilih = (itemOpsi) => {
+    if (!itemOpsi || itemOpsi.getAttribute('aria-disabled')) return;
+    const berubah = select.value !== itemOpsi.dataset.value;
+    select.value = itemOpsi.dataset.value;
     tutup();
     if (berubah) {
       select.dispatchEvent(new Event('input', { bubbles: true }));
@@ -2803,16 +2814,15 @@ function pilihanKustom(select) {
   };
   daftar.onclick = (event) => pilih(event.target.closest('.pilih-opsi'));
   daftar.onkeydown = (event) => {
-    const opsi = [...daftar.children];
-    const i = opsi.indexOf(document.activeElement);
+    const semuaOpsi = [...daftar.children];
+    const posisi = semuaOpsi.indexOf(document.activeElement);
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault();
-      opsi[
-        Math.max(0, Math.min(opsi.length - 1, i + (event.key === 'ArrowDown' ? 1 : -1)))
-      ]?.focus();
+      const langkah = event.key === 'ArrowDown' ? 1 : -1;
+      semuaOpsi[Math.max(0, Math.min(semuaOpsi.length - 1, posisi + langkah))]?.focus();
     } else if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
-      pilih(opsi[i]);
+      pilih(semuaOpsi[posisi]);
     } else if (event.key === 'Escape') {
       event.preventDefault();
       tutup();
@@ -2828,8 +2838,8 @@ function pilihanKustom(select) {
     Object.defineProperty(select, nama, {
       configurable: true,
       get: () => PILIH_PROTO[nama].get.call(select),
-      set: (v) => {
-        PILIH_PROTO[nama].set.call(select, v);
+      set: (nilai) => {
+        PILIH_PROTO[nama].set.call(select, nilai);
         sinkron();
       },
     });
@@ -2844,13 +2854,15 @@ function pilihanKustom(select) {
   });
   sinkron();
 }
-document.querySelectorAll('select').forEach(pilihanKustom);
+document.querySelectorAll('select').forEach(pasangPilihanKustom);
 // <select> yang dibuat belakangan ikut diganti.
-new MutationObserver((perubahan) => {
-  for (const p of perubahan)
-    for (const n of p.addedNodes)
-      if (n.nodeType === 1)
-        (n.matches('select') ? [n] : n.querySelectorAll('select')).forEach(pilihanKustom);
+new MutationObserver((daftarPerubahan) => {
+  for (const perubahan of daftarPerubahan)
+    for (const simpul of perubahan.addedNodes)
+      if (simpul.nodeType === 1)
+        (simpul.matches('select') ? [simpul] : simpul.querySelectorAll('select')).forEach(
+          pasangPilihanKustom,
+        );
 }).observe(document.body, { childList: true, subtree: true });
 document.addEventListener('click', (event) => {
   for (const daftar of document.querySelectorAll('.pilih-daftar:not([hidden])'))

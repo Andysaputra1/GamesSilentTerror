@@ -43,9 +43,9 @@ class Question(BaseModel):
 
 
 # Terjemahkan kegagalan layanan survei menjadi status HTTP yang jelas tanpa detail internal.
-def survey_call(operation):
+def survey_call(operasi):
     try:
-        return operation()
+        return operasi()
     except SurveyAlreadySubmitted as error:
         raise HTTPException(409, str(error)) from error
     except LookupError as error:
@@ -76,8 +76,10 @@ def survey_status(
 @router.post("/api/rooms/{code}/survey")
 # PEMAIN: kirim jawaban sekali per pertandingan; validasi skala mengikuti pertanyaan di database.
 def survey_submit(code: str, body: SurveySubmission, user=Depends(require_authenticated_user)):
-    answers = [answer.model_dump() for answer in body.answers]
-    return survey_call(lambda: survey_service.submit(code, user.username, body.match_id, answers))
+    daftar_jawaban = [jawaban.model_dump() for jawaban in body.answers]
+    return survey_call(
+        lambda: survey_service.submit(code, user.username, body.match_id, daftar_jawaban)
+    )
 
 
 @router.get("/api/panel/survey/questions")
@@ -121,20 +123,21 @@ def panel_summary(token=Depends(require_panel)):
 # Nilai disimpan persis demi data penelitian, sama seperti CSV riwayat chat: teks bebas pemain tidak
 # di-escape, jadi saat membuka di spreadsheet impor kolom teks sebagai teks (bukan formula).
 def panel_export(token=Depends(require_panel)):
-    rows = survey_call(survey_service.export_rows)
-    buffer = io.StringIO()
-    columns = [
+    daftar_baris = survey_call(survey_service.export_rows)
+    penampung_csv = io.StringIO()
+    kolom_csv = [
         "created_at", "match_id", "room_code", "username", "role", "team", "outcome", "code",
         "prompt", "value_number", "value_text", "bots",
     ]  # fmt: skip
-    writer = csv.DictWriter(buffer, fieldnames=columns, extrasaction="ignore")
-    writer.writeheader()
-    for row in rows:
-        snapshot = row.get("question_snapshot")
-        snapshot = json.loads(snapshot) if isinstance(snapshot, str) else (snapshot or {})
-        writer.writerow({**row, "prompt": snapshot.get("prompt", "")})
+    penulis_csv = csv.DictWriter(penampung_csv, fieldnames=kolom_csv, extrasaction="ignore")
+    penulis_csv.writeheader()
+    for baris in daftar_baris:
+        # Teks pertanyaan diambil dari salinan saat dijawab, bukan dari pertanyaan versi sekarang.
+        salinan = baris.get("question_snapshot")
+        salinan = json.loads(salinan) if isinstance(salinan, str) else (salinan or {})
+        penulis_csv.writerow({**baris, "prompt": salinan.get("prompt", "")})
     return Response(
-        "﻿" + buffer.getvalue(),
+        "﻿" + penampung_csv.getvalue(),
         media_type="text/csv; charset=utf-8",
         headers={
             "Content-Disposition": 'attachment; filename="survei_silent_terror.csv"',

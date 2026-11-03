@@ -45,9 +45,9 @@ bearer = HTTPBearer(auto_error=False)
 
 
 # Jalankan transaksi panel dan ubah kegagalan penyimpanan menjadi HTTP 503.
-def transaction(operation):
+def transaction(operasi):
     try:
-        return PersistenceService._run(operation)
+        return PersistenceService._run(operasi)
     except PersistenceError as error:
         raise HTTPException(
             503, "Database panel belum siap. Periksa koneksi dan migrasi V5/V6."
@@ -56,13 +56,20 @@ def transaction(operation):
 
 # Buat sidik kredensial agar pergantian username/password membatalkan sesi lama.
 def credential_version():
-    raw = settings.panel_password_hash.get_secret_value() if settings.panel_password_hash else ""
-    return hashlib.sha256((settings.panel_username + raw).encode()).hexdigest()
+    hash_password = (
+        settings.panel_password_hash.get_secret_value() if settings.panel_password_hash else ""
+    )
+    return hashlib.sha256((settings.panel_username + hash_password).encode()).hexdigest()
 
 
 # Hash token panel sebelum pencarian atau penyimpanan di database.
 def digest(token):
     return hashlib.sha256(token.encode()).hexdigest()
+
+
+# Kolom JSON dari database bisa berupa teks atau sudah menjadi objek.
+def _baca_kolom_json(nilai):
+    return json.loads(nilai) if isinstance(nilai, str) else nilai
 
 
 # Validasi hash token, kedaluwarsa, dan versi kredensial panel.
@@ -72,8 +79,8 @@ def require_panel(
     response.headers["Cache-Control"] = "no-store"
     if not credentials or not settings.panel_password_hash:
         raise HTTPException(401, "Login administrator diperlukan.")
-    valid = transaction(
-        lambda db: db.execute(
+    sesi_berlaku = transaction(
+        lambda database: database.execute(
             text("""
         SELECT token_hash FROM panel_sessions WHERE token_hash=:token
         AND expires_at > UTC_TIMESTAMP() AND credential_version=:version
@@ -81,7 +88,7 @@ def require_panel(
             {"token": digest(credentials.credentials), "version": credential_version()},
         ).scalar()
     )
-    if not valid:
+    if not sesi_berlaku:
         raise HTTPException(401, "Sesi panel berakhir. Silakan login lagi.")
     return credentials.credentials
 
@@ -98,39 +105,44 @@ def login(body: Login, response: Response):
     if not settings.panel_password_hash:
         raise HTTPException(503, "Password administrator belum disiapkan di server.")
     try:
-        encoded = base64.b64decode(
+        hash_password = base64.b64decode(
             settings.panel_password_hash.get_secret_value(), validate=True
         ).decode()
     except (ValueError, UnicodeError):
         raise HTTPException(503, "Konfigurasi login panel tidak valid.")
-    password_ok = verify_password(body.password, encoded)
+    # Password selalu dihitung lebih dulu agar lama proses tidak membocorkan benar-salahnya username.
+    password_cocok = verify_password(body.password, hash_password)
     if (
         not hmac.compare_digest(body.username.encode(), settings.panel_username.encode())
-        or not password_ok
+        or not password_cocok
     ):
         raise HTTPException(401, "Username atau password salah.")
-    token = secrets.token_urlsafe(32)
-    expires = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=8)
+    token_sesi = secrets.token_urlsafe(32)
+    waktu_kedaluwarsa = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=8)
 
     # Bersihkan sesi kedaluwarsa dan simpan hash sesi baru dalam satu transaksi.
-    def save(db):
-        db.execute(text("DELETE FROM panel_sessions WHERE expires_at <= UTC_TIMESTAMP()"))
-        db.execute(
+    def simpan_sesi(database):
+        database.execute(text("DELETE FROM panel_sessions WHERE expires_at <= UTC_TIMESTAMP()"))
+        database.execute(
             text(
                 "INSERT INTO panel_sessions(token_hash,expires_at,credential_version) VALUES(:token,:expires,:version)"
             ),
-            {"token": digest(token), "expires": expires, "version": credential_version()},
+            {
+                "token": digest(token_sesi),
+                "expires": waktu_kedaluwarsa,
+                "version": credential_version(),
+            },
         )
 
-    transaction(save)
-    return {"access_token": token, "username": settings.panel_username}
+    transaction(simpan_sesi)
+    return {"access_token": token_sesi, "username": settings.panel_username}
 
 
 # Hapus sesi panel terautentikasi dari database.
 @router.post("/api/panel/logout", status_code=204)
 def logout(token=Depends(require_panel)):
     transaction(
-        lambda db: db.execute(
+        lambda database: database.execute(
             text("DELETE FROM panel_sessions WHERE token_hash=:token"), {"token": digest(token)}
         )
     )
@@ -347,10 +359,11 @@ async def test_ai(body: AIProbe, token=Depends(require_panel)):
 # Daftar room yang pernah tercatat (cursor ID), jumlah pesan, dan tanda room yang masih hidup di memori.
 @router.get("/api/panel/rooms")
 def rooms(after_id: int = Query(0, ge=0), token=Depends(require_panel)):
-    rows = transaction(
-        lambda db: [
-            dict(row)
-            for row in db.execute(
+    # LIMIT 201 = satu baris lebih dari isi halaman, untuk tahu masih ada halaman berikutnya.
+    daftar_baris = transaction(
+        lambda database: [
+            dict(baris)
+            for baris in database.execute(
                 text("""
         SELECT s.id,s.room_code,s.created_at,COUNT(m.id) AS message_count,MAX(m.created_at) AS last_message_at
         FROM game_sessions s LEFT JOIN chat_messages m ON m.game_session_id=s.id
@@ -361,13 +374,14 @@ def rooms(after_id: int = Query(0, ge=0), token=Depends(require_panel)):
         ]
     )
     with room_service.lock:
-        live = {room.code for room in room_service.rooms.values()}
-    for row in rows:
-        row["live"] = row["room_code"] in live
+        kode_room_hidup = {room.code for room in room_service.rooms.values()}
+    for baris in daftar_baris:
+        baris["live"] = baris["room_code"] in kode_room_hidup
+    isi_halaman = daftar_baris[:200]
     return {
-        "rooms": rows[:200],
-        "has_more": len(rows) > 200,
-        "next_after_id": rows[min(len(rows), 200) - 1]["id"] if rows else after_id,
+        "rooms": isi_halaman,
+        "has_more": len(daftar_baris) > 200,
+        "next_after_id": isi_halaman[-1]["id"] if isi_halaman else after_id,
     }
 
 
@@ -379,10 +393,10 @@ def checker(
 ):
     if len(code) > 36:
         raise HTTPException(422, "Kode room terlalu panjang.")
-    # Timestamp+ID cursor offers stable pages, including equal timestamps.
-    params = {"code": code, "before": before or "9999"}
-    rows = transaction(
-        lambda db: db.execute(
+    # Cursor waktu+ID membuat halaman stabil walau ada waktu yang sama. LIMIT 101 = satu baris lebih
+    # dari isi halaman, untuk tahu masih ada halaman berikutnya.
+    daftar_baris = transaction(
+        lambda database: database.execute(
             text("""
         SELECT id,JSON_REMOVE(trace,'$.penjelasan') AS trace,
         CONCAT(DATE_FORMAT(created_at,'%Y-%m-%d %H:%i:%s'), '|', id) AS trace_cursor
@@ -390,46 +404,53 @@ def checker(
         AND CONCAT(DATE_FORMAT(created_at,'%Y-%m-%d %H:%i:%s'), '|', id) < :before
         ORDER BY created_at DESC,id DESC LIMIT 101
     """),
-            params,
+            {"code": code, "before": before or "9999"},
         )
         .mappings()
         .all()
     )
-    archived = [
-        json.loads(row["trace"]) if isinstance(row["trace"], str) else row["trace"]
-        for row in rows[:100]
-    ]
-    live = checker_service.list(code) if before is None else []
-    merged = {item["id"]: item for item in archived}
-    merged.update({item["id"]: item for item in live})
-    traces = sorted(merged.values(), key=lambda item: item["created_at"], reverse=True)
+    isi_halaman = daftar_baris[:100]
+    # Jejak di memori menimpa arsip ber-ID sama; halaman lanjutan hanya berisi arsip.
+    jejak_arsip = [_baca_kolom_json(baris["trace"]) for baris in isi_halaman]
+    jejak_aktif = checker_service.list(code) if before is None else []
+    jejak_per_id = {jejak["id"]: jejak for jejak in jejak_arsip}
+    jejak_per_id.update({jejak["id"]: jejak for jejak in jejak_aktif})
+    jejak_terbaru_dulu = sorted(
+        jejak_per_id.values(), key=lambda jejak: jejak["created_at"], reverse=True
+    )
     return {
-        "traces": traces,
+        "traces": jejak_terbaru_dulu,
         "events": activity.list(code) if before is None else [],
         # Ringkasan room hanya di halaman pertama: status, komposisi role, metode/persona bot.
-        "room": checker_service.ringkasan_room(code, traces) if before is None else None,
-        "has_more": len(rows) > 100,
-        "next_before": rows[min(len(rows), 100) - 1]["trace_cursor"] if rows else None,
+        "room": (
+            checker_service.ringkasan_room(code, jejak_terbaru_dulu) if before is None else None
+        ),
+        "has_more": len(daftar_baris) > 100,
+        "next_before": isi_halaman[-1]["trace_cursor"] if isi_halaman else None,
     }
 
 
 # Satu jejak lengkap beserta penjelasan keputusan bot (parameter, penalaran metode, NLG).
 @router.get("/api/panel/checker/{code}/jejak/{trace_id}")
 def checker_trace(code: str, trace_id: str, token=Depends(require_panel)):
-    if len(code) > 36 or len(trace_id) != 32 or any(c not in "0123456789abcdef" for c in trace_id):
+    if (
+        len(code) > 36
+        or len(trace_id) != 32
+        or any(karakter not in "0123456789abcdef" for karakter in trace_id)
+    ):
         raise HTTPException(422, "Kode room atau ID jejak tidak valid.")
-    live = checker_service.cari(code, trace_id)
-    if live is not None:
-        return live
-    stored = transaction(
-        lambda db: db.execute(
+    jejak_aktif = checker_service.cari(code, trace_id)
+    if jejak_aktif is not None:
+        return jejak_aktif
+    jejak_arsip = transaction(
+        lambda database: database.execute(
             text("SELECT trace FROM checker_traces WHERE id=:id AND room_code=:code"),
             {"id": trace_id, "code": code},
         ).scalar()
     )
-    if stored is None:
+    if jejak_arsip is None:
         raise HTTPException(404, "Jejak tidak ditemukan.")
-    return json.loads(stored) if isinstance(stored, str) else stored
+    return _baca_kolom_json(jejak_arsip)
 
 
 # Bangun kondisi SQL berparameter; rentang tanggal WIB dikonversi ke UTC.
@@ -438,23 +459,24 @@ def history_filter(room_code, date_from, date_to, sender_kind="all"):
         raise HTTPException(422, "Tanggal awal terlalu kecil.")
     if date_from and date_to and date_from > date_to:
         raise HTTPException(422, "Tanggal awal harus sebelum atau sama dengan tanggal akhir.")
-    clauses = ["1=1"]
-    params = {}
+    selisih_wib = timedelta(hours=7)
+    daftar_syarat = ["1=1"]
+    parameter_sql = {}
     if sender_kind != "all":
-        clauses.append("m.sender_kind=:sender_kind")
-        params["sender_kind"] = sender_kind
+        daftar_syarat.append("m.sender_kind=:sender_kind")
+        parameter_sql["sender_kind"] = sender_kind
     if room_code:
-        clauses.append("s.room_code=:room")
-        params["room"] = room_code
+        daftar_syarat.append("s.room_code=:room")
+        parameter_sql["room"] = room_code
     if date_from:
-        clauses.append("m.created_at >= :start")
-        params["start"] = datetime.combine(date_from, time()) - timedelta(hours=7)
+        daftar_syarat.append("m.created_at >= :start")
+        parameter_sql["start"] = datetime.combine(date_from, time()) - selisih_wib
     if date_to:
         if date_to == date.max:
             raise HTTPException(422, "Tanggal akhir terlalu besar.")
-        clauses.append("m.created_at < :end")
-        params["end"] = datetime.combine(date_to + timedelta(days=1), time()) - timedelta(hours=7)
-    return " AND ".join(clauses), params
+        daftar_syarat.append("m.created_at < :end")
+        parameter_sql["end"] = datetime.combine(date_to + timedelta(days=1), time()) - selisih_wib
+    return " AND ".join(daftar_syarat), parameter_sql
 
 
 # Ambil halaman pesan sesuai filter tanpa memuat seluruh arsip.
@@ -469,38 +491,38 @@ def history(
     sender_kind: Literal["all", "human", "bot", "legacy"] = "all",
     token=Depends(require_panel),
 ):
-    where, params = history_filter(room_code, date_from, date_to, sender_kind)
+    syarat_sql, parameter_sql = history_filter(room_code, date_from, date_to, sender_kind)
     # Halaman berikutnya: "lama" melanjutkan sesudah after_id, "baru" (terbaru dulu) sebelum before_id.
     if urut == "baru":
         arah = "DESC"
         if before_id:
-            where += " AND m.id<:before"
-            params["before"] = before_id
+            syarat_sql += " AND m.id<:before"
+            parameter_sql["before"] = before_id
     else:
         arah = "ASC"
-        where += " AND m.id>:after"
-        params["after"] = after_id
-    rows = transaction(
-        lambda db: [
-            dict(row)
-            for row in db.execute(
+        syarat_sql += " AND m.id>:after"
+        parameter_sql["after"] = after_id
+    # LIMIT 201 = satu baris lebih dari isi halaman, untuk tahu masih ada halaman berikutnya.
+    daftar_baris = transaction(
+        lambda database: [
+            dict(baris)
+            for baris in database.execute(
                 text("""
         SELECT m.id,m.sender_name,m.sender_kind,m.message,m.nlu,m.created_at,m.match_id,m.round_number,m.phase,s.room_code
         FROM chat_messages m LEFT JOIN game_sessions s ON s.id=m.game_session_id
-        WHERE """ + where + f" ORDER BY m.id {arah} LIMIT 201"),
-                params,
+        WHERE """ + syarat_sql + f" ORDER BY m.id {arah} LIMIT 201"),
+                parameter_sql,
             ).mappings()
         ]
     )
-    for row in rows:  # bacaan IndoBERT saat game berjalan (JSON; kosong untuk pesan lama)
-        if isinstance(row["nlu"], str):
-            row["nlu"] = json.loads(row["nlu"])
-    terakhir = rows[min(len(rows), 200) - 1]["id"] if rows else None
+    for baris in daftar_baris:  # bacaan IndoBERT saat game berjalan (JSON; kosong untuk pesan lama)
+        baris["nlu"] = _baca_kolom_json(baris["nlu"])
+    isi_halaman = daftar_baris[:200]
     return {
-        "messages": rows[:200],
-        "has_more": len(rows) > 200,
+        "messages": isi_halaman,
+        "has_more": len(daftar_baris) > 200,
         # id pesan terakhir di halaman ini: lanjutkan dengan after_id (urut lama) atau before_id (urut baru).
-        "next_after_id": terakhir if terakhir is not None else after_id,
+        "next_after_id": isi_halaman[-1]["id"] if isi_halaman else after_id,
     }
 
 
@@ -511,32 +533,14 @@ KOLOM_CSV = ["pengirim", "teks_chat", "label_intent", "chat_sebelumnya", "daftar
 
 
 # Target bacaan → [{pemain, relasi}]. Bacaan baru menyimpan dict; konteks lama menyimpan teks "NOX: offend (0.88)".
-def target_dataset(daftar):
+def target_dataset(daftar_target):
     hasil = []
-    for t in daftar or []:
-        if isinstance(t, dict):
-            hasil.append({"pemain": t["pemain"], "relasi": t["relasi"]})
-        elif cocok := re.match(r"(.+): (offend|defend|neutral)\b", str(t)):
+    for target in daftar_target or []:
+        if isinstance(target, dict):
+            hasil.append({"pemain": target["pemain"], "relasi": target["relasi"]})
+        elif cocok := re.match(r"(.+): (offend|defend|neutral)\b", str(target)):
             hasil.append({"pemain": cocok[1], "relasi": cocok[2]})
     return hasil
-
-
-# Satu pesan → satu baris dataset. Pesan tanpa bacaan IndoBERT (arsip lama) → kolom bacaan kosong.
-def baris_dataset(chat_id, pengirim, jenis, teks, nlu, match_id, room_code, waktu):
-    data = (json.loads(nlu) if isinstance(nlu, str) else nlu) or {}
-    teks_json = lambda x: json.dumps(x, ensure_ascii=False)  # noqa: E731
-    sebelum = [
-        {"pengirim": c["pengirim"], "teks_chat": c["teks"], "label_intent": c.get("intent"),
-         "target": target_dataset(c.get("target"))}
-        for c in data.get("konteks") or []
-    ]  # fmt: skip
-    return [
-        pengirim, teks, data.get("intent", ""),
-        teks_json(sebelum) if data else "", teks_json(data.get("daftar_pemain") or []) if data else "",
-        teks_json(target_dataset(data.get("target"))) if data else "",
-        match_id or room_code or "", chat_id, room_code or "", data.get("confidence", ""), jenis,
-        waktu.isoformat(sep=" ") if hasattr(waktu, "isoformat") else (waktu or ""),
-    ]  # fmt: skip
 
 
 # Ekspor snapshot riwayat menjadi CSV dengan pembacaan database per halaman.
@@ -549,62 +553,98 @@ def download(
     urut: Literal["lama", "baru"] = "lama",
     token=Depends(require_panel),
 ):
-    where, params = history_filter(room_code, date_from, date_to, sender_kind)
-    # Build on disk beyond 1 MB; no giant in-memory transcript or long open DB transaction.
-    output = SpooledTemporaryFile(max_size=1024 * 1024, mode="w+b")
+    # INPUT: filter yang sama dengan daftar riwayat
+    syarat_sql, parameter_sql = history_filter(room_code, date_from, date_to, sender_kind)
+
+    # PROSES: CSV ditulis ke berkas sementara. Lewat 1 MB berkas pindah ke disk, jadi transkrip besar
+    # tidak menumpuk di memori dan transaksi database tidak terbuka lama.
+    berkas_csv = SpooledTemporaryFile(max_size=1024 * 1024, mode="w+b")
 
     # Encode satu baris CSV sebagai UTF-8 ke berkas sementara ekspor.
-    def write_row(values):
-        buffer = io.StringIO(newline="")
-        csv.writer(buffer).writerow(values)
-        output.write(buffer.getvalue().encode("utf-8"))
+    def tulis_baris_csv(nilai_kolom):
+        penampung = io.StringIO(newline="")
+        csv.writer(penampung).writerow(nilai_kolom)
+        berkas_csv.write(penampung.getvalue().encode("utf-8"))
+
+    def teks_json(nilai):
+        return json.dumps(nilai, ensure_ascii=False)
 
     try:
-        output.write(b"\xef\xbb\xbf")
-        write_row(KOLOM_CSV)
-        maximum = transaction(
-            lambda db: db.execute(text("SELECT COALESCE(MAX(id),0) FROM chat_messages")).scalar()
+        berkas_csv.write(b"\xef\xbb\xbf")
+        tulis_baris_csv(KOLOM_CSV)
+        id_maksimum = transaction(
+            lambda database: database.execute(
+                text("SELECT COALESCE(MAX(id),0) FROM chat_messages")
+            ).scalar()
         )
         # Snapshot sampai id maksimum saat ekspor dimulai; halaman berjalan naik ("lama") atau turun ("baru").
-        baru = urut == "baru"
-        batas = maximum + 1 if baru else 0
-        syarat = " AND m.id<:batas" if baru else " AND m.id>:batas AND m.id<=:maximum"
+        urut_baru = urut == "baru"
+        batas = id_maksimum + 1 if urut_baru else 0
+        syarat_halaman = " AND m.id<:batas" if urut_baru else " AND m.id>:batas AND m.id<=:maximum"
         while True:
-            page_params = {**params, "batas": batas, "maximum": maximum}
-            rows = transaction(
-                lambda db: db.execute(
+            parameter_halaman = {**parameter_sql, "batas": batas, "maximum": id_maksimum}
+            daftar_baris = transaction(
+                lambda database: database.execute(
                     text(
                         """
                 SELECT m.id,m.sender_name,m.sender_kind,m.message,m.nlu,m.match_id,s.room_code,m.created_at
                 FROM chat_messages m LEFT JOIN game_sessions s ON s.id=m.game_session_id
                 WHERE """
-                        + where
-                        + syarat
-                        + f" ORDER BY m.id {'DESC' if baru else 'ASC'} LIMIT 1000"
+                        + syarat_sql
+                        + syarat_halaman
+                        + f" ORDER BY m.id {'DESC' if urut_baru else 'ASC'} LIMIT 1000"
                     ),
-                    page_params,
+                    parameter_halaman,
                 ).all()
             )
-            if not rows:
+            if not daftar_baris:
                 break
-            for row in rows:
-                write_row(baris_dataset(*row))
-            batas = rows[-1][0]
-        output.seek(0)
+            for id_chat, pengirim, jenis, teks, nlu, id_match, kode_room, waktu in daftar_baris:
+                # Satu pesan → satu baris dataset, urutannya mengikuti KOLOM_CSV.
+                # Pesan tanpa bacaan IndoBERT (arsip lama) → kolom bacaan kosong.
+                bacaan = _baca_kolom_json(nlu) or {}
+                chat_sebelumnya = [
+                    {
+                        "pengirim": pesan["pengirim"],
+                        "teks_chat": pesan["teks"],
+                        "label_intent": pesan.get("intent"),
+                        "target": target_dataset(pesan.get("target")),
+                    }
+                    for pesan in bacaan.get("konteks") or []
+                ]
+                tulis_baris_csv(
+                    [
+                        pengirim,
+                        teks,
+                        bacaan.get("intent", ""),
+                        teks_json(chat_sebelumnya) if bacaan else "",
+                        teks_json(bacaan.get("daftar_pemain") or []) if bacaan else "",
+                        teks_json(target_dataset(bacaan.get("target"))) if bacaan else "",
+                        id_match or kode_room or "",
+                        id_chat,
+                        kode_room or "",
+                        bacaan.get("confidence", ""),
+                        jenis,
+                        waktu.isoformat(sep=" ") if hasattr(waktu, "isoformat") else (waktu or ""),
+                    ]
+                )
+            batas = daftar_baris[-1][0]
+        berkas_csv.seek(0)
     except BaseException:
-        output.close()
+        berkas_csv.close()
         raise
 
     # Kirim potongan berkas ekspor dan tutup berkas saat streaming selesai.
-    def chunks():
+    def kirim_potongan_berkas():
         try:
-            while chunk := output.read(65536):
-                yield chunk
+            while potongan := berkas_csv.read(65536):
+                yield potongan
         finally:
-            output.close()
+            berkas_csv.close()
 
+    # OUTPUT: berkas dialirkan ke browser sedikit demi sedikit
     return StreamingResponse(
-        chunks(),
+        kirim_potongan_berkas(),
         media_type="text/csv; charset=utf-8",
         headers={
             "Content-Disposition": 'attachment; filename="riwayat-chat.csv"',

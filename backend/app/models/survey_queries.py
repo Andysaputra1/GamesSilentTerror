@@ -11,29 +11,33 @@ KOLOM_PERTANYAAN = (
 )
 
 
-# Ubah baris pertanyaan menjadi dict; kolom JSON options dinormalkan menjadi list.
-def _question(row) -> dict:
-    data = dict(row._mapping)
-    options = data.get("options")
-    data["options"] = json.loads(options) if isinstance(options, str) else (options or [])
-    data["required"] = bool(data["required"])
-    data["active"] = bool(data["active"])
-    return data
-
-
 # QUERY SELECT: pertanyaan survei berurutan; pemain hanya menerima pertanyaan aktif.
 def list_questions(database: Session, *, active_only: bool = True) -> list[dict]:
-    where = "WHERE active = TRUE" if active_only else ""
-    rows = database.execute(
-        text(f"SELECT {KOLOM_PERTANYAAN} FROM survey_questions {where} ORDER BY position, id")
+    syarat_aktif = "WHERE active = TRUE" if active_only else ""
+    daftar_baris = database.execute(
+        text(
+            f"SELECT {KOLOM_PERTANYAAN} FROM survey_questions {syarat_aktif} ORDER BY position, id"
+        )
     )
-    return [_question(row) for row in rows]
+    daftar_pertanyaan = []
+    for baris in daftar_baris:
+        pertanyaan = dict(baris._mapping)
+        # Kolom JSON options dinormalkan menjadi list.
+        pilihan = pertanyaan.get("options")
+        pertanyaan["options"] = json.loads(pilihan) if isinstance(pilihan, str) else (pilihan or [])
+        pertanyaan["required"] = bool(pertanyaan["required"])
+        pertanyaan["active"] = bool(pertanyaan["active"])
+        daftar_pertanyaan.append(pertanyaan)
+    return daftar_pertanyaan
 
 
 # QUERY INSERT: pertanyaan baru dari panel; kode unik dijaga constraint database.
-def insert_question(database: Session, data: dict) -> int:
-    params = {**data, "options": json.dumps(data.get("options") or [], ensure_ascii=False)}
-    result = database.execute(
+def insert_question(database: Session, pertanyaan: dict) -> int:
+    parameter_sql = {
+        **pertanyaan,
+        "options": json.dumps(pertanyaan.get("options") or [], ensure_ascii=False),
+    }
+    hasil = database.execute(
         text("""
         INSERT INTO survey_questions
             (code, prompt, kind, scale_min, scale_max, label_min, label_max, options, required,
@@ -41,17 +45,17 @@ def insert_question(database: Session, data: dict) -> int:
         VALUES (:code, :prompt, :kind, :scale_min, :scale_max, :label_min, :label_max, :options,
                 :required, :active, :position)
     """),
-        params,
+        parameter_sql,
     )
-    return int(result.lastrowid)
+    return int(hasil.lastrowid)
 
 
 # QUERY UPDATE: ubah pertanyaan; jawaban lama tetap memakai salinan pertanyaan saat dijawab.
-def update_question(database: Session, question_id: int, data: dict) -> int:
-    params = {
-        **data,
-        "id": question_id,
-        "options": json.dumps(data.get("options") or [], ensure_ascii=False),
+def update_question(database: Session, id_pertanyaan: int, pertanyaan: dict) -> int:
+    parameter_sql = {
+        **pertanyaan,
+        "id": id_pertanyaan,
+        "options": json.dumps(pertanyaan.get("options") or [], ensure_ascii=False),
     }
     return database.execute(
         text("""
@@ -60,24 +64,24 @@ def update_question(database: Session, question_id: int, data: dict) -> int:
             required=:required, active=:active, position=:position
         WHERE id = :id
     """),
-        params,
+        parameter_sql,
     ).rowcount
 
 
 # QUERY COUNT: apakah akun sudah mengirim survei untuk pertandingan ini.
-def count_answers(database: Session, match_id: str, username: str) -> int:
+def count_answers(database: Session, id_pertandingan: str, username: str) -> int:
     return int(
         database.execute(
             text("""
         SELECT COUNT(*) FROM survey_responses WHERE match_id = :match_id AND username = :username
     """),
-            {"match_id": match_id, "username": username},
+            {"match_id": id_pertandingan, "username": username},
         ).scalar_one()
     )
 
 
 # QUERY INSERT: satu jawaban beserta salinan pertanyaan dan konteks hasil pemain.
-def insert_answer(database: Session, row: dict) -> None:
+def insert_answer(database: Session, jawaban: dict) -> None:
     database.execute(
         text("""
         INSERT INTO survey_responses
@@ -86,42 +90,45 @@ def insert_answer(database: Session, row: dict) -> None:
         VALUES (:match_id, :room_code, :username, :question_id, :question_snapshot, :value_number,
                 :value_text, :role, :team, :outcome)
     """),
-        {**row, "question_snapshot": json.dumps(row["question_snapshot"], ensure_ascii=False)},
+        {
+            **jawaban,
+            "question_snapshot": json.dumps(jawaban["question_snapshot"], ensure_ascii=False),
+        },
     )
 
 
 # QUERY INSERT: metode dan persona bot sekali per pertandingan (untuk analisis per metode).
-def record_match_bot(database: Session, row: dict) -> None:
+def record_match_bot(database: Session, bot: dict) -> None:
     database.execute(
         text("""
         INSERT IGNORE INTO match_bots (match_id, room_code, bot_name, method, persona, role)
         VALUES (:match_id, :room_code, :bot_name, :method, :persona, :role)
     """),
-        row,
+        bot,
     )
 
 
 # QUERY DELETE: kosongkan jawaban beserta arsip peserta. Tanpa arsip ikut terhapus, pertandingan lama
 # muncul lagi sebagai survei tertunda karena jawabannya sudah tidak ada (lihat pending_surveys).
 def clear_responses(database: Session) -> int:
-    deleted = database.execute(text("DELETE FROM survey_responses")).rowcount
+    jumlah_terhapus = database.execute(text("DELETE FROM survey_responses")).rowcount
     database.execute(text("DELETE FROM match_participants"))
-    return deleted
+    return jumlah_terhapus
 
 
 # QUERY COUNT: jumlah jawaban satu pertanyaan.
-def count_question_answers(database: Session, question_id: int) -> int:
+def count_question_answers(database: Session, id_pertanyaan: int) -> int:
     return int(
         database.execute(
             text("SELECT COUNT(*) FROM survey_responses WHERE question_id = :id"),
-            {"id": question_id},
+            {"id": id_pertanyaan},
         ).scalar_one()
     )
 
 
 # QUERY DELETE: hapus satu pertanyaan; service memastikan belum ada jawaban yang merujuknya.
-def delete_question(database: Session, question_id: int) -> None:
-    database.execute(text("DELETE FROM survey_questions WHERE id = :id"), {"id": question_id})
+def delete_question(database: Session, id_pertanyaan: int) -> None:
+    database.execute(text("DELETE FROM survey_questions WHERE id = :id"), {"id": id_pertanyaan})
 
 
 # QUERY RINGKASAN: jumlah, rata-rata, dan sebaran nilai per pertanyaan, serta rata-rata per metode bot.
@@ -148,18 +155,18 @@ def summary(database: Session) -> dict:
         WHERE value_text IS NOT NULL AND value_text <> '' GROUP BY question_id
     """)).all()
     return {
-        "distribution": [dict(row._mapping) for row in distribusi],
+        "distribution": [dict(baris._mapping) for baris in distribusi],
         "per_method": [
-            {**dict(row._mapping), "rata": float(row.rata) if row.rata is not None else None}
-            for row in per_metode
+            {**dict(baris._mapping), "rata": float(baris.rata) if baris.rata is not None else None}
+            for baris in per_metode
         ],
-        "text_answers": [dict(row._mapping) for row in teks],
+        "text_answers": [dict(baris._mapping) for baris in teks],
     }
 
 
 # QUERY EKSPOR: seluruh jawaban beserta metode bot di pertandingan yang sama.
 def export_rows(database: Session) -> list[dict]:
-    rows = database.execute(text("""
+    daftar_baris = database.execute(text("""
         SELECT r.created_at, r.match_id, r.room_code, r.username, r.role, r.team, r.outcome,
                q.code, r.question_snapshot, r.value_number, r.value_text,
                (SELECT GROUP_CONCAT(DISTINCT CONCAT(b.bot_name, ':', b.method, ':', b.persona)
@@ -168,26 +175,26 @@ def export_rows(database: Session) -> list[dict]:
         FROM survey_responses r JOIN survey_questions q ON q.id = r.question_id
         ORDER BY r.created_at, r.id
     """))
-    return [dict(row._mapping) for row in rows]
+    return [dict(baris._mapping) for baris in daftar_baris]
 
 
 # QUERY INSERT: peserta manusia pertandingan yang selesai; dicatat sekali (INSERT IGNORE per match + username).
-def record_participants(database: Session, rows: list[dict]) -> None:
-    for row in rows:
+def record_participants(database: Session, daftar_peserta: list[dict]) -> None:
+    for peserta in daftar_peserta:
         database.execute(
             text("""
             INSERT IGNORE INTO match_participants (match_id, room_code, username, role, team, outcome)
             VALUES (:match_id, :room_code, :username, :role, :team, :outcome)
         """),
-            row,
+            peserta,
         )
 
 
 # QUERY SELECT: konteks survei satu akun dari arsip peserta (pertandingan tertentu atau yang terbaru di room).
 def participant(
-    database: Session, room_code: str, username: str, match_id: str | None
+    database: Session, kode_room: str, username: str, id_pertandingan: str | None
 ) -> dict | None:
-    row = (
+    baris = (
         database.execute(
             text("""
         SELECT match_id, room_code, role, team, outcome FROM match_participants
@@ -195,17 +202,17 @@ def participant(
           AND (:match_id IS NULL OR match_id = :match_id)
         ORDER BY finished_at DESC LIMIT 1
     """),
-            {"room_code": room_code, "username": username, "match_id": match_id},
+            {"room_code": kode_room, "username": username, "match_id": id_pertandingan},
         )
         .mappings()
         .first()
     )
-    return dict(row) if row else None
+    return dict(baris) if baris else None
 
 
 # QUERY SELECT: pertandingan selesai yang surveinya belum dijawab akun ini (terbaru dulu).
 def pending_surveys(database: Session, username: str, limit: int = 20) -> list[dict]:
-    rows = database.execute(
+    daftar_baris = database.execute(
         text("""
         SELECT p.match_id, p.room_code, p.role, p.team, p.outcome, p.finished_at
         FROM match_participants p
@@ -216,4 +223,4 @@ def pending_surveys(database: Session, username: str, limit: int = 20) -> list[d
     """),
         {"username": username, "limit": limit},
     ).mappings()
-    return [dict(row) for row in rows]
+    return [dict(baris) for baris in daftar_baris]
