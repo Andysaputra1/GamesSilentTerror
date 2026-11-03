@@ -11,13 +11,13 @@ export interface UserProfile {
   skinId?: string;
 }
 
-// Transform API response (snake_case) to TypeScript interface (camelCase).
-function toUserProfile(raw: {
+// Ubah respons API (snake_case) menjadi profil aplikasi (camelCase).
+function toUserProfile(respons: {
   username: string;
   display_name: string;
   skin_id?: string;
 }): UserProfile {
-  return { username: raw.username, displayName: raw.display_name, skinId: raw.skin_id };
+  return { username: respons.username, displayName: respons.display_name, skinId: respons.skin_id };
 }
 
 // SESI LOGIN: profil, skin, dan logout. Token disimpan di localStorage; backend tetap memvalidasinya.
@@ -103,7 +103,7 @@ export class SessionService {
     return defer(() => {
       this.loggingOut.set(true);
       const token = localStorage.getItem(STORAGE.token);
-      const revoke = token
+      const pencabutanToken = token
         ? this.http
             .post<void>(
               backendUrl() + '/api/auth/logout',
@@ -114,7 +114,7 @@ export class SessionService {
             )
             .pipe(timeout(10000))
         : of(undefined);
-      return revoke.pipe(
+      return pencabutanToken.pipe(
         catchError((error: unknown) =>
           error instanceof HttpErrorResponse && error.status === 401
             ? of(undefined)

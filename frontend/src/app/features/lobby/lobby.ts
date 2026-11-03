@@ -37,7 +37,7 @@ export class Lobby implements OnInit, OnDestroy {
   error = '';
   busy = false;
   copied = false;
-  quick = false;
+  modeCepat = false;
   capacity = 6;
   helpOpen = false;
 
@@ -50,33 +50,37 @@ export class Lobby implements OnInit, OnDestroy {
   get durations() {
     if (this.room?.match_durations) return this.room.match_durations;
     if (this.room?.phase_durations)
-      return this.room.phase_durations[this.quick ? 'quick' : 'standard'];
-    const count = this.room
+      return this.room.phase_durations[this.modeCepat ? 'quick' : 'standard'];
+    const jumlahPemain = this.room
       ? Math.max(4, this.room.members.length + this.room.bots.length)
       : this.capacity;
-    return this.quick
+    return this.modeCepat
       ? {
-          day: Math.ceil((count * 10) / 3),
-          night: Math.ceil(count * 2.5),
-          tribunal: Math.ceil(count * 2.5),
+          day: Math.ceil((jumlahPemain * 10) / 3),
+          night: Math.ceil(jumlahPemain * 2.5),
+          tribunal: Math.ceil(jumlahPemain * 2.5),
         }
-      : { day: count * 20, night: count * 5, tribunal: Math.ceil(count * 7.5) + 30 };
+      : {
+          day: jumlahPemain * 20,
+          night: jumlahPemain * 5,
+          tribunal: Math.ceil(jumlahPemain * 7.5) + 30,
+        };
   }
   // PRIVATE PROPERTY: simpan timer polling agar dapat dihentikan ketika meninggalkan lobby.
-  private timer?: ReturnType<typeof setInterval>;
+  private timerPolling?: ReturnType<typeof setInterval>;
   // Polling latar tidak memakai `busy`: aplikasi zoneless tidak menggambar ulang tombol saat polling
   // dimulai, jadi klik yang jatuh di tengah polling dulu ditolak diam-diam (tombol bot harus ditekan
   // dua kali). Nomor aksi membuang respons polling yang lebih tua dari klik terakhir.
-  private polling = false;
-  private aksi = 0;
+  private sedangPolling = false;
+  private nomorAksiTerakhir = 0;
 
   // CONSTRUCTOR: Angular menyediakan service ruangan, router, platform, dan fasilitas lifecycle.
   constructor(
     @Inject(PLATFORM_ID) private readonly platformId: object,
     private readonly router: Router,
     private readonly rooms: RoomService,
-    private readonly cdr: ChangeDetectorRef,
-    private readonly destroy: DestroyRef,
+    private readonly changeDetector: ChangeDetectorRef,
+    private readonly destroyRef: DestroyRef,
   ) {}
 
   // LIFECYCLE METHOD: baca sesi browser, ambil kembali ruangan, lalu perbarui roster tiap 3 detik.
@@ -86,15 +90,15 @@ export class Lobby implements OnInit, OnDestroy {
       this.username =
         JSON.parse(localStorage.getItem(STORAGE.user) ?? '{}').username || this.username;
     } catch {}
-    const code = sessionStorage.getItem(STORAGE.room);
+    const kodeRoom = sessionStorage.getItem(STORAGE.room);
     // Tampilkan dulu snapshot dari Main (respons create/join barusan) agar layar room tidak
-    // menunggu satu round trip; restoreRoom/load tetap menggantinya dengan data server.
-    this.room = this.roomSnapshot(code);
+    // menunggu satu round trip; request berikutnya tetap menggantinya dengan data server.
+    this.room = this.bacaSnapshotRoom(kodeRoom);
     if (localStorage.getItem(STORAGE.token)) this.restoreRoom();
-    else if (code) this.load('GET', '/' + encodeURIComponent(code));
-    this.timer = setInterval(() => {
-      if (this.room && !this.busy && !this.polling)
-        this.load('GET', '/' + this.room.code, undefined, true);
+    else if (kodeRoom) this.kirimPermintaanRoom('GET', '/' + encodeURIComponent(kodeRoom));
+    this.timerPolling = setInterval(() => {
+      if (this.room && !this.busy && !this.sedangPolling)
+        this.kirimPermintaanRoom('GET', '/' + this.room.code, undefined, true);
     }, 3000);
   }
 
@@ -110,7 +114,7 @@ export class Lobby implements OnInit, OnDestroy {
   }
 
   // Snapshot room tab ini hanya dipakai bila kodenya sama dengan pointer room yang aktif.
-  private roomSnapshot(code: string | null): Room | null {
+  private bacaSnapshotRoom(code: string | null): Room | null {
     if (!code) return null;
     try {
       const room = JSON.parse(sessionStorage.getItem(STORAGE.roomSnapshot) ?? 'null');
@@ -123,7 +127,7 @@ export class Lobby implements OnInit, OnDestroy {
 
   // LIFECYCLE METHOD: hentikan polling saat komponen dilepas agar tidak berjalan di belakang.
   ngOnDestroy(): void {
-    if (this.timer) clearInterval(this.timer);
+    if (this.timerPolling) clearInterval(this.timerPolling);
   }
 
   // Case File adalah overlay agar aturan lengkap tidak mengambil tinggi waiting room.
@@ -147,7 +151,7 @@ export class Lobby implements OnInit, OnDestroy {
 
   // Case File bersifat modal: Tab dan Shift+Tab tetap berputar di dalam dialog.
   @HostListener('document:keydown', ['$event'])
-  keepHelpFocus(event: KeyboardEvent): void {
+  jagaFokusDalamPanduan(event: KeyboardEvent): void {
     if (event.key !== 'Tab' || !this.helpOpen || !this.helpDialog) return;
     const focusable = Array.from(
       this.helpDialog.nativeElement.querySelectorAll<HTMLElement>(
@@ -160,13 +164,13 @@ export class Lobby implements OnInit, OnDestroy {
     }
     const first = focusable[0];
     const last = focusable[focusable.length - 1];
-    const active = document.activeElement;
-    if (event.shiftKey && active === first) {
+    const elemenAktif = document.activeElement;
+    if (event.shiftKey && elemenAktif === first) {
       event.preventDefault();
       last.focus();
     } else if (
       !event.shiftKey &&
-      (active === last || !this.helpDialog.nativeElement.contains(active))
+      (elemenAktif === last || !this.helpDialog.nativeElement.contains(elemenAktif))
     ) {
       event.preventDefault();
       first.focus();
@@ -176,13 +180,15 @@ export class Lobby implements OnInit, OnDestroy {
   // METHOD EVENT TOMBOL: minta perubahan pilihan NOX; izin pembuat ruangan diperiksa backend.
   toggleBot(): void {
     if (this.room && !this.busy)
-      this.load('POST', '/' + this.room.code + '/bot', { enabled: !this.room.bot_enabled });
+      this.kirimPermintaanRoom('POST', '/' + this.room.code + '/bot', {
+        enabled: !this.room.bot_enabled,
+      });
   }
 
   // START: backend memeriksa host/jumlah peserta lalu mengacak role.
   startGame(): void {
     if (this.room && !this.busy)
-      this.load('POST', '/' + this.room.code + '/start', { quick: this.quick });
+      this.kirimPermintaanRoom('POST', '/' + this.room.code + '/start', { quick: this.modeCepat });
   }
 
   // Keluar hanya dari lobby atau game selesai; tidak mengeluarkan pemain lain.
@@ -192,10 +198,10 @@ export class Lobby implements OnInit, OnDestroy {
     this.rooms
       .request('POST', '/' + this.room.code + '/leave')
       .pipe(
-        takeUntilDestroyed(this.destroy),
+        takeUntilDestroyed(this.destroyRef),
         finalize(() => {
           this.busy = false;
-          this.cdr.markForCheck();
+          this.changeDetector.markForCheck();
         }),
       )
       .subscribe({
@@ -219,10 +225,10 @@ export class Lobby implements OnInit, OnDestroy {
     this.rooms
       .current()
       .pipe(
-        takeUntilDestroyed(this.destroy),
+        takeUntilDestroyed(this.destroyRef),
         finalize(() => {
           this.busy = false;
-          this.cdr.markForCheck();
+          this.changeDetector.markForCheck();
         }),
       )
       .subscribe({
@@ -248,7 +254,7 @@ export class Lobby implements OnInit, OnDestroy {
     } catch {
       this.error = 'Salin kode ruangan secara manual.';
     }
-    this.cdr.markForCheck();
+    this.changeDetector.markForCheck();
   }
 
   // METHOD EVENT TOMBOL: simpan ruangan dan tanda navigasi pada tab ini, lalu buka /game.
@@ -262,31 +268,36 @@ export class Lobby implements OnInit, OnDestroy {
 
   // PRIVATE METHOD: jalankan Observable dari RoomService, kelola loading dan hasil/error.
   // takeUntilDestroyed membatalkan subscription saat komponen dilepas; finalize membuka UI.
-  private load(method: 'GET' | 'POST', path: string, body?: unknown, latar = false): void {
-    const nomor = latar ? this.aksi : ++this.aksi;
-    if (latar) this.polling = true;
+  private kirimPermintaanRoom(
+    method: 'GET' | 'POST',
+    path: string,
+    body?: unknown,
+    pollingLatar = false,
+  ): void {
+    const nomorAksi = pollingLatar ? this.nomorAksiTerakhir : ++this.nomorAksiTerakhir;
+    if (pollingLatar) this.sedangPolling = true;
     else this.busy = true;
     this.rooms
       .request(method, path, body)
       .pipe(
-        takeUntilDestroyed(this.destroy),
+        takeUntilDestroyed(this.destroyRef),
         finalize(() => {
-          if (latar) this.polling = false;
+          if (pollingLatar) this.sedangPolling = false;
           else this.busy = false;
-          this.cdr.markForCheck();
+          this.changeDetector.markForCheck();
         }),
       )
       .subscribe({
         next: (room) => {
           // Pengguna menekan tombol saat polling berjalan: snapshot polling sudah basi.
-          if (nomor !== this.aksi) return;
+          if (nomorAksi !== this.nomorAksiTerakhir) return;
           // Tab di latar bisa melewatkan layar persiapan yang singkat: fase apa pun selain lobby berarti mulai.
-          const justStarted = this.room?.phase === 'lobby' && room.phase !== 'lobby';
+          const baruDimulai = this.room?.phase === 'lobby' && room.phase !== 'lobby';
           this.room = room;
           this.error = '';
           sessionStorage.setItem(STORAGE.room, room.code);
           // Host maupun anggota lain langsung masuk ke layar persiapan begitu pertandingan dimulai.
-          if (path.endsWith('/start') || justStarted) {
+          if (path.endsWith('/start') || baruDimulai) {
             this.busy = false;
             this.enterGame();
           }

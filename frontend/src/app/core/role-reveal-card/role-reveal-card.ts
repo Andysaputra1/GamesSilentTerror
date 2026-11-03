@@ -7,21 +7,21 @@ import { Component, Input } from '@angular/core';
   styleUrl: './role-reveal-card.css',
 })
 export class RoleRevealCard {
-  /** Skin identifier for the avatar. Falls back to 'dexter' if undefined. */
+  /** Skin pemain pada potret; kosong berarti memakai 'dexter'. */
   @Input() skinId: string | undefined = undefined;
 
-  /** Role determines which card frame and prop to display. */
+  /** Role menentukan bingkai kartu dan properti yang tampil. */
   @Input() role: string = 'civilian';
 
-  /** Parent controls the portrait-only fade when the deck skin changes. */
+  /** Induk mengatur pudar khusus potret saat skin di deck berganti. */
   @Input() skinTransition: 'idle' | 'out' | 'in' = 'idle';
 
-  /** Mapping from role to prop asset filename (without extension). */
+  /** Nama berkas properti tiap role, tanpa ekstensi. */
   private readonly roleToProp: Record<string, string | null> = {
     spy: 'spy-shades',
     hitman: 'hitman-pistol',
     stalker: 'stalker-nerd-eyes',
-    civilian: null, // Civilian has no prop
+    civilian: null, // Civilian tidak punya properti.
   };
 
   private getSafeSkinId(): string {
@@ -36,7 +36,7 @@ export class RoleRevealCard {
     return `/assets/cards/card_${this.role}.png`;
   }
 
-  /** Returns prop URL if the role has one, null otherwise. */
+  /** URL properti role; null bila role ini tidak punya properti. */
   get propUrl(): string | null {
     const prop = this.roleToProp[this.role];
     return prop ? `/assets/props/${prop}.png` : null;

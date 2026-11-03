@@ -85,17 +85,17 @@ export class Game implements OnInit, OnDestroy {
   // Permintaan keluar sedang dikirim; polling ditahan agar tidak berebut dengan pembersihan room.
   leaving = false;
   // Pop-up konfirmasi keluar sedang terbuka.
-  confirmLeave = false;
+  popupKeluarTerbuka = false;
   // Fokus awal pop-up keluar di "Tetap bermain" agar Enter tidak langsung mengeluarkan pemain.
   @ViewChild('stayButton') set stayButton(button: ElementRef<HTMLButtonElement> | undefined) {
     if (button) queueMicrotask(() => button.nativeElement.focus());
   }
-  revealRole = false;
+  kartuRoleTerbuka = false;
   readingRole = false;
-  private readingPrompt = false;
-  private readRoleMatch = '';
+  private membacaLewatPengingat = false;
+  private idPertandinganRoleDibaca = '';
   private roleReadTimer?: ReturnType<typeof setTimeout>;
-  seconds = 0;
+  sisaDetik = 0;
   // Tampilan: tab di HP, panel aturan, dan layar akhir (pengumuman → kuesioner → meja akhir).
   mobileTab: 'table' | 'chat' | 'info' = 'table';
   unread = 0;
@@ -105,13 +105,13 @@ export class Game implements OnInit, OnDestroy {
   @ViewChild('messageList') private messageList?: ElementRef<HTMLElement>;
   // CHAT: pemain di dasar daftar ikut turun ke pesan baru; yang sedang membaca riwayat tidak ditarik.
   chatAtBottom = true;
-  newBelow = 0;
+  jumlahPesanBaruDiBawah = 0;
   private lastMessageId = '';
   private lastRevealTry = 0;
   private messagesLoaded = false;
   private feltSize = { width: 0, height: 0 };
   private feltObserver?: ResizeObserver;
-  private endMatch = '';
+  private idPertandinganBerakhir = '';
   private endTimer?: ReturnType<typeof setTimeout>;
   readonly phaseSteps = [
     { key: 'day', label: 'Diskusi', icon: '☀' },
@@ -155,21 +155,23 @@ export class Game implements OnInit, OnDestroy {
     color: ['#e3b448', '#36564b', '#c8553d', '#6c8ea4', '#efcfac'][index % 5],
   }));
   private socket?: Socket;
-  private poll?: ReturnType<typeof setInterval>;
+  private timerPolling?: ReturnType<typeof setInterval>;
   // Polling latar tidak memakai `busy`: aplikasi zoneless tidak menggambar ulang tombol saat polling
   // dimulai, jadi klik yang jatuh di tengah polling (tiap detik) dulu ditolak diam-diam dan tombol
   // harus ditekan berkali-kali. Nomor aksi membuang respons polling yang lebih tua dari klik terakhir.
-  private polling = false;
-  private aksi = 0;
+  private sedangPolling = false;
+  private nomorAksiTerakhir = 0;
   // Batas fase menurut jam browser (deadline server dikoreksi selisih jam). Timer dihitung dari sini tiap
   // setengah detik, jadi tetap berjalan walau satu polling tersendat di jaringan (dulu layar tampak membeku).
-  private batasLokal = 0;
-  private jam?: ReturnType<typeof setInterval>;
+  private batasFaseLokal = 0;
+  private timerSisaDetik?: ReturnType<typeof setInterval>;
   // Pesan error dari polling latar dihapus lagi oleh polling berikutnya yang berhasil.
-  private errorLatar = false;
-  private loadedPhase = '';
-  private shownPhase = '';
-  private surveyMatch = '';
+  private errorDariPollingLatar = false;
+  // Format `id/ronde/fase`: bila berganti, pilihan target dan draf chat tim direset.
+  private kunciFaseTerakhir = '';
+  // Format `id/fase`: bila berganti, overlay transisi fase ditampilkan.
+  private kunciFaseTampil = '';
+  private idPertandinganSurvei = '';
   private transitionTimer?: ReturnType<typeof setTimeout>;
   readonly phaseIcons: Record<string, string> = {
     day: '☀',
@@ -250,8 +252,10 @@ export class Game implements OnInit, OnDestroy {
   }
 
   // Chip Hitman di tepi meja menampilkan "tersisa/total"; chip lain dan layar persiapan: null.
-  hitmanLeft(item: { role: string }, place: string): number | null {
-    return item.role === 'hitman' && place === 'felt-composition' ? this.hitmanRemaining : null;
+  hitmanTersisaDiChip(item: { role: string }, kelasTambahan: string): number | null {
+    return item.role === 'hitman' && kelasTambahan === 'felt-composition'
+      ? this.hitmanRemaining
+      : null;
   }
 
   // REKAN SYNDICATE: server hanya mengirim daftar ini kepada Hitman; role lain selalu kosong.
@@ -289,9 +293,10 @@ export class Game implements OnInit, OnDestroy {
     const counts = new Map<string, number>();
     for (const action of game.me.ally_actions ?? [])
       counts.set(action.target, (counts.get(action.target) ?? 0) + 1);
-    let best = '';
-    for (const [target, count] of counts) if (count > (counts.get(best) ?? 0)) best = target;
-    return best;
+    let targetTerbanyak = '';
+    for (const [target, count] of counts)
+      if (count > (counts.get(targetTerbanyak) ?? 0)) targetTerbanyak = target;
+    return targetTerbanyak;
   }
 
   // Rekan yang memilih pemain ini sebagai target Hostage malam ini (penanda di kartu meja).
@@ -308,8 +313,8 @@ export class Game implements OnInit, OnDestroy {
   peekLabel(name: string): string {
     const me = this.game?.me;
     if (!me || me.role !== 'stalker' || this.game?.winner) return '';
-    for (let i = me.intel.length - 1; i >= 0; i--)
-      if (me.intel[i].name === name) return me.intel[i].role;
+    for (let indeks = me.intel.length - 1; indeks >= 0; indeks--)
+      if (me.intel[indeks].name === name) return me.intel[indeks].role;
     return me.action?.ability === 'peek' && me.action.target === name ? '?' : '';
   }
 
@@ -350,7 +355,7 @@ export class Game implements OnInit, OnDestroy {
     if (!game || game.winner || this.transition) return false;
     if (game.phase !== 'day' || game.me.role !== 'hitman') return false;
     return !!game.me.syndicate_hostages?.some(
-      (h) => !h.success && h.name === name && h.round === game.round - 1,
+      (sandera) => !sandera.success && sandera.name === name && sandera.round === game.round - 1,
     );
   }
 
@@ -365,15 +370,15 @@ export class Game implements OnInit, OnDestroy {
 
   // Jelaskan alasan kemenangan server, dengan fallback untuk backend versi lama.
   get resultExplanation(): string {
-    const hitmen = this.hitmanCount > 1 ? 'Semua Hitman' : 'Hitman';
+    const sebutanHitman = this.hitmanCount > 1 ? 'Semua Hitman' : 'Hitman';
     // Hitman yang keluar di tengah pertandingan tersingkir seperti dieksekusi.
-    const out = this.game?.players.some((p) => p.role === 'hitman' && p.left)
+    const nasibHitman = this.game?.players.some((player) => player.role === 'hitman' && player.left)
       ? 'tersingkir'
       : 'dieksekusi';
     const explanations: Record<string, string> = {
       vote_control:
         'Warga hidup yang masih punya hak voting tidak lebih banyak dari Hitman yang masih hidup. Suara warga tidak lagi bisa mengalahkan suara Hitman.',
-      hitman_executed: `${hitmen} telah ${out}. Semua anggota kubu warga menang, termasuk yang menjadi Hostage atau sudah dieksekusi.`,
+      hitman_executed: `${sebutanHitman} telah ${nasibHitman}. Semua anggota kubu warga menang, termasuk yang menjadi Hostage atau sudah dieksekusi.`,
       all_survivors_hostage:
         'Semua anggota kubu warga yang masih hidup telah menjadi Hostage. Hitman menguasai meja.',
       no_civilians_alive:
@@ -454,13 +459,13 @@ export class Game implements OnInit, OnDestroy {
   }
 
   // Nama tampilan pemain dari snapshot; username tetap dipakai untuk aksi dan vote.
-  nama(name: string | null | undefined): string {
+  ambilNamaTampilan(name: string | null | undefined): string {
     if (!name) return '';
-    return this.game?.players.find((p) => p.name === name)?.label ?? name;
+    return this.game?.players.find((player) => player.name === name)?.label ?? name;
   }
 
-  namaDaftar(names: string[]): string {
-    return names.map((name) => this.nama(name)).join(', ');
+  gabungNamaTampilan(names: string[]): string {
+    return names.map((name) => this.ambilNamaTampilan(name)).join(', ');
   }
 
   // Skin pilihan akun (dibagikan server tanpa kembar); urutan kursi hanya cadangan snapshot lama.
@@ -490,35 +495,38 @@ export class Game implements OnInit, OnDestroy {
 
   // Suara terbanyak tunggal: pemain ini dieksekusi jika Tribunal berakhir sekarang.
   get leadingTarget(): string {
-    const tally = (this.game?.tribunal_votes ?? []).filter((item) => item.voters.length > 0);
-    if (!tally.length) return '';
-    const top = Math.max(...tally.map((item) => item.voters.length));
-    const leaders = tally.filter((item) => item.voters.length === top);
-    return leaders.length === 1 ? leaders[0].target : '';
+    const suaraMasuk = (this.game?.tribunal_votes ?? []).filter((item) => item.voters.length > 0);
+    if (!suaraMasuk.length) return '';
+    const suaraTerbanyak = Math.max(...suaraMasuk.map((item) => item.voters.length));
+    const targetTeratas = suaraMasuk.filter((item) => item.voters.length === suaraTerbanyak);
+    return targetTeratas.length === 1 ? targetTeratas[0].target : '';
   }
 
   // Susunan meja: jumlah kolom yang membuat kartu (rasio 4:5) paling besar di papan yang tersedia.
   // Tanpa ukuran papan (render awal/test): satu baris sampai 5 pemain, selebihnya dua baris.
   get tableColumns(): number {
-    const count = this.game?.players.length ?? 0;
+    const jumlahPemain = this.game?.players.length ?? 0;
     const { width, height } = this.feltSize;
-    if (!count || !width || !height) return count <= 5 ? Math.max(1, count) : Math.ceil(count / 2);
-    const gap = 16;
-    let best = 1;
-    let bestSize = 0;
-    for (let cols = 1; cols <= count; cols++) {
-      const rows = Math.ceil(count / cols);
-      const size = Math.min(
+    if (!jumlahPemain || !width || !height)
+      return jumlahPemain <= 5 ? Math.max(1, jumlahPemain) : Math.ceil(jumlahPemain / 2);
+    const jarakKartu = 16;
+    let kolomTerbaik = 1;
+    let lebarKartuTerbesar = 0;
+    for (let jumlahKolom = 1; jumlahKolom <= jumlahPemain; jumlahKolom++) {
+      const jumlahBaris = Math.ceil(jumlahPemain / jumlahKolom);
+      // Lebar kartu paling besar 200 px; 0.8 mengubah tinggi sel menjadi lebar (rasio kartu 4:5).
+      const lebarKartu = Math.min(
         200,
-        (width - (cols - 1) * gap) / cols,
-        ((height - (rows - 1) * gap) / rows) * 0.8,
+        (width - (jumlahKolom - 1) * jarakKartu) / jumlahKolom,
+        ((height - (jumlahBaris - 1) * jarakKartu) / jumlahBaris) * 0.8,
       );
-      if (size >= bestSize - 0.5) {
-        best = cols;
-        bestSize = size;
+      // Selisih di bawah 0,5 px dianggap sama: pilih kolom yang lebih banyak.
+      if (lebarKartu >= lebarKartuTerbesar - 0.5) {
+        kolomTerbaik = jumlahKolom;
+        lebarKartuTerbesar = lebarKartu;
       }
     }
-    return best;
+    return kolomTerbaik;
   }
 
   get tableRows(): number {
@@ -534,7 +542,7 @@ export class Game implements OnInit, OnDestroy {
       if (Math.abs(width - this.feltSize.width) < 1 && Math.abs(height - this.feltSize.height) < 1)
         return;
       this.feltSize = { width, height };
-      this.cdr.markForCheck();
+      this.changeDetector.markForCheck();
     });
     this.feltObserver.observe(ref.nativeElement);
   }
@@ -545,7 +553,7 @@ export class Game implements OnInit, OnDestroy {
     if (!this.game || this.game.winner || !this.durations || !phase || !(phase in this.durations))
       return 1;
     const total = this.durations[phase as keyof PhaseDurations];
-    return total > 0 ? Math.max(0, Math.min(1, this.seconds / total)) : 1;
+    return total > 0 ? Math.max(0, Math.min(1, this.sisaDetik / total)) : 1;
   }
 
   get finalCountdown(): boolean {
@@ -555,15 +563,15 @@ export class Game implements OnInit, OnDestroy {
       !state.winner &&
       !this.transition &&
       state.phase in this.finalLabels &&
-      this.seconds > 0 &&
-      this.seconds <= 5
+      this.sisaDetik > 0 &&
+      this.sisaDetik <= 5
     );
   }
 
   // Countdown server juga mencakup batas tunggu AI bila model belum siap.
   get preparationSeconds(): number {
-    const prep = this.game?.preparation;
-    return prep ? (prep.starts_in ?? prep.max_wait) : 0;
+    const persiapan = this.game?.preparation;
+    return persiapan ? (persiapan.starts_in ?? persiapan.max_wait) : 0;
   }
 
   get mySkinId(): string {
@@ -584,7 +592,7 @@ export class Game implements OnInit, OnDestroy {
       { label: 'Chat', text: 'Siang: diskusikan alibi.' },
       { label: 'Vote', text: 'Tribunal mulai ronde 2: pilih tersangka.' },
     ];
-    if (!this.revealRole) return shared;
+    if (!this.kartuRoleTerbuka) return shared;
     const special: Record<string, { label: string; text: string }[]> = {
       hitman: [
         { label: 'Gag Order', text: 'Siang: bungkam chat; jeda satu ronde.' },
@@ -602,12 +610,15 @@ export class Game implements OnInit, OnDestroy {
     const punyaTim =
       (role === 'hitman' && this.multiHitman) ||
       (role === 'spy' && (this.game?.composition?.spy ?? 1) > 1);
-    const tim = { label: 'Chat tim', text: 'Malam: berdiskusi rahasia dengan rekan setim.' };
-    return [...shared, ...(special[role] ?? []), ...(punyaTim ? [tim] : [])];
+    const aksiChatTim = {
+      label: 'Chat tim',
+      text: 'Malam: berdiskusi rahasia dengan rekan setim.',
+    };
+    return [...shared, ...(special[role] ?? []), ...(punyaTim ? [aksiChatTim] : [])];
   }
 
   get preparationTarget(): string {
-    if (!this.revealRole) return 'Buka kartu role untuk melihat target kemenanganmu.';
+    if (!this.kartuRoleTerbuka) return 'Buka kartu role untuk melihat target kemenanganmu.';
     return this.game?.me.role === 'hitman'
       ? 'Buat jumlah warga yang bebas bersuara tidak melebihi Hitman yang masih hidup.'
       : 'Temukan dan eksekusi semua Hitman lewat voting Tribunal.';
@@ -615,9 +626,11 @@ export class Game implements OnInit, OnDestroy {
 
   // Pengingat muncul pada 10 detik terakhir; pembukaan otomatis pada 5 detik terakhir.
   get revealPrompt(): boolean {
-    if (this.readingRole && this.readingPrompt) return true;
-    const prep = this.game?.phase === 'preparing' ? this.game.preparation : null;
-    return !!prep && !this.revealRole && !prep.revealed && this.preparationSeconds <= 10;
+    if (this.readingRole && this.membacaLewatPengingat) return true;
+    const persiapan = this.game?.phase === 'preparing' ? this.game.preparation : null;
+    return (
+      !!persiapan && !this.kartuRoleTerbuka && !persiapan.revealed && this.preparationSeconds <= 10
+    );
   }
 
   // Snapshot tetap mengikuti server; layar persiapan memberi waktu membaca kartu sebelum berpindah.
@@ -628,26 +641,26 @@ export class Game implements OnInit, OnDestroy {
   // Buka/tutup kartu role; pembukaan pertama dilaporkan tanpa mempercepat countdown server.
   toggleRole(): void {
     if (this.readingRole) return;
-    const prompted = this.revealPrompt;
-    this.revealRole = !this.revealRole;
+    const dariPengingat = this.revealPrompt;
+    this.kartuRoleTerbuka = !this.kartuRoleTerbuka;
     if (
-      this.revealRole &&
+      this.kartuRoleTerbuka &&
       this.game?.phase === 'preparing' &&
-      this.readRoleMatch !== this.game.id
+      this.idPertandinganRoleDibaca !== this.game.id
     ) {
-      this.startRoleReading(prompted);
+      this.startRoleReading(dariPengingat);
     }
-    if (this.revealRole) this.refresh();
+    if (this.kartuRoleTerbuka) this.refresh();
   }
 
-  private startRoleReading(prompted: boolean): void {
-    this.readRoleMatch = this.game!.id;
+  private startRoleReading(dariPengingat: boolean): void {
+    this.idPertandinganRoleDibaca = this.game!.id;
     this.readingRole = true;
-    this.readingPrompt = prompted;
+    this.membacaLewatPengingat = dariPengingat;
     this.roleReadTimer = setTimeout(() => {
       this.stopRoleReading();
       this.updatePhaseTransition();
-      this.cdr.markForCheck();
+      this.changeDetector.markForCheck();
     }, ROLE_REVEAL_READ_MS);
   }
 
@@ -655,18 +668,18 @@ export class Game implements OnInit, OnDestroy {
     clearTimeout(this.roleReadTimer);
     this.roleReadTimer = undefined;
     this.readingRole = false;
-    this.readingPrompt = false;
+    this.membacaLewatPengingat = false;
   }
 
   // Kartu sudah dibuka di layar ini, tetapi server belum mencatatnya.
   private get revealPending(): boolean {
     const state = this.game;
-    return this.revealRole && state?.phase === 'preparing' && !state.preparation?.revealed;
+    return this.kartuRoleTerbuka && state?.phase === 'preparing' && !state.preparation?.revealed;
   }
 
   get timerUrgent(): boolean {
     return (
-      !!this.game && !this.game.winner && this.game.phase !== 'preparing' && this.seconds <= 10
+      !!this.game && !this.game.winner && this.game.phase !== 'preparing' && this.sisaDetik <= 10
     );
   }
 
@@ -712,42 +725,48 @@ export class Game implements OnInit, OnDestroy {
     @Inject(PLATFORM_ID) private readonly platform: object,
     private readonly api: GameService,
     private readonly router: Router,
-    private readonly cdr: ChangeDetectorRef,
-    private readonly destroy: DestroyRef,
+    private readonly changeDetector: ChangeDetectorRef,
+    private readonly destroyRef: DestroyRef,
     private readonly injector: Injector,
   ) {}
 
   // INIT: polling menjaga snapshot setelah reconnect; Socket.IO membawa pesan/error langsung.
   ngOnInit(): void {
     if (!isPlatformBrowser(this.platform)) return;
+
+    // INPUT: kode room yang tersimpan di tab ini
     this.code = sessionStorage.getItem(STORAGE.room) ?? '';
     if (!this.code) {
       void this.router.navigateByUrl('/lobby');
       return;
     }
+
+    // PROSES: ambil snapshot sekarang, ulangi tiap detik, dan jalankan timer dari jam browser
     this.refresh();
-    this.poll = setInterval(() => this.refresh(), 1000);
-    this.jam = setInterval(() => this.detak(), 500);
+    this.timerPolling = setInterval(() => this.refresh(), 1000);
+    this.timerSisaDetik = setInterval(() => this.perbaruiSisaDetik(), 500);
+
+    // OUTPUT: status koneksi, peringatan, dan chat dari server lewat socket
     this.socket = io(`${backendUrl()}`, {
       auth: { token: localStorage.getItem(STORAGE.token), room_code: this.code },
       transports: ['websocket', 'polling'],
     });
     this.socket.on('connect', () => {
       this.connected = true;
-      this.cdr.markForCheck();
+      this.changeDetector.markForCheck();
     });
     this.socket.on('disconnect', () => {
       this.connected = false;
-      this.cdr.markForCheck();
+      this.changeDetector.markForCheck();
     });
     this.socket.on('connect_error', () => {
       this.connected = false;
       this.error = 'Chat belum tersambung. Periksa koneksi atau kembali ke lobby.';
-      this.cdr.markForCheck();
+      this.changeDetector.markForCheck();
     });
     this.socket.on('system_alert', (data: { msg: string }) => {
       this.error = data.msg;
-      this.cdr.markForCheck();
+      this.changeDetector.markForCheck();
     });
     this.socket.on('receive_chat', (message: GameMessage) => {
       if (this.game && !this.game.messages.some((item) => item.id === message.id))
@@ -755,8 +774,8 @@ export class Game implements OnInit, OnDestroy {
       // Kalimat bot sudah tiba: awan berpikirnya hilang tanpa menunggu polling berikutnya.
       const sender = this.game?.players.find((player) => player.name === message.sender);
       if (sender?.thinking) sender.thinking = false;
-      this.afterMessages();
-      this.cdr.markForCheck();
+      this.perbaruiPenandaPesan();
+      this.changeDetector.markForCheck();
     });
   }
 
@@ -764,20 +783,20 @@ export class Game implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.stopRoleReading();
     this.socket?.disconnect();
-    if (this.poll) clearInterval(this.poll);
-    if (this.jam) clearInterval(this.jam);
+    if (this.timerPolling) clearInterval(this.timerPolling);
+    if (this.timerSisaDetik) clearInterval(this.timerSisaDetik);
     if (this.transitionTimer) clearTimeout(this.transitionTimer);
     if (this.endTimer) clearTimeout(this.endTimer);
     this.feltObserver?.disconnect();
   }
 
   // TIMER: sisa detik dari jam browser, tidak menunggu snapshot polling berikutnya.
-  private detak(): void {
+  private perbaruiSisaDetik(): void {
     if (!this.game || this.game.winner) return;
-    const sisa = Math.max(0, Math.ceil((this.batasLokal - Date.now()) / 1000));
-    if (sisa === this.seconds) return;
-    this.seconds = sisa;
-    this.cdr.markForCheck();
+    const sisaTerbaru = Math.max(0, Math.ceil((this.batasFaseLokal - Date.now()) / 1000));
+    if (sisaTerbaru === this.sisaDetik) return;
+    this.sisaDetik = sisaTerbaru;
+    this.changeDetector.markForCheck();
   }
 
   // CHAT: posisi gulir dicatat saat pemain menggulir; di dasar = ikut turun saat ada pesan baru.
@@ -785,35 +804,42 @@ export class Game implements OnInit, OnDestroy {
     const list = this.messageList?.nativeElement;
     if (!list) return;
     this.chatAtBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 48;
-    if (this.chatAtBottom) this.newBelow = 0;
+    if (this.chatAtBottom) this.jumlahPesanBaruDiBawah = 0;
   }
 
   jumpToLatest(): void {
-    this.newBelow = 0;
+    this.jumlahPesanBaruDiBawah = 0;
     this.chatAtBottom = true;
     this.scrollChat();
   }
 
   // CHAT: gulir ke pesan terbaru bila pemain sedang di bawah atau baru mengirim pesan; selain itu
   // tampilkan tombol "pesan baru". Hitung pesan belum dibaca untuk tab HP.
-  private afterMessages(): void {
+  private perbaruiPenandaPesan(): void {
     const messages = this.game?.messages ?? [];
-    const last = messages[messages.length - 1]?.id ?? '';
-    const firstLoad = !this.messagesLoaded;
+    const idPesanTerbaru = messages[messages.length - 1]?.id ?? '';
+    const pemuatanPertama = !this.messagesLoaded;
     this.messagesLoaded = true;
-    if (!firstLoad && last === this.lastMessageId) return;
+    if (!pemuatanPertama && idPesanTerbaru === this.lastMessageId) return;
     // Riwayat saat halaman dibuka tidak dihitung sebagai pesan baru.
-    const index = this.lastMessageId
+    const posisiPesanLama = this.lastMessageId
       ? messages.findIndex((message) => message.id === this.lastMessageId)
       : -1;
-    const added = firstLoad ? 0 : index >= 0 ? messages.length - index - 1 : messages.length;
-    this.lastMessageId = last;
-    if (added && this.mobileTab !== 'chat') this.unread = Math.min(99, this.unread + added);
-    const sentByMe = messages
-      .slice(-added || messages.length)
-      .some((m) => m.sender === this.game?.me.name);
-    if (firstLoad || this.chatAtBottom || (added && sentByMe)) this.jumpToLatest();
-    else if (added) this.newBelow = Math.min(99, this.newBelow + added);
+    const jumlahPesanBaru = pemuatanPertama
+      ? 0
+      : posisiPesanLama >= 0
+        ? messages.length - posisiPesanLama - 1
+        : messages.length;
+    this.lastMessageId = idPesanTerbaru;
+    if (jumlahPesanBaru && this.mobileTab !== 'chat')
+      this.unread = Math.min(99, this.unread + jumlahPesanBaru);
+    const adaPesanSendiri = messages
+      .slice(-jumlahPesanBaru || messages.length)
+      .some((message) => message.sender === this.game?.me.name);
+    if (pemuatanPertama || this.chatAtBottom || (jumlahPesanBaru && adaPesanSendiri))
+      this.jumpToLatest();
+    else if (jumlahPesanBaru)
+      this.jumlahPesanBaruDiBawah = Math.min(99, this.jumlahPesanBaruDiBawah + jumlahPesanBaru);
   }
 
   // Gulir setelah Angular merender pesan baru; setTimeout bisa jalan sebelum render (aplikasi zoneless),
@@ -827,18 +853,18 @@ export class Game implements OnInit, OnDestroy {
       },
       { injector: this.injector },
     );
-    this.cdr.markForCheck();
+    this.changeDetector.markForCheck();
   }
 
   // AKHIR: pengumuman pemenang tampil dulu, lalu otomatis lanjut ke kuesioner bila belum diisi.
-  private startEnding(): void {
-    if (!this.game?.winner || this.endMatch === this.game.id) return;
-    this.endMatch = this.game.id;
+  private mulaiLayarAkhir(): void {
+    if (!this.game?.winner || this.idPertandinganBerakhir === this.game.id) return;
+    this.idPertandinganBerakhir = this.game.id;
     this.endView = 'reveal';
     if (this.endTimer) clearTimeout(this.endTimer);
     this.endTimer = setTimeout(() => {
       if (this.endView === 'reveal' && this.surveyState === 'ready') this.endView = 'survey';
-      this.cdr.markForCheck();
+      this.changeDetector.markForCheck();
     }, 10000);
   }
 
@@ -848,9 +874,9 @@ export class Game implements OnInit, OnDestroy {
   // tidak ada); keduanya pengumuman publik server, jadi tampil lebih lama. Malam ronde 1 belum punya
   // hasil Tribunal, jadi lastVerdict kosong dan subjudul biasa yang tampil.
   private showTransition(phase: string, fromSplash = false): void {
-    const info = this.transitions[phase];
-    if (!info) return;
-    const verdict = fromSplash
+    const teksFase = this.transitions[phase];
+    if (!teksFase) return;
+    const hasilFaseSebelumnya = fromSplash
       ? ''
       : phase === 'night'
         ? this.lastVerdict
@@ -858,32 +884,32 @@ export class Game implements OnInit, OnDestroy {
           ? this.lastNightResult
           : '';
     this.transition = fromSplash
-      ? { phase: 'start', title: 'Ronde 1 dimulai', subtitle: info.subtitle }
-      : { phase, ...info, subtitle: verdict || info.subtitle };
+      ? { phase: 'start', title: 'Ronde 1 dimulai', subtitle: teksFase.subtitle }
+      : { phase, ...teksFase, subtitle: hasilFaseSebelumnya || teksFase.subtitle };
     if (this.transitionTimer) clearTimeout(this.transitionTimer);
     this.transitionTimer = setTimeout(
       () => {
         this.transition = null;
-        this.cdr.markForCheck();
+        this.changeDetector.markForCheck();
       },
-      fromSplash ? 3000 : verdict ? 3400 : 2600,
+      fromSplash ? 3000 : hasilFaseSebelumnya ? 3400 : 2600,
     );
   }
 
   private updatePhaseTransition(): void {
     if (!this.game || this.readingRole) return;
-    const shown = `${this.game.id}/${this.game.phase}`;
+    const kunciFase = `${this.game.id}/${this.game.phase}`;
     // Hanya saat fase berganti di pertandingan yang sama, setelah jeda membaca role selesai.
-    if (this.shownPhase.startsWith(this.game.id + '/') && this.shownPhase !== shown)
-      this.showTransition(this.game.phase, this.shownPhase.endsWith('/preparing'));
-    this.shownPhase = shown;
+    if (this.kunciFaseTampil.startsWith(this.game.id + '/') && this.kunciFaseTampil !== kunciFase)
+      this.showTransition(this.game.phase, this.kunciFaseTampil.endsWith('/preparing'));
+    this.kunciFaseTampil = kunciFase;
   }
 
   // Pengumuman Tribunal terakhir dari server ("Tribunal mengeksekusi …" atau "… tanpa eksekusi").
   private get lastVerdict(): string {
     const events = this.game?.events ?? [];
-    for (let i = events.length - 1; i >= 0; i--)
-      if (events[i].startsWith('Tribunal')) return events[i];
+    for (let indeks = events.length - 1; indeks >= 0; indeks--)
+      if (events[indeks].startsWith('Tribunal')) return events[indeks];
     return '';
   }
 
@@ -891,9 +917,9 @@ export class Game implements OnInit, OnDestroy {
   // "Malam ini tidak ada yang disandera.").
   private get lastNightResult(): string {
     const events = this.game?.events ?? [];
-    for (let i = events.length - 1; i >= 0; i--)
-      if (events[i].startsWith('Malam selesai.'))
-        return events[i].slice('Malam selesai.'.length).trim();
+    for (let indeks = events.length - 1; indeks >= 0; indeks--)
+      if (events[indeks].startsWith('Malam selesai.'))
+        return events[indeks].slice('Malam selesai.'.length).trim();
     return '';
   }
 
@@ -901,19 +927,19 @@ export class Game implements OnInit, OnDestroy {
   readyUp(): void {
     const state = this.game;
     if (!state || state.phase !== 'preparing' || this.busy || state.preparation?.consented) return;
-    this.request({ match_id: state.id }, 'ready');
+    this.kirimPermintaanGame({ match_id: state.id }, 'ready');
   }
 
   // SURVEI: muat pertanyaan sekali per pertandingan setelah ada pemenang.
   private loadSurvey(): void {
-    if (!this.game?.winner || this.surveyMatch === this.game.id || !this.code) return;
-    this.surveyMatch = this.game.id;
+    if (!this.game?.winner || this.idPertandinganSurvei === this.game.id || !this.code) return;
+    this.idPertandinganSurvei = this.game.id;
     this.surveyState = 'loading';
     this.api
       .survey(this.code)
       .pipe(
-        takeUntilDestroyed(this.destroy),
-        finalize(() => this.cdr.markForCheck()),
+        takeUntilDestroyed(this.destroyRef),
+        finalize(() => this.changeDetector.markForCheck()),
       )
       .subscribe({
         next: (status) => {
@@ -934,99 +960,105 @@ export class Game implements OnInit, OnDestroy {
   // dibuka tetapi belum tercatat dikirim ulang paling cepat tiap 4 detik; di sela itu tetap polling,
   // jadi layar tidak macet bila backend belum mengenal /reveal.
   refresh(): void {
-    if (this.busy || this.polling || this.leaving || !this.code) return;
+    if (this.busy || this.sedangPolling || this.leaving || !this.code) return;
     if (this.revealPending && this.game && Date.now() - this.lastRevealTry >= 4000) {
       this.lastRevealTry = Date.now();
-      this.request({ match_id: this.game.id }, 'reveal', true);
-    } else this.request(undefined, 'play', true);
+      this.kirimPermintaanGame({ match_id: this.game.id }, 'reveal', true);
+    } else this.kirimPermintaanGame(undefined, 'play', true);
   }
 
   // Sinkronkan snapshot/aksi server, reset pilihan fase lama, dan tampilkan kegagalan request.
-  private request(body?: unknown, action = 'play', latar = false): void {
-    const nomor = latar ? this.aksi : ++this.aksi;
-    if (latar) this.polling = true;
+  private kirimPermintaanGame(body?: unknown, action = 'play', pollingLatar = false): void {
+    const nomorAksi = pollingLatar ? this.nomorAksiTerakhir : ++this.nomorAksiTerakhir;
+    if (pollingLatar) this.sedangPolling = true;
     else this.busy = true;
-    const messagesAtRequest = new Set(this.game?.messages.map((message) => message.id));
+    const idPesanSaatDikirim = new Set(this.game?.messages.map((message) => message.id));
     this.api
       // Polling yang tersendat di jaringan dilepas sesudah 4 detik agar polling berikutnya bisa jalan.
-      .request(this.code, body, action, latar ? 4000 : 10000)
+      .request(this.code, body, action, pollingLatar ? 4000 : 10000)
       .pipe(
-        takeUntilDestroyed(this.destroy),
+        takeUntilDestroyed(this.destroyRef),
         finalize(() => {
-          if (latar) this.polling = false;
+          if (pollingLatar) this.sedangPolling = false;
           else this.busy = false;
-          this.cdr.markForCheck();
+          this.changeDetector.markForCheck();
         }),
       )
       .subscribe({
         next: (snapshot) => {
           // Pemain menekan tombol saat polling berjalan: snapshot polling sudah basi.
-          if (nomor !== this.aksi) return;
-          const missedReveal =
+          if (nomorAksi !== this.nomorAksiTerakhir) return;
+
+          // INPUT: bandingkan snapshot baru dengan yang masih tampil, sebelum diganti
+          const kartuTerlewat =
             this.game?.phase === 'preparing' &&
             this.game.id === snapshot.game.id &&
-            !this.revealRole &&
+            !this.kartuRoleTerbuka &&
             !this.game.preparation?.revealed &&
             snapshot.game.phase !== 'preparing' &&
             !snapshot.game.winner;
           if (this.readingRole && (snapshot.game.id !== this.game?.id || snapshot.game.winner))
             this.stopRoleReading();
           if (this.game && this.game.id !== snapshot.game.id) {
-            this.revealRole = false;
-            this.readRoleMatch = '';
+            this.kartuRoleTerbuka = false;
+            this.idPertandinganRoleDibaca = '';
           }
           // Echo socket dapat tiba sesudah snapshot server dibuat tetapi sebelum HTTP selesai.
           // Pertahankan pesan baru itu, tanpa menghidupkan lagi riwayat lama yang sudah dipangkas.
-          const receivedDuringRequest =
+          const pesanSelamaPermintaan =
             this.game?.id === snapshot.game.id
-              ? this.game.messages.filter((message) => !messagesAtRequest.has(message.id))
+              ? this.game.messages.filter((message) => !idPesanSaatDikirim.has(message.id))
               : [];
-          const snapshotIds = new Set(snapshot.game.messages.map((message) => message.id));
+          const idPesanSnapshot = new Set(snapshot.game.messages.map((message) => message.id));
           snapshot.game.messages = [
             ...snapshot.game.messages,
-            ...receivedDuringRequest.filter((message) => !snapshotIds.has(message.id)),
+            ...pesanSelamaPermintaan.filter((message) => !idPesanSnapshot.has(message.id)),
           ].slice(-100);
+
+          // PROSES: ganti snapshot, lalu sesuaikan kartu role, pesan, timer, dan pilihan fase
           this.game = snapshot.game;
-          if (missedReveal) {
+          if (kartuTerlewat) {
             // Reconnect/tab tidur bisa melewati lima detik terakhir: tetap beri waktu melihat role.
-            this.revealRole = true;
+            this.kartuRoleTerbuka = true;
             this.startRoleReading(true);
           } else if (
             this.game.phase === 'preparing' &&
             this.preparationSeconds <= 5 &&
-            !this.revealRole &&
+            !this.kartuRoleTerbuka &&
             !this.game.preparation?.revealed &&
-            this.readRoleMatch !== this.game.id
+            this.idPertandinganRoleDibaca !== this.game.id
           ) {
             this.toggleRole();
           }
           this.durations = snapshot.room?.match_durations ?? this.durations;
-          this.afterMessages();
-          this.batasLokal = Date.now() + (this.game.deadline - this.game.server_time) * 1000;
-          this.seconds = this.game.winner
+          this.perbaruiPenandaPesan();
+          this.batasFaseLokal = Date.now() + (this.game.deadline - this.game.server_time) * 1000;
+          this.sisaDetik = this.game.winner
             ? 0
             : Math.max(0, Math.ceil(this.game.deadline - this.game.server_time));
-          const phase = `${this.game.id}/${this.game.round}/${this.game.phase}`;
-          if (phase !== this.loadedPhase) {
+          const kunciFase = `${this.game.id}/${this.game.round}/${this.game.phase}`;
+          if (kunciFase !== this.kunciFaseTerakhir) {
             this.target = '';
             this.teamDraft = '';
-            this.loadedPhase = phase;
+            this.kunciFaseTerakhir = kunciFase;
           }
+
+          // OUTPUT: transisi fase, layar akhir, dan pembersihan pesan error
           this.updatePhaseTransition();
           if (this.game.winner) {
             this.loadSurvey();
-            this.startEnding();
+            this.mulaiLayarAkhir();
           }
           // Aksi berhasil, atau polling pulih dari gangguan jaringan: hapus pesan error sebelumnya.
-          if ((body && action !== 'reveal') || this.errorLatar) {
+          if ((body && action !== 'reveal') || this.errorDariPollingLatar) {
             this.error = '';
-            this.errorLatar = false;
+            this.errorDariPollingLatar = false;
           }
         },
         error: (error: HttpErrorResponse) => {
           // Pembukaan kartu dikirim ulang oleh polling; backend lama belum punya /reveal (404).
           // Polling yang sudah dilewati klik pemain juga tidak boleh menimpa hasil klik itu.
-          if (action === 'reveal' || nomor !== this.aksi) return;
+          if (action === 'reveal' || nomorAksi !== this.nomorAksiTerakhir) return;
           // GET /game menolak room hilang, keanggotaan lama, atau match belum dimulai.
           // Pulihkan lewat lobby; kesalahan aksi dan jaringan tidak boleh mengeluarkan pemain.
           if (!body && error.status === 400) {
@@ -1037,30 +1069,30 @@ export class Game implements OnInit, OnDestroy {
             typeof error.error?.detail === 'string'
               ? error.error.detail
               : 'Server belum bisa dihubungi.';
-          this.errorLatar = latar;
+          this.errorDariPollingLatar = pollingLatar;
           if (error.status === 401) void this.router.navigateByUrl('/login');
           // Aksi ditolak, mis. fase berganti tepat saat pilihan dikirim: ambil snapshot baru tanpa menunggu.
-          else if (!latar && error.status === 400) setTimeout(() => this.refresh());
+          else if (!pollingLatar && error.status === 400) setTimeout(() => this.refresh());
         },
       });
   }
 
   // AKSI: token fase menolak tombol lama yang diklik ketika timer sudah berganti.
-  act(vote = false): void {
+  kirimPilihanTarget(adalahVote = false): void {
     if (!this.game || !this.target || this.busy) return;
-    this.request({
+    this.kirimPermintaanGame({
       match_id: this.game.id,
       round_number: this.game.round,
       phase: this.game.phase,
       target: this.target,
-      ability: vote ? null : this.game.me.ability,
+      ability: adalahVote ? null : this.game.me.ability,
     });
   }
 
   // BATAL VOTE: tarik suara Tribunal sendiri; tombol Kunci vote muncul lagi untuk memilih ulang.
   cancelVote(): void {
     if (!this.game?.me.can_cancel_vote || this.busy) return;
-    this.request(
+    this.kirimPermintaanGame(
       { match_id: this.game.id, round_number: this.game.round, phase: this.game.phase },
       'cancel-vote',
     );
@@ -1069,7 +1101,7 @@ export class Game implements OnInit, OnDestroy {
   // BATAL AKSI MALAM: tarik Hostage/Guard/Peek sendiri; tombol aksi muncul lagi untuk memilih ulang.
   cancelAction(): void {
     if (!this.game?.me.can_cancel_action || this.busy) return;
-    this.request(
+    this.kirimPermintaanGame(
       { match_id: this.game.id, round_number: this.game.round, phase: this.game.phase },
       'cancel-action',
     );
@@ -1078,7 +1110,7 @@ export class Game implements OnInit, OnDestroy {
   // Persetujuan bukan chat/vote: manusia hidup yang dibungkam tetap boleh setuju.
   skipDiscussion(): void {
     if (!this.game?.discussion_skip.can_consent || this.busy) return;
-    this.request(
+    this.kirimPermintaanGame(
       { match_id: this.game.id, round_number: this.game.round, phase: this.game.phase },
       'skip-discussion',
     );
@@ -1086,22 +1118,22 @@ export class Game implements OnInit, OnDestroy {
 
   // KELUAR: tombol Keluar membuka pop-up konfirmasi bergaya game (bukan dialog bawaan browser).
   leaveMatch(): void {
-    if (this.code && !this.leaving) this.confirmLeave = true;
+    if (this.code && !this.leaving) this.popupKeluarTerbuka = true;
   }
 
   // Setelah dikonfirmasi, server menganggap pemain tereliminasi seperti dieksekusi (status "Keluar")
   // dan tidak bisa kembali ke pertandingan ini; lalu pemain dibawa ke menu utama.
   confirmLeaveMatch(): void {
     if (!this.code || this.leaving) return;
-    this.confirmLeave = false;
+    this.popupKeluarTerbuka = false;
     this.leaving = true;
     this.api
       .leave(this.code)
       .pipe(
-        takeUntilDestroyed(this.destroy),
+        takeUntilDestroyed(this.destroyRef),
         finalize(() => {
           this.leaving = false;
-          this.cdr.markForCheck();
+          this.changeDetector.markForCheck();
         }),
       )
       .subscribe({
@@ -1121,8 +1153,8 @@ export class Game implements OnInit, OnDestroy {
   // Lepas room di tab ini: hentikan polling/socket, hapus pointer room, lalu pindah halaman.
   private exitRoom(url: string): void {
     this.stopRoleReading();
-    if (this.poll) clearInterval(this.poll);
-    if (this.jam) clearInterval(this.jam);
+    if (this.timerPolling) clearInterval(this.timerPolling);
+    if (this.timerSisaDetik) clearInterval(this.timerSisaDetik);
     this.socket?.disconnect();
     this.game = null;
     this.code = '';
@@ -1165,7 +1197,7 @@ export class Game implements OnInit, OnDestroy {
     const state = this.game;
     const message = this.teamDraft.trim();
     if (!state?.me.can_team_chat || !message || this.busy) return;
-    this.request(
+    this.kirimPermintaanGame(
       { match_id: state.id, round_number: state.round, phase: state.phase, message },
       'team-chat',
     );

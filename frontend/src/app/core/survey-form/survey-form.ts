@@ -24,8 +24,8 @@ import { GameService, SurveyQuestion, SurveyStatus } from '../game.service';
 })
 export class SurveyForm {
   private readonly api = inject(GameService);
-  private readonly cdr = inject(ChangeDetectorRef);
-  private readonly destroy = inject(DestroyRef);
+  private readonly changeDetector = inject(ChangeDetectorRef);
+  private readonly destroyRef = inject(DestroyRef);
 
   @Input({ required: true }) code = '';
   @Input({ required: true }) survey!: SurveyStatus;
@@ -81,10 +81,10 @@ export class SurveyForm {
     this.api
       .submitSurvey(this.code, this.survey.match_id, answers)
       .pipe(
-        takeUntilDestroyed(this.destroy),
+        takeUntilDestroyed(this.destroyRef),
         finalize(() => {
           this.sending = false;
-          this.cdr.markForCheck();
+          this.changeDetector.markForCheck();
         }),
       )
       .subscribe({

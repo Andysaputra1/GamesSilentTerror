@@ -161,14 +161,14 @@ export class GameService {
   constructor(private readonly http: HttpClient) {}
 
   // Kirim aksi atau ambil snapshot privat pertandingan dengan token sesi dan timeout (ms).
-  request(code: string, body?: unknown, action = 'play', batas = 10000) {
-    const base = `${backendUrl()}/api/rooms/${encodeURIComponent(code)}`;
+  request(code: string, body?: unknown, action = 'play', batasWaktuMs = 10000) {
+    const urlRoom = `${backendUrl()}/api/rooms/${encodeURIComponent(code)}`;
     return this.http
-      .request<GameSnapshot>(body ? 'POST' : 'GET', base + (body ? '/' + action : '/game'), {
+      .request<GameSnapshot>(body ? 'POST' : 'GET', urlRoom + (body ? '/' + action : '/game'), {
         body,
         headers: authHeaders(),
       })
-      .pipe(timeout(batas));
+      .pipe(timeout(batasWaktuMs));
   }
 
   // Keluar dari room. Di tengah pertandingan server menganggap pemain tereliminasi (status `left`);

@@ -146,13 +146,13 @@ export class ProfileMenu implements OnInit {
   draftUsername = '';
   private readonly platform = inject(PLATFORM_ID);
   private readonly element = inject(ElementRef<HTMLElement>);
-  private readonly destroy = inject(DestroyRef);
+  private readonly destroyRef = inject(DestroyRef);
 
   // Fokuskan nama saat form muncul agar pengguna langsung dapat mengetik dan menekan Enter.
   @ViewChild('nameInput') set nameInput(input: ElementRef<HTMLInputElement> | undefined) {
     if (input)
       queueMicrotask(() => {
-        if (!this.destroy.destroyed) {
+        if (!this.destroyRef.destroyed) {
           input.nativeElement.focus();
           input.nativeElement.select();
         }
@@ -235,7 +235,7 @@ export class ProfileMenu implements OnInit {
     this.session
       .updateProfile(name, changingUsername ? username : undefined)
       .pipe(
-        takeUntilDestroyed(this.destroy),
+        takeUntilDestroyed(this.destroyRef),
         finalize(() => this.saving.set(false)),
       )
       .subscribe({
@@ -266,7 +266,7 @@ export class ProfileMenu implements OnInit {
 
   // Tutup menu saat klik berasal dari luar komponen profil.
   @HostListener('document:click', ['$event'])
-  outside(event: MouseEvent): void {
+  tutupSaatKlikDiLuar(event: MouseEvent): void {
     if (!this.element.nativeElement.contains(event.target as Node)) this.open.set(false);
   }
 
@@ -283,7 +283,7 @@ export class ProfileMenu implements OnInit {
     this.error.set('');
     this.session
       .logout()
-      .pipe(takeUntilDestroyed(this.destroy))
+      .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         error: () => this.error.set('Logout belum berhasil. Periksa koneksi lalu coba lagi.'),
       });

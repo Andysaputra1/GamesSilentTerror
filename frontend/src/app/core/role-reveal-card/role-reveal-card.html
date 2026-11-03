@@ -1,17 +1,17 @@
 <div class="card-container">
-  <!-- Layer 1: Card frame (always render) -->
+  <!-- Lapis 1: bingkai kartu (selalu tampil). -->
   <img [src]="frameUrl" alt="Role Card" class="card-frame" />
 
-  <!-- Layer 2: Portrait window containing skin + prop -->
+  <!-- Lapis 2: jendela potret berisi skin dan properti. -->
   <div
     class="portrait-window"
     [class.portrait-window--skin-fading-out]="skinTransition === 'out'"
     [class.portrait-window--skin-fading-in]="skinTransition === 'in'"
   >
-    <!-- Skin image -->
+    <!-- Gambar skin. -->
     <img [src]="skinUrl" alt="Avatar" class="skin-img" />
 
-    <!-- Prop overlay (only render if role has a prop) -->
+    <!-- Properti di atas skin, hanya bila role punya properti. -->
     @if (propUrl) {
       <img [src]="propUrl!" alt="Role Prop" class="prop-overlay" />
     }

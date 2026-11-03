@@ -60,7 +60,7 @@ export class MainPage implements OnInit, OnDestroy {
   caseFileOpen = false;
   activeCaseTab: CaseFileTab = 'phases';
 
-  // Room action state
+  // Status form buat dan gabung room.
   capacity = DEFAULT_CAPACITY;
   createSetupOpen = false;
   joinCode = '';
@@ -124,8 +124,8 @@ export class MainPage implements OnInit, OnDestroy {
     private readonly router: Router,
     private readonly rooms: RoomService,
     private readonly session: SessionService,
-    private readonly destroy: DestroyRef,
-    private readonly cdr: ChangeDetectorRef,
+    private readonly destroyRef: DestroyRef,
+    private readonly changeDetector: ChangeDetectorRef,
     preloader: AssetPreloader,
   ) {
     // Setelah render pertama di browser: unduh + decode semua skin, kartu, dan aset Main agar
@@ -147,11 +147,11 @@ export class MainPage implements OnInit, OnDestroy {
     // Skin di browser bisa basi bila diganti dari perangkat lain; server yang menentukan.
     this.session
       .refreshProfile()
-      .pipe(takeUntilDestroyed(this.destroy))
+      .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (profile) => {
           if (!this.skinSaveTimer) this.showSavedSkin(profile.skinId);
-          this.cdr.markForCheck();
+          this.changeDetector.markForCheck();
         },
         error: () => {},
       });
@@ -190,11 +190,11 @@ export class MainPage implements OnInit, OnDestroy {
       this.skinFadeTimer = undefined;
       this.advanceSkin();
       this.skinTransitionState = 'in';
-      this.cdr.markForCheck();
+      this.changeDetector.markForCheck();
       this.skinRevealTimer = setTimeout(() => {
         this.skinRevealTimer = undefined;
         this.skinTransitionState = 'idle';
-        this.cdr.markForCheck();
+        this.changeDetector.markForCheck();
       }, 280);
     }, 160);
   }
@@ -228,13 +228,13 @@ export class MainPage implements OnInit, OnDestroy {
         if (saved === this.activeSkin.id) {
           this.deckAnnouncement = `Skin ${skin.label} tersimpan di akunmu.`;
         }
-        this.cdr.markForCheck();
+        this.changeDetector.markForCheck();
       },
       error: () => {
         // Kembalikan tampilan ke skin yang benar-benar tersimpan agar sama dengan yang muncul di game.
         if (this.activeSkin.id === skin.id) this.showSavedSkin(this.savedSkinId);
         this.deckAnnouncement = 'Skin gagal disimpan. Coba lagi.';
-        this.cdr.markForCheck();
+        this.changeDetector.markForCheck();
       },
     });
   }
@@ -276,7 +276,7 @@ export class MainPage implements OnInit, OnDestroy {
     this.roleDeckShuffleTimer = setInterval(() => {
       this.rotateRoleDeck('next');
       this.deckAnnouncement = '';
-      this.cdr.markForCheck();
+      this.changeDetector.markForCheck();
     }, 3000);
   }
 
@@ -373,7 +373,7 @@ export class MainPage implements OnInit, OnDestroy {
     }
   }
 
-  // Create room handler
+  // Buat room dengan kapasitas terpilih, lalu pindah ke lobby.
   onCreateRoom(): void {
     if (this.busy) return;
     this.busy = true;
@@ -382,10 +382,10 @@ export class MainPage implements OnInit, OnDestroy {
     this.rooms
       .request('POST', '', { capacity: this.capacity })
       .pipe(
-        takeUntilDestroyed(this.destroy),
+        takeUntilDestroyed(this.destroyRef),
         finalize(() => {
           this.busy = false;
-          this.cdr.markForCheck();
+          this.changeDetector.markForCheck();
         }),
       )
       .subscribe({
@@ -393,19 +393,19 @@ export class MainPage implements OnInit, OnDestroy {
           saveRoomSession(room);
           void this.router.navigateByUrl('/lobby');
         },
-        error: (err: HttpErrorResponse) => {
-          this.error = err.error?.detail || 'Gagal membuat ruangan.';
+        error: (error: HttpErrorResponse) => {
+          this.error = error.error?.detail || 'Gagal membuat ruangan.';
         },
       });
   }
 
-  // Join room handler
+  // Gabung lewat kode room, lalu pindah ke lobby. Kode yang salah ditolak sebelum request.
   onJoinRoom(): void {
     if (this.busy) return;
 
-    const result = validateRoomCode(this.joinCode);
-    if (!result.valid) {
-      this.error = result.error;
+    const hasilValidasi = validateRoomCode(this.joinCode);
+    if (!hasilValidasi.valid) {
+      this.error = hasilValidasi.error;
       return;
     }
 
@@ -413,12 +413,12 @@ export class MainPage implements OnInit, OnDestroy {
     this.error = '';
 
     this.rooms
-      .request('POST', '/join', { code: result.code })
+      .request('POST', '/join', { code: hasilValidasi.code })
       .pipe(
-        takeUntilDestroyed(this.destroy),
+        takeUntilDestroyed(this.destroyRef),
         finalize(() => {
           this.busy = false;
-          this.cdr.markForCheck();
+          this.changeDetector.markForCheck();
         }),
       )
       .subscribe({
@@ -426,8 +426,8 @@ export class MainPage implements OnInit, OnDestroy {
           saveRoomSession(room);
           void this.router.navigateByUrl('/lobby');
         },
-        error: (err: HttpErrorResponse) => {
-          this.error = err.error?.detail || 'Gagal bergabung ke ruangan.';
+        error: (error: HttpErrorResponse) => {
+          this.error = error.error?.detail || 'Gagal bergabung ke ruangan.';
         },
       });
   }

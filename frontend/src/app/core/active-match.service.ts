@@ -29,9 +29,9 @@ export class ActiveMatchService {
     if (!isPlatformBrowser(this.platform)) return of(null);
     const token = localStorage.getItem(STORAGE.token);
     if (!token || this.session.loggingOut()) return of(null);
-    const base = `${backendUrl()}/api/rooms/active`;
+    const urlPertandinganAktif = `${backendUrl()}/api/rooms/active`;
     return this.http
-      .get<{ active: ActiveMatch | null }>(base, {
+      .get<{ active: ActiveMatch | null }>(urlPertandinganAktif, {
         headers: authHeaders(token),
       })
       .pipe(
@@ -54,55 +54,56 @@ export class ActiveMatchService {
 // Pulihkan pertandingan atau lobby saat pindah halaman, termasuk tab baru / login ulang.
 // Room yang pertandingannya selesai tidak memaksa redirect, sehingga Main dan survei tetap tersedia.
 export const activeMatchGuard: CanActivateFn = (_, state) => {
-  const service = inject(ActiveMatchService);
+  const activeMatchService = inject(ActiveMatchService);
   const rooms = inject(RoomService);
   const session = inject(SessionService);
   const router = inject(Router);
   const platform = inject(PLATFORM_ID);
   if (!isPlatformBrowser(platform)) return true;
+
+  // INPUT: halaman tujuan dan token sesi saat navigasi dimulai
   const path = state.url.split(/[?#]/)[0];
-  const isGame = path === '/game';
+  const menujuGame = path === '/game';
   const token = localStorage.getItem(STORAGE.token);
-  const fallback = () =>
-    isGame && sessionStorage.getItem(STORAGE.gameEntry) !== 'allowed'
+  const sesiBerganti = () => session.loggingOut() || localStorage.getItem(STORAGE.token) !== token;
+  // Tanpa pertandingan untuk dipulihkan: hanya /game yang butuh izin masuk dari lobby.
+  const tujuanTanpaPertandingan = () =>
+    menujuGame && sessionStorage.getItem(STORAGE.gameEntry) !== 'allowed'
       ? router.createUrlTree(['/main'])
       : true;
   // Masuk dari lobby yang sudah mulai: jangan menahan layar game satu round trip backend.
   // Masuk lobby baru menghapus tanda 'allowed' milik pertandingan sebelumnya.
-  if (isGame && sessionStorage.getItem(STORAGE.gameEntry) === 'allowed') return true;
-  return service.lookup().pipe(
+  if (menujuGame && sessionStorage.getItem(STORAGE.gameEntry) === 'allowed') return true;
+
+  // PROSES: tanya backend pertandingan aktif, lalu room yang masih terbuka
+  return activeMatchService.lookup().pipe(
     switchMap((active) => {
       if (active) {
-        service.remember(active);
-        return of(isGame ? true : router.createUrlTree(['/game']));
+        activeMatchService.remember(active);
+        return of(menujuGame ? true : router.createUrlTree(['/game']));
       }
       // Lobby memulihkan room sendiri; jangan menambah request atau membuat redirect berulang.
-      if (
-        path === '/lobby' ||
-        !token ||
-        session.loggingOut() ||
-        localStorage.getItem(STORAGE.token) !== token
-      )
-        return of(fallback());
+      if (path === '/lobby' || !token || sesiBerganti()) return of(tujuanTanpaPertandingan());
 
       return rooms.current().pipe(
         map((room) => {
           // Respons akun lama tidak boleh mengembalikan pengguna yang sudah logout/ganti akun.
-          if (session.loggingOut() || localStorage.getItem(STORAGE.token) !== token)
-            return fallback();
+          if (sesiBerganti()) return tujuanTanpaPertandingan();
           if (!room) {
             forgetRoom();
-            return fallback();
+            return tujuanTanpaPertandingan();
           }
-          if (room.phase === 'finished') return fallback();
+          if (room.phase === 'finished') return tujuanTanpaPertandingan();
+
+          // OUTPUT: simpan pointer room dan arahkan ke layar yang sesuai fasenya
           saveRoomSession(room);
           if (room.phase === 'lobby') return router.createUrlTree(['/lobby']);
           // Host bisa mulai di sela lookup /active dan /current; langsung ikuti fase terbaru.
           sessionStorage.setItem(STORAGE.gameEntry, 'allowed');
-          return isGame ? true : router.createUrlTree(['/game']);
+          return menujuGame ? true : router.createUrlTree(['/game']);
         }),
       );
     }),
-    catchError(() => of(fallback())),
+    catchError(() => of(tujuanTanpaPertandingan())),
   );
 };

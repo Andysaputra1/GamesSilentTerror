@@ -130,7 +130,7 @@
           <h2 id="login-heading">Log In</h2>
         </header>
 
-        <form class="storybook-form login-form" (ngSubmit)="submit()" novalidate>
+        <form class="storybook-form login-form" (ngSubmit)="kirimLogin()" novalidate>
           <label class="paper-field" for="username">
             <span>Email / username</span>
             <input
@@ -138,7 +138,7 @@
               type="text"
               name="username"
               [(ngModel)]="username"
-              (input)="clearError()"
+              (input)="hapusErrorLogin()"
               autocomplete="username"
               autocapitalize="none"
               spellcheck="false"
@@ -154,7 +154,7 @@
                 [type]="passwordVisible ? 'text' : 'password'"
                 name="password"
                 [(ngModel)]="password"
-                (input)="clearError()"
+                (input)="hapusErrorLogin()"
                 autocomplete="current-password"
                 placeholder="Your secret password"
                 [disabled]="isSubmitting"
@@ -191,7 +191,7 @@
             <button
               type="button"
               class="storybook-button storybook-button--google"
-              (click)="prepareGoogle()"
+              (click)="siapkanTombolGoogle()"
               [disabled]="isSubmitting || googleLoading"
               [attr.aria-busy]="googleLoading"
             >

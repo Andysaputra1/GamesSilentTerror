@@ -131,7 +131,7 @@ describe('Auth', () => {
   });
 
   it('explains Google configuration missing without loading Google', async () => {
-    const pending = component.prepareGoogle();
+    const pending = component.siapkanTombolGoogle();
     httpMock.expectOne('http://localhost:8000/api/auth/google/config').flush({ client_id: '' });
     await pending;
     expect(component.googleError).toContain('belum diaktifkan');
@@ -146,7 +146,7 @@ describe('Auth', () => {
       accounts: { id: { initialize, renderButton } },
     };
 
-    const pending = component.prepareGoogle();
+    const pending = component.siapkanTombolGoogle();
     httpMock
       .expectOne('http://localhost:8000/api/auth/google/config')
       .flush({ client_id: 'google-client-id' });
@@ -176,7 +176,7 @@ describe('Auth', () => {
   it('keeps the form usable after an invalid-password response', () => {
     component.username = 'user1';
     component.password = 'wrong-password';
-    component.submit();
+    component.kirimLogin();
 
     expect(component.isSubmitting).toBe(true);
     const request = httpMock.expectOne('http://localhost:8000/api/auth/login');
@@ -195,7 +195,7 @@ describe('Auth', () => {
 
   // TES: input kosong harus menghasilkan pesan validasi tanpa mengirim request API.
   it('shows validation feedback without starting a request', () => {
-    component.submit();
+    component.kirimLogin();
 
     expect(component.isSubmitting).toBe(false);
     expect(component.errorMessage).toBe('MASUKKAN USERNAME DAN PASSWORD TERLEBIH DAHULU.');

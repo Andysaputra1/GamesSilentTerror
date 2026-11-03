@@ -25,7 +25,7 @@
             type="button"
             aria-haspopup="dialog"
             [attr.aria-label]="'Isi survei ruangan ' + item.room_code"
-            (click)="open(item)"
+            (click)="bukaSurvei(item)"
           >
             Isi survei
           </button>
@@ -44,8 +44,8 @@
   </section>
 }
 
-@if (active) {
-  <div class="survey-overlay" (click)="close()">
+@if (surveiDibuka) {
+  <div class="survey-overlay" (click)="tutupSurvei()">
     <section
       class="survey-dialog"
       role="dialog"
@@ -55,18 +55,19 @@
     >
       <header class="survey-dialog__head">
         <div>
-          <p>Kuesioner singkat · ruangan {{ active.room_code }}</p>
+          <p>Kuesioner singkat · ruangan {{ surveiDibuka.room_code }}</p>
           <h2 id="survey-dialog-title">Bagaimana permainanmu?</h2>
           <p>
-            Selesai <time [attr.datetime]="active.finished_at">{{ active.finishedLabel }}</time>
+            Selesai
+            <time [attr.datetime]="surveiDibuka.finished_at">{{ surveiDibuka.finishedLabel }}</time>
           </p>
         </div>
-        <button #closeButton class="survey-dialog__close" type="button" (click)="close()">
+        <button #closeButton class="survey-dialog__close" type="button" (click)="tutupSurvei()">
           <span>Tutup</span><b aria-hidden="true">×</b>
         </button>
       </header>
       <div class="survey-dialog__body">
-        @switch (state) {
+        @switch (statusDialog) {
           @case ('loading') {
             <p class="survey-dialog__note">Memuat pertanyaan…</p>
           }
@@ -82,7 +83,11 @@
           }
           @default {
             @if (survey) {
-              <app-survey-form [code]="active.room_code" [survey]="survey" (submitted)="finish()" />
+              <app-survey-form
+                [code]="surveiDibuka.room_code"
+                [survey]="survey"
+                (submitted)="tandaiSurveiSelesai()"
+              />
             }
           }
         }

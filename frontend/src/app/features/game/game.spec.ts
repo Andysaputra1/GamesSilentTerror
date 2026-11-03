@@ -85,7 +85,7 @@ describe('Game', () => {
     const request = vi.spyOn(TestBed.inject(GameService), 'request').mockReturnValue(of(state));
     component.code = 'ABC123';
     component.refresh();
-    expect(component.seconds).toBe(20);
+    expect(component.sisaDetik).toBe(20);
     component.target = 'NOX';
     request.mockReturnValue(of({ ...state, game: { ...state.game, phase: 'night' } }));
     component.refresh();
@@ -100,7 +100,7 @@ describe('Game', () => {
     const request = vi
       .spyOn(TestBed.inject(GameService), 'request')
       .mockReturnValue(of(snapshot()));
-    component.act();
+    component.kirimPilihanTarget();
     expect(request).toHaveBeenCalledWith(
       'ABC123',
       {
@@ -133,7 +133,7 @@ describe('Game', () => {
     };
     request.mockReturnValue(of(locked));
     component.target = 'NOX';
-    component.act();
+    component.kirimPilihanTarget();
     expect(request).toHaveBeenLastCalledWith(
       'ABC123',
       expect.objectContaining({ target: 'NOX' }),
@@ -233,12 +233,12 @@ describe('Game', () => {
       .spyOn(TestBed.inject(GameService), 'request')
       .mockReturnValue(of(snapshot()));
     component.refresh();
-    expect(component.seconds).toBe(20);
+    expect(component.sisaDetik).toBe(20);
     request.mockReturnValue(new Subject<GameSnapshot>());
     component.refresh();
     sekarang.mockReturnValue(1_007_500);
-    (component as unknown as { detak(): void }).detak();
-    expect(component.seconds).toBe(13);
+    (component as unknown as { perbaruiSisaDetik(): void }).perbaruiSisaDetik();
+    expect(component.sisaDetik).toBe(13);
     sekarang.mockRestore();
   });
 
@@ -265,7 +265,7 @@ describe('Game', () => {
     const request = vi
       .spyOn(TestBed.inject(GameService), 'request')
       .mockReturnValue(throwError(() => ({ status: 400, error: { detail } })));
-    component.act();
+    component.kirimPilihanTarget();
     expect(component.error).toBe(detail);
     request.mockReturnValue(of(snapshot()));
     await new Promise((selesai) => setTimeout(selesai));
@@ -310,7 +310,7 @@ describe('Game', () => {
     vi.spyOn(TestBed.inject(GameService), 'request').mockReturnValue(
       throwError(() => ({ status: 400, error: { detail: 'Fase sudah berubah.' } })),
     );
-    component.act();
+    component.kirimPilihanTarget();
     expect(component.code).toBe('ABC123');
     expect(component.game).not.toBeNull();
     expect(component.error).toBe('Fase sudah berubah.');
@@ -335,11 +335,11 @@ describe('Game', () => {
     expect((cards[1] as HTMLElement).querySelector('.voter-badges')?.getAttribute('title')).toBe(
       'Alice Wonder',
     );
-    expect(component.nama('alice')).toBe('Alice Wonder');
-    expect(component.nama('tamu')).toBe('tamu'); // snapshot lama tanpa label
+    expect(component.ambilNamaTampilan('alice')).toBe('Alice Wonder');
+    expect(component.ambilNamaTampilan('tamu')).toBe('tamu'); // snapshot lama tanpa label
     component.target = 'NOX';
     const request = vi.spyOn(TestBed.inject(GameService), 'request').mockReturnValue(of(state));
-    component.act();
+    component.kirimPilihanTarget();
     expect(request.mock.calls[0][1]).toMatchObject({ target: 'NOX' });
   });
 
@@ -411,7 +411,7 @@ describe('Game', () => {
     component.refresh();
     fixture.componentRef.changeDetectorRef.markForCheck();
     fixture.detectChanges();
-    expect(component.seconds).toBe(30);
+    expect(component.sisaDetik).toBe(30);
     expect(component.timerFraction).toBeCloseTo(30 / 45);
     expect(component.target).toBe('NOX');
     const note = fixture.nativeElement.querySelector('.tribunal-extra') as HTMLElement;
@@ -435,7 +435,7 @@ describe('Game', () => {
       spy_actions: [{ name: 'NOX', target: 'bob' }],
     };
     component.game = state.game;
-    component.revealRole = true;
+    component.kartuRoleTerbuka = true;
     expect(component.isSpyAlly('NOX')).toBe(true);
     expect(component.isSpyAlly('bob')).toBe(false);
     expect(component.isAlly('NOX')).toBe(false);
@@ -597,7 +597,7 @@ describe('Game', () => {
     vi.spyOn(TestBed.inject(GameService), 'request').mockReturnValue(of(state));
     component.code = 'ABC123';
     component.refresh();
-    expect(component.seconds).toBe(20);
+    expect(component.sisaDetik).toBe(20);
     expect(component.timerFraction).toBeCloseTo(20 / 120);
     expect(component.timerUrgent).toBe(false);
   });
@@ -856,7 +856,7 @@ describe('Game', () => {
     expect(splash.querySelectorAll('.prep-card').length).toBe(3);
     expect(splash.querySelector('.prep-target')?.textContent).toContain('Buka kartu role');
     expect(splash.querySelector('.prep-actions')?.textContent).not.toContain('Sandera');
-    component.revealRole = true;
+    component.kartuRoleTerbuka = true;
     const opened = render();
     expect(opened.querySelector('.prep-actions')?.textContent).toContain('Sandera');
     expect(opened.querySelector('.prep-target')?.textContent).toContain('bebas bersuara');
@@ -891,7 +891,7 @@ describe('Game', () => {
     game.players = ['alice', 'NOX', 'bob'].map((name) => ({ name, alive: true }));
     game.me.allies = ['NOX'];
     component.game = game;
-    component.revealRole = true;
+    component.kartuRoleTerbuka = true;
     let cards = render().querySelectorAll('.player-card');
     expect(component.canTarget('NOX')).toBe(false);
     expect(component.canTarget('bob')).toBe(true);
@@ -1021,7 +1021,7 @@ describe('Game', () => {
     const game = snapshot().game;
     const labels = () => component.preparationActions.map((action) => action.label);
     component.game = game;
-    component.revealRole = true;
+    component.kartuRoleTerbuka = true;
     game.composition = { hitman: 1, spy: 1, stalker: 1, civilian: 2 };
     expect(labels()).not.toContain('Chat tim');
     game.composition = { hitman: 2, spy: 2, stalker: 1, civilian: 3 };
@@ -1141,7 +1141,7 @@ describe('Game', () => {
       expect(nudge.textContent).toContain('Ketuk kartumu');
       vi.spyOn(TestBed.inject(GameService), 'request').mockReturnValue(of(preparing(false, 30)));
       (nudge.querySelector('.role-flip') as HTMLButtonElement).click();
-      expect(component.revealRole).toBe(true);
+      expect(component.kartuRoleTerbuka).toBe(true);
       expect(render().querySelector('.reveal-nudge .role-flip')?.classList).toContain('open');
       expect(render().querySelector('#nudge-title')?.textContent).toContain('Role kamu: Hitman');
       vi.advanceTimersByTime(2999);
@@ -1150,7 +1150,7 @@ describe('Game', () => {
       expect(component.readingRole).toBe(false);
       expect(component.revealPrompt).toBe(false);
       // Sudah tercatat di server (mis. setelah memuat ulang halaman): tidak ditegur lagi.
-      component.revealRole = false;
+      component.kartuRoleTerbuka = false;
       component.game = preparing(true, 30).game;
       expect(component.revealPrompt).toBe(false);
     } finally {
@@ -1176,14 +1176,14 @@ describe('Game', () => {
       expect(card.classList).toContain('open');
       expect(card.disabled).toBe(true);
       component.toggleRole();
-      expect(component.revealRole).toBe(true);
+      expect(component.kartuRoleTerbuka).toBe(true);
 
       vi.advanceTimersByTime(2000);
       const latest = snapshot();
       latest.game.server_time = 102;
       request.mockReturnValue(of(latest));
       component.refresh();
-      expect(component.seconds).toBe(18);
+      expect(component.sisaDetik).toBe(18);
       expect(component.showPreparation).toBe(true);
       expect(component.transition).toBeNull();
       vi.advanceTimersByTime(999);
@@ -1192,7 +1192,7 @@ describe('Game', () => {
       expect(component.showPreparation).toBe(false);
       expect(component.transition?.phase).toBe('start');
       expect(render().querySelector('.hud')).not.toBeNull();
-      expect(component.revealRole).toBe(true);
+      expect(component.kartuRoleTerbuka).toBe(true);
     } finally {
       fixture.destroy();
       vi.useRealTimers();
@@ -1232,10 +1232,10 @@ describe('Game', () => {
         .mockReturnValue(of(preparing(false, 34)));
       component.code = 'ABC123';
       component.refresh();
-      expect(component.revealRole).toBe(false);
+      expect(component.kartuRoleTerbuka).toBe(false);
       request.mockReturnValue(of(preparing(false, 35)));
       component.refresh();
-      expect(component.revealRole).toBe(true);
+      expect(component.kartuRoleTerbuka).toBe(true);
       expect(component.readingRole).toBe(true);
       expect(render().querySelector('.reveal-nudge .role-flip')?.classList).toContain('open');
       component.refresh();
@@ -1245,7 +1245,7 @@ describe('Game', () => {
       component.refresh();
       component.toggleRole();
       component.refresh();
-      expect(component.revealRole).toBe(false); // Do not reopen a card the player has already read.
+      expect(component.kartuRoleTerbuka).toBe(false); // Do not reopen a card the player has already read.
     } finally {
       fixture.destroy();
       vi.useRealTimers();
@@ -1273,7 +1273,7 @@ describe('Game', () => {
       component.refresh();
       request.mockReturnValue(of(snapshot()));
       component.refresh();
-      expect(component.revealRole).toBe(true);
+      expect(component.kartuRoleTerbuka).toBe(true);
       expect(component.showPreparation).toBe(true);
       vi.advanceTimersByTime(3000);
       expect(component.showPreparation).toBe(false);
@@ -1331,9 +1331,9 @@ describe('Game', () => {
   // 5 DETIK TERAKHIR: angka besar hanya di fase berjalan, bukan saat persiapan, transisi, atau selesai.
   it('shows a large countdown in the last five seconds of a phase', () => {
     component.game = snapshot().game;
-    component.seconds = 6;
+    component.sisaDetik = 6;
     expect(component.finalCountdown).toBe(false);
-    component.seconds = 5;
+    component.sisaDetik = 5;
     expect(component.finalCountdown).toBe(true);
     const overlay = render().querySelector('.final-count') as HTMLElement;
     expect(overlay.getAttribute('aria-hidden')).toBe('true');
@@ -1342,9 +1342,9 @@ describe('Game', () => {
     expect(render().querySelector('.timer')?.classList).toContain('final');
     // Chat tetap bisa dipakai: overlay tidak menggantikan atau menonaktifkan input.
     expect((render().querySelector('.composer input') as HTMLInputElement).disabled).toBe(false);
-    component.seconds = 0;
+    component.sisaDetik = 0;
     expect(component.finalCountdown).toBe(false);
-    component.seconds = 3;
+    component.sisaDetik = 3;
     component.transition = { phase: 'night', title: 'Malam', subtitle: '' };
     expect(component.finalCountdown).toBe(false);
     component.transition = null;
@@ -1364,18 +1364,18 @@ describe('Game', () => {
     next.game.messages = [{ id: 'm1', sender: 'NOX', message: 'Halo' }];
     request.mockReturnValue(of(next));
     component.refresh();
-    expect(component.newBelow).toBe(1);
+    expect(component.jumlahPesanBaruDiBawah).toBe(1);
     expect(render().querySelector('.chat-jump')?.textContent).toContain('1 pesan baru');
     const own = snapshot();
     own.game.messages = [...next.game.messages, { id: 'm2', sender: 'alice', message: 'Aku?' }];
     request.mockReturnValue(of(own));
     component.refresh();
-    expect(component.newBelow).toBe(0);
+    expect(component.jumlahPesanBaruDiBawah).toBe(0);
     expect(component.chatAtBottom).toBe(true);
     component.chatAtBottom = false;
-    component.newBelow = 4;
+    component.jumlahPesanBaruDiBawah = 4;
     (render().querySelector('.chat-jump') as HTMLButtonElement).click();
-    expect([component.newBelow, component.chatAtBottom]).toEqual([0, true]);
+    expect([component.jumlahPesanBaruDiBawah, component.chatAtBottom]).toEqual([0, true]);
   });
 
   // KELUAR: konfirmasi dulu; server menandai pemain tereliminasi, lalu tab ini kembali ke menu utama.

@@ -1,8 +1,8 @@
 <form (ngSubmit)="submit()">
-  @for (question of survey.questions; track question.id; let n = $index) {
+  @for (question of survey.questions; track question.id; let nomorUrut = $index) {
     <fieldset class="survey-question">
       <legend>
-        <span class="q-number">{{ n + 1 }}</span> {{ question.prompt }}
+        <span class="q-number">{{ nomorUrut + 1 }}</span> {{ question.prompt }}
         @if (!question.required) {
           <small>(opsional)</small>
         }

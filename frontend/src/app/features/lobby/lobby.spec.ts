@@ -66,7 +66,7 @@ describe('Lobby', () => {
     expect(fixture.nativeElement.querySelector('.room-roster')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('.room-controls')).toBeTruthy();
     expect(component.durations).toEqual({ day: 80, night: 20, tribunal: 60 });
-    component.quick = true;
+    component.modeCepat = true;
     expect(component.durations).toEqual({ day: 14, night: 10, tribunal: 10 });
   });
 
@@ -163,7 +163,9 @@ describe('Lobby', () => {
     vi.spyOn(TestBed.inject(RoomService), 'request').mockReturnValue(
       of({ ...room, phase: 'preparing' }),
     );
-    (component as unknown as { load: (m: string, p: string) => void }).load('GET', '/ABC123');
+    (
+      component as unknown as { kirimPermintaanRoom: (m: string, p: string) => void }
+    ).kirimPermintaanRoom('GET', '/ABC123');
     expect(navigate).toHaveBeenCalledWith('/game');
     expect(sessionStorage.getItem('shadow_heist_game_entry')).toBe('allowed');
   });
@@ -181,7 +183,9 @@ describe('Lobby', () => {
     component.room = room;
     const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
     vi.spyOn(TestBed.inject(RoomService), 'request').mockReturnValue(of({ ...room, phase: 'day' }));
-    (component as unknown as { load: (m: string, p: string) => void }).load('GET', '/ABC123');
+    (
+      component as unknown as { kirimPermintaanRoom: (m: string, p: string) => void }
+    ).kirimPermintaanRoom('GET', '/ABC123');
     expect(navigate).toHaveBeenCalledWith('/game');
   });
 
@@ -205,9 +209,9 @@ describe('Lobby', () => {
       );
     const load = (
       component as unknown as {
-        load: (m: string, p: string, b?: unknown, latar?: boolean) => void;
+        kirimPermintaanRoom: (m: string, p: string, b?: unknown, pollingLatar?: boolean) => void;
       }
-    ).load.bind(component);
+    ).kirimPermintaanRoom.bind(component);
     load('GET', '/ABC123', undefined, true);
 
     component.toggleBot();

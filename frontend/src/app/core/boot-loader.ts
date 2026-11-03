@@ -33,25 +33,28 @@ export class BootLoader {
       this.done.set(true);
       return;
     }
-    const startedAt = Date.now();
-    const ready = this.firstPage().then((url) =>
+    const waktuMulai = Date.now();
+    const halamanSiap = this.tungguHalamanPertama().then((url) =>
       Promise.all([
         this.preloader.preload(url.startsWith('/main') ? MAIN_CRITICAL_IMAGES : FALLBACK_IMAGES),
         ...FONTS.map((font) => this.document.fonts?.load(font).catch(() => undefined)),
       ]),
     );
-    const cap = new Promise((resolve) => setTimeout(resolve, BOOT_LOADER_MAX_WAIT_MS));
-    const reduced = this.document.defaultView?.matchMedia?.(
+    const batasTunggu = new Promise((resolve) => setTimeout(resolve, BOOT_LOADER_MAX_WAIT_MS));
+    const gerakDikurangi = this.document.defaultView?.matchMedia?.(
       '(prefers-reduced-motion: reduce)',
     ).matches;
-    const minimum = reduced ? MIN_VISIBLE_MS : BOOT_LOADER_SCAN_MS;
-    void Promise.race([ready, cap]).then(() => {
-      setTimeout(() => this.hide(loader), Math.max(0, minimum - (Date.now() - startedAt)));
+    const lamaTampilMinimal = gerakDikurangi ? MIN_VISIBLE_MS : BOOT_LOADER_SCAN_MS;
+    void Promise.race([halamanSiap, batasTunggu]).then(() => {
+      setTimeout(
+        () => this.pudarkanLoader(loader),
+        Math.max(0, lamaTampilMinimal - (Date.now() - waktuMulai)),
+      );
     });
   }
 
   // URL halaman pertama setelah redirect/guard selesai (pembatalan karena redirect diabaikan).
-  private firstPage(): Promise<string> {
+  private tungguHalamanPertama(): Promise<string> {
     if (this.router.navigated) return Promise.resolve(this.router.url);
     return new Promise((resolve) =>
       this.router.events
@@ -63,13 +66,13 @@ export class BootLoader {
     );
   }
 
-  private hide(loader: HTMLElement): void {
+  private pudarkanLoader(loader: HTMLElement): void {
     this.done.set(true);
     loader.classList.add('boot-loader--done');
     loader.setAttribute('aria-hidden', 'true');
-    const remove = () => loader.remove();
-    loader.addEventListener('transitionend', remove, { once: true });
+    const hapusLoader = () => loader.remove();
+    loader.addEventListener('transitionend', hapusLoader, { once: true });
     // Cadangan bila transisi tidak berjalan (prefers-reduced-motion atau tab di latar).
-    setTimeout(remove, 800);
+    setTimeout(hapusLoader, 800);
   }
 }

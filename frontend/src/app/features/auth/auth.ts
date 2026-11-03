@@ -33,7 +33,7 @@ import {
 import { loadGoogleIdentity } from '../../core/google-identity';
 import { profileCountdown, PROFILE_COUNTDOWN_TARGET } from '../../core/profile-countdown';
 
-// Transform API response (snake_case) to TypeScript interface (camelCase).
+// Respons login dan daftar dari API; nama field mengikuti backend (snake_case).
 interface LoginResponse {
   access_token: string;
   expires_at: string;
@@ -86,8 +86,12 @@ export class Auth implements OnInit, AfterViewInit {
   register(): void {
     if (!isPlatformBrowser(this.platformId) || this.isSubmitting) return;
     this.registerError = '';
+
+    // INPUT: isian form yang sudah dirapikan
     const username = this.registerName.trim();
     const displayName = this.registerDisplayName.trim();
+
+    // PROSES: hentikan di browser bila isian belum memenuhi syarat
     if (!/^[A-Za-z0-9_]{3,40}$/.test(username)) {
       this.registerError = 'Username harus 3–40 huruf, angka, atau underscore.';
       return;
@@ -108,6 +112,8 @@ export class Auth implements OnInit, AfterViewInit {
       this.registerError = 'Password 10–128 karakter dan konfirmasinya harus sama.';
       return;
     }
+
+    // OUTPUT: kirim ke backend; berhasil daftar langsung dianggap login
     this.isSubmitting = true;
     this.http
       .post<LoginResponse>(this.backendUrl + '/api/auth/register', {
@@ -146,7 +152,7 @@ export class Auth implements OnInit, AfterViewInit {
   // Siapkan satu tombol resmi Google yang langsung bisa diklik. Button flow
   // tidak boleh dipicu secara programatik oleh tombol custom, jadi tombol
   // resmi dirender otomatis sejak halaman login selesai dimuat.
-  async prepareGoogle(): Promise<void> {
+  async siapkanTombolGoogle(): Promise<void> {
     if (
       !isPlatformBrowser(this.platformId) ||
       this.googleLoading ||
@@ -157,6 +163,7 @@ export class Auth implements OnInit, AfterViewInit {
     this.googleError = '';
     this.googleLoading = true;
     try {
+      // INPUT: client ID dan nonce sekali pakai dari backend
       if (
         location.protocol !== 'https:' &&
         !['localhost', '127.0.0.1'].includes(location.hostname)
@@ -176,20 +183,26 @@ export class Auth implements OnInit, AfterViewInit {
           .post<{ nonce: string }>(this.backendUrl + '/api/auth/google/challenge', {})
           .pipe(timeout(15000)),
       );
+
+      // PROSES: muat library Google dan daftarkan penerima hasil login
       const identity = await loadGoogleIdentity();
       if (this.destroyRef.destroyed) return;
       identity.initialize({
         client_id: config.client_id,
         nonce: challenge.nonce,
         auto_select: false,
-        callback: (result) => this.submitGoogle(result.credential, challenge.nonce),
+        callback: (result) => this.tukarKredensialGoogle(result.credential, challenge.nonce),
       });
-      const target = this.googleButton?.nativeElement;
-      if (!target) throw new Error('Tombol Google belum siap. Muat ulang halaman lalu coba lagi.');
-      target.replaceChildren();
+
+      // OUTPUT: tombol resmi Google tampil di halaman
+      const wadahTombol = this.googleButton?.nativeElement;
+      if (!wadahTombol) {
+        throw new Error('Tombol Google belum siap. Muat ulang halaman lalu coba lagi.');
+      }
+      wadahTombol.replaceChildren();
       // Pakai varian icon resmi Google agar aksinya tetap langsung tersedia,
       // tetapi visualnya tidak mengambil alih desain buku pada halaman ini.
-      identity.renderButton(target, {
+      identity.renderButton(wadahTombol, {
         theme: 'outline',
         size: 'large',
         type: 'icon',
@@ -210,10 +223,10 @@ export class Auth implements OnInit, AfterViewInit {
   }
 
   // Tukar credential dan nonce Google menjadi sesi aplikasi, lalu bersihkan tombol login.
-  private submitGoogle(credential: string, nonce: string): void {
+  private tukarKredensialGoogle(credential: string, nonce: string): void {
     if (this.destroyRef.destroyed || this.isSubmitting) return;
     this.isSubmitting = true;
-    let retryButton = false;
+    let perluSiapkanUlang = false;
     this.http
       .post<LoginResponse>(this.backendUrl + '/api/auth/google', { credential, nonce })
       .pipe(
@@ -224,13 +237,13 @@ export class Auth implements OnInit, AfterViewInit {
           this.googleReady = false;
           this.googleButton?.nativeElement.replaceChildren();
           this.changeDetector.markForCheck();
-          if (retryButton && !this.destroyRef.destroyed) void this.prepareGoogle();
+          if (perluSiapkanUlang && !this.destroyRef.destroyed) void this.siapkanTombolGoogle();
         }),
       )
       .subscribe({
         next: (response) => this.completeLogin(response),
         error: (error: unknown) => {
-          retryButton = true;
+          perluSiapkanUlang = true;
           this.googleError =
             error instanceof HttpErrorResponse && error.status === 409
               ? 'Email sudah terdaftar. Gunakan metode login awal.'
@@ -251,8 +264,9 @@ export class Auth implements OnInit, AfterViewInit {
     @Inject(PLATFORM_ID) private readonly platformId: object,
   ) {}
 
-  // Periksa kesiapan backend saat halaman dibuka, tiap 30 detik, dan saat koneksi/fokus kembali.
-  // Request tidak ditumpuk; teardown komponen membatalkan polling dan request yang masih berjalan.
+  // Mulai hitung mundur, lalu periksa kesiapan backend saat halaman dibuka, tiap 30 detik, dan saat
+  // koneksi/fokus kembali. Request tidak ditumpuk; teardown komponen membatalkan polling dan request
+  // yang masih berjalan.
   ngOnInit(): void {
     if (!isPlatformBrowser(this.platformId)) return;
     const updateCountdown = () => {
@@ -295,7 +309,7 @@ export class Auth implements OnInit, AfterViewInit {
     // Jalankan setelah siklus render selesai agar spinner/button tidak memicu
     // perubahan state di tengah pemeriksaan Angular.
     queueMicrotask(() => {
-      if (!this.destroyRef.destroyed) void this.prepareGoogle();
+      if (!this.destroyRef.destroyed) void this.siapkanTombolGoogle();
     });
   }
 
@@ -307,7 +321,7 @@ export class Auth implements OnInit, AfterViewInit {
 
   // METHOD EVENT FORM: validasi input, kirim POST login, lalu tangani sukses/gagal.
   // Form dikunci selama request dan selalu dibuka kembali melalui finalize.
-  submit(): void {
+  kirimLogin(): void {
     if (!isPlatformBrowser(this.platformId) || this.isSubmitting) return;
 
     this.hasAttemptedSubmit = true;
@@ -344,7 +358,7 @@ export class Auth implements OnInit, AfterViewInit {
   }
 
   // METHOD EVENT INPUT: hapus pesan error lama ketika pengguna mengubah input.
-  clearError(): void {
+  hapusErrorLogin(): void {
     if (this.errorMessage) this.errorMessage = '';
   }
 

@@ -10,47 +10,47 @@
     <button
       type="button"
       class="role-flip"
-      [class.open]="revealRole || !!state.winner"
+      [class.open]="kartuRoleTerbuka || !!state.winner"
       [disabled]="!!state.winner || readingRole"
       (click)="toggleRole()"
-      [attr.aria-pressed]="revealRole"
-      [attr.aria-label]="revealRole ? 'Sembunyikan role' : 'Lihat role saya'"
+      [attr.aria-pressed]="kartuRoleTerbuka"
+      [attr.aria-label]="kartuRoleTerbuka ? 'Sembunyikan role' : 'Lihat role saya'"
     >
       <span class="flip-inner">
         <span class="flip-face flip-back" aria-hidden="true">
           <b>◆</b>
           <small>Ketuk untuk melihat role</small>
         </span>
-        <span class="flip-face flip-front" [attr.aria-hidden]="!(revealRole || state.winner)">
+        <span class="flip-face flip-front" [attr.aria-hidden]="!(kartuRoleTerbuka || state.winner)">
           <app-role-reveal-card [role]="state.me.role" [skinId]="mySkinId" />
         </span>
       </span>
     </button>
-    @if (revealRole || state.winner) {
+    @if (kartuRoleTerbuka || state.winner) {
       <p class="sr-only">Role kamu: {{ roleNames[state.me.role] || state.me.role }}</p>
     }
   </ng-template>
 
   <!-- Komposisi role room dari server (dipakai di persiapan dan di tepi atas meja). -->
-  <ng-template #compositionChips let-extra>
-    <p class="composition {{ extra }}">
+  <ng-template #compositionChips let-kelasTambahan>
+    <p class="composition {{ kelasTambahan }}">
       <span class="sr-only">Komposisi room: </span>
       @for (item of composition; track item.role) {
-        @let sisa = hitmanLeft(item, extra);
+        @let hitmanTersisa = hitmanTersisaDiChip(item, kelasTambahan);
         <span
           class="comp-chip"
           [attr.data-role]="item.role"
-          [class.reduced]="sisa !== null && sisa < item.count"
-          [attr.title]="sisa === null ? null : 'Hitman tersisa ' + sisa + ' dari ' + item.count"
+          [class.reduced]="hitmanTersisa !== null && hitmanTersisa < item.count"
+          [attr.title]="hitmanTersisa === null ? null : 'Hitman tersisa ' + hitmanTersisa + ' dari ' + item.count"
           ><i aria-hidden="true">{{ roleIcons[item.role] }}</i>
-          @if (sisa === null) {
+          @if (hitmanTersisa === null) {
             <b>{{ item.count }}</b> {{ roleNames[item.role] }}
           } @else {
             <!-- "1/2" dibaca pembaca layar sebagai pecahan; teks sr-only memberi arti yang jelas. -->
             <span aria-hidden="true"
-              ><b>{{ sisa }}/{{ item.count }}</b> {{ roleNames[item.role] }}</span
+              ><b>{{ hitmanTersisa }}/{{ item.count }}</b> {{ roleNames[item.role] }}</span
             >
-            <span class="sr-only">Hitman tersisa {{ sisa }} dari {{ item.count }}</span>
+            <span class="sr-only">Hitman tersisa {{ hitmanTersisa }} dari {{ item.count }}</span>
           }
         </span>
       }
@@ -62,21 +62,21 @@
     <section class="prep-cards" aria-label="Panduan tiga kartu">
       <article class="paper prep-card prep-role">
         <span class="prep-number">01 / ROLE</span>
-        <h3>{{ revealRole ? roleNames[state.me.role] : 'Siapa kamu?' }}</h3>
+        <h3>{{ kartuRoleTerbuka ? roleNames[state.me.role] : 'Siapa kamu?' }}</h3>
         <div class="prep-role-art">
           <ng-container *ngTemplateOutlet="roleFlip; context: { $implicit: state }" />
         </div>
         <p>
-          {{ revealRole ? roleSummary[state.me.role] : 'Ketuk kartu untuk membuka identitas rahasiamu.' }}
+          {{ kartuRoleTerbuka ? roleSummary[state.me.role] : 'Ketuk kartu untuk membuka identitas rahasiamu.' }}
         </p>
-        @if (revealRole && allies.length) {
+        @if (kartuRoleTerbuka && allies.length) {
           <p class="prep-allies">
-            Rekan: <b>{{ namaDaftar(allies) }}</b>
+            Rekan: <b>{{ gabungNamaTampilan(allies) }}</b>
           </p>
         }
-        @if (revealRole && spyAllies.length) {
+        @if (kartuRoleTerbuka && spyAllies.length) {
           <p class="prep-allies">
-            Rekan Spy: <b>{{ namaDaftar(spyAllies) }}</b>
+            Rekan Spy: <b>{{ gabungNamaTampilan(spyAllies) }}</b>
           </p>
         }
       </article>
@@ -96,16 +96,16 @@
             </li>
           }
         </ul>
-        @if (!revealRole) {
+        @if (!kartuRoleTerbuka) {
           <small>Buka kartu untuk melihat aksi khususmu.</small>
         }
       </article>
       <article class="paper prep-card prep-target">
         <span class="prep-number">03 / TARGET</span>
-        <h3>{{ revealRole ? 'Cara kamu menang' : 'Misi rahasiamu' }}</h3>
+        <h3>{{ kartuRoleTerbuka ? 'Cara kamu menang' : 'Misi rahasiamu' }}</h3>
         <img class="prep-illustration" src="/assets/decorations/objects/case-lens.svg" alt="" />
         <p class="prep-objective">{{ preparationTarget }}</p>
-        @if (revealRole) {
+        @if (kartuRoleTerbuka) {
           <small
             >{{ state.me.role === 'hitman' ? 'Pilih warga sebagai target. Sandera menghilangkan suara, bukan nyawa.' : 'Suara terbanyak tunggal dieksekusi. Seri: waktu ditambah sekali; masih seri berarti tidak ada eksekusi.' }}</small
           >
@@ -120,12 +120,17 @@
     </section>
   </ng-template>
 
-  @if (transition; as t) {
-    <div class="phase-transition" [attr.data-phase]="t.phase" role="status" aria-live="polite">
+  @if (transition; as transisi) {
+    <div
+      class="phase-transition"
+      [attr.data-phase]="transisi.phase"
+      role="status"
+      aria-live="polite"
+    >
       <div class="transition-card">
-        <span class="transition-icon" aria-hidden="true">{{ phaseIcons[t.phase] }}</span>
-        <h2>{{ t.title }}</h2>
-        <p>{{ t.subtitle }}</p>
+        <span class="transition-icon" aria-hidden="true">{{ phaseIcons[transisi.phase] }}</span>
+        <h2>{{ transisi.title }}</h2>
+        <p>{{ transisi.subtitle }}</p>
       </div>
     </div>
   }
@@ -163,10 +168,10 @@
             <div class="splash-cast">
               <h3 id="splash-table-title">Meja malam ini</h3>
               <ul>
-                @for (player of state.players; track player.name; let i = $index) {
-                  <li [style.--i]="i" [style.--tag]="colorFor(player.name)">
+                @for (player of state.players; track player.name; let urutan = $index) {
+                  <li [style.--i]="urutan" [style.--tag]="colorFor(player.name)">
                     <span class="cast-portrait"><img [src]="skinFor(player.name)" alt="" /></span>
-                    <b>{{ nama(player.name) }}</b>
+                    <b>{{ ambilNamaTampilan(player.name) }}</b>
                     @if (player.name === state.me.name) {
                       <small>Kamu</small>
                     }
@@ -174,13 +179,13 @@
                 }
               </ul>
             </div>
-            @if (state.preparation; as prep) {
+            @if (state.preparation; as persiapan) {
               <div class="splash-status" aria-live="polite">
                 <p class="splash-state">
-                  @if (prep.ready) {
+                  @if (persiapan.ready) {
                     {{ preparationSeconds ? 'Ronde 1 dimulai dalam ' + preparationSeconds + ' detik' : 'Memulai ronde 1…' }}
                   } @else {
-                    Menyiapkan AI · batas tunggu {{ prep.max_wait }} detik
+                    Menyiapkan AI · batas tunggu {{ persiapan.max_wait }} detik
                   }
                 </p>
                 <div
@@ -189,24 +194,24 @@
                   aria-label="Kesiapan AI"
                   aria-valuemin="0"
                   aria-valuemax="100"
-                  [attr.aria-valuenow]="prep.progress * 100"
+                  [attr.aria-valuenow]="persiapan.progress * 100"
                 >
-                  <span [style.width.%]="prep.progress * 100"></span>
+                  <span [style.width.%]="persiapan.progress * 100"></span>
                 </div>
-                <small class="hand">{{ prep.detail }}</small>
+                <small class="hand">{{ persiapan.detail }}</small>
                 <button
                   type="button"
                   class="wood-button green splash-ready"
                   (click)="readyUp()"
-                  [disabled]="busy || prep.consented"
+                  [disabled]="busy || persiapan.consented"
                 >
                   <span
-                    >{{ prep.consented ? 'Menunggu pertandingan dimulai…' : 'Saya sudah paham, siap!' }}</span
+                    >{{ persiapan.consented ? 'Menunggu pertandingan dimulai…' : 'Saya sudah paham, siap!' }}</span
                   >
                 </button>
                 <small
-                  >{{ prep.agreed }} / {{ prep.required }} pemain siap{{
-                      prep.ready ? '' : ' · paling lama ' + prep.max_wait + ' detik'
+                  >{{ persiapan.agreed }} / {{ persiapan.required }} pemain siap{{
+                      persiapan.ready ? '' : ' · paling lama ' + persiapan.max_wait + ' detik'
                   }}</small
                 >
               </div>
@@ -278,7 +283,7 @@
             [class.urgent]="timerUrgent"
             [class.final]="finalCountdown"
             role="timer"
-            [attr.aria-label]="state.winner ? 'Permainan selesai' : 'Sisa waktu ' + seconds + ' detik'"
+            [attr.aria-label]="state.winner ? 'Permainan selesai' : 'Sisa waktu ' + sisaDetik + ' detik'"
           >
             <svg viewBox="0 0 48 48" aria-hidden="true">
               <circle class="timer-track" cx="24" cy="24" r="20" />
@@ -290,7 +295,7 @@
                 [style.stroke-dashoffset]="125.66 * (1 - timerFraction)"
               />
             </svg>
-            <b>{{ state.winner ? '★' : seconds }}</b>
+            <b>{{ state.winner ? '★' : sisaDetik }}</b>
           </div>
           <button
             type="button"
@@ -335,8 +340,8 @@
       @if (finalCountdown) {
         <!-- 5 detik terakhir: angka besar di tengah; pointer-events: none agar chat dan vote tetap bisa dipakai. -->
         <div class="final-count" [attr.data-phase]="state.phase" aria-hidden="true">
-          @for (n of [seconds]; track n) {
-            <b>{{ n }}</b>
+          @for (angka of [sisaDetik]; track angka) {
+            <b>{{ angka }}</b>
           }
           <small>{{ finalLabels[state.phase] }}</small>
         </div>
@@ -355,19 +360,19 @@
           <div class="private-card">
             <p class="eyebrow">{{ state.winner ? 'Role kamu' : 'Hanya untukmu' }}</p>
             <ng-container *ngTemplateOutlet="roleFlip; context: { $implicit: state }" />
-            @if (revealRole && !state.winner) {
+            @if (kartuRoleTerbuka && !state.winner) {
               <p class="role-help">
                 <b>{{ roleNames[state.me.role] || state.me.role }}.</b>
                 {{ roleHelp[state.me.role] }}
               </p>
               @if (allies.length) {
                 <p class="allies">
-                  Rekan Syndicate: <b>{{ namaDaftar(allies) }}</b>
+                  Rekan Syndicate: <b>{{ gabungNamaTampilan(allies) }}</b>
                 </p>
               }
               @if (spyAllies.length) {
                 <p class="allies">
-                  Rekan Spy: <b>{{ namaDaftar(spyAllies) }}</b>
+                  Rekan Spy: <b>{{ gabungNamaTampilan(spyAllies) }}</b>
                 </p>
               }
             }
@@ -396,21 +401,21 @@
               />
             }
             <div class="players" [style.--cols]="tableColumns" [style.--rows]="tableRows">
-              @for (player of state.players; track player.name; let i = $index) {
-                @let intip = peekLabel(player.name);
-                @let sandera = player.alive && isHostage(player.name);
+              @for (player of state.players; track player.name; let urutan = $index) {
+                @let hasilIntip = peekLabel(player.name);
+                @let tersandera = player.alive && isHostage(player.name);
                 <!-- Penanda Intip, Jaga, dan Gag hanya dari data privat pemain ini; cap Sandera publik. -->
                 <div
                   class="player-card"
                   animate.enter="card-enter"
                   [class.guarded]="guardTarget === player.name"
-                  [class.peeked]="!!intip"
+                  [class.peeked]="!!hasilIntip"
                   [class.has-votes]="state.phase === 'tribunal' && votersFor(player.name).length > 0"
                   [class.leading]="state.phase === 'tribunal' && leadingTarget === player.name"
                   [attr.data-bump]="votersFor(player.name).length % 2"
                   [style.--heat]="state.phase === 'tribunal' ? voteHeat(player.name) : 0"
                   [style.--tag]="colorFor(player.name)"
-                  [style.--i]="i"
+                  [style.--i]="urutan"
                 >
                   <button
                     type="button"
@@ -418,7 +423,7 @@
                     [class.chosen]="target === player.name"
                     [class.eliminated]="!player.alive"
                     [class.self]="player.name === state.me.name"
-                    [class.held]="sandera"
+                    [class.held]="tersandera"
                     [attr.aria-pressed]="target === player.name"
                     [disabled]="
                       !player.alive ||
@@ -427,16 +432,17 @@
                     "
                     (click)="target = player.name"
                   >
-                    @if (intip) {
+                    @if (hasilIntip) {
                       <!-- Hasil Peek di atas karakter, seperti judul kartu role di Main. -->
-                      <b class="peek-role" [attr.data-role]="intip">
-                        @if (intip === '?') {
+                      <b class="peek-role" [attr.data-role]="hasilIntip">
+                        @if (hasilIntip === '?') {
                           <span aria-hidden="true">👁 ?</span
                           ><span class="sr-only"
                             >Diintip malam ini; hasilnya keluar setelah malam</span
                           >
                         } @else {
-                          <span class="sr-only">Hasil Intip: </span>{{ roleNames[intip] || intip }}
+                          <span class="sr-only">Hasil Intip: </span
+                          >{{ roleNames[hasilIntip] || hasilIntip }}
                         }
                       </b>
                     }
@@ -451,7 +457,7 @@
                       <span
                         class="thought"
                         role="img"
-                        [attr.aria-label]="nama(player.name) + ' sedang berpikir'"
+                        [attr.aria-label]="ambilNamaTampilan(player.name) + ' sedang berpikir'"
                       >
                         <span class="thought__cloud"
                           ><span class="thought__face" aria-hidden="true">🤔</span></span
@@ -468,7 +474,7 @@
                         ><span class="sr-only">{{ tahapBot[player.tahap] }}</span></span
                       >
                     }
-                    <b class="name-tag">{{ nama(player.name) }}</b>
+                    <b class="name-tag">{{ ambilNamaTampilan(player.name) }}</b>
                     <!-- prettier-ignore -->
                     <small class="player-sub">{{ state.winner ? (player.bot ? 'BOT' : 'PEMAIN') : '' }}{{ player.name === state.me.name ? (state.winner ? ' · ' : '') + 'KAMU' : '' }}</small>
                     @if (player.role) {
@@ -499,26 +505,27 @@
                       <span class="stamp stamp-dead" [class.stamp-left]="player.left">{{
                         player.left ? 'Keluar' : 'Dieksekusi'
                       }}</span>
-                    } @else if (sandera) {
+                    } @else if (tersandera) {
                       <span class="stamp stamp-sandera">Disandera</span>
                     } @else if (failedHostage(player.name)) {
                       <span class="stamp stamp-sandera stamp-gagal">Disandera <b>Gagal</b></span>
                     }
-                    @if (target === player.name && !sandera) {
+                    @if (target === player.name && !tersandera) {
                       <span class="stamp stamp-target">Target</span>
                     }
                     @if (allyPicks(player.name).length) {
                       <!-- Label pendek agar tidak terpotong di kartu kecil; rincian untuk pembaca layar. -->
                       <span class="ally-pick"
                         >◆ Incaran<span class="sr-only">
-                          Hostage pilihan rekan: {{ namaDaftar(allyPicks(player.name)) }}</span
+                          Hostage pilihan rekan:
+                          {{ gabungNamaTampilan(allyPicks(player.name)) }}</span
                         ></span
                       >
                     }
                     @if (spyPicks(player.name).length) {
                       <span class="ally-pick"
                         >◆ Dijaga<span class="sr-only">
-                          Guard pilihan rekan: {{ namaDaftar(spyPicks(player.name)) }}</span
+                          Guard pilihan rekan: {{ gabungNamaTampilan(spyPicks(player.name)) }}</span
                         ></span
                       >
                     }
@@ -529,13 +536,16 @@
                   @if (state.phase === 'tribunal') {
                     <span
                       class="vote-count"
-                      [attr.aria-label]="votersFor(player.name).length + ' vote untuk ' + nama(player.name)"
+                      [attr.aria-label]="votersFor(player.name).length + ' vote untuk ' + ambilNamaTampilan(player.name)"
                       >{{ votersFor(player.name).length }} vote</span
                     >
-                    <div class="voter-badges" [attr.title]="namaDaftar(votersFor(player.name))">
+                    <div
+                      class="voter-badges"
+                      [attr.title]="gabungNamaTampilan(votersFor(player.name))"
+                    >
                       @for (voter of votersFor(player.name).slice(0, 4); track voter) {
                         <span class="voter-badge" [style.--chip]="voterColor(voter)">{{
-                          nama(voter).slice(0, 2)
+                          ambilNamaTampilan(voter).slice(0, 2)
                         }}</span>
                       }
                       @if (votersFor(player.name).length > 4) {
@@ -546,10 +556,10 @@
                     </div>
                     <ul
                       class="voter-details sr-only"
-                      [attr.aria-label]="'Pemilih ' + nama(player.name)"
+                      [attr.aria-label]="'Pemilih ' + ambilNamaTampilan(player.name)"
                     >
                       @for (voter of votersFor(player.name); track voter) {
-                        <li>{{ nama(voter) }}</li>
+                        <li>{{ ambilNamaTampilan(voter) }}</li>
                       }
                     </ul>
                   }
@@ -569,9 +579,9 @@
                     type="button"
                     class="wood-button red"
                     [disabled]="!target || busy"
-                    (click)="act(true)"
+                    (click)="kirimPilihanTarget(true)"
                   >
-                    ⚖ Kunci vote: {{ nama(target) || 'pilih pemain' }}
+                    ⚖ Kunci vote: {{ ambilNamaTampilan(target) || 'pilih pemain' }}
                   </button>
                 } @else if (state.me.can_cancel_vote) {
                   <button
@@ -580,7 +590,7 @@
                     [disabled]="busy"
                     (click)="cancelVote()"
                   >
-                    ✕ Batalkan vote: {{ nama(state.me.vote) }}
+                    ✕ Batalkan vote: {{ ambilNamaTampilan(state.me.vote) }}
                   </button>
                 } @else if (state.me.can_act) {
                   @if (allyTarget && target !== allyTarget && canTarget(allyTarget)) {
@@ -589,17 +599,17 @@
                       class="wood-button plank ally-match"
                       (click)="target = allyTarget"
                     >
-                      ◆ Samakan dengan rekan: {{ nama(allyTarget) }}
+                      ◆ Samakan dengan rekan: {{ ambilNamaTampilan(allyTarget) }}
                     </button>
                   }
                   <button
                     type="button"
                     class="wood-button green"
                     [disabled]="!target || busy"
-                    (click)="act()"
+                    (click)="kirimPilihanTarget()"
                   >
                     {{ abilityNames[state.me.ability || ''] || state.me.ability }} →
-                    {{ nama(target) || 'pilih pemain' }}
+                    {{ ambilNamaTampilan(target) || 'pilih pemain' }}
                   </button>
                 } @else if (state.me.can_cancel_action && state.me.action) {
                   <button
@@ -610,7 +620,7 @@
                   >
                     ✕ Batalkan
                     {{ abilityNames[state.me.action.ability] || state.me.action.ability }}:
-                    {{ nama(state.me.action.target) }}
+                    {{ ambilNamaTampilan(state.me.action.target) }}
                   </button>
                 }
                 @if (state.phase === 'day') {
@@ -659,16 +669,16 @@
                   [class.self]="chat.sender === state.me.name"
                   [style.--tag]="colorFor(chat.sender)"
                 >
-                  <small><i aria-hidden="true"></i>{{ nama(chat.sender) }}</small>
+                  <small><i aria-hidden="true"></i>{{ ambilNamaTampilan(chat.sender) }}</small>
                   <p>{{ chat.message }}</p>
                 </article>
               } @empty {
                 <p class="hint empty">Belum ada percakapan. Mulai diskusi saat siang.</p>
               }
             </div>
-            @if (newBelow) {
+            @if (jumlahPesanBaruDiBawah) {
               <button type="button" class="chat-jump" (click)="jumpToLatest()">
-                ↓ {{ newBelow }} pesan baru
+                ↓ {{ jumlahPesanBaruDiBawah }} pesan baru
               </button>
             }
           </div>
@@ -684,7 +694,7 @@
                       [class.self]="chat.sender === state.me.name"
                       [style.--tag]="colorFor(chat.sender)"
                     >
-                      <small><i aria-hidden="true"></i>{{ nama(chat.sender) }}</small>
+                      <small><i aria-hidden="true"></i>{{ ambilNamaTampilan(chat.sender) }}</small>
                       <p>{{ chat.message }}</p>
                     </article>
                   } @empty {
@@ -795,7 +805,7 @@
                 @for (player of winners; track player.name; let index = $index) {
                   <li [style.--i]="index" [style.--tag]="colorFor(player.name)">
                     <img class="lineup-skin" [src]="skinFor(player.name)" alt="" />
-                    <b>{{ nama(player.name) }}</b>
+                    <b>{{ ambilNamaTampilan(player.name) }}</b>
                     <small>{{ winnerLabel(player) }}</small>
                   </li>
                 }
@@ -908,9 +918,9 @@
           </section>
         </div>
       }
-      @if (confirmLeave) {
+      @if (popupKeluarTerbuka) {
         <!-- Konfirmasi keluar: kertas di tengah meja, pilihan aman ("Tetap bermain") difokuskan dulu. -->
-        <div class="modal-backdrop" (click)="confirmLeave = false">
+        <div class="modal-backdrop" (click)="popupKeluarTerbuka = false">
           <section
             class="leave-modal paper"
             role="alertdialog"
@@ -918,7 +928,7 @@
             aria-labelledby="leave-title"
             aria-describedby="leave-text"
             (click)="$event.stopPropagation()"
-            (keydown.escape)="confirmLeave = false"
+            (keydown.escape)="popupKeluarTerbuka = false"
           >
             <span class="leave-icon" aria-hidden="true">🚪</span>
             <h2 id="leave-title">Keluar dari permainan?</h2>
@@ -931,7 +941,7 @@
                 #stayButton
                 type="button"
                 class="wood-button plank"
-                (click)="confirmLeave = false"
+                (click)="popupKeluarTerbuka = false"
               >
                 Tetap bermain
               </button>

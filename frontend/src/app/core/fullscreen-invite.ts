@@ -22,9 +22,9 @@ import { STORAGE } from './storage';
 })
 export class FullscreenInvite {
   private readonly document = inject(DOCUMENT);
-  private readonly boot = inject(BootLoader);
-  private readonly wanted = signal(false);
-  readonly open = computed(() => this.wanted() && this.boot.done());
+  private readonly bootLoader = inject(BootLoader);
+  private readonly perluDitawarkan = signal(false);
+  readonly open = computed(() => this.perluDitawarkan() && this.bootLoader.done());
 
   // Fokus pindah ke tombol utama begitu dialog tampil (pengguna keyboard langsung bisa memilih).
   @ViewChild('enterButton') set enterButton(button: ElementRef<HTMLButtonElement> | undefined) {
@@ -36,12 +36,14 @@ export class FullscreenInvite {
       const supported =
         !!this.document.fullscreenEnabled &&
         typeof this.document.documentElement.requestFullscreen === 'function';
-      this.wanted.set(supported && !this.document.fullscreenElement && !this.asked());
+      this.perluDitawarkan.set(
+        supported && !this.document.fullscreenElement && !this.sudahPernahDitanya(),
+      );
     });
   }
 
-  async enter(): Promise<void> {
-    this.close();
+  async masukLayarPenuh(): Promise<void> {
+    this.tutupUndangan();
     try {
       await this.document.documentElement.requestFullscreen();
     } catch {
@@ -50,16 +52,16 @@ export class FullscreenInvite {
   }
 
   @HostListener('document:keydown.escape')
-  close(): void {
-    if (!this.wanted()) return;
-    this.wanted.set(false);
+  tutupUndangan(): void {
+    if (!this.perluDitawarkan()) return;
+    this.perluDitawarkan.set(false);
     try {
       sessionStorage.setItem(STORAGE.fullscreenAsked, '1');
     } catch {}
   }
 
   // Storage yang diblokir dianggap sudah ditanya agar pop-up tidak muncul di setiap halaman.
-  private asked(): boolean {
+  private sudahPernahDitanya(): boolean {
     try {
       return sessionStorage.getItem(STORAGE.fullscreenAsked) === '1';
     } catch {
