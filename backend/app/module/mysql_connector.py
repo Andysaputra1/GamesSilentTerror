@@ -18,7 +18,7 @@ from app.config.settings import settings
 
 logger = logging.getLogger("shadow_heist.database")
 
-# pool_pre_ping dan pool_recycle: koneksi yang sudah diputus MySQL diganti, tidak menggagalkan request.
+# Kumpulan koneksi (pool) yang dipakai bersama. Koneksi yang diputus MySQL atau berumur lebih dari 1 jam diganti otomatis.
 engine = create_engine(
     settings.sqlalchemy_database_url,
     echo=settings.sql_echo,
@@ -36,6 +36,7 @@ if engine.dialect.name == "mysql":
             cursor.execute("SET time_zone = '+00:00'")
 
 
+# Pembuat sesi DB. Sesi wajib ditutup: close() mengembalikan koneksi ke pool, dan tanpa itu koneksi lama-lama habis.
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
 
 

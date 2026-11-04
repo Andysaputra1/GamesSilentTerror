@@ -117,7 +117,8 @@ class Settings(MySQLSettings):
         return key.get_secret_value().strip() or None if key else None
 
     @property
-    # PROPERTY: pecah konfigurasi CORS menjadi daftar origin browser yang diizinkan.
+    # Mengubah pengaturan CORS dari satu teks menjadi daftar alamat web.
+    # Dipakai di 3 tempat (Socket.IO, middleware CORS, login Google), jadi rumusnya cukup ditulis sekali.
     def allowed_origins(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
 

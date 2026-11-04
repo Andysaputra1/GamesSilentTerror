@@ -78,7 +78,8 @@ class RoomService:
         for username, (skin_id, nama_tampilan) in self._ambil_profil_akun(daftar_username).items():
             room.members_skin[username], room.members_label[username] = skin_id, nama_tampilan
 
-    # SERVICE AKSES: ambil ruangan berdasarkan kode serta pastikan pengguna merupakan anggotanya.
+    # Mengambil room dari kodenya, sekaligus memastikan pemain itu anggotanya.
+    # Room hanya ada di memori: tidak ada query DB di sini, dan semua room hilang saat server restart.
     def get(self, code: str, username: str) -> Room:
         with self.lock:
             room = self.rooms.get(code.strip().upper())

@@ -31,7 +31,8 @@ class MySQLSettings(BaseSettings):
     database_max_overflow: int = Field(default=10, ge=0)
 
     @property
-    # PROPERTY: susun URL koneksi MySQL dengan kredensial yang di-encode, atau gunakan database_url khusus.
+    # Menyusun alamat DB yang dipakai engine, atau memakai DATABASE_URL apa adanya kalau diisi.
+    # User, password, dan nama DB di-encode, supaya karakter seperti @ tidak merusak alamat.
     def sqlalchemy_database_url(self) -> str:
         if self.database_url:
             return self.database_url

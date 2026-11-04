@@ -30,9 +30,9 @@ logger = logging.getLogger("shadow_heist.socket")
 
 
 class SocketGameController:
-    """Chat per ruangan; engine di memori, pesan dicatat ke MySQL. `sid` = ID koneksi Socket.IO."""
+    """Menampung semua fungsi yang melayani socket. `sid` = nomor sambungan, dibuat Socket.IO."""
 
-    # CONSTRUCTOR: simpan dependensi dan catatan tiap socket: akun, ruangan, dan token login.
+    # sockets: catatan tiap sambungan aktif, {sid: {username, token, room}}. Hanya di memori, jadi hilang saat server restart.
     def __init__(self, sio: socketio.AsyncServer) -> None:
         self.sio = sio
         self.sockets: dict[str, dict[str, str]] = {}
@@ -68,7 +68,8 @@ class SocketGameController:
                 await self.sio.leave_room(sid, to)
         await self.sio.emit(event, data, to=to)
 
-    # EVENT CONNECT: periksa token login dan akses ruangan sebelum mencatat identitas socket.
+    # Jalan saat browser menyambung: mengecek siapa yang masuk dan ke room mana, sebelum sambungan boleh menerima chat.
+    # auth = data dari browser (token, room_code). environ tidak dipakai, tapi wajib ada karena Socket.IO mengirimnya.
     async def connect(self, sid: str, environ: dict[str, Any], auth: Any = None) -> None:
         token = str(auth.get("token", "")) if isinstance(auth, dict) else ""
         try:
@@ -83,11 +84,13 @@ class SocketGameController:
             raise socketio.exceptions.ConnectionRefusedError("Ruangan tidak valid.") from error
 
         kode_room = kode_room.strip().upper()
+        # Token ikut dicatat karena dicek ulang tiap chat, jadi pemain yang sudah logout tidak bisa terus chat lewat sambungan lama.
         self.sockets[sid] = {"username": akun.username, "token": token, "room": kode_room}
         await self.sio.enter_room(sid, kode_room)
         logger.info("Pemain terkoneksi ke Socket: %s", sid)
 
-    # EVENT DISCONNECT: hapus pemetaan socket yang keluar; tidak menghapus keanggotaan lobby atau data MySQL.
+    # Jalan saat browser terputus: hanya menghapus catatan sambungan.
+    # Keanggotaan room tetap, jadi pemain yang memuat ulang halaman bisa kembali ke room yang sama.
     async def disconnect(self, sid: str) -> None:
         self.sockets.pop(sid, None)
         logger.info("Pemain keluar dari Socket: %s", sid)
@@ -204,7 +207,8 @@ class SocketGameController:
                     pertandingan, pengirim, pesan, jejak["message_id"], room_code=kode_room
                 )
 
-    # EVENT CHAT ASYNC: validasi pesan, catat checker dan MySQL, lalu kirim hanya ke ruangan terkait.
+    # Jalan saat pemain mengirim chat. Kerjanya ada di _send_chat, sedangkan fungsi ini memastikan jejak pesan tersimpan.
+    # Jejak = catatan tahap dan durasi satu pesan, yang tampil di panel checker.
     async def send_chat(self, sid: str, data: dict[str, Any]) -> None:
         waktu_mulai = perf_counter()
         # Wadah agar jejak tetap terbaca di finally walaupun _send_chat berhenti di tengah jalan.

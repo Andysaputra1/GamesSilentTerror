@@ -72,7 +72,8 @@ def create_session(database: Session, *, user_id: int, token_hash: str, expires_
     ).lastrowid
 
 
-# Cari akun aktif dengan sesi yang cocok dan belum kedaluwarsa.
+# Mencari akun pemilik token: hash cocok, sesi belum kedaluwarsa, dan akun masih aktif.
+# Hasilnya satu baris atau None, karena token_hash unik.
 def account_by_token(database: Session, token_hash: str, waktu_sekarang: datetime):
     sql = text("""
         SELECT u.id, u.username, u.display_name, u.skin_id

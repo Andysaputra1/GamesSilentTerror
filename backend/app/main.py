@@ -79,11 +79,12 @@ async def lifespan(_: FastAPI):
         engine.dispose()
 
 
-# Setup Logger
+# Menyiapkan pencatat log. File lain memakai anak dari nama ini (mis. shadow_heist.auth), jadi pesannya ikut aturan yang sama.
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("shadow_heist")
 
-# Koneksi WebSocket lewat Socket.IO: jalur realtime server dengan browser pemain, bot NPC ikut memakainya.
+# Socket.IO: jalur yang tetap terbuka antara server dan browser, jadi server bisa mengirim chat kapan saja.
+# Di sini hanya persiapan: connect, disconnect, dan send_chat baru jalan saat ada pemain.
 sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins=settings.allowed_origins)
 socket_controller = SocketGameController(sio)
 sio.on("connect", socket_controller.connect)

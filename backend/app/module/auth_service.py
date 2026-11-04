@@ -85,7 +85,8 @@ class AuthService:
 
         return jalankan_transaksi(periksa_akun_lalu_buat_sesi, PESAN_LOGIN)
 
-    # Cari akun aktif untuk token yang belum kedaluwarsa; sesi tidak valid ditolak.
+    # Mengubah token dari browser menjadi data akun, dan menolak kalau tidak sah.
+    # DB hanya menyimpan hash, jadi token asli tidak terbaca walau DB bocor.
     def check_user_by_token(self, token: str) -> AuthenticatedUser:
         if not token.strip():
             raise SessionValidationError("Sesi login tidak ditemukan.")
