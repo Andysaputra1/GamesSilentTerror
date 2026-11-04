@@ -441,7 +441,7 @@
   font-size: 19px;
 }
 .nudge-card {
-  width: min(230px, 56vw);
+  width: min(230px, 56vw, 42dvh);
   border-radius: 7%;
   animation: sorot 1.4s ease-in-out infinite;
 }
