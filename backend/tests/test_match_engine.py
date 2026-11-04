@@ -785,8 +785,7 @@ class SocketGameTests(unittest.IsolatedAsyncioTestCase):
 
         sio = Mock(emit=AsyncMock())
         controller = SocketGameController(sio)
-        controller.socket_players["sid"] = "alice"
-        controller.socket_tokens["sid"] = "revoked-test-token"
+        controller.sockets["sid"] = {"username": "alice", "token": "revoked-test-token"}
         with patch(
             "app.controller.realtime.socket_handlers.auth_service.user_for_token",
             side_effect=SessionValidationError(),
@@ -802,8 +801,7 @@ class SocketGameTests(unittest.IsolatedAsyncioTestCase):
         rooms.start(room.code, "alice")
         sio = Mock(emit=AsyncMock(), enter_room=AsyncMock())
         controller = SocketGameController(sio)
-        controller.socket_players["sid"] = "alice"
-        controller.socket_rooms["sid"] = room.code
+        controller.sockets["sid"] = {"username": "alice", "room": room.code}
         with (
             patch("app.controller.realtime.socket_handlers.room_service", rooms),
             patch("app.controller.realtime.socket_handlers.PersistenceService"),

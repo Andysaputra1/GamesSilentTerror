@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import re
-from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
@@ -123,10 +122,4 @@ class Settings(MySQLSettings):
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
 
 
-@lru_cache
-# FUNCTION CACHE: buat konfigurasi tervalidasi sekali, lalu gunakan ulang hasilnya.
-def get_settings() -> Settings:
-    return Settings()
-
-
-settings = get_settings()
+settings = Settings()

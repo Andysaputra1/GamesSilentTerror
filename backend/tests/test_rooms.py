@@ -60,15 +60,17 @@ class SocketRoomTests(unittest.IsolatedAsyncioTestCase):
         rooms.join(room.code, "bob")
         sio = Mock(emit=AsyncMock(), leave_room=AsyncMock())
         controller = SocketGameController(sio)
-        controller.socket_players.update({"alice-sid": "alice", "bob-sid": "bob"})
-        controller.socket_rooms.update({"alice-sid": room.code, "bob-sid": room.code})
+        controller.sockets.update({
+            "alice-sid": {"username": "alice", "room": room.code},
+            "bob-sid": {"username": "bob", "room": room.code},
+        })
         rooms.leave(room.code, "bob")
         with patch("app.controller.realtime.socket_handlers.room_service", rooms):
             await controller.emit_room("receive_chat", {"message": "private room"}, to=room.code)
             sio.leave_room.assert_awaited_once_with("bob-sid", room.code)
             sio.leave_room.reset_mock()
             rooms.join(room.code, "bob")
-            controller.socket_tokens["bob-sid"] = "revoked-session"
+            controller.sockets["bob-sid"]["token"] = "revoked-session"
             with patch(
                 "app.controller.realtime.socket_handlers.auth_service.user_for_token",
                 side_effect=SessionValidationError("revoked"),
@@ -95,8 +97,7 @@ class SocketRoomTests(unittest.IsolatedAsyncioTestCase):
                     return real_begin(*args)
 
                 controller = SocketGameController(sio)
-                controller.socket_players["sid"] = "alice"
-                controller.socket_rooms["sid"] = room.code
+                controller.sockets["sid"] = {"username": "alice", "room": room.code}
                 with (
                     patch("app.controller.realtime.socket_handlers.room_service", rooms),
                     patch("app.controller.realtime.socket_handlers.PersistenceService") as persistence,
@@ -115,8 +116,7 @@ class SocketRoomTests(unittest.IsolatedAsyncioTestCase):
         rooms.set_bot(room.code, "alice", True)
         sio = Mock(emit=AsyncMock(), enter_room=AsyncMock())
         controller = SocketGameController(sio)
-        controller.socket_players["sid"] = "alice"
-        controller.socket_rooms["sid"] = room.code
+        controller.sockets["sid"] = {"username": "alice", "room": room.code}
         with (
             patch("app.controller.realtime.socket_handlers.room_service", rooms),
             patch("app.controller.realtime.socket_handlers.PersistenceService") as persistence,

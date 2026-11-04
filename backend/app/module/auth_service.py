@@ -114,25 +114,14 @@ class AuthService:
         if not token.strip():
             raise SessionValidationError("Sesi login tidak ditemukan.")
 
-        database = SessionLocal()
-        try:
-            akun = auth_queries.account_for_token(
+        akun = self._jalankan_transaksi(
+            lambda database: auth_queries.account_for_token(
                 database, _hash_token(token), _waktu_utc_sekarang()
             )
-        except SQLAlchemyError as error:
-            logger.error("Session database query failed (%s).", type(error).__name__)
-            raise AuthenticationPersistenceError("Layanan login sedang tidak tersedia.") from error
-        finally:
-            database.close()
-
+        )
         if akun is None:
             raise SessionValidationError("Sesi login sudah tidak valid.")
-        return AuthenticatedUser(
-            id=akun["id"],
-            username=akun["username"],
-            display_name=akun["display_name"],
-            skin_id=akun["skin_id"],
-        )
+        return AuthenticatedUser(**akun)
 
     # Username hanya boleh berganti di luar ruangan; token tetap terkait ID akun yang sama.
     def update_profile(

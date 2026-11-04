@@ -2,7 +2,7 @@
 Menerima event Socket.IO dari browser pemain, lalu mengirim hasilnya ke room.
 
 Alurnya
-1. main.py memanggil register_socket_handlers (buat controller, daftarkan event)
+1. main.py membuat SocketGameController dan mendaftarkan event connect, disconnect, send_chat
 2. connect: Cek token login dan room, catat socket ini milik siapa, masuk kanal room
 3. send_chat: Cek pesan dan identitas, cek boleh chat atau tidak, simpan ke MySQL, kirim ke room, IndoBERT membaca pesan
 4. disconnect: Hapus catatan socket (keanggotaan lobby dan data MySQL tetap)
@@ -36,50 +36,41 @@ logger = logging.getLogger("shadow_heist.socket")
 class SocketGameController:
     """Chat per ruangan; engine di memori, pesan dicatat ke MySQL. `sid` = ID koneksi Socket.IO."""
 
-    # CONSTRUCTOR: simpan dependensi dan pemetaan socket → akun, ruangan, dan token login.
+    # CONSTRUCTOR: simpan dependensi dan catatan tiap socket: akun, ruangan, dan token login.
     def __init__(self, sio: socketio.AsyncServer) -> None:
         self.sio = sio
-        self.socket_players: dict[str, str] = {}
-        self.socket_rooms: dict[str, str] = {}
-        self.socket_tokens: dict[str, str] = {}
-
-    async def emit_room(self, event, data, *, to):
-        """Cabut penerima lama sebelum broadcast, termasuk socket pasif setelah logout/leave."""
-        for sid, kode_room in list(self.socket_rooms.items()):
-            if kode_room != to:
-                continue
-            username = self.socket_players.get(sid)
-            try:
-                room_service.get(kode_room, username)
-                if sid in self.socket_tokens:
-                    akun = auth_service.user_for_token(self.socket_tokens[sid])
-                    if akun.username != username:
-                        raise ValueError("Identitas sesi berubah.")
-            except (ValueError, SessionValidationError, AuthenticationPersistenceError):
-                await self.sio.leave_room(sid, kode_room)
-        await self.sio.emit(event, data, to=to)
+        self.sockets: dict[str, dict[str, str]] = {}
 
     # Cocokkan identitas dengan sesi login socket dan pastikan masih anggota ruangan. Hasil: kode ruangan.
     def _verifikasi_socket(self, sid: str, username: str) -> str:
-        username_sesi = self.socket_players.get(sid)
-        username_dikirim = username.strip()
-        if username_sesi is None:
+        socket = self.sockets.get(sid)
+        if socket is None:
             raise ValueError("Login diperlukan sebelum masuk ke game.")
-        if username_dikirim != username_sesi:
+        if username != socket["username"]:
             raise ValueError("Identitas pemain tidak sesuai dengan sesi login.")
 
         # Token handshake diperiksa lagi supaya logout/expiry mencabut akses chat.
-        if sid in self.socket_tokens:
+        if "token" in socket:
             try:
-                akun = auth_service.user_for_token(self.socket_tokens[sid])
-                if akun.username != username_sesi:
+                akun = auth_service.user_for_token(socket["token"])
+                if akun.username != socket["username"]:
                     raise ValueError("Sesi login berubah. Silakan sambungkan ulang.")
             except (SessionValidationError, AuthenticationPersistenceError) as error:
                 raise ValueError("Sesi login berakhir. Silakan login ulang.") from error
 
-        kode_room = self.socket_rooms[sid]
-        room_service.get(kode_room, username_sesi)
-        return kode_room
+        room_service.get(socket["room"], socket["username"])
+        return socket["room"]
+
+    async def emit_room(self, event, data, *, to):
+        """Cabut penerima lama sebelum broadcast, termasuk socket pasif setelah logout/leave."""
+        for sid, socket in list(self.sockets.items()):
+            if socket["room"] != to:
+                continue
+            try:
+                self._verifikasi_socket(sid, socket["username"])
+            except ValueError:
+                await self.sio.leave_room(sid, to)
+        await self.sio.emit(event, data, to=to)
 
     # EVENT CONNECT: periksa token login dan akses ruangan sebelum mencatat identitas socket.
     async def connect(self, sid: str, environ: dict[str, Any], auth: Any = None) -> None:
@@ -91,21 +82,18 @@ class SocketGameController:
         try:
             kode_room = str(auth.get("room_code", ""))
             room_service.get(kode_room, akun.username)
-        except (SessionValidationError, AuthenticationPersistenceError, ValueError) as error:
+        except ValueError as error:
             logger.info("Koneksi Socket ditolak untuk %s: %s", sid, error)
             raise socketio.exceptions.ConnectionRefusedError("Ruangan tidak valid.") from error
 
-        self.socket_players[sid] = akun.username
-        self.socket_tokens[sid] = token
-        self.socket_rooms[sid] = kode_room.strip().upper()
-        await self.sio.enter_room(sid, self.socket_rooms[sid])
+        kode_room = kode_room.strip().upper()
+        self.sockets[sid] = {"username": akun.username, "token": token, "room": kode_room}
+        await self.sio.enter_room(sid, kode_room)
         logger.info("Pemain terkoneksi ke Socket: %s", sid)
 
     # EVENT DISCONNECT: hapus pemetaan socket yang keluar; tidak menghapus keanggotaan lobby atau data MySQL.
     async def disconnect(self, sid: str) -> None:
-        self.socket_players.pop(sid, None)
-        self.socket_rooms.pop(sid, None)
-        self.socket_tokens.pop(sid, None)
+        self.sockets.pop(sid, None)
         logger.info("Pemain keluar dari Socket: %s", sid)
 
     # Validasi sesi dan hak chat, simpan pesan, lalu broadcast. Setelah itu IndoBERT membaca pesan sekali
@@ -121,12 +109,11 @@ class SocketGameController:
             if not pesan or len(pesan) > 1000:
                 raise ValueError("Pesan chat harus berisi 1–1000 karakter.")
             # Socket sudah masuk kanal ruangan saat connect; pemain dicatat di transaksi pesan (tahap 3).
-            self._verifikasi_socket(sid, pengirim)
+            kode_room = self._verifikasi_socket(sid, pengirim)
         except ValueError as error:
             await self.sio.emit("system_alert", {"msg": str(error)}, to=sid)
             return
 
-        kode_room = self.socket_rooms[sid]
         room = room_service.get(kode_room, pengirim)
         # TAHAP 2: engine mengotorisasi pesan sebelum disimpan atau ditampilkan.
         chat_terkunci = False
@@ -238,12 +225,3 @@ class SocketGameController:
                     logger.error(
                         "Checker archive could not be saved for room %s", jejak["room_code"]
                     )
-
-
-# FUNCTION WIRING: buat controller dan daftarkan method-nya sebagai handler event Socket.IO.
-def register_socket_handlers(sio: socketio.AsyncServer) -> SocketGameController:
-    pengendali = SocketGameController(sio)
-    sio.on("connect", pengendali.connect)
-    sio.on("disconnect", pengendali.disconnect)
-    sio.on("send_chat", pengendali.send_chat)
-    return pengendali

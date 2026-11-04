@@ -20,7 +20,7 @@ from fastapi import FastAPI
 from app.config.settings import settings
 from app.controller.controller_main import api_router
 from app.controller.middleware.cors import configure_cors
-from app.controller.realtime.socket_handlers import register_socket_handlers
+from app.controller.realtime.socket_handlers import SocketGameController
 from app.module.ai_runtime_service import muat_konfigurasi_ai
 from app.module.mysql_connector import engine, database_is_ready
 from app.module.npc_brain.runtime import brain_runtime
@@ -85,7 +85,10 @@ logger = logging.getLogger("shadow_heist")
 
 # Koneksi WebSocket lewat Socket.IO: jalur realtime server dengan browser pemain, bot NPC ikut memakainya.
 sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins=settings.allowed_origins)
-socket_controller = register_socket_handlers(sio)
+socket_controller = SocketGameController(sio)
+sio.on("connect", socket_controller.connect)
+sio.on("disconnect", socket_controller.disconnect)
+sio.on("send_chat", socket_controller.send_chat)
 npc_service = NPCService(sio, broadcast=socket_controller.emit_room)
 
 # Bangun FastAPI dan daftarkan lifespan(Koneksi ke DB, Konfigurasi AI, Konfigurasi NPC, Memuat Otak AI, Menyalakan Jam (cek terus setiap 0.5 Detik)).
