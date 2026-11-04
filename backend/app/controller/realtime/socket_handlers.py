@@ -17,7 +17,7 @@ from time import perf_counter
 from typing import Any
 
 import socketio
-from app.module.room_service import room_service
+from app.module.room_service import Room, room_service
 from app.module.checker_service import checker_service
 from app.module.activity_service import activity
 from app.module.ai_diagnostics import measure
@@ -37,8 +37,8 @@ class SocketGameController:
         self.sio = sio
         self.sockets: dict[str, dict[str, str]] = {}
 
-    # Cocokkan identitas dengan sesi login socket dan pastikan masih anggota ruangan. Hasil: kode ruangan.
-    def _verifikasi_socket(self, sid: str, username: str) -> str:
+    # Cocokkan identitas dengan sesi login socket dan pastikan masih anggota ruangan. Hasil: room-nya.
+    def _verifikasi_socket(self, sid: str, username: str) -> Room:
         socket = self.sockets.get(sid)
         if socket is None:
             raise ValueError("Login diperlukan sebelum masuk ke game.")
@@ -54,8 +54,7 @@ class SocketGameController:
             except (SessionValidationError, PersistenceError) as error:
                 raise ValueError("Sesi login berakhir. Silakan login ulang.") from error
 
-        room_service.get(socket["room"], socket["username"])
-        return socket["room"]
+        return room_service.get(socket["room"], socket["username"])
 
     async def emit_room(self, event, data, *, to):
         """Cabut penerima lama sebelum broadcast, termasuk socket pasif setelah logout/leave."""
@@ -112,12 +111,12 @@ class SocketGameController:
                 if not pesan or len(pesan) > 1000:
                     raise ValueError("Pesan chat harus berisi 1–1000 karakter.")
                 # Socket sudah masuk kanal ruangan saat connect; pemain dicatat di transaksi pesan (tahap 3).
-                kode_room = self._verifikasi_socket(sid, pengirim)
+                room = self._verifikasi_socket(sid, pengirim)
             except ValueError as error:
                 await self.sio.emit("system_alert", {"msg": str(error)}, to=sid)
                 return
 
-            room = room_service.get(kode_room, pengirim)
+            kode_room = room.code
             # TAHAP 2: engine mengotorisasi pesan sebelum disimpan atau ditampilkan.
             chat_terkunci = False
             with room_service.lock:
