@@ -30,10 +30,11 @@ from app.models import auth_queries
 from app.module.auth_service import (
     AuthenticatedUser,
     AuthenticationError,
-    AuthenticationPersistenceError,
     LoginResult,
+    PESAN_LOGIN,
     auth_service,
 )
+from app.module.mysql_connector import PersistenceError, jalankan_transaksi
 from app.module.password_service import hash_password
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -66,7 +67,7 @@ def login(body: LoginRequest) -> LoginResponse:
         hasil_login = auth_service.login(username=body.username, password=body.password)
     except AuthenticationError as error:
         raise HTTPException(status_code=401, detail=str(error)) from error
-    except AuthenticationPersistenceError as error:
+    except PersistenceError as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
     return _buat_respons_login(hasil_login)
 
@@ -91,7 +92,7 @@ def update_profile(
         pengguna_terbaru = auth_service.update_profile(user, body.display_name, body.username)
     except ValueError as error:
         raise HTTPException(409, str(error)) from error
-    except AuthenticationPersistenceError as error:
+    except PersistenceError as error:
         raise HTTPException(503, "Nama belum berhasil disimpan. Coba lagi nanti.") from error
     return _buat_respons_pengguna(pengguna_terbaru)
 
@@ -106,7 +107,7 @@ def update_skin(
         skin_id = auth_service.update_skin(user, body.skin_id)
     except ValueError as error:
         raise HTTPException(400, str(error)) from error
-    except AuthenticationPersistenceError as error:
+    except PersistenceError as error:
         raise HTTPException(503, "Skin gagal disimpan. Coba lagi.") from error
     return {"skin_id": skin_id}
 
@@ -119,7 +120,7 @@ def logout(
     if kredensial is not None and kredensial.scheme.lower() == "bearer":
         try:
             auth_service.logout(kredensial.credentials)
-        except AuthenticationPersistenceError as error:
+        except PersistenceError as error:
             raise HTTPException(status_code=503, detail=str(error)) from error
 
 
@@ -131,7 +132,7 @@ def _jalankan_operasi_akun(operasi):
         raise HTTPException(409, str(error)) from error
     except AuthenticationError as error:
         raise HTTPException(401, str(error)) from error
-    except AuthenticationPersistenceError as error:
+    except PersistenceError as error:
         raise HTTPException(503, str(error)) from error
     return _buat_respons_login(hasil_login)
 
@@ -246,7 +247,7 @@ def register_account(body):
             database.rollback()
             raise AccountConflict("Username atau email sudah digunakan. Silakan login.") from error
 
-    return auth_service._jalankan_transaksi(simpan_akun_lalu_buat_sesi)
+    return jalankan_transaksi(simpan_akun_lalu_buat_sesi, PESAN_LOGIN)
 
 
 def google_account(klaim):
@@ -285,7 +286,7 @@ def google_account(klaim):
                 "Email sudah terdaftar. Gunakan metode login awal; penautan akun belum tersedia."
             ) from error
 
-    return auth_service._jalankan_transaksi(cari_atau_buat_akun_lalu_buat_sesi)
+    return jalankan_transaksi(cari_atau_buat_akun_lalu_buat_sesi, PESAN_LOGIN)
 
 
 # Login Google memverifikasi ID token + nonce sekali pakai, bukan sekadar decode JWT.
@@ -329,7 +330,7 @@ class BoundedGoogleRequest(GoogleRequest):
 # Habiskan nonce lalu verifikasi tanda tangan, audience, nonce, dan email Google.
 def verify_google(credential, nonce):
     if not settings.google_client_id.strip():
-        raise AuthenticationPersistenceError("Login Google belum dikonfigurasi.")
+        raise HTTPException(503, "Login Google belum dikonfigurasi.")
     if not nonces.consume(nonce):
         raise AuthenticationError("Percobaan login kedaluwarsa. Muat ulang halaman.")
     try:
@@ -349,4 +350,4 @@ def verify_google(credential, nonce):
     except (ValueError, TypeError) as error:
         raise AuthenticationError("Identitas Google tidak valid. Coba login ulang.") from error
     except TransportError as error:
-        raise AuthenticationPersistenceError("Google belum dapat dihubungi. Coba lagi.") from error
+        raise HTTPException(503, "Google belum dapat dihubungi. Coba lagi.") from error

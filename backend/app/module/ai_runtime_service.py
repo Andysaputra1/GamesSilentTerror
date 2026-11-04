@@ -24,7 +24,7 @@ from pydantic import SecretStr
 from sqlalchemy import text
 
 from app.config.settings import settings
-from app.module.persistence_service import PersistenceError, PersistenceService
+from app.module.mysql_connector import PersistenceError, jalankan_transaksi
 
 
 class AIRuntimeService:
@@ -98,7 +98,7 @@ def _decode_config(stored):
 # Ambil konfigurasi AI yang disimpan di panel saat server nyala, supaya key dan link tidak hilang
 # saat restart. Baris kosong bukan error: bot memakai nilai .env.
 def muat_konfigurasi_ai():
-    nilai = PersistenceService._run(
+    nilai = jalankan_transaksi(
         lambda db: db.execute(text("SELECT config FROM panel_configuration WHERE id=1")).scalar()
     )
     stored = json.loads(nilai) if isinstance(nilai, str) else nilai
@@ -171,5 +171,5 @@ def save_panel_configuration(
             )
             return override
 
-        # Gagal baca atau tulis: _run melempar error, memori tidak berubah, panel menerima gagal.
-        ai_runtime.override = PersistenceService._run(write)
+        # Gagal baca atau tulis: error dilempar, memori tidak berubah, panel menerima gagal.
+        ai_runtime.override = jalankan_transaksi(write)

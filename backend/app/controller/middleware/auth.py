@@ -5,10 +5,10 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.module.auth_service import (
     AuthenticatedUser,
-    AuthenticationPersistenceError,
     SessionValidationError,
     auth_service,
 )
+from app.module.mysql_connector import PersistenceError
 
 _skema_bearer = HTTPBearer(auto_error=False)
 
@@ -20,8 +20,8 @@ def require_authenticated_user(
     if kredensial is None or kredensial.scheme.lower() != "bearer":
         raise HTTPException(status_code=401, detail="Login diperlukan.")
     try:
-        return auth_service.user_for_token(kredensial.credentials)
+        return auth_service.check_user_by_token(kredensial.credentials)
     except SessionValidationError as error:
         raise HTTPException(status_code=401, detail=str(error)) from error
-    except AuthenticationPersistenceError as error:
+    except PersistenceError as error:
         raise HTTPException(status_code=503, detail=str(error)) from error

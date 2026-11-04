@@ -787,7 +787,7 @@ class SocketGameTests(unittest.IsolatedAsyncioTestCase):
         controller = SocketGameController(sio)
         controller.sockets["sid"] = {"username": "alice", "token": "revoked-test-token"}
         with patch(
-            "app.controller.realtime.socket_handlers.auth_service.user_for_token",
+            "app.controller.realtime.socket_handlers.auth_service.check_user_by_token",
             side_effect=SessionValidationError(),
         ):
             await controller.send_chat("sid", {"username": "alice", "message": "halo"})

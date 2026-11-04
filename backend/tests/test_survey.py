@@ -156,7 +156,7 @@ class SurveyServiceTests(unittest.TestCase):
         self.fake = FakeQueries()
         self.enterContext(patch("app.module.survey_service.room_service", self.rooms))
         self.enterContext(patch("app.module.survey_service.queries", self.fake))
-        self.enterContext(patch("app.module.survey_service.PersistenceService._run",
+        self.enterContext(patch("app.module.survey_service.jalankan_transaksi",
                                 side_effect=lambda operation: operation(None)))  # fmt: skip
         self.service = SurveyService()
         app = FastAPI()
@@ -285,14 +285,14 @@ class SurveyServiceTests(unittest.TestCase):
                 "INSERT", {}, Exception(kode, "fixture")
             )
 
-        with patch("app.module.survey_service.PersistenceService._run",
+        with patch("app.module.survey_service.jalankan_transaksi",
                    side_effect=lambda operation: gagal(1062)):  # fmt: skip
             with self.assertRaises(SurveyAlreadySubmitted):
                 self.service.submit(self.room.code, "alice", self.match.id, self.answers())
             body = {"match_id": self.match.id, "answers": self.answers()}
             response = self.client.post(f"/api/rooms/{self.room.code}/survey", json=body)
             self.assertEqual(response.status_code, 409)
-        with patch("app.module.survey_service.PersistenceService._run",
+        with patch("app.module.survey_service.jalankan_transaksi",
                    side_effect=lambda operation: gagal(1452)):  # fmt: skip
             with self.assertRaises(PersistenceError):  # pelanggaran lain tetap error database
                 self.service.submit(self.room.code, "alice", self.match.id, self.answers())

@@ -72,7 +72,7 @@ class SocketRoomTests(unittest.IsolatedAsyncioTestCase):
             rooms.join(room.code, "bob")
             controller.sockets["bob-sid"]["token"] = "revoked-session"
             with patch(
-                "app.controller.realtime.socket_handlers.auth_service.user_for_token",
+                "app.controller.realtime.socket_handlers.auth_service.check_user_by_token",
                 side_effect=SessionValidationError("revoked"),
             ):
                 await controller.emit_room("receive_chat", {"message": "next"}, to=room.code)

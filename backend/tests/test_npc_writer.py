@@ -317,7 +317,7 @@ class NpcConfigStoreTests(unittest.TestCase):
 
         with (
             patch.object(layanan, "brain_runtime") as runtime,
-            patch.object(layanan.PersistenceService, "_run") as baca,
+            patch.object(layanan, "jalankan_transaksi") as baca,
         ):
             # Baris produksi lama masih memuat kunci metode dan validasi; keduanya diabaikan.
             baca.return_value = {"metode": "fuzzy", "penulis": "otomatis", "validasi": True}
@@ -340,7 +340,7 @@ class NpcConfigStoreTests(unittest.TestCase):
                    "model_tautan": ""}  # fmt: skip
         with (
             patch.object(layanan, "brain_runtime") as runtime,
-            patch.object(layanan.PersistenceService, "_run", side_effect=PersistenceError("db")),
+            patch.object(layanan, "jalankan_transaksi", side_effect=PersistenceError("db")),
         ):
             runtime.ringkasan.return_value = sebelum
             runtime.atur.return_value = {**sebelum, "urutan_penulis": ["tautan"]}
@@ -383,7 +383,7 @@ class PanelWriterApiTests(unittest.TestCase):
                      "model_tautan": "qwen3:4b-instruct"}  # fmt: skip
         with (
             patch("app.module.npc_config_service.brain_runtime") as runtime,
-            patch("app.module.npc_config_service.PersistenceService._run") as simpan,
+            patch("app.module.npc_config_service.jalankan_transaksi") as simpan,
         ):
             runtime.atur.return_value = ringkasan
             # Klien lama (skrip kirim-link versi lama) masih boleh mengirim kunci validasi; kuncinya diabaikan.

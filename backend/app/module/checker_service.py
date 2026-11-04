@@ -130,7 +130,7 @@ class CheckerService:
 def _bot_arsip(code):
     from sqlalchemy import text
 
-    from app.module.persistence_service import PersistenceError, PersistenceService
+    from app.module.mysql_connector import PersistenceError, jalankan_transaksi
 
     def baca_baris_bot(database):
         return database.execute(
@@ -142,7 +142,7 @@ def _bot_arsip(code):
         ).mappings().all()  # fmt: skip
 
     try:
-        daftar_baris = PersistenceService._run(baca_baris_bot)
+        daftar_baris = jalankan_transaksi(baca_baris_bot)
     except PersistenceError:
         return []
     id_pertandingan_terakhir = daftar_baris[0]["match_id"] if daftar_baris else None

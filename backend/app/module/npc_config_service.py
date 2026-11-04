@@ -19,8 +19,8 @@ import logging
 
 from sqlalchemy import text
 
+from app.module.mysql_connector import jalankan_transaksi
 from app.module.npc_brain.runtime import brain_runtime
-from app.module.persistence_service import PersistenceService
 
 BARIS_NPC = 2
 logger = logging.getLogger("shadow_heist.npc_config")
@@ -34,7 +34,7 @@ def load_npc_configuration():
         ).scalar()
         return json.loads(value) if isinstance(value, str) else value
 
-    stored = PersistenceService._run(read)
+    stored = jalankan_transaksi(read)
     if stored:
         try:
             # Baris lama tanpa urutan/model penulis → None → nilai .env dipertahankan.
@@ -74,7 +74,7 @@ def save_npc_configuration(penulis, urutan_penulis=None, model_openrouter=None, 
         )
 
     try:
-        PersistenceService._run(write)
+        jalankan_transaksi(write)
     except Exception:
         # Gagal simpan: kembalikan runtime ke konfigurasi sebelumnya agar panel dan server konsisten.
         brain_runtime.atur(

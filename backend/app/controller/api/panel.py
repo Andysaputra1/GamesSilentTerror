@@ -22,7 +22,7 @@ from pydantic import BaseModel, Field, SecretStr
 from sqlalchemy import text
 from app.config.settings import settings
 from app.module.password_service import verify_password
-from app.module.persistence_service import PersistenceService, PersistenceError
+from app.module.mysql_connector import PersistenceError, jalankan_transaksi
 from app.module.ai_runtime_service import ai_runtime, save_panel_configuration
 from app.module.checker_service import checker_service
 from app.module.npc_brain.runtime import POLA_MODEL_TAUTAN, brain_runtime
@@ -39,7 +39,7 @@ bearer = HTTPBearer(auto_error=False)
 # Jalankan transaksi panel dan ubah kegagalan penyimpanan menjadi HTTP 503.
 def transaction(operasi):
     try:
-        return PersistenceService._run(operasi)
+        return jalankan_transaksi(operasi)
     except PersistenceError as error:
         raise HTTPException(
             503, "Database panel belum siap. Periksa koneksi dan migrasi V5/V6."

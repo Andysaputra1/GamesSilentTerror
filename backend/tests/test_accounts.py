@@ -12,6 +12,10 @@ from app.controller.middleware.auth_limits import _riwayat_percobaan
 from app.config.settings import settings
 from app.controller.api.auth import nonces
 
+# Diimpor sebelum setUp mem-patch SessionLocal: room_service menyalin nama itu saat pertama diimpor,
+# jadi impor pertama di tengah patch mengikatnya selamanya ke engine tes yang sudah ditutup.
+from app.module.room_service import room_service
+
 
 class AccountTests(unittest.TestCase):
     def setUp(self):
@@ -36,7 +40,7 @@ class AccountTests(unittest.TestCase):
                 )
             )
         self.session_patch = patch(
-            "app.module.auth_service.SessionLocal", sessionmaker(bind=self.engine)
+            "app.module.mysql_connector.SessionLocal", sessionmaker(bind=self.engine)
         )
         self.session_patch.start()
         app = FastAPI()
@@ -261,8 +265,6 @@ class AccountTests(unittest.TestCase):
         )
 
     def test_username_change_conflicts_rooms_and_google_identity(self):
-        from app.module.room_service import room_service
-
         first, _ = self.google(name="Google Name")
         original = first.json()["user"]["username"]
         headers = {"Authorization": "Bearer " + first.json()["access_token"]}

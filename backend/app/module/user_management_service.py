@@ -5,7 +5,7 @@ from sqlalchemy.exc import IntegrityError
 from app.config.settings import settings
 from app.models import auth_queries
 
-from app.module.auth_service import auth_service
+from app.module.mysql_connector import jalankan_transaksi
 from app.module.password_service import hash_password
 from app.module.room_service import BOT_NAMES, room_service
 
@@ -38,7 +38,7 @@ def create_user(username, display_name, password):
             raise ValueError("Username sudah digunakan.") from error
         return account_for_management(database, id_akun_baru)
 
-    return auth_service._jalankan_transaksi(simpan_akun_baru)
+    return jalankan_transaksi(simpan_akun_baru)
 
 
 # Edit identitas berdasarkan ID; arsip pengirim lama dan identitas Google tetap dipertahankan.
@@ -60,7 +60,7 @@ def update_user(user_id, display_name, username=None):
         return account_for_management(database, user_id)
 
     with room_service.lock:
-        return auth_service._jalankan_transaksi(simpan_perubahan_profil)
+        return jalankan_transaksi(simpan_perubahan_profil)
 
 
 # Baca akun terkini di dalam transaksi; password hanya dipakai menentukan metode login.
@@ -110,7 +110,7 @@ def list_users(after_id=0, search=""):
             "next_after_id": halaman[-1]["id"] if halaman else after_id,
         }
 
-    return auth_service._jalankan_transaksi(baca_satu_halaman)
+    return jalankan_transaksi(baca_satu_halaman)
 
 
 # Ganti hash dan cabut semua sesi secara atomik; akun Google tidak memiliki password aplikasi.
@@ -125,7 +125,7 @@ def reset_password(user_id, password):
         )
         database.execute(text("DELETE FROM auth_sessions WHERE user_id = :id"), {"id": user_id})
 
-    auth_service._jalankan_transaksi(simpan_password_baru)
+    jalankan_transaksi(simpan_password_baru)
 
 
 # Hapus hanya data autentikasi; jangan DELETE players, chat_messages, ai_analyses, atau checker_traces.
@@ -145,4 +145,4 @@ def delete_user(user_id, confirm_username):
         database.execute(text("DELETE FROM user_accounts WHERE id = :id"), {"id": user_id})
 
     with room_service.lock:
-        auth_service._jalankan_transaksi(hapus_data_autentikasi)
+        jalankan_transaksi(hapus_data_autentikasi)

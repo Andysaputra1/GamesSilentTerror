@@ -41,10 +41,10 @@ class AccountQueryTests(unittest.TestCase):
             auth_queries.create_session(
                 db, user_id=1, token_hash="test", expires_at=now + timedelta(hours=1)
             )
-            self.assertEqual(auth_queries.account_for_token(db, "test", now)["username"], "user1")
-            self.assertIsNone(auth_queries.account_for_token(db, "test", now + timedelta(hours=2)))
+            self.assertEqual(auth_queries.account_by_token(db, "test", now)["username"], "user1")
+            self.assertIsNone(auth_queries.account_by_token(db, "test", now + timedelta(hours=2)))
             self.assertEqual(auth_queries.delete_session(db, "test"), 1)
-            self.assertIsNone(auth_queries.account_for_token(db, "test", now))
+            self.assertIsNone(auth_queries.account_by_token(db, "test", now))
         engine.dispose()
 
 

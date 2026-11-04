@@ -10,7 +10,7 @@ import time
 from sqlalchemy.exc import IntegrityError
 
 from app.models import survey_queries as queries
-from app.module.persistence_service import PersistenceError, PersistenceService
+from app.module.mysql_connector import PersistenceError, jalankan_transaksi
 from app.module.room_service import room_service
 
 logger = logging.getLogger("shadow_heist.survey")
@@ -185,7 +185,7 @@ class SurveyService:
     # Gagal simpan (mis. migrasi V10 belum dijalankan) hanya dicatat: survei tetap jalan lewat memori.
     def catat_peserta(self, daftar_peserta: list[dict]) -> None:
         try:
-            PersistenceService._run(
+            jalankan_transaksi(
                 lambda database: queries.record_participants(database, daftar_peserta)
             )
         except PersistenceError:
@@ -243,7 +243,7 @@ class SurveyService:
                     }
                 # Lalu arsip peserta di database: berlaku juga setelah server dinyalakan ulang.
                 try:
-                    konteks_arsip = PersistenceService._run(
+                    konteks_arsip = jalankan_transaksi(
                         lambda database: queries.participant(
                             database, kode_rapi, username, id_pertandingan
                         )
@@ -282,7 +282,7 @@ class SurveyService:
             return queries.pending_surveys(database, username)
 
         try:
-            survei_tertunda = PersistenceService._run(ambil_survei_tertunda)
+            survei_tertunda = jalankan_transaksi(ambil_survei_tertunda)
         except PersistenceError:
             return []
         return [
@@ -300,7 +300,7 @@ class SurveyService:
                 queries.count_answers(database, konteks["match_id"], username),
             )
 
-        pertanyaan_aktif, jumlah_jawaban = PersistenceService._run(
+        pertanyaan_aktif, jumlah_jawaban = jalankan_transaksi(
             ambil_pertanyaan_dan_jumlah_jawaban
         )
         return {
@@ -335,7 +335,7 @@ class SurveyService:
             return len(baris_jawaban)
 
         try:
-            return {"submitted": True, "answers": PersistenceService._run(simpan_jawaban)}
+            return {"submitted": True, "answers": jalankan_transaksi(simpan_jawaban)}
         except PersistenceError as error:
             # Kiriman bersamaan melanggar UNIQUE (uq_survey_answer): sama dengan "sudah dikirim".
             penyebab = error.__cause__
@@ -355,7 +355,7 @@ class SurveyService:
                 raise ValueError("Kode pertanyaan sudah dipakai.")
             return queries.insert_question(database, pertanyaan)
 
-        return {"id": PersistenceService._run(simpan_pertanyaan_baru), **pertanyaan}
+        return {"id": jalankan_transaksi(simpan_pertanyaan_baru), **pertanyaan}
 
     # PANEL: ubah pertanyaan; jawaban lama tetap memakai salinan pertanyaan saat dijawab.
     def update_question(self, id_pertanyaan, data):
@@ -372,12 +372,12 @@ class SurveyService:
                 raise ValueError("Kode pertanyaan sudah dipakai.")
             queries.update_question(database, id_pertanyaan, pertanyaan)
 
-        PersistenceService._run(simpan_perubahan)
+        jalankan_transaksi(simpan_perubahan)
         return {"id": id_pertanyaan, **pertanyaan}
 
     # PANEL: hapus permanen semua jawaban dan arsip peserta; pertanyaan tetap ada.
     def clear_responses(self):
-        jumlah_terhapus = PersistenceService._run(queries.clear_responses)
+        jumlah_terhapus = jalankan_transaksi(queries.clear_responses)
         logger.warning("Panel menghapus %s jawaban survei.", jumlah_terhapus)
         return {"deleted": jumlah_terhapus}
 
@@ -392,19 +392,19 @@ class SurveyService:
                 raise ValueError("Pertanyaan ini masih punya jawaban. Bersihkan jawaban dulu.")
             queries.delete_question(database, id_pertanyaan)
 
-        PersistenceService._run(hapus_bila_belum_dijawab)
+        jalankan_transaksi(hapus_bila_belum_dijawab)
 
     # PANEL: ringkasan jawaban per pertanyaan dan per metode bot.
     def summary(self):
         def ambil_pertanyaan_dan_ringkasan(database):
             return queries.list_questions(database, active_only=False), queries.summary(database)
 
-        semua_pertanyaan, ringkasan = PersistenceService._run(ambil_pertanyaan_dan_ringkasan)
+        semua_pertanyaan, ringkasan = jalankan_transaksi(ambil_pertanyaan_dan_ringkasan)
         return {"questions": semua_pertanyaan, **ringkasan}
 
     # PANEL: baris CSV untuk analisis penelitian.
     def export_rows(self):
-        return PersistenceService._run(queries.export_rows)
+        return jalankan_transaksi(queries.export_rows)
 
     # NPC: catat metode dan persona bot pertandingan (gagal simpan tidak menghentikan game).
     def record_match_bots(self, daftar_bot):
@@ -412,7 +412,7 @@ class SurveyService:
             for bot in daftar_bot:
                 queries.record_match_bot(database, bot)
 
-        PersistenceService._run(simpan_daftar_bot)
+        jalankan_transaksi(simpan_daftar_bot)
 
 
 survey_service = SurveyService()

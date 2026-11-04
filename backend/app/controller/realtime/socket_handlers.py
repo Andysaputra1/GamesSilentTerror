@@ -23,11 +23,7 @@ from app.module.activity_service import activity
 from app.module.ai_diagnostics import measure
 from app.module.npc_service import catat_nlu
 
-from app.module.auth_service import (
-    AuthenticationPersistenceError,
-    SessionValidationError,
-    auth_service,
-)
+from app.module.auth_service import SessionValidationError, auth_service
 from app.module.persistence_service import PersistenceError, PersistenceService
 
 logger = logging.getLogger("shadow_heist.socket")
@@ -52,10 +48,10 @@ class SocketGameController:
         # Token handshake diperiksa lagi supaya logout/expiry mencabut akses chat.
         if "token" in socket:
             try:
-                akun = auth_service.user_for_token(socket["token"])
+                akun = auth_service.check_user_by_token(socket["token"])
                 if akun.username != socket["username"]:
                     raise ValueError("Sesi login berubah. Silakan sambungkan ulang.")
-            except (SessionValidationError, AuthenticationPersistenceError) as error:
+            except (SessionValidationError, PersistenceError) as error:
                 raise ValueError("Sesi login berakhir. Silakan login ulang.") from error
 
         room_service.get(socket["room"], socket["username"])
@@ -76,8 +72,8 @@ class SocketGameController:
     async def connect(self, sid: str, environ: dict[str, Any], auth: Any = None) -> None:
         token = str(auth.get("token", "")) if isinstance(auth, dict) else ""
         try:
-            akun = auth_service.user_for_token(token)
-        except (SessionValidationError, AuthenticationPersistenceError) as error:
+            akun = auth_service.check_user_by_token(token)
+        except (SessionValidationError, PersistenceError) as error:
             raise socketio.exceptions.ConnectionRefusedError("Login diperlukan.") from error
         try:
             kode_room = str(auth.get("room_code", ""))

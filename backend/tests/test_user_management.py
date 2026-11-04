@@ -50,7 +50,7 @@ class UserManagementTests(unittest.TestCase):
             db.execute(text("INSERT INTO ai_analyses VALUES (1,1,'Analisis tetap disimpan')"))
             db.execute(text("INSERT INTO checker_traces VALUES (1,'trace tetap disimpan')"))
         self.session_patch = patch(
-            "app.module.auth_service.SessionLocal", sessionmaker(bind=self.engine)
+            "app.module.mysql_connector.SessionLocal", sessionmaker(bind=self.engine)
         )
         self.session_patch.start()
         self.app = FastAPI()

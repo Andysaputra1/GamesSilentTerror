@@ -28,7 +28,7 @@ class PanelSecretsTests(unittest.TestCase):
 
         self.db.execute.side_effect = execute
         self.run = patch(
-            "app.module.persistence_service.PersistenceService._run",
+            "app.module.ai_runtime_service.jalankan_transaksi",
             side_effect=lambda fn: fn(self.db),
         )
         self.run.start()

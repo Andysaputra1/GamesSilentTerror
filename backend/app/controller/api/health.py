@@ -6,11 +6,10 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
-from app.module.mysql_connector import database_is_ready
+from app.module.mysql_connector import PersistenceError, database_is_ready, jalankan_transaksi
 from app.config.settings import settings
 from app.module.ollama_client import model_available
 from app.module.ai_runtime_service import ai_runtime
-from app.module.persistence_service import PersistenceService, PersistenceError
 
 router = APIRouter(tags=["system"])
 
@@ -47,7 +46,7 @@ def ready():
     skema_siap = False
     try:
         skema_siap = (
-            PersistenceService._run(
+            jalankan_transaksi(
                 lambda database: database.execute(
                     text(
                         "SELECT COUNT(*) FROM schema_migrations WHERE version IN ('V5__chat_history','V6__admin_panel')"

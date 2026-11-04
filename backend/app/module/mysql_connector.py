@@ -3,15 +3,20 @@
 Alurnya
 1. Saat berkas ini diimpor, pool dibuat. Koneksinya baru dibuka saat pertama kali dipakai
 2. Setiap koneksi MySQL baru diatur ke zona waktu UTC
-3. Modul lain membuka transaksi lewat SessionLocal, sedangkan main.py dan controller health memeriksa kesiapan lewat database_is_ready
-4. main.py menutup pool saat server mati (engine.dispose)
+3. Modul lain menjalankan transaksi lewat jalankan_transaksi: commit bila sukses; error SQL di-rollback lalu menjadi PersistenceError
+4. main.py dan controller health memeriksa kesiapan lewat database_is_ready
+5. main.py menutup pool saat server mati (engine.dispose)
 """
+
+import logging
 
 from sqlalchemy import create_engine, text, event
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
 
 from app.config.settings import settings
+
+logger = logging.getLogger("shadow_heist.database")
 
 # pool_pre_ping dan pool_recycle: koneksi yang sudah diputus MySQL diganti, tidak menggagalkan request.
 engine = create_engine(
@@ -32,6 +37,28 @@ if engine.dialect.name == "mysql":
 
 
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
+
+
+class PersistenceError(RuntimeError):
+    """Transaksi database gagal."""
+
+
+# Jalankan operasi(database) dalam satu transaksi; hanya error SQL menjadi PersistenceError(pesan).
+# Sesi dibuka manual, bukan lewat SessionLocal.begin(): operasi di controller auth memanggil
+# database.rollback() sendiri, dan di dalam blok begin() itu bisa memicu InvalidRequestError.
+def jalankan_transaksi(operasi, pesan="Database sedang tidak tersedia."):
+    database = SessionLocal()
+    try:
+        hasil = operasi(database)
+        database.commit()
+        return hasil
+    except SQLAlchemyError as error:
+        database.rollback()
+        # Parameter SQL tidak dicatat karena bisa memuat isi chat privat.
+        logger.error("Transaksi database gagal (%s).", type(error).__name__)
+        raise PersistenceError(pesan) from error
+    finally:
+        database.close()
 
 
 # HEALTH CHECK: jalankan SELECT 1 tanpa mengubah data; dipakai startup dan controller health.

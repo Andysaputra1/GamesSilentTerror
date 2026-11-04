@@ -66,7 +66,7 @@ def create_session(database: Session, *, user_id: int, token_hash: str, expires_
 
 
 # Cari akun aktif dengan sesi yang cocok dan belum kedaluwarsa.
-def account_for_token(database: Session, token_hash: str, waktu_sekarang: datetime):
+def account_by_token(database: Session, token_hash: str, waktu_sekarang: datetime):
     sql = text("""
         SELECT u.id, u.username, u.display_name, u.skin_id
         FROM user_accounts u JOIN auth_sessions s ON s.user_id = u.id
