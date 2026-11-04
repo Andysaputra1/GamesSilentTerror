@@ -31,8 +31,8 @@ logger = logging.getLogger("shadow_heist")
 
 
 # Mengatur hidup server: yang dijalankan saat server nyala dan saat server mati.
-# Alur: 1 cek MySQL -> 2 muat konfigurasi panel -> 3 muat otak bot di latar -> 4 nyalakan jam
-# -> 5 layani pemain -> 6 saat mati: hentikan jam, bot, thread otak, lalu koneksi MySQL
+# Alur 1 (server nyala): 1 cek MySQL -> 2 muat konfigurasi panel -> 3 muat otak bot di latar -> 4 nyalakan jam
+# Alur 2 (server mati): 1 hentikan jam -> 2 batalkan giliran bot -> 3 tutup thread otak -> 4 tutup koneksi MySQL
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     """Validate connectivity without changing schema."""
