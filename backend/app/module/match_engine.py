@@ -129,6 +129,11 @@ def snapshot_berlabel(snapshot, labels):
     saya["syndicate_hostages"] = [
         {**data, "name": ke_label(data["name"])} for data in saya["syndicate_hostages"]
     ]
+    saya["ally_gags"] = [ke_label(nama) for nama in saya["ally_gags"]]
+    saya["team_messages"] = [
+        {**pesan, "sender": ke_label(pesan["sender"])} for pesan in saya["team_messages"]
+    ]
+    saya["team_humans"] = [ke_label(nama) for nama in saya["team_humans"]]
     return salinan
 
 
@@ -775,14 +780,16 @@ class Match:
         self.events = self.events[-40:]
 
     # PESAN PUBLIK: hanya dipanggil setelah pemeriksaan can_chat; ID mencegah duplikasi saat reconnect.
-    def add_message(self, sender, message):
-        # ID diawali nomor urut: otak bot mengurutkan chat dengan waktu terima lalu ID, jadi chat yang
-        # terbaca dalam satu langkah tetap kronologis (UUID murni membuat urutannya acak).
+    # now hanya diisi simulasi yang memakai jam buatan.
+    def add_message(self, sender, message, now=None):
+        # ID diawali nomor urut: otak bot mengurutkan chat dengan waktu lalu ID, jadi chat dengan
+        # waktu yang sama tetap kronologis (UUID murni membuat urutannya acak).
         self.jumlah_pesan += 1
         pesan = {
             "id": f"{self.jumlah_pesan:06d}{uuid4().hex[:10]}",
             "sender": sender,
             "message": message,
+            "time": time.time() if now is None else now,
         }
         self.messages.append(pesan)
         self.messages = self.messages[-100:]
@@ -969,6 +976,16 @@ class Match:
                 "can_team_chat": boleh_chat_tim,
                 "team_messages": (
                     list(self.team_messages[self.team_channel(viewer)]) if boleh_chat_tim else []
+                ),
+                # Rekan setim yang manusia, hanya untuk penonton bot: pemain manusia tidak boleh tahu siapa bot.
+                "team_humans": (
+                    [
+                        nama
+                        for nama in self.allies(viewer) + self.spy_allies(viewer)
+                        if not self.players[nama].bot
+                    ]
+                    if pemain.bot
+                    else []
                 ),
                 "last_guard": (
                     pemain.last_guard if pemain.last_guard_round == self.round - 1 else None

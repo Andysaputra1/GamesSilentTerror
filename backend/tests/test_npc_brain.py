@@ -118,8 +118,8 @@ class BrainRuntimeTests(unittest.TestCase):
         match.deadline = 10.0 + match.durations["tribunal"]
         match.votes = {"human": "NOX"}
         for i in range(14):
-            match.add_message("ECHO", f"Obrolan ke-{i}.")
-        match.add_message("human", "Aku curiga NOX, vote NOX.")
+            match.add_message("ECHO", f"Obrolan ke-{i}.", now=5.0)
+        match.add_message("human", "Aku curiga NOX, vote NOX.", now=9.0)
         otak = self.runtime.otak_bot(match.id, "NOX")
         _, _, konteks = self.runtime.langkah(otak, match.snapshot("NOX"), 10.0)
         self.assertEqual(len(konteks["chat_terbaru"]), 12)
@@ -168,7 +168,7 @@ class BrainRuntimeTests(unittest.TestCase):
                             tulisan = self.runtime.tulis(otak, hasil["nlg"], konteks)
                             if not match.can_chat(bot):
                                 raise ValueError("chat tanpa izin")
-                            match.add_message(bot, tulisan["teks"])
+                            match.add_message(bot, tulisan["teks"], now=waktu)
                             self.runtime.catat_chat(
                                 otak, view, hasil["rencana_chat"], tulisan["teks"]
                             )
@@ -176,9 +176,9 @@ class BrainRuntimeTests(unittest.TestCase):
                             catatan["langgar"] += bool(tulisan["pelanggaran"])
                         if npc["action"] == "vote":
                             match.vote(bot, npc["target"])
+                            self.runtime.catat_vote(otak, view, hasil["rencana_vote"])
                         elif npc["action"] in AKSI_RAHASIA:
                             match.act(bot, npc["action"], npc["target"])
-                            self.runtime.catat_aksi(otak, ronde, npc["action"], npc["target"])
                     except ValueError:
                         catatan["ilegal"] += 1
             t += durasi
@@ -303,14 +303,45 @@ class NPCServiceBrainTests(unittest.IsolatedAsyncioTestCase):
         await self.service.prepare(self.room.code, self.match)
         self.match.begin()
         otak = self.runtime.otak_bot(self.match.id, "NOX")
-        npc = {"action": "vote", "target": "human", "message": ""}
+        keputusan = {
+            "npc_decision": {"action": "vote", "target": "human", "message": ""},
+            "rencana_vote": {"aksi": "vote", "target": "human", "alasan": [], "skor": None},
+        }
         self.match.phase = "tribunal"
         stale_key = (self.match.id, self.match.round, "day")
         berlaku, penolakan = self.service._kirim_vote_atau_aksi(
-            self.room.code, self.match, stale_key, otak, npc
+            self.room.code, self.match, stale_key, otak, {"ronde": self.match.round}, keputusan
         )
         self.assertEqual((berlaku, penolakan), (False, None))
         self.assertEqual(self.match.votes, {})
+        self.assertEqual(otak.ingatan.vote_bot, [])
+
+    # Hanya vote yang diterima engine yang masuk ingatan; vote yang ditolak tidak meninggalkan catatan.
+    async def test_only_accepted_vote_is_recorded_in_bot_memory(self):
+        await self.service.prepare(self.room.code, self.match)
+        self.match.begin()
+        self.match.round, self.match.phase = 2, "tribunal"
+        self.match.deadline = time.time() + 60
+        otak = self.runtime.otak_bot(self.match.id, "NOX")
+        fase, view = (self.match.id, 2, "tribunal"), {"ronde": 2}
+        keputusan = {
+            "npc_decision": {"action": "vote", "target": "human", "message": ""},
+            "rencana_vote": {"aksi": "vote", "target": "human", "alasan": ["Dia aneh."]},
+        }
+        hasil = self.service._kirim_vote_atau_aksi(
+            self.room.code, self.match, fase, otak, view, keputusan
+        )
+        self.assertEqual(hasil, (True, None))
+        catatan = [{"ronde": 2, "target": "human", "alasan": ["Dia aneh."], "dinilai_ulang": False}]
+        self.assertEqual(otak.ingatan.vote_bot, catatan)
+        keputusan["npc_decision"]["target"] = "ECHO"  # suara sudah terkunci: engine menolak
+        keputusan["rencana_vote"]["target"] = "ECHO"
+        berlaku, penolakan = self.service._kirim_vote_atau_aksi(
+            self.room.code, self.match, fase, otak, view, keputusan
+        )
+        self.assertTrue(berlaku)
+        self.assertIsNotNone(penolakan)
+        self.assertEqual(otak.ingatan.vote_bot, catatan)
 
     async def test_floor_lets_bots_write_in_parallel_without_twin_or_stale_plans(self):
         await self.service.prepare(self.room.code, self.match)
@@ -442,6 +473,12 @@ class HostageResultTests(unittest.TestCase):
         tahu = M.pengetahuan_peran(ingatan, view)
         self.assertEqual(tahu["korban_saya"], {"civilian2"})
         self.assertEqual(tahu["dijaga"], {"civilian": 1})
+        # Tanpa catatan server tidak ada kesimpulan dari pengumuman roster.
+        snapshot = game.snapshot("hitman")
+        snapshot["me"]["syndicate_hostages"] = []
+        ingatan = M.Ingatan("hitman")
+        tahu = M.pengetahuan_peran(ingatan, ingatan.sinkron_snapshot(snapshot, time.time()))
+        self.assertEqual((tahu["korban_saya"], tahu["dijaga"]), (set(), {}))
 
 
 class ExportFreshnessTests(unittest.TestCase):

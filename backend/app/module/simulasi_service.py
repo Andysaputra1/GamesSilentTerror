@@ -82,14 +82,14 @@ class Simulasi:
         )  # fmt: skip
 
     # Satu langkah bot persis seperti NPCService.brain_turn: keputusan → vote/aksi ke engine → kalimat.
-    async def _langkah(self, otak):
+    async def _langkah(self, otak, jam):
         m, loop, mulai = self.match, asyncio.get_running_loop(), time.perf_counter()
         lapor = self._lapor(m.labels[otak.nama])
         otak.langkah += 1
         snapshot = snapshot_berlabel(m.snapshot(otak.nama), m.labels)
         view, hasil, konteks = await asyncio.wait_for(
             loop.run_in_executor(brain_runtime.eksekutor_keputusan, brain_runtime.langkah, otak,
-                                 snapshot, self.jam, True, lapor),
+                                 snapshot, jam, True, lapor),
             timeout=BATAS_LANGKAH_DETIK,
         )  # fmt: skip
         npc, rencana = hasil["npc_decision"], hasil["rencana_chat"]
@@ -99,16 +99,16 @@ class Simulasi:
         try:
             if npc["action"] == "vote":
                 m.vote(otak.nama, m.username(npc["target"]))
+                brain_runtime.catat_vote(otak, view, hasil["rencana_vote"])
             elif npc["action"] in AKSI_RAHASIA:
                 m.act(otak.nama, npc["action"], m.username(npc["target"]))
-                brain_runtime.catat_aksi(otak, m.round, npc["action"], npc["target"])
         except ValueError as error:
             penolakan = str(error)
         if hasil["nlg"] is not None:
             tulisan = await tulis_kalimat(brain_runtime, otak, hasil["nlg"], konteks, lapor)
             if tulisan["teks"] and m.can_chat(otak.nama):
                 lapor("kirim")
-                m.add_message(otak.nama, tulisan["teks"])
+                m.add_message(otak.nama, tulisan["teks"], now=jam)
                 brain_runtime.catat_chat(otak, view, rencana, tulisan["teks"])
                 nlu = await self._baca(otak.nama, tulisan["teks"])
             else:
@@ -129,9 +129,12 @@ class Simulasi:
         for nama in sorted(self.otak):
             if m.players[nama].alive:
                 self._lapor(nama)("menunggu")
-        for nama in sorted(self.otak):
+        for urutan, nama in enumerate(sorted(self.otak)):
             if not m.winner and m.players[nama].alive:
-                jejak += [await self._langkah(self.otak[nama]), *self._sistem()]
+                # Jam maju sedikit tiap bot, seperti jam server. Dengan jam yang persis sama, chat bot lain pada
+                # putaran ini tidak terbaca sebagai chat baru.
+                jam_bot = self.jam + urutan * 1e-6
+                jejak += [await self._langkah(self.otak[nama], jam_bot), *self._sistem()]
         return jejak
 
     async def kirim(self, teks, detik):
@@ -140,7 +143,7 @@ class Simulasi:
             raise ValueError(
                 "Kamu tidak bisa chat sekarang (malam, dibungkam, atau permainan selesai)."
             )
-        m.add_message(PEMAIN, teks)
+        m.add_message(PEMAIN, teks, now=self.jam)
         trace = {**jejak_baru(KODE, m.labels[PEMAIN], teks), "stage": "delivered", "manusia": True}
         lapor = self._lapor(m.labels[PEMAIN])
         lapor("nlu_pesan")

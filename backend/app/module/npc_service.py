@@ -10,7 +10,7 @@ Alurnya
 5. brain_turn (satu langkah satu bot):
    5.1 Lihat: Ambil snapshot permainan milik bot
    5.2 Pikir: IndoBERT membaca chat baru, fuzzy memutuskan (runtime.langkah)
-   5.3 Aksi: Kirim vote atau aksi rahasia ke game
+   5.3 Aksi: Kirim vote atau aksi rahasia ke game, lalu vote yang diterima masuk ingatan bot
    5.4 Tulis chat: Minta giliran bicara, tulis kalimat (NLG), jeda mengetik, simpan chat
    5.5 Kirim: Siarkan chat ke room
    5.6 Catat: Simpan jejak untuk panel checker, IndoBERT membaca kalimat bot
@@ -246,7 +246,8 @@ class NPCService:
         )
 
     # Vote/aksi rahasia diterapkan segera. Hasil: (masih berlaku, pesan penolakan engine atau None).
-    def _kirim_vote_atau_aksi(self, code, match, fase, otak, keputusan_aksi):
+    def _kirim_vote_atau_aksi(self, code, match, fase, otak, view, keputusan):
+        keputusan_aksi = keputusan["npc_decision"]
         with room_service.lock:
             if not self._berlaku(code, match, fase):
                 return False, None
@@ -257,14 +258,12 @@ class NPCService:
             try:
                 if keputusan_aksi["action"] == "vote":
                     match.vote(otak.nama, match.username(keputusan_aksi["target"]))
+                    self.runtime.catat_vote(otak, view, keputusan["rencana_vote"])
                 elif keputusan_aksi["action"] in AKSI_RAHASIA:
                     match.act(
                         otak.nama,
                         keputusan_aksi["action"],
                         match.username(keputusan_aksi["target"]),
-                    )
-                    self.runtime.catat_aksi(
-                        otak, match.round, keputusan_aksi["action"], keputusan_aksi["target"]
                     )
             except ValueError as error:
                 return True, str(error)
@@ -336,7 +335,7 @@ class NPCService:
 
             # OUTPUT 1: vote dan aksi rahasia langsung ke game, tidak menunggu kalimat selesai diketik
             masih_berlaku, penolakan = self._kirim_vote_atau_aksi(
-                code, match, fase, otak, keputusan_aksi
+                code, match, fase, otak, view, keputusan
             )
             if not masih_berlaku:
                 return  # fase berganti selama bot berpikir: keputusan basi dibuang

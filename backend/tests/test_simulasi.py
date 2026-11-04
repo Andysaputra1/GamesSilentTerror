@@ -49,6 +49,16 @@ class SimulasiTests(unittest.TestCase):
         self.assertEqual(set(progres["progres"]), {"Andy Saputra", "NOX", "ECHO", "VEIL"})
         self.assertEqual({p["tahap"] for p in progres["progres"].values()}, {"selesai"})
 
+    # Waktu chat memakai jam simulasi; tiap bot melangkah sedikit lebih akhir dari bot sebelumnya.
+    def test_waktu_chat_memakai_jam_simulasi_yang_maju_tiap_bot(self):
+        asyncio.run(self.layanan.jalankan(self.awal["id"], "kirim", "aku curiga NOX itu hitman", 3))
+        pesan = self.layanan.simulasi[self.awal["id"]].match.messages
+        self.assertEqual(pesan[0]["time"], 2.0)  # chat admin sebelum putaran bot
+        waktu_bot = [p["time"] for p in pesan[1:]]
+        self.assertTrue(waktu_bot, "bot harus berbicara")
+        self.assertTrue(all(5.0 <= w < 5.001 for w in waktu_bot), waktu_bot)
+        self.assertEqual(len(set(waktu_bot)), len(waktu_bot))
+
     def test_fase_berikutnya_diselesaikan_engine_lalu_bot_melangkah_di_fase_baru(self):
         hasil = asyncio.run(self.layanan.jalankan(self.awal["id"], "fase"))
         self.assertEqual(hasil["fase"], "night")

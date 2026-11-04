@@ -7,7 +7,7 @@ Alurnya
 3. Awal pertandingan (siapkan_pertandingan): Buat persona dan ingatan tiap bot
 4. Tiap langkah bot (langkah, thread keputusan): IndoBERT membaca chat baru, fuzzy memutuskan, penjelasan dibuat untuk panel
 5. Bot mau chat (tulis, thread penulis): Rencana jadi kalimat lewat LLM atau templat, lalu diperiksa aturan
-6. Chat atau aksi sudah terjadi (catat_chat, catat_aksi): Masuk ingatan bot
+6. Chat atau vote sudah terjadi (catat_chat, catat_vote): Masuk ingatan bot
 7. Chat baru masuk (baca_chat): IndoBERT membaca sekali dan hasilnya masuk memo, jadi bot tidak menghitung ulang
 
 Catatan
@@ -607,8 +607,9 @@ class BrainRuntime:
         bot.ingatan.catat_aksi_bot(view, rencana)
         bot.riwayat.append(teks)
 
-    def catat_aksi(self, bot: OtakBot, ronde, aksi, target):
-        bot.ingatan.catat_aksi_rahasia(ronde, aksi, target)
+    # Dipanggil setelah vote diterima engine.
+    def catat_vote(self, bot: OtakBot, view, rencana):
+        bot.ingatan.catat_vote_bot(view, rencana)
 
     def tutup(self):
         self.eksekutor_keputusan.shutdown(wait=False, cancel_futures=True)

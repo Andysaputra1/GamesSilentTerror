@@ -55,8 +55,10 @@ def satu_game(argumen):
         # Dari deadline, bukan durasi tetap: suara seri menambah waktu Tribunal yang lebih pendek dari satu fase.
         ronde, fase, durasi = match.round, match.phase, match.deadline - t
         for k in range(1, langkah + 1):
-            waktu = t + durasi * k / (langkah + 1)
-            for n in sorted(otak):
+            for urutan, n in enumerate(sorted(otak)):
+                # Jam maju sedikit tiap bot, seperti jam server. Dengan jam yang persis sama, chat bot lain pada
+                # langkah ini tidak terbaca sebagai chat baru.
+                waktu = t + durasi * k / (langkah + 1) + urutan * 1e-6
                 if not match.players[n].alive or match.phase == "finished":
                     continue
                 ingatan = otak[n]
@@ -71,17 +73,17 @@ def satu_game(argumen):
                     if rc["kirim"]:
                         if not match.can_chat(n):
                             raise ValueError("chat tanpa izin")
-                        rekaman = match.add_message(n, npc["message"])
+                        rekaman = match.add_message(n, npc["message"], now=waktu)
                         label[rekaman["id"]] = label_rencana(rc)
                         ingatan.catat_aksi_bot(view, rc)
                     if npc["action"] == "vote":
                         match.vote(n, npc["target"])
+                        ingatan.catat_vote_bot(view, hasil["rencana_vote"])
                         if match.players[n].role != "hitman":
                             suara_warga += 1
                             suara_tepat += match.players[npc["target"]].role == "hitman"
                     elif npc["action"] in modul.AKSI_RAHASIA:
                         match.act(n, npc["action"], npc["target"])
-                        ingatan.catat_aksi_rahasia(ronde, npc["action"], npc["target"])
                 except ValueError:
                     ilegal += 1
         for n in otak:

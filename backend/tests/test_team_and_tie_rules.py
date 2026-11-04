@@ -204,6 +204,26 @@ class BrainExtraTimeTests(unittest.TestCase):
             if nama in ("spy", "hitman"):
                 self.assertNotEqual(aksi, "vote", nama)
 
+    # Bot yang pertama melangkah saat waktu tambahan tetap mencatat awal Tribunal yang sebenarnya.
+    def test_first_step_in_extra_time_keeps_the_real_phase_start(self):
+        for cepat in (False, True):
+            game = pertandingan([], ENAM, now=0.0, quick=cepat)
+            game.round, game.phase, game.deadline = 2, "tribunal", 500.0
+            mulai = game.deadline - game.durations["tribunal"]
+            game.vote("spy", "hitman")
+            game.vote("hitman", "spy")
+            game.npc_decisions = {(2, "tribunal", nama) for nama in ENAM}
+            game.tick(game.deadline)
+            self.assertTrue(game.tribunal_extra)
+            ingatan = otak_fuzzy.Ingatan("stalker", cepat=cepat)
+            view = ingatan.sinkron_snapshot(game.snapshot("stalker"), game.deadline - 1)
+            self.assertEqual(ingatan.mulai_fase[(2, "tribunal")], mulai)
+            self.assertTrue(view["tribunal_tambahan"])
+
+    def test_extra_time_in_brain_matches_engine(self):
+        self.assertEqual(otak_fuzzy.TAMBAHAN_TRIBUNAL, TRIBUNAL_EXTRA_SECONDS)
+        self.assertEqual(otak_fuzzy.TAMBAHAN_TRIBUNAL_CEPAT, TRIBUNAL_EXTRA_QUICK_SECONDS)
+
 
 class SchedulerExtraTimeTests(unittest.IsolatedAsyncioTestCase):
     # Jadwal bot membaca lama fase dari deadline: waktu tambahan tidak boleh membuat bot menunggu
@@ -324,6 +344,24 @@ class SpyAlliesTests(unittest.TestCase):
         # Snapshot asli tetap memakai username.
         self.assertEqual(game.snapshot("spy2")["me"]["spy_allies"], ["spy"])
 
+    def test_bot_snapshot_translates_team_data_to_labels(self):
+        labels = {name: f"Nama {name}" for name in DELAPAN}
+        game = pertandingan(["hitman"], [n for n in DELAPAN if n != "hitman"], now=0, labels=labels)
+        game.act("hitman2", "gag", "civilian")
+        game.phase = "night"
+        pesan = {"id": "t1", "sender": "hitman", "message": RAHASIA_HITMAN}
+        game.team_messages["hitman"].append(pesan)
+        snapshot = game.snapshot("hitman2")
+        # Bot belum menerima pesan tim dari engine (Fase 7), jadi bentuknya ditiru di sini.
+        snapshot["me"]["team_messages"] = [pesan]
+        me = snapshot_berlabel(snapshot, game.labels)["me"]
+        self.assertEqual(me["ally_gags"], ["Nama civilian"])
+        self.assertEqual(me["team_messages"][0]["sender"], "Nama hitman")
+        self.assertEqual(me["team_humans"], ["Nama hitman"])
+        # Salinan: snapshot asli tetap memakai username.
+        self.assertEqual(snapshot["me"]["ally_gags"], ["civilian"])
+        self.assertEqual(pesan["sender"], "hitman")
+
 
 class TeamChatTests(unittest.TestCase):
     def setUp(self):
@@ -437,6 +475,31 @@ class TeamChatTests(unittest.TestCase):
             pesan = self.game.snapshot(viewer)["me"]["team_messages"]
             self.assertEqual(len(pesan), TEAM_CHAT_LIMIT)
             self.assertEqual(pesan[-1]["message"], f"pesan {TEAM_CHAT_LIMIT + 4}")
+
+    # Chat tim hanya ada di view bot: di ingatan.chat ia akan terbaca sebagai bukti publik.
+    def test_team_messages_stay_out_of_bot_chat_memory(self):
+        self.game.add_team_message("hitman2", RAHASIA_HITMAN)
+        ingatan = otak_fuzzy.Ingatan("hitman")
+        view = ingatan.sinkron_snapshot(self.game.snapshot("hitman"), 1.0)
+        self.assertEqual(ingatan.chat, [])
+        self.assertEqual(view["saya"]["chat_tim"][0]["pengirim"], "hitman2")
+        self.assertEqual(view["saya"]["chat_tim"][0]["teks"], RAHASIA_HITMAN)
+        self.assertEqual(ingatan._chat_tim["jumlah"], 1)
+        self.assertNotIn(RAHASIA_HITMAN, json.dumps(ingatan._chat_tim))
+
+    # Rekan manusia hanya diberitahukan ke bot: pemain manusia tidak boleh tahu siapa bot.
+    def test_team_humans_are_told_only_to_bots(self):
+        manusia = ["hitman", "spy", "civilian"]
+        game = pertandingan(manusia, [n for n in DELAPAN if n not in manusia], now=0)
+        self.assertEqual(game.snapshot("hitman2")["me"]["team_humans"], ["hitman"])
+        self.assertEqual(game.snapshot("spy2")["me"]["team_humans"], ["spy"])
+        for bot in ("stalker", "civilian2", "civilian3"):
+            self.assertEqual(game.snapshot(bot)["me"]["team_humans"], [])
+        for orang in manusia:
+            self.assertEqual(game.snapshot(orang)["me"]["team_humans"], [])
+        # Sesama bot tidak masuk daftar.
+        semua_bot = pertandingan([], DELAPAN, now=0)
+        self.assertEqual(semua_bot.snapshot("hitman")["me"]["team_humans"], [])
 
     # Bot belum membaca chat tim: snapshot, ingatan, dan prompt LLM mode pembanding bersih.
     def test_bots_on_the_team_do_not_receive_team_messages(self):

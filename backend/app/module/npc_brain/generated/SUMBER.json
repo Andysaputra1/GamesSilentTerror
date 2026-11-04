@@ -3,14 +3,14 @@
     "modul": "otak_fuzzy",
     "notebook": "npc_fuzzy.ipynb",
     "sel": 20,
-    "blok": 128,
-    "sidik": "fdab664267f31375"
+    "blok": 130,
+    "sidik": "eb3ea97d383aa1bc"
   },
   {
     "modul": "nlg",
     "notebook": "npc_nlg.ipynb",
     "sel": 10,
     "blok": 78,
-    "sidik": "e62999d39c50fb0c"
+    "sidik": "452c8237a12c8604"
   }
 ]

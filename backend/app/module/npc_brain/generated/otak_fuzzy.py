@@ -1,8 +1,8 @@
 """FILE INI DIHASILKAN OTOMATIS oleh scripts/ekspor_otak_npc.py. JANGAN DIEDIT MANUAL.
 
 Sumber : npc_fuzzy.ipynb
-Sidik  : fdab664267f31375
-Dibuat : 2026-11-04 04:41 UTC
+Sidik  : eb3ea97d383aa1bc
+Dibuat : 2026-11-04 04:59 UTC
 
 Perubahan logika bot dilakukan di notebook skripsi, dijalankan ulang sampai semua
 skenario/pengujian lulus, lalu diekspor ulang dengan skrip ini.
@@ -86,6 +86,10 @@ BATAS_TERSANGKA_JAGA = 0.60
 
 URUTAN_FASE = {"day": 0, "tribunal": 1, "night": 2}
 
+TAMBAHAN_TRIBUNAL = 30
+
+TAMBAHAN_TRIBUNAL_CEPAT = 10
+
 # Fase sesudah (ronde, fase) menurut engine: siang ronde 1 langsung malam; malam → siang ronde berikutnya.
 def fase_berikut(ronde, fase):
     if fase == "day":
@@ -165,7 +169,7 @@ def pemain_disebut(teks, daftar_pemain, pengirim, common_words):
 # Masukan : nlu = NLUIndoBERT (atau pembungkus dengan intent/target yang sama); chat = {id, ronde, fase, waktu,
 #           pengirim, teks}; riwayat = chat sebelumnya yang sudah beranotasi (12 terakhir menjadi konteks Model 2);
 #           daftar_pemain = roster.
-# Keluaran: chat yang sama + intent, conf_intent (0–1), target [{pemain, relasi, prob, sumber}], dan sumber_nlu.
+# Keluaran: chat yang sama + intent, conf_intent (0–1), dan target [{pemain, relasi, prob, sumber}].
 #           sumber = ["indobert"], ["nama"], atau keduanya. Hanya relasi offend/defend yang menjadi bukti (relasi_chat);
 #           target neutral menandai pemain yang diajak bicara (konteks "penanya").
 # Dipakai oleh: Ingatan.sinkron_snapshot (setiap chat baru).
@@ -185,7 +189,7 @@ def anotasi_chat(nlu, chat, riwayat, daftar_pemain):
                 target.append({"pemain": nama, "relasi": "neutral", "prob": None, "sumber": ["nama"]})
             else:
                 sama["sumber"].append("nama")
-    return {**chat, "intent": intent, "conf_intent": confidence, "target": target, "sumber_nlu": "indobert"}
+    return {**chat, "intent": intent, "conf_intent": confidence, "target": target}
 
 # Pilihan terbanyak; seri dimenangkan pilihan yang paling awal (aturan Hostage Syndicate di engine).
 def pilihan_terbanyak(pilihan):
@@ -203,7 +207,7 @@ class Ingatan:
     """Memori pengamatan milik satu bot, untuk role apa pun.
 
     Dibuat sekali per bot per pertandingan: Ingatan(nama_bot, cepat=...). Diisi sinkron_snapshot setiap langkah, serta
-    catat_aksi_bot/catat_aksi_rahasia setelah game menerima tindakan bot; dibaca semua tahap putuskan.
+    catat_aksi_bot/catat_vote_bot setelah game menerima tindakan bot; dibaca semua tahap putuskan.
     """
 
     nama_bot: str
@@ -216,8 +220,7 @@ class Ingatan:
     keluar: list = field(default_factory=list)
     mulai_fase: dict = field(default_factory=dict)
     aksi_bot: list = field(default_factory=list)
-    aksi_rahasia: list = field(default_factory=list)
-    pilihan_syndicate: dict = field(default_factory=dict)
+    vote_bot: list = field(default_factory=list)
     gag_bot: set = field(default_factory=set)
     intel: list = field(default_factory=list)
     # Status internal pencatatan: chat yang sudah dicatat, vote terkunci, Tribunal berjalan, roster dan Hitman terakhir.
@@ -227,6 +230,8 @@ class Ingatan:
     _suara_berjalan: dict = field(default_factory=dict)
     _hidup_terakhir: set | None = None
     _hitman_tersisa: int | None = None
+    # Chat tim: hitungan dan id terakhir saja, supaya isinya tidak pernah tersimpan di ingatan.
+    _chat_tim: dict = field(default_factory=lambda: {"jumlah": 0, "id_terakhir": None})
 
     # Chat dengan id sama hanya dicatat sekali (polling atau reconnect bisa mengirim ulang).
     def catat_chat(self, chat):
@@ -256,46 +261,25 @@ class Ingatan:
         self.aksi_bot.append({
             "ronde": view["ronde"], "fase": view["fase"], "waktu": view["waktu"],
             "aksi": rencana["aksi"], "intent": rencana["intent"], "target": rencana["target"],
+            "alasan": list(rencana["alasan"]), "jenis": rencana.get("jenis"), "pemicu": rencana.get("pemicu"),
+            "role_diakui": rencana.get("role_diakui"),
         })
 
-    # Aksi rahasia milik bot (hostage/guard/peek/gag); hanya bot sendiri yang tahu. Satu catatan per (ronde, aksi):
-    # bila engine membuang aksi malam karena targetnya keluar lalu bot memilih ulang, target baru menggantikan target
-    # lama.
-    def catat_aksi_rahasia(self, ronde, aksi, target):
-        lama = next((a for a in self.aksi_rahasia if (a["ronde"], a["aksi"]) == (ronde, aksi)), None)
+    # Dipanggil game setelah vote bot diterima engine. Satu catatan per ronde: suara yang pindah mengganti catatan lama.
+    def catat_vote_bot(self, view, rencana):
+        catatan = {"ronde": view["ronde"], "target": rencana["target"], "alasan": list(rencana["alasan"]),
+                   "dinilai_ulang": False}
+        lama = next((v for v in self.vote_bot if v["ronde"] == view["ronde"]), None)
         if lama is None:
-            self.aksi_rahasia.append({"ronde": ronde, "aksi": aksi, "target": target})
+            self.vote_bot.append(catatan)
         else:
-            lama["target"] = target
-        if aksi == "hostage":
-            self.catat_pilihan_syndicate(ronde, self.nama_bot, target)
-
-    # Pilihan Hostage Syndicate (bot sendiri atau rekan), satu per Hitman per malam, urut seperti engine: pilihan baru
-    # di belakang; pilihan ulang seorang Hitman (target lama keluar) pindah ke belakang dengan target baru.
-    def catat_pilihan_syndicate(self, ronde, pemain, target):
-        pilihan = self.pilihan_syndicate.setdefault(ronde, [])
-        if (pemain, target) not in pilihan:
-            pilihan[:] = [(p, t) for p, t in pilihan if p != pemain] + [(pemain, target)]
-
-    # Malam berjalan: pilihan Hostage Syndicate disamakan dengan aksi yang masih ada di engine (snapshot privat).
-    # Pilihan yang sama tetap di urutannya, pilihan baru atau ulang masuk di belakang, dan pilihan yang dibuang engine
-    # (targetnya keluar) tanpa pengganti dihapus.
-    def sinkron_pilihan_syndicate(self, ronde, sekarang):
-        tetap = [x for x in self.pilihan_syndicate.get(ronde, []) if x in sekarang]
-        pilihan = tetap + [x for x in sekarang if x not in tetap]
-        if pilihan:
-            self.pilihan_syndicate[ronde] = pilihan
-        else:
-            self.pilihan_syndicate.pop(ronde, None)
-
-    # Target Hostage Syndicate pada malam tertentu (None jika belum ada pilihan).
-    def target_syndicate(self, ronde):
-        return pilihan_terbanyak([t for _, t in self.pilihan_syndicate.get(ronde, [])])
+            lama.update(catatan, dinilai_ulang=True)
 
     # Ingatan: mengubah snapshot backend menjadi view keputusan sambil mencatat pengamatan baru.
     # Masukan : snapshot = Match.snapshot(nama_bot) {round, phase, deadline, players, messages, tribunal_votes, me};
     #           waktu_terima = detik saat snapshot diterima; nlu = NLUIndoBERT (None: chat disimpan tanpa anotasi).
-    # Keluaran: view = {ronde, fase, waktu, deadline, durasi, pemain, suara_tribunal, komposisi, hitman_tersisa, saya};
+    # Keluaran: view = {ronde, fase, waktu, deadline, durasi, pemain, suara_tribunal, komposisi, hitman_tersisa,
+    #           tribunal_tambahan, saya};
     #           pemain = [{nama, hidup, sandera}], sandera = ronde malam korban Hostage (diumumkan server) atau None.
     # Dipakai oleh: game sebelum putuskan(ingatan, view); ingatan yang diperbarui dibaca semua tahap berikutnya.
     def sinkron_snapshot(self, snapshot, waktu_terima, nlu=None):
@@ -311,6 +295,7 @@ class Ingatan:
         if self.jumlah_awal is None:
             self.jumlah_awal = len(pemain)
         durasi = durasi_fase(self.jumlah_awal, self.cepat)
+        tribunal_tambahan = bool(snapshot.get("tribunal_extra"))
 
         # Server mengosongkan vote setelah Tribunal; vote terakhir yang terlihat dikunci saat fase berganti.
         if self._tribunal_berjalan is not None and (ronde, fase) != (self._tribunal_berjalan, "tribunal"):
@@ -349,32 +334,31 @@ class Ingatan:
         self._hidup_terakhir, self._hitman_tersisa = hidup, tersisa
 
         if fase in URUTAN_FASE and (ronde, fase) not in self.mulai_fase:
-            self.mulai_fase[(ronde, fase)] = min(waktu_terima, snapshot["deadline"] - durasi[fase])
+            # Saat waktu tambahan seri, deadline sudah mundur sebanyak tambahan itu.
+            tambahan = 0
+            if tribunal_tambahan:
+                tambahan = TAMBAHAN_TRIBUNAL_CEPAT if self.cepat else TAMBAHAN_TRIBUNAL
+            self.mulai_fase[(ronde, fase)] = min(waktu_terima, snapshot["deadline"] - durasi[fase] - tambahan)
         if me["gagged"]:
             self.gag_bot.add(ronde)
 
-        # Hasil Peek, aksi malam sendiri, dan pilihan Hostage rekan hanya ada di snapshot privat bot.
+        # Hasil Peek dan pilihan Hostage rekan hanya ada di snapshot privat bot.
         self.intel = [{"ronde": x["round"], "pemain": x["name"], "peran": x["role"]} for x in me.get("intel", [])]
         aksi_rekan = [{"pemain": a["name"], "target": a["target"]} for a in me.get("ally_actions", [])]
-        if fase == "night":
-            aksi = me.get("action")
-            if aksi:
-                self.catat_aksi_rahasia(ronde, aksi["ability"], aksi["target"])
-            elif me.get("ability"):
-                # Aksi malam bot dibuang engine (targetnya keluar) dan belum dipilih ulang: tidak lagi dicatat.
-                self.aksi_rahasia = [a for a in self.aksi_rahasia if (a["ronde"], a["aksi"]) != (ronde, me["ability"])]
-            if self.peran == "hitman":
-                milik_bot = [(self.nama_bot, aksi["target"])] if aksi and aksi["ability"] == "hostage" else []
-                self.sinkron_pilihan_syndicate(ronde, milik_bot + [(a["pemain"], a["target"]) for a in aksi_rekan])
 
-        # Server tidak mengirim waktu chat; bot memakai waktu terima dan fase saat itu. Chat yang baru terlihat saat
-        # malam/selesai dikirim di akhir fase publik sebelumnya: siang di ronde 1, Tribunal di ronde berikutnya.
+        # Chat tim hanya masuk view: di ingatan.chat ia akan terbaca sebagai bukti publik.
+        chat_tim = [{"id": m["id"], "pengirim": m["sender"], "teks": m["message"]} for m in me.get("team_messages", [])]
+        if chat_tim:
+            self._chat_tim = {"jumlah": len(chat_tim), "id_terakhir": chat_tim[-1]["id"]}
+
+        # Waktu chat dari server. Fase chat tetap dari snapshot: chat yang baru terlihat saat malam/selesai dikirim di
+        # akhir fase publik sebelumnya, yaitu siang di ronde 1 dan Tribunal di ronde berikutnya.
         daftar_pemain = [p["nama"] for p in pemain]
         fase_chat = fase if fase in ("day", "tribunal") else ("day" if ronde == 1 else "tribunal")
         for pesan in snapshot["messages"]:
             if pesan["id"] in self._id_chat:
                 continue
-            chat = {"id": pesan["id"], "ronde": ronde, "fase": fase_chat, "waktu": waktu_terima,
+            chat = {"id": pesan["id"], "ronde": ronde, "fase": fase_chat, "waktu": pesan.get("time", waktu_terima),
                     "pengirim": pesan["sender"], "teks": pesan["message"]}
             if nlu is not None:
                 chat = anotasi_chat(nlu, chat, self.chat, daftar_pemain)
@@ -383,13 +367,15 @@ class Ingatan:
         return {
             "ronde": ronde, "fase": fase, "waktu": waktu_terima, "deadline": snapshot["deadline"],
             "durasi": durasi, "pemain": pemain, "suara_tribunal": suara, "komposisi": snapshot.get("composition"),
-            "hitman_tersisa": tersisa,
-            "saya": {"nama": me["name"], "role": me["role"], "hidup": me["alive"], "hostage": me["hostage"],
-                     "gagged": me["gagged"], "can_chat": me["can_chat"], "can_vote": me["can_vote"],
-                     "vote": me["vote"], "ability": me.get("ability"), "can_act": bool(me.get("can_act")),
-                     "next_gag": me.get("next_gag", 1), "next_peek": me.get("next_peek", 1),
-                     "last_guard": me.get("last_guard"), "action": me.get("action"),
-                     "rekan": list(me.get("allies", [])), "aksi_rekan": aksi_rekan,
+            "hitman_tersisa": tersisa, "tribunal_tambahan": tribunal_tambahan,
+            "saya": {"nama": me["name"], "role": me["role"], "can_chat": me["can_chat"], "can_vote": me["can_vote"],
+                     "can_cancel_vote": bool(me.get("can_cancel_vote")), "ability": me.get("ability"),
+                     "can_act": bool(me.get("can_act")), "can_cancel_action": bool(me.get("can_cancel_action")),
+                     "last_guard": me.get("last_guard"), "rekan": list(me.get("allies", [])), "aksi_rekan": aksi_rekan,
+                     "rekan_spy": list(me.get("spy_allies", [])),
+                     "aksi_rekan_spy": [{"pemain": a["name"], "target": a["target"]} for a in me.get("spy_actions", [])],
+                     "korban_gag_tim": list(me.get("ally_gags", [])), "rekan_manusia": list(me.get("team_humans", [])),
+                     "chat_tim": chat_tim,
                      # Hasil Hostage tim tiap malam dari server (hanya Hitman): berhasil, atau gagal karena Guard.
                      "hasil_sandera": [{"ronde": h["round"], "pemain": h["name"], "berhasil": h["success"]}
                                        for h in me.get("syndicate_hostages", [])]},
@@ -474,7 +460,7 @@ def dugaan_status(ingatan, view, pengamat):
 def _luruh(ronde, R, faktor):
     return faktor ** max(0, R - ronde)
 
-# Chat ingatan dalam urutan kronologis: ronde, fase, waktu terima, lalu id (id dari engine diawali nomor urut).
+# Chat ingatan dalam urutan kronologis: ronde, fase, waktu, lalu id (id dari engine diawali nomor urut).
 def _chat_urut(ingatan):
     return sorted(ingatan.chat, key=lambda c: (c["ronde"], URUTAN_FASE[c["fase"]], c["waktu"], c["id"]))
 
@@ -885,7 +871,7 @@ def _konteks_permainan(ingatan, view, publik, chats, relasi, klaim, p_sandera):
 
 # Pengetahuan pasti: fakta yang hanya diketahui bot dari role-nya sendiri (hasil Peek, rekan, korban Hostage, ...).
 # Hasilnya dibaca terapkan_pengetahuan, fitur Hitman/Spy, kandidat tindakan, serta chat_pasti/vote_pasti lewat ctx.
-# Masukan : ingatan (intel, eksekusi, keluar, pilihan_syndicate, chat/vote), view (role, rekan, hasil_sandera,
+# Masukan : ingatan (intel, eksekusi, keluar), view (role, rekan, hasil_sandera,
 #           komposisi, fase).
 # Keluaran: dict {peran, pasti_hitman, hitman_diketahui, pasti_orang_baik, rekan, korban_saya, dijaga, tidak_dijaga,
 #           gagal_beruntun}.
@@ -919,15 +905,7 @@ def pengetahuan_peran(ingatan, view):
     korban_saya, dijaga, hasil_malam = set(), {}, {}
     if peran == "hitman":
         # Hasil pasti dari server (me.syndicate_hostages): berhasil, atau gagal karena target dijaga Guard.
-        pasti = {h["ronde"]: h for h in view["saya"].get("hasil_sandera", [])}
-        hasil_malam = {n: (h["pemain"], h["berhasil"]) for n, h in pasti.items()}
-        # Tanpa catatan server, malam n yang sudah selesai dibaca dari pengumuman Hostage di roster: target yang
-        # diumumkan disandera malam n berarti berhasil, yang tidak diumumkan berarti dijaga Spy malam itu.
-        sandera = {p["nama"]: p.get("sandera") for p in view["pemain"]}
-        for n in sorted(set(ingatan.pilihan_syndicate) - set(pasti)):
-            if n < R:
-                x = ingatan.target_syndicate(n)
-                hasil_malam[n] = (x, sandera.get(x) == n)
+        hasil_malam = {h["ronde"]: (h["pemain"], h["berhasil"]) for h in view["saya"].get("hasil_sandera", [])}
         for n, (x, berhasil) in sorted(hasil_malam.items()):
             if berhasil:
                 korban_saya.add(x)

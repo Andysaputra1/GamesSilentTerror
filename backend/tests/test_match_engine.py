@@ -1,6 +1,7 @@
 """Aturan game diuji tanpa LLM/DB agar hasil deterministik dan cepat."""
 
 import random
+import time
 import unittest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
@@ -853,6 +854,28 @@ class ChatOrderTests(unittest.TestCase):
             tabel, _ = otak_fuzzy.hitung_bukti(ingatan, view)
             budi = tabel[tabel["pemain"] == "Budi"].iloc[0]
             self.assertEqual(budi["alihkan_tuduhan"], 0.5)  # dituduh lalu menuduh pihak ketiga
+
+
+class ChatTimeTests(unittest.TestCase):
+    # Waktu chat dari server; simulasi berjam buatan mengirim sendiri waktunya.
+    def test_message_records_server_time_or_the_given_clock(self):
+        match = Match(["Andi", "Budi", "Citra", "Dodi"], [])
+        sebelum = time.time()
+        pesan = match.add_message("Andi", "Halo.")
+        self.assertTrue(sebelum <= pesan["time"] <= time.time())
+        self.assertEqual(match.add_message("Budi", "Hai.", now=12.5)["time"], 12.5)
+        self.assertEqual(match.snapshot("Citra")["messages"][1]["time"], 12.5)
+
+    def test_bot_reads_server_time_and_keeps_order_on_equal_times(self):
+        from app.module.npc_brain.generated import otak_fuzzy
+
+        match = Match(["Andi", "Budi", "Citra", "Dodi"], [], now=0.0)
+        match.add_message("Andi", "Halo.", now=5.0)
+        match.add_message("Budi", "Hai.", now=5.0)
+        ingatan = otak_fuzzy.Ingatan("Dodi")
+        ingatan.sinkron_snapshot(match.snapshot("Dodi"), 30.0)
+        self.assertEqual([c["waktu"] for c in ingatan.chat], [5.0, 5.0])
+        self.assertEqual([c["pengirim"] for c in otak_fuzzy._chat_urut(ingatan)], ["Andi", "Budi"])
 
 
 class DisplayNameTests(unittest.TestCase):

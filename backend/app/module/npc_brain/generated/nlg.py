@@ -1,8 +1,8 @@
 """FILE INI DIHASILKAN OTOMATIS oleh scripts/ekspor_otak_npc.py. JANGAN DIEDIT MANUAL.
 
 Sumber : npc_nlg.ipynb
-Sidik  : e62999d39c50fb0c
-Dibuat : 2026-11-04 04:41 UTC
+Sidik  : 452c8237a12c8604
+Dibuat : 2026-11-04 04:59 UTC
 
 Perubahan logika bot dilakukan di notebook skripsi, dijalankan ulang sampai semua
 skenario/pengujian lulus, lalu diekspor ulang dengan skrip ini.
@@ -535,7 +535,7 @@ def pemain_disebut(teks, daftar_pemain, pengirim, common_words):
 # Masukan : nlu = NLUIndoBERT (atau pembungkus dengan intent/target yang sama); chat = {id, ronde, fase, waktu,
 #           pengirim, teks}; riwayat = chat sebelumnya yang sudah beranotasi (12 terakhir menjadi konteks Model 2);
 #           daftar_pemain = roster.
-# Keluaran: chat yang sama + intent, conf_intent (0–1), target [{pemain, relasi, prob, sumber}], dan sumber_nlu.
+# Keluaran: chat yang sama + intent, conf_intent (0–1), dan target [{pemain, relasi, prob, sumber}].
 #           sumber = ["indobert"], ["nama"], atau keduanya. Hanya relasi offend/defend yang menjadi bukti (relasi_chat);
 #           target neutral menandai pemain yang diajak bicara (konteks "penanya").
 # Dipakai oleh: Ingatan.sinkron_snapshot (setiap chat baru).
@@ -555,7 +555,7 @@ def anotasi_chat(nlu, chat, riwayat, daftar_pemain):
                 target.append({"pemain": nama, "relasi": "neutral", "prob": None, "sumber": ["nama"]})
             else:
                 sama["sumber"].append("nama")
-    return {**chat, "intent": intent, "conf_intent": confidence, "target": target, "sumber_nlu": "indobert"}
+    return {**chat, "intent": intent, "conf_intent": confidence, "target": target}
 
 JALUR_PENULIS = ("openrouter", "tautan")
 

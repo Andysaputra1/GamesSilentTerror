@@ -37,20 +37,19 @@ def kumpulkan(runtime, seed=3, jumlah=6, ronde_maks=3):
                 otak = runtime.otak_bot(match.id, bot)
                 if not match.players[bot].alive or match.winner:
                     continue
-                view, hasil, konteks = runtime.langkah(
-                    otak, match.snapshot(bot), t + durasi * k / 4
-                )
+                waktu = t + durasi * k / 4
+                view, hasil, konteks = runtime.langkah(otak, match.snapshot(bot), waktu)
                 npc, tulisan, penolakan = hasil["npc_decision"], None, None
                 try:
                     if hasil["nlg"] is not None:
                         tulisan = runtime.tulis(otak, hasil["nlg"], konteks)
-                        match.add_message(bot, tulisan["teks"])
+                        match.add_message(bot, tulisan["teks"], now=waktu)
                         runtime.catat_chat(otak, view, hasil["rencana_chat"], tulisan["teks"])
                     if npc["action"] == "vote":
                         match.vote(bot, npc["target"])
+                        runtime.catat_vote(otak, view, hasil["rencana_vote"])
                     elif npc["action"] in AKSI_RAHASIA:
                         match.act(bot, npc["action"], npc["target"])
-                        runtime.catat_aksi(otak, match.round, npc["action"], npc["target"])
                 except ValueError as error:
                     penolakan = str(error)
                 if tulisan or npc["action"] != "wait" or penolakan:
