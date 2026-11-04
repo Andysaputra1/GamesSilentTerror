@@ -254,11 +254,11 @@ class SurveyServiceTests(unittest.TestCase):
             start=lambda: target(*args)
         )  # noqa: E731
         self.enterContext(patch("app.module.room_service.threading.Thread", side_effect=langsung))
-        self.rooms.tick_all()
+        self.rooms.perbarui_fase_semua_room()
         self.assertEqual(self.fake.participants, [])  # belum selesai: belum dicatat
         self.finish()
-        self.rooms.tick_all()
-        self.rooms.tick_all()  # dicatat sekali saja
+        self.rooms.perbarui_fase_semua_room()
+        self.rooms.perbarui_fase_semua_room()  # dicatat sekali saja
         self.assertEqual(sorted(p["username"] for p in self.fake.participants), ["alice", "bob"])
         # "Restart": room di memori hilang dan registri kosong; konteks diambil dari arsip.
         self.enterContext(patch("app.module.survey_service.room_service", RoomService()))

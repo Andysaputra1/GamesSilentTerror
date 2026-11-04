@@ -127,7 +127,7 @@ Layar hasil menampilkan ucapan selamat (untuk pemenang pribadi atau kubu pemenan
 ```text
 Lobby -> POST /api/rooms {capacity} -> RoomService
 Host mulai -> Match (role acak, timer, snapshot privat)
-Timer 0,5 detik -> resolusi fase + NPCService.schedule
+Timer 0,5 detik -> resolusi fase + NPCService.jalankan_bot_yang_sudah_waktunya
 Host mulai -> layar persiapan -> otak NPC siap -> ronde 1
 NPC -> snapshot privat -> IndoBERT -> fuzzy -> NLG tervalidasi -> Match.act/vote
 Human -> HTTP /play -> validasi token fase + aturan -> Match.act/vote

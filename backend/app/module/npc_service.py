@@ -181,7 +181,7 @@ class NPCService:
 
     # Dipanggil jam permainan tiap 0,5 detik: menyuruh bot yang sudah waktunya melangkah, tanpa menunggu
     # manusia mengirim chat.
-    def schedule(self):
+    def jalankan_bot_yang_sudah_waktunya(self):
         waktu_sekarang = time.time()
         with room_service.lock:
             # INPUT: pertandingan yang masih berjalan

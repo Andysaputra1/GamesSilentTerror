@@ -138,7 +138,7 @@ class TickAllTests(unittest.TestCase):
         rusak.match = Mock(tick=Mock(side_effect=RuntimeError("rusak")), phase="day", round=1)
         sehat.match = Mock(phase="day", round=1)
         with self.assertLogs("shadow_heist.rooms", "ERROR"):
-            rooms.tick_all()
+            rooms.perbarui_fase_semua_room()
         sehat.match.tick.assert_called_once()
 
 

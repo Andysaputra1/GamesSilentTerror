@@ -366,8 +366,8 @@ class NPCServiceBrainTests(unittest.IsolatedAsyncioTestCase):
         await self.service.prepare(self.room.code, self.match)
         self.match.begin(now=time.time() - 30)
         with patch("app.module.npc_service.asyncio.sleep", AsyncMock()):
-            self.service.schedule()
-            self.service.schedule()  # bot yang sibuk tidak dijadwalkan dua kali
+            self.service.jalankan_bot_yang_sudah_waktunya()
+            self.service.jalankan_bot_yang_sudah_waktunya()  # bot yang sibuk tidak dijadwalkan dua kali
             await asyncio.gather(*list(self.service.tasks))
         langkah = {nama: o.langkah for nama, o in self.runtime.pertandingan[self.match.id].items()}
         self.assertEqual(langkah, {nama: 1 for nama in langkah})

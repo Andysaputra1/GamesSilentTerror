@@ -229,7 +229,7 @@ class SchedulerExtraTimeTests(unittest.IsolatedAsyncioTestCase):
             patch("app.module.npc_service.room_service", rooms),
             patch.object(service, "_sudah_waktunya_melangkah", return_value=False) as jadwal,
         ):
-            service.schedule()
+            service.jalankan_bot_yang_sudah_waktunya()
         elapsed = jadwal.call_args.args[2]
         self.assertAlmostEqual(elapsed, game.durations["tribunal"], delta=1)
         await service.close()

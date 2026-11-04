@@ -352,8 +352,9 @@ class RoomService:
                 pertandingan.vote(username, target)
             return self.state(code, username)
 
-    # CLOCK: dipanggil background task, bukan bergantung pada request browser.
-    def tick_all(self):
+    # JAM: dipanggil tiap 0,5 detik oleh game_clock, bukan oleh request browser. Untuk tiap room,
+    # panggil Match.tick(): kalau waktu fase habis, fase berganti. Pergantian fase dicatat untuk panel.
+    def perbarui_fase_semua_room(self):
         with self.lock:
             for room in self.rooms.values():
                 pertandingan = room.match

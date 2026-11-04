@@ -56,8 +56,8 @@ async def lifespan(_: FastAPI):
     async def game_clock():
         while True:
             try:
-                room_service.tick_all()
-                npc_service.schedule()
+                room_service.perbarui_fase_semua_room()
+                npc_service.jalankan_bot_yang_sudah_waktunya()
             except Exception:
                 # Error tak terduga tidak boleh mematikan jam permainan untuk seluruh server.
                 logger.exception("Satu putaran jam permainan gagal.")

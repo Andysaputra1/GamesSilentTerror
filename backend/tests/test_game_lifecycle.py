@@ -52,7 +52,7 @@ class GameLifecycleTests(unittest.TestCase):
             self.assertTrue(self.state(f"player{index}")["preparation"]["revealed"])
         self.assertEqual(self.state()["phase"], "preparing")
         self.now = self.match.preparation["min_until"]
-        self.rooms.tick_all()
+        self.rooms.perbarui_fase_semua_room()
         self.assertEqual(self.state()["phase"], "day")
         self.assertNotIn("max_rounds", self.state())
 
@@ -78,7 +78,7 @@ class GameLifecycleTests(unittest.TestCase):
 
     def advance(self):
         self.now = self.match.deadline
-        self.rooms.tick_all()
+        self.rooms.perbarui_fase_semua_room()
         return self.state()
 
     def check_result_and_leave(self, winner):
@@ -94,7 +94,7 @@ class GameLifecycleTests(unittest.TestCase):
             self.assertIsNone(response.json()["active"])
         before = self.state()
         self.now += 10000
-        self.rooms.tick_all()
+        self.rooms.perbarui_fase_semua_room()
         after = self.state()
         for key in ("round", "winner", "result", "players", "events"):
             self.assertEqual(before[key], after[key])
