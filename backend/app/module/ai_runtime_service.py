@@ -83,7 +83,8 @@ def _decode_config(stored):
 
 # Ambil konfigurasi AI yang disimpan di panel saat server nyala, supaya key dan link tidak hilang
 # saat restart. Baris kosong bukan error: bot memakai nilai .env.
-# Alur: 1 tarik data DB -> 2 cek isi -> 3 dekripsi key -> 4 simpan ke memori
+# Alur: 1 tarik data DB -> 2.1.1 ada isi -> 2.1.2 dekripsi key -> 2.1.3 simpan ke memori
+#                       \> 2.2.1 kosong -> 2.2.2 selesai, bot memakai .env
 def muat_konfigurasi_ai():
     nilai = PersistenceService._run(
         lambda db: db.execute(text("SELECT config FROM panel_configuration WHERE id=1")).scalar()
@@ -96,7 +97,11 @@ def muat_konfigurasi_ai():
 
 
 # Simpan konfigurasi AI dari panel ke DB dan memori, supaya langsung berlaku tanpa restart.
-# Alur: 1 baca isi lama (baris dikunci) -> 2 susun isi baru dan enkripsi key -> 3 uji dekripsi -> 4 tulis DB -> 5 simpan ke memori
+# Alur: 1 baca isi lama (baris dikunci) -> 2.1.1 susun isi baru dan enkripsi key -> 3.1.1 uji dekripsi -> 4 tulis DB -> 5 simpan ke memori
+#                                       \> 2.2.1 sumber key salah atau key kosong -> 2.2.2 batal, DB tidak berubah
+#                                                                                \> 3.2.1 gagal dekripsi -> 3.2.2 batal, DB tidak berubah
+#                                       \> 2 gagal baca -> return gagal
+
 def save_panel_configuration(
     provider,
     endpoint,
