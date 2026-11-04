@@ -2,6 +2,16 @@
 
 Disimpan di baris panel_configuration id=2 agar tidak bercampur dengan konfigurasi provider LLM
 (id=1) yang ditulis ulang utuh oleh save_panel_configuration.
+
+Alurnya saat server nyala (load_npc_configuration, dipanggil main.py sebelum otak dimuat)
+1. Baca baris id=2 dari DB
+2. Baris kosong: selesai, otak memakai nilai .env
+3. Ada isi: titipkan ke runtime otak, yang baru membangun rantai penulisnya saat otak dimuat. Isi tidak valid diabaikan, otak memakai nilai .env
+
+Alurnya saat panel menyimpan (save_npc_configuration)
+1. Terapkan dulu ke runtime otak, yang sekaligus memvalidasi. Nilai salah ditolak sebelum menyentuh DB
+2. Tulis nilai yang berlaku ke DB
+3. Gagal tulis: kembalikan runtime ke konfigurasi sebelumnya, lalu teruskan errornya
 """
 
 import json
@@ -37,7 +47,6 @@ def load_npc_configuration():
             )
         except ValueError:
             logger.warning("Konfigurasi NPC tersimpan tidak valid; memakai nilai .env.")
-    return brain_runtime.ringkasan()
 
 
 # Validasi lewat runtime terlebih dahulu, simpan nilai efektifnya, lalu kembalikan ringkasan terbaru.

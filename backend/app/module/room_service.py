@@ -1,11 +1,26 @@
-"""Daftar lobby aktif untuk satu proses backend. Restart menghapus semua room aktif."""
+"""Daftar lobby aktif untuk satu proses backend. Restart menghapus semua room aktif.
+
+Alurnya di lobby
+1. Host membuat room (create), pemain lain bergabung dengan kodenya (join), host boleh menyalakan bot pengisi kursi kosong (set_bot)
+2. Host memulai (start): pertandingan dibuat, tetapi ronde 1 ditahan di layar persiapan sampai otak bot siap
+
+Alurnya saat pemain bertindak (play, skip, cancel_vote, cancel_action, team_chat)
+1. Majukan fase sesuai timer
+2. Cocokkan token fase. Kalau berbeda, klik itu basi dari tab lain atau ronde sebelumnya, jadi ditolak
+3. Teruskan ke Match dan kembalikan state terbaru
+
+Alurnya tiap detak jam (perbarui_fase_semua_room, dipanggil main.py tiap 0,5 detik)
+1. Untuk tiap room yang bertanding, panggil Match.tick: kalau waktu fase habis, fase berganti
+2. Pertandingan yang baru selesai: peserta manusianya dicatat sekali ke arsip survei lewat thread latar
+3. Fase yang berganti dicatat ke jejak aktivitas panel
+4. Satu room gagal: dicatat di log, room lain tetap jalan
+"""
 
 import logging
 from dataclasses import dataclass, field
 from sqlalchemy import text
 import secrets
 import threading
-from threading import RLock
 from app.module.mysql_connector import SessionLocal
 from app.module.match_engine import Match, label_unik, phase_durations
 from app.module.activity_service import activity, traced
@@ -33,7 +48,7 @@ class RoomService:
     # CONSTRUCTOR: siapkan registry ruangan di memori dan lock untuk operasi dari beberapa thread.
     def __init__(self):
         self.rooms: dict[str, Room] = {}
-        self.lock = RLock()
+        self.lock = threading.RLock()
 
     # HELPER: skin_id dan nama tampilan dari user_accounts; akun yang tidak ditemukan memakai bawaan.
     def _ambil_profil_akun(self, daftar_username: list[str]) -> dict[str, tuple[str, str]]:
@@ -63,6 +78,85 @@ class RoomService:
         for username, (skin_id, nama_tampilan) in self._ambil_profil_akun(daftar_username).items():
             room.members_skin[username], room.members_label[username] = skin_id, nama_tampilan
 
+    # SERVICE AKSES: ambil ruangan berdasarkan kode serta pastikan pengguna merupakan anggotanya.
+    def get(self, code: str, username: str) -> Room:
+        with self.lock:
+            room = self.rooms.get(code.strip().upper())
+            if room is None:
+                raise ValueError("Ruangan tidak ditemukan atau server sudah dimulai ulang.")
+            if username not in room.members:
+                if room.match is not None:
+                    raise ValueError("Pertandingan sudah dimulai; tunggu ruangan baru.")
+                raise ValueError("Gabung ke ruangan ini terlebih dahulu.")
+            return room
+
+    # PEMULIHAN: cari room akun dari server, bukan sessionStorage tab; tanpa data role privat.
+    def current(self, username):
+        with self.lock:
+            return next((room for room in self.rooms.values() if username in room.members), None)
+
+    # Cari pertandingan yang belum selesai untuk mencegah pengguna bermain di dua ruangan.
+    def active(self, username):
+        with self.lock:
+            for room in self.rooms.values():
+                if username in room.members and room.match:
+                    room.match.tick()
+                    if not room.match.winner:
+                        return {"code": room.code, "match_id": room.match.id}
+            return None
+
+    # Pertandingan yang baru selesai (lewat timer atau pemain keluar): peserta manusianya dicatat sekali ke
+    # arsip survei di thread latar, jadi jam permainan tidak menunggu database.
+    def _catat_peserta_pertandingan_selesai(self, room):
+        if room.peserta_tercatat or not room.match or not room.match.winner:
+            return
+        room.peserta_tercatat = True
+        # Impor lambat: survey_service mengimpor modul ini.
+        from app.module.survey_service import survey_service
+
+        baris_peserta = survey_service.baris_peserta(room)
+        threading.Thread(
+            target=survey_service.catat_peserta, args=(baris_peserta,), daemon=True
+        ).start()
+
+    # LEAVE: dari lobby/hasil keluar biasa. Dari pertandingan aktif, pemain dianggap tereliminasi
+    # seperti dieksekusi (Match.leave) lalu keanggotaannya dicabut, jadi tidak bisa kembali ke
+    # pertandingan itu. Room tanpa anggota manusia dibersihkan; keluar dua kali tidak mengubah apa pun.
+    @traced
+    def leave(self, code, username):
+        with self.lock:
+            room = self.rooms.get(code.strip().upper())
+            pertandingan = room.match if room else None
+            if pertandingan and username in pertandingan.players and username not in room.members:
+                return  # sudah keluar dari pertandingan ini
+            room = self.get(code, username)
+            if room.match and not room.match.winner:
+                room.match.tick()
+                room.match.leave(username)
+            if room.match:
+                # Survei akhir tetap bisa dikirim setelah keluar (room mungkin segera dibersihkan).
+                # Impor lambat: survey_service mengimpor modul ini.
+                from app.module.survey_service import survey_service
+
+                survey_service.ingat_pertandingan(room)
+                # Room bisa dihapus di bawah sebelum timer sempat mencatat.
+                self._catat_peserta_pertandingan_selesai(room)
+            room.members.remove(username)
+            room.members_skin.pop(username, None)
+            room.members_label.pop(username, None)
+            if not room.members:
+                del self.rooms[room.code]
+            elif username == room.owner:
+                room.owner = room.members[0]
+
+    # Room yang pertandingannya sudah selesai tidak menahan pemain: keanggotaannya dilepas sebelum membuat atau
+    # bergabung ke room lain (survei pertandingan itu tetap bisa dikirim lewat registri pertandingan selesai).
+    def _lepas_room_selesai(self, username, kecuali=None):
+        with self.lock:
+            room = self.current(username)
+            if room and room.code != kecuali and room.match and room.match.winner:
+                self.leave(room.code, username)
+
     # SERVICE LOBBY: buat kode unik 6 karakter, tetapkan pemilik sebagai anggota pertama, dan batasi jumlah ruangan.
     @traced
     def create(self, username: str, capacity=6) -> Room:
@@ -82,18 +176,6 @@ class RoomService:
             room = Room(kode_room, username, [username], capacity=capacity)
             self._ingat_profil(room, [username])
             self.rooms[kode_room] = room
-            return room
-
-    # SERVICE AKSES: ambil ruangan berdasarkan kode serta pastikan pengguna merupakan anggotanya.
-    def get(self, code: str, username: str) -> Room:
-        with self.lock:
-            room = self.rooms.get(code.strip().upper())
-            if room is None:
-                raise ValueError("Ruangan tidak ditemukan atau server sudah dimulai ulang.")
-            if username not in room.members:
-                if room.match is not None:
-                    raise ValueError("Pertandingan sudah dimulai; tunggu ruangan baru.")
-                raise ValueError("Gabung ke ruangan ini terlebih dahulu.")
             return room
 
     # SERVICE LOBBY: tambahkan anggota tanpa duplikasi; tolak ruangan hilang atau kapasitas pilihan host penuh.
@@ -136,6 +218,15 @@ class RoomService:
             room.bot_enabled = enabled
             return room
 
+    # NPC mengisi sisa kapasitas yang dipilih host; manusia yang bergabung menggantikan kursi NPC.
+    def bot_names(self, room):
+        if room.match:
+            return [peserta.name for peserta in room.match.players.values() if peserta.bot]
+        if not room.bot_enabled:
+            return []
+        jumlah_kursi_kosong = room.capacity - len(room.members)
+        return [nama for nama in BOT_NAMES if nama not in room.members][:jumlah_kursi_kosong]
+
     # METHOD SERIALISASI: salin data publik ruangan dan roster untuk respons API/socket.
     def snapshot(self, room: Room):
         with self.lock:
@@ -148,6 +239,7 @@ class RoomService:
                 for username in room.members
             ]
             nama_bot = self.bot_names(room)
+            # Pratinjau durasi di lobby: anggota yang masih sedikit tetap dihitung 4 peserta, ukuran room terkecil.
             jumlah_peserta = max(4, len(room.members) + len(nama_bot))
             return {
                 "code": room.code,
@@ -164,15 +256,6 @@ class RoomService:
                 },
             }
 
-    # NPC mengisi sisa kapasitas yang dipilih host; manusia yang bergabung menggantikan kursi NPC.
-    def bot_names(self, room):
-        if room.match:
-            return [peserta.name for peserta in room.match.players.values() if peserta.bot]
-        if not room.bot_enabled:
-            return []
-        jumlah_kursi_kosong = room.capacity - len(room.members)
-        return [nama for nama in BOT_NAMES if nama not in room.members][:jumlah_kursi_kosong]
-
     # START: hanya host; role tidak pernah dikembalikan lewat snapshot lobby.
     @traced
     def start(self, code, username, quick=False):
@@ -186,6 +269,7 @@ class RoomService:
                 )
             if any(self.active(anggota) for anggota in room.members):
                 raise ValueError("Ada anggota yang masih mengikuti pertandingan lain.")
+            # Baca ulang: skin dan nama tampilan boleh diganti selama anggota menunggu di lobby.
             self._ingat_profil(room, room.members)
             nama_bot = self.bot_names(room)
             nama_tampilan = {
@@ -200,8 +284,18 @@ class RoomService:
                 quick=quick,
                 preparing=True,
             )
+            # Tanpa tanda ini NPCService melewati pertandingan, jadi bot tidak pernah melangkah.
             room.match.ai_controlled = True
             return self.snapshot(room)
+
+    # Semua operasi engine memakai lock yang sama agar request bersamaan tidak menggandakan aksi.
+    def state(self, code, username):
+        with self.lock:
+            room = self.get(code, username)
+            if not room.match:
+                raise ValueError("Host belum memulai pertandingan.")
+            room.match.tick()
+            return {"room": self.snapshot(room), "game": room.match.snapshot(username)}
 
     # SIAP: manusia boleh mempercepat layar persiapan setelah membaca panduan; AI tetap harus siap.
     @traced
@@ -226,43 +320,6 @@ class RoomService:
             if pertandingan.phase == "preparing":
                 pertandingan.reveal_role(username)
             return self.state(code, username)
-
-    # PEMULIHAN: cari room akun dari server, bukan sessionStorage tab; tanpa data role privat.
-    def current(self, username):
-        with self.lock:
-            return next((room for room in self.rooms.values() if username in room.members), None)
-
-    # Pertandingan yang baru selesai (lewat timer atau pemain keluar): peserta manusianya dicatat sekali ke
-    # arsip survei di thread latar, jadi jam permainan tidak menunggu database.
-    def _catat_peserta_pertandingan_selesai(self, room):
-        if room.peserta_tercatat or not room.match or not room.match.winner:
-            return
-        room.peserta_tercatat = True
-        # Impor lambat: survey_service mengimpor modul ini.
-        from app.module.survey_service import survey_service
-
-        baris_peserta = survey_service.baris_peserta(room)
-        threading.Thread(
-            target=survey_service.catat_peserta, args=(baris_peserta,), daemon=True
-        ).start()
-
-    # Room yang pertandingannya sudah selesai tidak menahan pemain: keanggotaannya dilepas sebelum membuat atau
-    # bergabung ke room lain (survei pertandingan itu tetap bisa dikirim lewat registri pertandingan selesai).
-    def _lepas_room_selesai(self, username, kecuali=None):
-        with self.lock:
-            room = self.current(username)
-            if room and room.code != kecuali and room.match and room.match.winner:
-                self.leave(room.code, username)
-
-    # Cari pertandingan yang belum selesai untuk mencegah pengguna bermain di dua ruangan.
-    def active(self, username):
-        with self.lock:
-            for room in self.rooms.values():
-                if username in room.members and room.match:
-                    room.match.tick()
-                    if not room.match.winner:
-                        return {"code": room.code, "match_id": room.match.id}
-            return None
 
     # Perintah pemain saat bermain: maju sesuai timer dulu, lalu cocokkan token fase agar klik basi dari
     # tab lain atau ronde sebelumnya ditolak. Dipanggil di dalam lock oleh pemanggilnya.
@@ -327,15 +384,6 @@ class RoomService:
             pertandingan.add_team_message(username, message)
             return self.state(code, username)
 
-    # Semua operasi engine memakai lock yang sama agar request bersamaan tidak menggandakan aksi.
-    def state(self, code, username):
-        with self.lock:
-            room = self.get(code, username)
-            if not room.match:
-                raise ValueError("Host belum memulai pertandingan.")
-            room.match.tick()
-            return {"room": self.snapshot(room), "game": room.match.snapshot(username)}
-
     # COMMAND: validasi token pertandingan/fase sebelum mengunci aksi atau vote.
     @traced
     def play(self, code, username, *, match_id, round_number, phase, target, ability=None):
@@ -379,36 +427,6 @@ class RoomService:
                             "winner": pertandingan.winner,
                         },
                     )
-
-    # LEAVE: dari lobby/hasil keluar biasa. Dari pertandingan aktif, pemain dianggap tereliminasi
-    # seperti dieksekusi (Match.leave) lalu keanggotaannya dicabut, jadi tidak bisa kembali ke
-    # pertandingan itu. Room tanpa anggota manusia dibersihkan; keluar dua kali tidak mengubah apa pun.
-    @traced
-    def leave(self, code, username):
-        with self.lock:
-            room = self.rooms.get(code.strip().upper())
-            pertandingan = room.match if room else None
-            if pertandingan and username in pertandingan.players and username not in room.members:
-                return  # sudah keluar dari pertandingan ini
-            room = self.get(code, username)
-            if room.match and not room.match.winner:
-                room.match.tick()
-                room.match.leave(username)
-            if room.match:
-                # Survei akhir tetap bisa dikirim setelah keluar (room mungkin segera dibersihkan).
-                # Impor lambat: survey_service mengimpor modul ini.
-                from app.module.survey_service import survey_service
-
-                survey_service.ingat_pertandingan(room)
-                # Room bisa dihapus di bawah sebelum timer sempat mencatat.
-                self._catat_peserta_pertandingan_selesai(room)
-            room.members.remove(username)
-            room.members_skin.pop(username, None)
-            room.members_label.pop(username, None)
-            if not room.members:
-                del self.rooms[room.code]
-            elif username == room.owner:
-                room.owner = room.members[0]
 
 
 room_service = RoomService()
