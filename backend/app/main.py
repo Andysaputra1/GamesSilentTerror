@@ -1,4 +1,12 @@
-"""Titik masuk backend: menyusun server HTTP, Socket.IO, bot, dan jam permainan."""
+"""
+Membangun Server HTTP, Mengkoneksi dengan Socket.IO,Mengatur Jam Server dan mengatur bot NPC.
+
+Alurnya 
+1. Membangun Socket.IO
+2. Membangun Server (Koneksi ke DB, Konfigurasi AI, Konfigurasi NPC, Memuat Otak AI, Menyalakan Jam (cek terus setiap 0.5 Detik))
+
+Jadinya AI Mulai Mikir dari Sini (isi pikirannya di module/npc_service.py)
+"""
 
 from __future__ import annotations
 
@@ -21,83 +29,70 @@ from app.module.npc_service import NPCService
 from app.module.persistence_service import PersistenceError
 from app.module.room_service import room_service
 
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    # setiap 0.5 detik jalankan pengcekan fase dan bot
+    async def game_clock():
+        while True:
+            try:
+                # ganti fase yang waktunya habis
+                room_service.perbarui_fase_semua_room()
+                # jalankan bot yang sudah waktunya
+                npc_service.jalankan_bot_yang_sudah_waktunya()
+            except Exception:
+                logger.exception("Satu putaran jam permainan gagal.")
+            # tunggu 0,5 detik
+            await asyncio.sleep(0.5)
+    
+    
+    if database_is_ready():
+        logger.info("Koneksi MySQL siap.")
+        try:
+            # API key, token, dan link LLM yang disimpan lewat panel dibaca dari DB ke memori,
+            # supaya tidak hilang saat server restart.
+            muat_konfigurasi_ai()
+        except PersistenceError as error:
+            logger.error("Konfigurasi AI panel gagal dimuat; memakai .env: %s", error)
+        try:
+            # Pengaturan Otak NPC dari panel (penulis kalimat, model, validasi) dibaca dari DB ke otak bot.
+            load_npc_configuration()
+        except PersistenceError as error:
+            logger.warning("Konfigurasi Otak NPC panel gagal dimuat; memakai .env: %s", error)
+    else:
+        logger.error("Koneksi awal MySQL gagal.")
+
+
+    # memasukan Indobert, Fuzzy , NLG 
+    brain_runtime.mulai_memuat()
+
+    # Jam jalan sebagai tugas latar, supaya tetap berdetak sambil server melayani pemain.
+    clock = asyncio.create_task(game_clock())
+    try:
+        yield
+    finally:
+        # Server mati: hentikan jam, batalkan giliran bot yang masih jalan, tutup thread otak, tutup koneksi MySQL.
+        clock.cancel()
+        with suppress(asyncio.CancelledError):
+            await clock
+        await npc_service.close()
+        brain_runtime.tutup()
+        engine.dispose()
+
+
+# Setup Logger
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("shadow_heist")
 
-# Server chat realtime dan pengatur bot; dipakai jam permainan di lifespan.
+# Koneksi WebSocket lewat Socket.IO: jalur realtime server dengan browser pemain, bot NPC ikut memakainya.
 sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins=settings.allowed_origins)
 socket_controller = register_socket_handlers(sio)
 npc_service = NPCService(sio, broadcast=socket_controller.emit_room)
 
-
-# Mengatur hidup server: yang dijalankan saat server nyala dan saat server mati.
-# Alur 1 (server nyala): 1 cek MySQL -> 2.1.1 muat konfigurasi panel -----------------------------------------> 3 muat otak bot di latar -> 4 nyalakan jam -> 5 layani pemain
-#                                    \> 2.2.1 MySQL atau konfigurasi gagal -> 2.2.2 catat error, pakai .env / [lanjut 3]
-
-# Alur 2 (server mati): 1 hentikan jam -> 2 batalkan giliran bot -> 3 tutup thread otak -> 4 tutup koneksi MySQL
-@asynccontextmanager
-async def lifespan(_: FastAPI):
-    # Alur 1 - 1 cek MySQL
-    if database_is_ready():
-        logger.info("Koneksi MySQL siap.")
-        # Alur 1 - 2.1.1 muat konfigurasi panel (Konfigurasi AI)
-        try:
-            muat_konfigurasi_ai()
-        # Alur 1 - 2.2.1 Konfigurasi AI gagal, 2.2.2 catat error (bot memakai .env)
-        except PersistenceError as error:
-            logger.error("Konfigurasi AI panel gagal dimuat; memakai .env: %s", error)
-        # Alur 1 - 2.1.1 muat konfigurasi panel (Otak NPC)
-        try:
-            load_npc_configuration()
-        # Alur 1 - 2.2.1 Otak NPC gagal, 2.2.2 catat error (bot memakai .env)
-        except PersistenceError as error:
-            logger.warning("Konfigurasi Otak NPC panel gagal dimuat; memakai .env: %s", error)
-    # Alur 1 - 2.2.1 MySQL gagal, 2.2.2 catat error (bot memakai .env)
-    else:
-        logger.error("Koneksi awal MySQL gagal.")
-
-    # Alur 1 - 3 muat otak bot di latar
-    # Otak NPC (IndoBERT + fuzzy + NLG) dimuat di latar agar server langsung melayani.
-    brain_runtime.mulai_memuat()
-
-    # Jam permainan: tiap 0,5 detik, tidak bergantung pada tab pemain atau kecepatan respons LLM.
-    # Alur: 1 ganti fase yang waktunya habis -> 2.1.1 jalankan bot yang sudah waktunya -> 3 tunggu 0,5 detik -> kembali ke 1
-    #                                        \> 2.2.1 ada error -> 2.2.2 catat ke log / [lanjut 3]
-    async def game_clock():
-        while True:
-            try:
-                # 1 ganti fase yang waktunya habis
-                room_service.perbarui_fase_semua_room()
-                # 2.1.1 jalankan bot yang sudah waktunya
-                npc_service.jalankan_bot_yang_sudah_waktunya()
-            # 2.2.1 ada error, 2.2.2 catat ke log
-            except Exception:
-                # Error tak terduga tidak boleh mematikan jam permainan untuk seluruh server.
-                logger.exception("Satu putaran jam permainan gagal.")
-            # 3 tunggu 0,5 detik
-            await asyncio.sleep(0.5)
-
-    # Alur 1 - 4 nyalakan jam
-    clock = asyncio.create_task(game_clock())
-    try:
-        # Alur 1 - 5 layani pemain
-        yield
-    finally:
-        # Alur 2 - 1 hentikan jam
-        clock.cancel()
-        with suppress(asyncio.CancelledError):
-            await clock
-        # Alur 2 - 2 batalkan giliran bot
-        await npc_service.close()
-        # Alur 2 - 3 tutup thread otak
-        brain_runtime.tutup()
-        # Alur 2 - 4 tutup koneksi MySQL
-        engine.dispose()
-
-
+# Bangun FastAPI dan daftarkan lifespan(Koneksi ke DB, Konfigurasi AI, Konfigurasi NPC, Memuat Otak AI, Menyalakan Jam (cek terus setiap 0.5 Detik)).
+# Lifespan baru jalan saat Uvicorn menyalakan server.
 app = FastAPI(title=settings.app_name, lifespan=lifespan)
+
 configure_cors(app)
 app.include_router(api_router)
 
-# Uvicorn menjalankan objek ini, supaya FastAPI dan Socket.IO berbagi satu port.
 asgi_app = socketio.ASGIApp(sio, other_asgi_app=app)
