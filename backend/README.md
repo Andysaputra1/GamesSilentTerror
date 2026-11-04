@@ -26,7 +26,7 @@ backend/
       auth_queries.py           # SELECT/INSERT/DELETE akun dan sesi
       game_queries.py           # SELECT/INSERT/UPDATE pemain dan chat
     module/                     # Logika password, sesi login, AI, dan game
-      mysql_connector.py        # Engine, connection pool, session, health probe
+      mysql_connector.py        # Pool, sesi, jalankan_transaksi, PersistenceError, health probe
       ollama_client.py          # Cek model di link Ollama
       create_user.py            # CLI akun tambahan untuk multiplayer lokal
     schemas/                    # Validasi request/response API
