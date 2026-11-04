@@ -1,10 +1,21 @@
-"""Runtime otak NPC di backend.
+"""
+Runtime otak NPC di backend: memuat otak, menyimpan otak tiap bot, lalu menjalankan langkah keputusan dan penulisan kalimat.
 
+Alurnya
+1. Memuat otak di thread latar (mulai_memuat): Modul fuzzy dan NLG, IndoBERT, lalu rantai penulis kalimat
+2. Mengecek rantai penulis di latar (segarkan_penulis), supaya permainan tidak menunggu jaringan
+3. Awal pertandingan (siapkan_pertandingan): Buat persona dan ingatan tiap bot
+4. Tiap langkah bot (langkah, thread keputusan): IndoBERT membaca chat baru, fuzzy memutuskan, penjelasan dibuat untuk panel
+5. Bot mau chat (tulis, thread penulis): Rencana jadi kalimat lewat LLM atau templat, lalu divalidasi aturan dan IndoBERT
+6. Chat atau aksi sudah terjadi (catat_chat, catat_aksi): Masuk ingatan bot
+7. Chat baru masuk (baca_chat): IndoBERT membaca sekali dan hasilnya masuk memo, jadi bot tidak menghitung ulang
+
+Catatan
 - Modul penalaran dan NLG berasal dari ekspor notebook (`generated/`), jadi logika bot sama
   dengan yang diuji di skripsi.
 - Satu NLU (IndoBERT) dipakai bersama semua bot. Hasil anotasi chat publik disimpan (memo)
   karena identik untuk semua bot, dan inferensi model diserialkan agar aman antar-thread.
-- Setiap bot punya ingatan, metode (fuzzy, atau llm sebagai pembanding), dan persona sendiri.
+- Setiap bot punya ingatan dan persona sendiri; semua bot memakai metode fuzzy.
 - Keputusan dijalankan di satu thread pekerja (logika notebook tidak dirancang paralel);
   penulisan kalimat berjalan di thread terpisah supaya LLM tidak menahan keputusan bot lain.
 """
@@ -23,6 +34,7 @@ from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
 from urllib.parse import urlsplit
 
 from app.config.settings import (
@@ -33,11 +45,16 @@ from app.module.ai_runtime_service import ai_runtime
 from app.module.match_engine import phase_durations
 from app.module.npc_brain.penjelasan import jelaskan
 
-logger = logging.getLogger("shadow_heist.npc_brain")
+if TYPE_CHECKING:
+    # Hanya untuk editor (Ctrl+klik). Saat program jalan modul ini dimuat di _muat, supaya server cepat nyala.
+    from app.module.npc_brain.generated import otak_fuzzy
+
+logger =logging.getLogger("shadow_heist.npc_brain")
 
 # scikit-fuzzy memanggil np.maximum dengan argumen ketiga posisional; peringatannya tidak memengaruhi hasil.
 warnings.filterwarnings("ignore", category=DeprecationWarning, module=r"skfuzzy(\..*)?")
 
+# Modul logika tiap metode; game sekarang hanya memakai fuzzy.
 METODE_MODUL = {"fuzzy": "otak_fuzzy"}
 # Nama model di link LLM (Ollama/OpenAI), mis. qwen3:4b-instruct atau qwen3:14b.
 POLA_MODEL_TAUTAN = re.compile(
@@ -46,6 +63,8 @@ POLA_MODEL_TAUTAN = re.compile(
 PENULIS_VALID = {"otomatis", "templat"}
 # Jalur rantai penulis: openrouter dan tautan (link LLM sendiri, mis. Ollama lewat tunnel).
 JALUR_PENULIS = JALUR_PENULIS_NPC
+# Pemuatan otak yang gagal dicoba ulang paling cepat setelah jeda ini (detik).
+JEDA_MUAT_ULANG_DETIK = 60
 
 # Lokasi default model IndoBERT: artifacts backend, lalu folder skripsi di sebelah repo Games.
 FOLDER_MODEL = {
@@ -99,6 +118,7 @@ def teks_target(target):
     ]
 
 
+# Pengganti lapor(tahap) saat tidak ada pemantau; hanya simulasi panel yang memantau tahap.
 def _tanpa_lapor(tahap):
     pass
 
@@ -148,19 +168,10 @@ class KonfigurasiNPC:
     model_tautan: str = ""  # kosong = model Ollama dari Konfigurasi AI/.env (OLLAMA_MODEL)
 
 
-# Nilai SecretStr tanpa spasi; None jika tidak diatur.
-def _rahasia(nilai):
-    return (nilai.get_secret_value().strip() or None) if nilai else None
-
-
-# Pemuatan otak yang gagal dicoba ulang paling cepat setelah jeda ini (detik).
-JEDA_MUAT_ULANG_DETIK = 60
-
-
 # Folder model pertama yang ada: pengaturan eksplisit, artifacts backend, lalu folder skripsi.
 def folder_model(nilai, jenis) -> Path | None:
     if nilai and not Path(nilai).is_dir():
-        # Salah ketik path di .env tidak boleh lolos diam-diam ke model lain atau NLU cadangan.
+        # Salah ketik path di .env tidak boleh lolos diam-diam ke model lain.
         logger.warning("Folder model %s dari pengaturan tidak ditemukan: %s", jenis, nilai)
     nama_artifact, relatif = FOLDER_MODEL[jenis]
     kandidat = [
@@ -209,6 +220,7 @@ class BrainRuntime:
         self.model_tautan_tersedia = []
         self.pertandingan: dict[str, dict[str, OtakBot]] = {}
         self._thread = None
+        self._gagal_pada = None  # waktu (monotonic) pemuatan terakhir gagal; None = belum pernah gagal
         self.eksekutor_keputusan = ThreadPoolExecutor(1, thread_name_prefix="otak-npc")
         self.eksekutor_nlg = ThreadPoolExecutor(3, thread_name_prefix="nlg-npc")
 
@@ -216,63 +228,54 @@ class BrainRuntime:
         with self.lock:
             self.status.update(nilai)
 
-    _gagal_pada = None  # waktu (monotonic) pemuatan terakhir gagal; None = belum pernah gagal
+    # Status tiap jalur untuk panel: jalur aktif sesuai prioritas, lalu yang dinonaktifkan. Tanpa nilai key.
+    def _status_rantai(self, penulis, berikut):
+        anggota = {p.jalur: p for p in (penulis.daftar if penulis else [])}
+        urutan = self.konfigurasi.urutan_penulis
+        baris = []
+        for jalur in urutan + [j for j in JALUR_PENULIS if j not in urutan]:
+            p = anggota.get(jalur)
+            if self.konfigurasi.penulis == "templat" or jalur not in urutan:
+                keadaan, status = "nonaktif", "mode templat" if jalur in urutan else "dinonaktifkan"
+            elif p is None:
+                keadaan, status = "tidak_ada", self.keterangan_penulis.get(jalur, "belum dimuat")
+            elif not p.aktif:
+                keadaan, status = "ditolak", p.status
+            elif not p.siap():
+                keadaan, status = "istirahat", p.status
+            else:
+                keadaan, status = ("dipakai" if p is berikut else "siap"), p.status
+            # Penghitung panggilan/token berlaku sejak rantai terakhir dibangun (token cek ikut dihitung).
+            baris.append({
+                "jalur": jalur, "keadaan": keadaan, "status": status,
+                "model": p.model if p else None, "panggilan": p.panggilan if p else 0,
+                "token_masuk": p.token_masuk if p else 0, "token_keluar": p.token_keluar if p else 0,
+                "alamat": self.alamat_tautan if jalur == "tautan" else None,
+                "hasil_cek": getattr(p, "hasil_cek", None),
+            })  # fmt: skip
+        return baris
 
-    # STARTUP: muat modul otak, NLU, dan penulis di thread latar agar server langsung melayani request.
-    def mulai_memuat(self):
+    # Status otak dan rantai penulis untuk panel dan layar persiapan.
+    def ringkasan(self):
         with self.lock:
-            # Sudah dimuat (termasuk lewat muat_sekarang) atau sedang dimuat: jangan memuat ulang,
-            # karena pemuatan ulang di latar mengganti NLU dan modul yang sedang dipakai bot.
-            if self.status["siap"] or (self._thread is not None and self._thread.is_alive()):
-                return
-            # Pemuatan yang gagal dicoba lagi (mis. saat pertandingan berikutnya disiapkan), paling
-            # cepat setelah jeda agar kegagalan permanen tidak memuat ulang di setiap persiapan.
-            if (
-                self._gagal_pada is not None
-                and time.monotonic() - self._gagal_pada < JEDA_MUAT_ULANG_DETIK
-            ):
-                return
-            self.status.update(gagal=False, detail="Memuat otak NPC…", progres=0.0)
-            self._thread = threading.Thread(
-                target=self._muat, daemon=True, name="muat-otak-npc"
-            )
-            self._thread.start()
-
-    # Dipakai test dan skrip: muat sinkron.
-    def muat_sekarang(self, nlu=None):
-        self._muat(nlu)
-
-    def _muat(self, nlu=None):
-        try:
-            self._set(detail="Memuat logika fuzzy…", progres=0.1)
-            for metode, nama in METODE_MODUL.items():
-                self.modul[metode] = importlib.import_module(f"app.module.npc_brain.generated.{nama}")
-            self.nlg = importlib.import_module("app.module.npc_brain.generated.nlg")
-            self._set(detail="Memuat NLU IndoBERT (intent dan target)…", progres=0.35)
-            self.nlu = nlu if nlu is not None else self._buat_nlu()
-            self._set(detail="Menyiapkan penulis kalimat…", progres=0.85)
-            # Rantai dibangun sekarang dan dicek di latar: permainan tidak menunggu jaringan, dan jalur
-            # yang belum selesai dicek tetap boleh dicoba (kegagalannya ditangani rantai).
-            self.segarkan_penulis()
-            self._set(siap=True, gagal=False, progres=1.0, detail="AI siap.", nlu=self.nlu.sumber)
-            logger.info("Otak NPC siap: NLU=%s", self.nlu.sumber)
-        except Exception as error:
-            logger.exception("Otak NPC gagal dimuat.")
-            self._gagal_pada = time.monotonic()
-            self._set(
-                siap=False, gagal=True, galat=type(error).__name__,
-                detail="Otak NPC gagal dimuat; bot memakai aksi cadangan engine.",
-            )  # fmt: skip
-
-    # Tanpa IndoBERT otak dianggap gagal dimuat: bot memakai aksi cadangan engine.
-    def _buat_nlu(self):
-        intent_dir = folder_model(settings.npc_intent_model_dir, "intent")
-        target_dir = folder_model(settings.npc_target_model_dir, "target")
-        if not intent_dir or not target_dir:
-            raise FileNotFoundError("Folder model IndoBERT tidak ditemukan.")
-        model = self.nlg.NLUIndoBERT(intent_dir, target_dir, settings.npc_nlu_device)
-        logger.info("IndoBERT dimuat dari %s dan %s", intent_dir, target_dir)
-        return NLUBersama(model, "indobert")
+            penulis = self.penulis if self.konfigurasi.penulis != "templat" else None
+            # Jalur yang menulis kalimat berikutnya: yang pertama siap (tidak ditolak dan tidak istirahat).
+            berikut = penulis.terdepan() if penulis else None
+            return {
+                **self.status,
+                "penulis_diminta": self.konfigurasi.penulis,
+                "validasi": self.konfigurasi.validasi,
+                "penulis_aktif": berikut is not None,
+                "penulis": berikut.jalur if berikut else "templat",
+                "model_penulis": berikut.model if berikut else None,
+                "urutan_penulis": list(self.konfigurasi.urutan_penulis),
+                "model_openrouter": self.konfigurasi.model_openrouter,
+                "model_tautan": self.konfigurasi.model_tautan,
+                "model_tautan_bawaan": ai_runtime.current().ollama_model,
+                "model_tautan_tersedia": list(self.model_tautan_tersedia),
+                "rantai_penulis": self._status_rantai(penulis, berikut),
+                "pertandingan_aktif": len(self.pertandingan),
+            }
 
     # RANTAI PENULIS sesuai urutan panel: key OpenRouter dan link LLM (Docker/tunnel) dari Konfigurasi AI
     # panel. Jalur tanpa key/link dilewati; semua gagal → templat.
@@ -295,41 +298,17 @@ class BrainRuntime:
             "openrouter": self.konfigurasi.model_openrouter or config.openrouter_model,
             "tautan": self.konfigurasi.model_tautan or config.ollama_model,
         }
+        # Token tanpa spasi; None jika tidak diatur.
+        token = config.ollama_tunnel_token
         try:
             rantai, self.keterangan_penulis = self.nlg.buat_rantai(
                 self.konfigurasi.urutan_penulis, kunci, model,
-                token_tautan=_rahasia(config.ollama_tunnel_token),
+                token_tautan=(token.get_secret_value().strip() or None) if token else None,
             )  # fmt: skip
         except Exception:
             logger.exception("Rantai penulis gagal disiapkan; memakai templat.")
             return None
         return rantai
-
-    # Bangun ulang rantai (key/link/urutan terbaru) lalu cek semua jalurnya di latar.
-    # latar=False tersedia untuk pemanggil sinkron; panel membaca progres lewat polling.
-    def segarkan_penulis(self, latar=True):
-        with self.lock:
-            if self.nlg is None:
-                return self.ringkasan()
-            lama, self.penulis = self.penulis, self._buat_penulis()
-            penulis = self.penulis
-            if penulis is not None:
-                # Dinaikkan sebelum thread cek mulai agar ringkasan langsung "sedang dicek".
-                self._cek_tertunda += 1
-                self.status["sedang_cek_penulis"] = True
-        if lama is not None:
-            # Koneksi rantai lama dilepas setelah kalimat yang mungkin sedang ditulis selesai.
-            penutup = threading.Timer(2 * self.nlg.BATAS_WAKTU_DETIK, lama.tutup)
-            penutup.daemon = True
-            penutup.start()
-        if penulis is not None:
-            if latar:
-                threading.Thread(
-                    target=self._cek_penulis, args=(penulis,), daemon=True, name="cek-penulis"
-                ).start()
-            else:
-                self._cek_penulis(penulis)
-        return self.ringkasan()
 
     # Hit provider langsung; link juga diuji menghasilkan jawaban setelah penemuan model.
     # Hanya status yang dicatat, tanpa key. Penghitung dinaikkan pemanggil (segarkan_penulis).
@@ -365,6 +344,87 @@ class BrainRuntime:
             with self.lock:
                 self._cek_tertunda -= 1
                 self.status["sedang_cek_penulis"] = self._cek_tertunda > 0
+
+    # Bangun ulang rantai (key/link/urutan terbaru) lalu cek semua jalurnya di latar.
+    # latar=False tersedia untuk pemanggil sinkron; panel membaca progres lewat polling.
+    def segarkan_penulis(self, latar=True):
+        with self.lock:
+            if self.nlg is None:
+                return self.ringkasan()
+            lama, self.penulis = self.penulis, self._buat_penulis()
+            penulis = self.penulis
+            if penulis is not None:
+                # Dinaikkan sebelum thread cek mulai agar ringkasan langsung "sedang dicek".
+                self._cek_tertunda += 1
+                self.status["sedang_cek_penulis"] = True
+        if lama is not None:
+            # Koneksi rantai lama dilepas setelah kalimat yang mungkin sedang ditulis selesai.
+            penutup = threading.Timer(2 * self.nlg.BATAS_WAKTU_DETIK, lama.tutup)
+            penutup.daemon = True
+            penutup.start()
+        if penulis is not None:
+            if latar:
+                threading.Thread(
+                    target=self._cek_penulis, args=(penulis,), daemon=True, name="cek-penulis"
+                ).start()
+            else:
+                self._cek_penulis(penulis)
+        return self.ringkasan()
+
+    def _muat(self, nlu=None):
+        try:
+            self._set(detail="Memuat logika fuzzy…", progres=0.1)
+            for metode, nama in METODE_MODUL.items():
+                self.modul[metode] = importlib.import_module(f"app.module.npc_brain.generated.{nama}")
+            self.nlg = importlib.import_module("app.module.npc_brain.generated.nlg")
+            self._set(detail="Memuat NLU IndoBERT (intent dan target)…", progres=0.35)
+            if nlu is None:
+                # Tanpa IndoBERT otak dianggap gagal dimuat: bot memakai aksi cadangan engine.
+                intent_dir = folder_model(settings.npc_intent_model_dir, "intent")
+                target_dir = folder_model(settings.npc_target_model_dir, "target")
+                if not intent_dir or not target_dir:
+                    raise FileNotFoundError("Folder model IndoBERT tidak ditemukan.")
+                model = self.nlg.NLUIndoBERT(intent_dir, target_dir, settings.npc_nlu_device)
+                logger.info("IndoBERT dimuat dari %s dan %s", intent_dir, target_dir)
+                nlu = NLUBersama(model, "indobert")
+            self.nlu = nlu
+            self._set(detail="Menyiapkan penulis kalimat…", progres=0.85)
+            # Rantai dibangun sekarang dan dicek di latar: permainan tidak menunggu jaringan, dan jalur
+            # yang belum selesai dicek tetap boleh dicoba (kegagalannya ditangani rantai).
+            self.segarkan_penulis()
+            self._set(siap=True, gagal=False, progres=1.0, detail="AI siap.", nlu=self.nlu.sumber)
+            logger.info("Otak NPC siap: NLU=%s", self.nlu.sumber)
+        except Exception as error:
+            logger.exception("Otak NPC gagal dimuat.")
+            self._gagal_pada = time.monotonic()
+            self._set(
+                siap=False, gagal=True, galat=type(error).__name__,
+                detail="Otak NPC gagal dimuat; bot memakai aksi cadangan engine.",
+            )  # fmt: skip
+
+    # STARTUP: muat modul otak, NLU, dan penulis di thread latar agar server langsung melayani request.
+    def mulai_memuat(self):
+        with self.lock:
+            # Sudah dimuat (termasuk lewat muat_sekarang) atau sedang dimuat: jangan memuat ulang,
+            # karena pemuatan ulang di latar mengganti NLU dan modul yang sedang dipakai bot.
+            if self.status["siap"] or (self._thread is not None and self._thread.is_alive()):
+                return
+            # Pemuatan yang gagal dicoba lagi (mis. saat pertandingan berikutnya disiapkan), paling
+            # cepat setelah jeda agar kegagalan permanen tidak memuat ulang di setiap persiapan.
+            if (
+                self._gagal_pada is not None
+                and time.monotonic() - self._gagal_pada < JEDA_MUAT_ULANG_DETIK
+            ):
+                return
+            self.status.update(gagal=False, detail="Memuat otak NPC…", progres=0.0)
+            self._thread = threading.Thread(
+                target=self._muat, daemon=True, name="muat-otak-npc"
+            )
+            self._thread.start()
+
+    # Dipakai tes: muat sinkron, NLU palsu bisa dititipkan.
+    def muat_sekarang(self, nlu=None):
+        self._muat(nlu)
 
     # PANEL: ubah penulis/validasi/rantai saat server berjalan; rantai penulis langsung dipakai kalimat
     # berikutnya. Semua nilai divalidasi dulu (atomik).
@@ -416,53 +476,17 @@ class BrainRuntime:
             self.segarkan_penulis()
         return self.ringkasan()
 
-    def ringkasan(self):
-        with self.lock:
-            penulis = self.penulis if self.konfigurasi.penulis != "templat" else None
-            # Jalur yang menulis kalimat berikutnya: yang pertama siap (tidak ditolak dan tidak istirahat).
-            berikut = penulis.terdepan() if penulis else None
-            return {
-                **self.status,
-                "penulis_diminta": self.konfigurasi.penulis,
-                "validasi": self.konfigurasi.validasi,
-                "penulis_aktif": berikut is not None,
-                "penulis": berikut.jalur if berikut else "templat",
-                "model_penulis": berikut.model if berikut else None,
-                "urutan_penulis": list(self.konfigurasi.urutan_penulis),
-                "model_openrouter": self.konfigurasi.model_openrouter,
-                "model_tautan": self.konfigurasi.model_tautan,
-                "model_tautan_bawaan": ai_runtime.current().ollama_model,
-                "model_tautan_tersedia": list(self.model_tautan_tersedia),
-                "rantai_penulis": self._status_rantai(penulis, berikut),
-                "pertandingan_aktif": len(self.pertandingan),
-            }
-
-    # Status tiap jalur untuk panel: jalur aktif sesuai prioritas, lalu yang dinonaktifkan. Tanpa nilai key.
-    def _status_rantai(self, penulis, berikut):
-        anggota = {p.jalur: p for p in (penulis.daftar if penulis else [])}
-        urutan = self.konfigurasi.urutan_penulis
-        baris = []
-        for jalur in urutan + [j for j in JALUR_PENULIS if j not in urutan]:
-            p = anggota.get(jalur)
-            if self.konfigurasi.penulis == "templat" or jalur not in urutan:
-                keadaan, status = "nonaktif", "mode templat" if jalur in urutan else "dinonaktifkan"
-            elif p is None:
-                keadaan, status = "tidak_ada", self.keterangan_penulis.get(jalur, "belum dimuat")
-            elif not p.aktif:
-                keadaan, status = "ditolak", p.status
-            elif not p.siap():
-                keadaan, status = "istirahat", p.status
-            else:
-                keadaan, status = ("dipakai" if p is berikut else "siap"), p.status
-            # Penghitung panggilan/token berlaku sejak rantai terakhir dibangun (token cek ikut dihitung).
-            baris.append({
-                "jalur": jalur, "keadaan": keadaan, "status": status,
-                "model": p.model if p else None, "panggilan": p.panggilan if p else 0,
-                "token_masuk": p.token_masuk if p else 0, "token_keluar": p.token_keluar if p else 0,
-                "alamat": self.alamat_tautan if jalur == "tautan" else None,
-                "hasil_cek": getattr(p, "hasil_cek", None),
-            })  # fmt: skip
-        return baris
+    # Otak tiap bot; dipakai juga simulasi panel (tidak didaftarkan di sini).
+    def buat_otak(self, match, bots):
+        bots = sorted(bots)
+        # Room mode cepat memakai durasi fase singkat; ingatan bot menghitung waktunya dari sini.
+        cepat = match.durations == phase_durations(len(match.players), True)
+        otak = {}
+        for nama in bots:
+            persona = self.nlg.persona_bot(nama, bots) if self.nlg else "santai"
+            ingatan = self.modul["fuzzy"].Ingatan(nama, cepat=cepat)
+            otak[nama] = OtakBot(nama, "fuzzy", persona, match.players[nama].role, ingatan)
+        return otak
 
     # Sekali per pertandingan: persona dan ingatan setiap bot.
     def siapkan_pertandingan(self, match, room_code):
@@ -477,17 +501,6 @@ class BrainRuntime:
                  "method": b.metode, "persona": b.persona, "role": b.peran}
                 for b in otak.values()
             ]  # fmt: skip
-
-    # Otak tiap bot; dipakai juga simulasi panel (tidak didaftarkan di sini).
-    def buat_otak(self, match, bots):
-        bots = sorted(bots)
-        cepat = match.durations == phase_durations(len(match.players), True)
-        otak = {}
-        for nama in bots:
-            persona = self.nlg.persona_bot(nama, bots) if self.nlg else "santai"
-            ingatan = self.modul["fuzzy"].Ingatan(nama, cepat=cepat)
-            otak[nama] = OtakBot(nama, "fuzzy", persona, match.players[nama].role, ingatan)
-        return otak
 
     def otak_bot(self, match_id, nama) -> OtakBot | None:
         with self.lock:
@@ -506,7 +519,10 @@ class BrainRuntime:
     # selalu_jelaskan: simulasi panel ingin penjelasan juga untuk langkah diam; lapor(tahap) memberi tahu
     # simulasi tahap yang sedang berjalan (flowchart live).
     def langkah(self, bot: OtakBot, snapshot, sekarang, selalu_jelaskan=False, lapor=_tanpa_lapor):
+        # modul = generated/otak_fuzzy.py (dimuat di _muat), jadi modul.putuskan ada di file itu.
         modul = self.modul[bot.metode]
+        if TYPE_CHECKING:
+            modul = otak_fuzzy
         mulai, jumlah_chat_sebelumnya = time.perf_counter(), len(bot.ingatan.chat)
         lapor("nlu")
         view = bot.ingatan.sinkron_snapshot(snapshot, sekarang, self.nlu)
@@ -569,7 +585,7 @@ class BrainRuntime:
 
     # PENCATAT NLU: baca satu chat dengan IndoBERT seperti ingatan bot (konteks = `riwayat` milik pemanggil,
     # urut kronologis). Hasil sama dengan bacaan bot dan masuk memo NLU, jadi bot tidak menghitung ulang.
-    # Target neutral (pemain yang diajak bicara) ikut dengan asalnya: IndoBERT/cadangan dan/atau aturan nama.
+    # Target neutral (pemain yang diajak bicara) ikut dengan asalnya: IndoBERT dan/atau aturan nama.
     # `konteks` = chat sebelumnya yang ikut dibaca Model 2 (maks KONTEKS_MAKS = 12) dan `daftar_pemain` = roster saat
     # itu; keduanya disimpan untuk riwayat panel dan ekspor format dataset (target sebagai {pemain, relasi}).
     def baca_chat(self, riwayat, pengirim, teks, roster):

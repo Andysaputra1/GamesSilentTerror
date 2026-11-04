@@ -36,8 +36,10 @@ class MySQLIntegration(unittest.TestCase):
         # Endpoint analisis lama (/api/analyze) sudah dihapus.
         self.assertEqual(client.post("/api/analyze", headers=headers, json={}).status_code, 404)
         username = "sql-test-" + uuid4().hex[:10]
-        PersistenceService().ensure_player(username)
-        PersistenceService().ensure_player(username)
+        # Dua pesan dari pemain yang sama tidak boleh membuat baris pemain ganda.
+        PersistenceService().record_player_message(
+            username=username, message="pertama", status="active"
+        )
         message_id = PersistenceService().record_player_message(
             username=username,
             message="'quoted'; --",

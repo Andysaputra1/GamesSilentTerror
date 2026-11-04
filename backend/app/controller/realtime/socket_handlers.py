@@ -1,4 +1,14 @@
-"""Controller event Socket.IO beserta status game jangka pendeknya."""
+"""
+Menerima event Socket.IO dari browser pemain, lalu mengirim hasilnya ke room.
+
+Alurnya
+1. main.py memanggil register_socket_handlers (buat controller, daftarkan event)
+2. connect: Cek token login dan room, catat socket ini milik siapa, masuk kanal room
+3. send_chat: Cek pesan dan identitas, cek boleh chat atau tidak, simpan ke MySQL, kirim ke room, IndoBERT membaca pesan
+4. disconnect: Hapus catatan socket (keanggotaan lobby dan data MySQL tetap)
+
+Chat bot tidak lewat send_chat. Bot hanya memakai emit_room untuk mengirim pesannya ke room.
+"""
 
 from __future__ import annotations
 
@@ -71,18 +81,6 @@ class SocketGameController:
         room_service.get(kode_room, username_sesi)
         return kode_room
 
-    # METHOD ASYNC: verifikasi socket, catat pemain di arsip, gabungkan ke kanal ruangan, lalu siarkan roster.
-    async def register_player_socket(self, sid: str, username: str) -> None:
-        kode_room = self._verifikasi_socket(sid, username)
-        username_bersih = username.strip()
-        PersistenceService(kode_room).ensure_player(username_bersih)
-        await self.sio.enter_room(sid, kode_room)
-        await self.emit_room(
-            "room_state",
-            room_service.snapshot(room_service.get(kode_room, username_bersih)),
-            to=kode_room,
-        )
-
     # EVENT CONNECT: periksa token login dan akses ruangan sebelum mencatat identitas socket.
     async def connect(self, sid: str, environ: dict[str, Any], auth: Any = None) -> None:
         token = str(auth.get("token", "")) if isinstance(auth, dict) else ""
@@ -115,33 +113,6 @@ class SocketGameController:
         self.socket_tokens.pop(sid, None)
         logger.info("Pemain keluar dari Socket: %s", sid)
 
-    # EVENT REGISTER: daftarkan socket pemain melalui helper dan kirim pemberitahuan jika validasi/penyimpanan gagal.
-    async def register_player(self, sid: str, data: dict[str, Any]) -> None:
-        try:
-            if not isinstance(data, dict):
-                raise ValueError("Format registrasi tidak valid.")
-            await self.register_player_socket(sid, str(data.get("username", "")))
-        except (ValueError, PersistenceError) as error:
-            await self.sio.emit("system_alert", {"msg": str(error)}, to=sid)
-
-    # EVENT CHAT ASYNC: validasi pesan, catat checker dan MySQL, lalu kirim hanya ke ruangan terkait.
-    async def send_chat(self, sid: str, data: dict[str, Any]) -> None:
-        waktu_mulai = perf_counter()
-        # Wadah agar jejak tetap terbaca di finally walaupun _send_chat berhenti di tengah jalan.
-        wadah_jejak = {}
-        try:
-            await self._send_chat(sid, data, wadah_jejak)
-        finally:
-            jejak = wadah_jejak.get("trace")
-            if jejak:
-                jejak["duration_ms"] = round((perf_counter() - waktu_mulai) * 1000, 2)
-                try:
-                    PersistenceService(jejak["room_code"]).record_trace(jejak)
-                except PersistenceError:
-                    logger.error(
-                        "Checker archive could not be saved for room %s", jejak["room_code"]
-                    )
-
     # Validasi sesi dan hak chat, simpan pesan, lalu broadcast. Setelah itu IndoBERT membaca pesan sekali
     # (tahap 5) untuk checker dan riwayat chat; hasilnya masuk memo NLU sehingga bot memakainya di langkah
     # NPCService berikutnya tanpa menghitung ulang. Handler ini tidak membalas pesan.
@@ -167,8 +138,10 @@ class SocketGameController:
         with room_service.lock:
             pertandingan = room.match
             if pertandingan:
+                # tick dulu: jam baru berdetak tiap 0,5 detik, jadi fase bisa belum terbarui.
                 pertandingan.tick()
                 chat_terkunci = not pertandingan.can_chat(pengirim)
+                # Penanda fase ini; dibandingkan lagi di tahap 3 untuk tahu fase sudah berubah atau belum.
                 token_fase = (pertandingan.id, pertandingan.round, pertandingan.phase)
             else:
                 token_fase = None
@@ -184,6 +157,7 @@ class SocketGameController:
                 "system_alert", {"msg": "Chat terkunci untukmu pada fase ini."}, to=sid
             )
             return
+        # Jejak debugging pesan (tahap dan durasi) untuk checker di panel.
         jejak = checker_service.begin(kode_room, pengirim, pesan)
         wadah_jejak["trace"] = jejak
         jejak["match_id"] = token_fase[0] if token_fase else None
@@ -252,15 +226,23 @@ class SocketGameController:
                     pertandingan, pengirim, pesan, jejak["message_id"], room_code=kode_room
                 )
 
-    # KOMPATIBILITAS: aksi memakai endpoint terautentikasi dengan token fase, bukan event lama.
-    async def use_gag_order(self, sid: str, data: dict[str, Any]) -> None:
-        await self.sio.emit("system_alert", {"msg": "Gunakan tombol aksi di halaman game."}, to=sid)
-
-    # KOMPATIBILITAS: client tidak boleh memaksa server mengubah fase.
-    async def start_tribunal(self, sid: str) -> None:
-        await self.sio.emit(
-            "system_alert", {"msg": "Fase berganti otomatis mengikuti timer server."}, to=sid
-        )
+    # EVENT CHAT ASYNC: validasi pesan, catat checker dan MySQL, lalu kirim hanya ke ruangan terkait.
+    async def send_chat(self, sid: str, data: dict[str, Any]) -> None:
+        waktu_mulai = perf_counter()
+        # Wadah agar jejak tetap terbaca di finally walaupun _send_chat berhenti di tengah jalan.
+        wadah_jejak = {}
+        try:
+            await self._send_chat(sid, data, wadah_jejak)
+        finally:
+            jejak = wadah_jejak.get("trace")
+            if jejak:
+                jejak["duration_ms"] = round((perf_counter() - waktu_mulai) * 1000, 2)
+                try:
+                    PersistenceService(jejak["room_code"]).record_trace(jejak)
+                except PersistenceError:
+                    logger.error(
+                        "Checker archive could not be saved for room %s", jejak["room_code"]
+                    )
 
 
 # FUNCTION WIRING: buat controller dan daftarkan method-nya sebagai handler event Socket.IO.
@@ -268,8 +250,5 @@ def register_socket_handlers(sio: socketio.AsyncServer) -> SocketGameController:
     pengendali = SocketGameController(sio)
     sio.on("connect", pengendali.connect)
     sio.on("disconnect", pengendali.disconnect)
-    sio.on("register_player", pengendali.register_player)
     sio.on("send_chat", pengendali.send_chat)
-    sio.on("use_gag_order", pengendali.use_gag_order)
-    sio.on("start_tribunal", pengendali.start_tribunal)
     return pengendali

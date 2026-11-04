@@ -1,6 +1,21 @@
-"""NPC independen: otak hasil notebook skripsi (NLU IndoBERT → fuzzy → NLG).
-
+"""
+NPC independen: otak hasil notebook skripsi (NLU IndoBERT → fuzzy → NLG).
 Setiap bot memakai ingatan dan persona sendiri.
+
+Alurnya
+1. Jam di main.py memanggil jalankan_bot_yang_sudah_waktunya tiap 0.5 detik
+2. Data pertandingan yang sudah selesai dibuang
+3. Tiap room: fase persiapan menjalankan prepare, fase lain menjalankan brain_turn untuk bot yang sudah waktunya
+4. prepare: Tunggu otak siap, bagi persona dan siapkan ingatan tiap bot, lalu buka ronde 1
+5. brain_turn (satu langkah satu bot):
+   5.1 Lihat: Ambil snapshot permainan milik bot
+   5.2 Pikir: IndoBERT membaca chat baru, fuzzy memutuskan (runtime.langkah)
+   5.3 Aksi: Kirim vote atau aksi rahasia ke game
+   5.4 Tulis chat: Minta giliran bicara, tulis kalimat (NLG), jeda mengetik, simpan chat
+   5.5 Kirim: Siarkan chat ke room
+   5.6 Catat: Simpan jejak untuk panel checker, IndoBERT membaca kalimat bot
+
+Chat manusia masuk lewat socket_handlers.py, lalu bacaannya dicatat catat_nlu di file ini.
 """
 
 import asyncio
@@ -47,7 +62,7 @@ def waktu_jejak(waktu, tulisan):
     return hasil
 
 
-# Isi jejak checker satu langkah otak; dipakai room asli (NPCService._trace) dan simulasi panel.
+# Isi jejak checker satu langkah otak; dipakai room asli (NPCService.brain_turn) dan simulasi panel.
 def isi_jejak(trace, match, otak, npc, rencana, tulisan, penolakan, durasi_ms, ditunda, penjelasan,
               waktu, nlu_sumber, masukan_nlg=None):  # fmt: skip
     penjelasan = lengkapi_penjelasan(penjelasan, npc, rencana, tulisan, penolakan, ditunda,
@@ -164,7 +179,6 @@ async def catat_nlu(match, pengirim, teks, message_id=None, runtime=brain_runtim
 
 class NPCService:
     def __init__(self, sio, *, broadcast=None, runtime=None):
-        self.sio = sio
         self.broadcast = broadcast or sio.emit
         self.tasks = set()
         self.preparing = set()
@@ -178,46 +192,6 @@ class NPCService:
         self.tasks.add(task)
         task.add_done_callback(self.tasks.discard)
         return task
-
-    # Dipanggil jam permainan tiap 0,5 detik: menyuruh bot yang sudah waktunya melangkah, tanpa menunggu
-    # manusia mengirim chat.
-    def jalankan_bot_yang_sudah_waktunya(self):
-        waktu_sekarang = time.time()
-        with room_service.lock:
-            # INPUT: pertandingan yang masih berjalan
-            id_pertandingan_aktif = {
-                r.match.id for r in room_service.rooms.values() if r.match and not r.match.winner
-            }
-
-            # PROSES: buang data pertandingan yang sudah selesai, supaya memori server tidak penuh
-            self.preparing &= id_pertandingan_aktif
-            self.lantai = {m: bot for m, bot in self.lantai.items() if m in id_pertandingan_aktif}
-            for match_id in [m for m in riwayat_nlu if m not in id_pertandingan_aktif]:
-                del riwayat_nlu[match_id]
-            self.runtime.lupakan_kecuali(id_pertandingan_aktif)
-
-            # OUTPUT: tiap room menyiapkan otak bot, atau menjalankan bot yang sudah waktunya
-            for room in list(room_service.rooms.values()):
-                match = room.match
-                if not match or match.winner or not match.ai_controlled:
-                    continue  # belum ada game, sudah selesai, atau bukan game ber-AI
-                if match.phase == "preparing":
-                    # Layar persiapan: muat otak dan siapkan ingatan bot sekali per pertandingan.
-                    if match.id not in self.preparing:
-                        self.preparing.add(match.id)
-                        self._spawn(self.prepare(room.code, match))
-                    continue
-                lama_fase_berjalan = match.phase_length() - (match.deadline - waktu_sekarang)
-                nama_bot_hidup = sorted(p.name for p in match.players.values() if p.bot and p.alive)
-                for urutan, nama in enumerate(nama_bot_hidup):
-                    otak = self.runtime.otak_bot(match.id, nama)
-                    if otak is None:
-                        continue  # otak gagal dimuat: engine mengisi aksi cadangan di deadline
-                    if not otak.sibuk and self._sudah_waktunya_melangkah(
-                        otak, match, lama_fase_berjalan, waktu_sekarang, urutan
-                    ):
-                        otak.sibuk = True
-                        self._spawn(self.brain_turn(room.code, match, otak))
 
     # Otak mengambil langkah berkala; bot digeser beberapa detik agar tidak berbicara serentak. Bot yang baru
     # dipanggil atau dituduh (otak.segera) melangkah lebih cepat, minimal JEDA_SEGERA_DETIK sesudah langkah terakhir.
@@ -256,12 +230,71 @@ class NPCService:
                     logger.warning("Metode bot tidak tersimpan ke database (migrasi V7?).")
             with room_service.lock:
                 match.mark_ai_ready(detail=detail)
-        except asyncio.CancelledError:
-            raise
         except Exception:
             logger.exception("Persiapan otak NPC gagal.")
             with room_service.lock:
                 match.mark_ai_ready(detail="Persiapan AI gagal; bot memakai aksi cadangan engine.")
+
+    # Keputusan masih berlaku jika room, pertandingan, dan fasenya sama serta deadline belum lewat.
+    def _berlaku(self, code, match, key):
+        room = room_service.rooms.get(code)
+        return bool(
+            room
+            and room.match is match
+            and not match.winner
+            and key == (match.id, match.round, match.phase)
+            and time.time() < match.deadline
+        )
+
+    # Vote/aksi rahasia diterapkan segera. Hasil: (masih berlaku, pesan penolakan engine atau None).
+    def _kirim_vote_atau_aksi(self, code, match, fase, otak, keputusan_aksi):
+        with room_service.lock:
+            if not self._berlaku(code, match, fase):
+                return False, None
+            # Otak sudah memutuskan fase ini: tunggu/abstain miliknya dihormati, bukan diganti aksi acak
+            # engine. Ditandai setelah keputusan ada, sehingga langkah yang error/timeout sebelum pernah
+            # memutuskan apa pun tetap mendapat aksi cadangan engine di akhir fase.
+            match.npc_decisions.add((fase[1], fase[2], otak.nama))
+            try:
+                if keputusan_aksi["action"] == "vote":
+                    match.vote(otak.nama, match.username(keputusan_aksi["target"]))
+                elif keputusan_aksi["action"] in AKSI_RAHASIA:
+                    match.act(
+                        otak.nama,
+                        keputusan_aksi["action"],
+                        match.username(keputusan_aksi["target"]),
+                    )
+                    self.runtime.catat_aksi(
+                        otak, match.round, keputusan_aksi["action"], keputusan_aksi["target"]
+                    )
+            except ValueError as error:
+                return True, str(error)
+            return True, None
+
+    # LANTAI BICARA: paling banyak LANTAI_MAKS bot menyusun/mengetik chat bersamaan per pertandingan (LLM
+    # menulis paralel). Ditolak bila lantai penuh, bila bot lain sedang menulis rencana kembar (intent dan
+    # target sama: tidak ada tuduhan atau pertanyaan serentak yang sama), atau bila rencana dibuat sebelum
+    # chat bot lain masuk. Bot yang ditolak memutuskan ulang di langkah berikutnya dengan chat terbaru.
+    def _ambil_giliran_bicara(self, match, otak, id_chat_terakhir_dilihat, rencana_chat):
+        penyusun = self.lantai.get(match.id, {})
+        niat = (rencana_chat.get("intent"), rencana_chat.get("target"))
+        if len(penyusun) >= LANTAI_MAKS or niat in penyusun.values():
+            return False
+        with room_service.lock:
+            pesan = list(match.messages)
+        semua_id = [m["id"] for m in pesan]
+        pesan_baru = (
+            pesan[semua_id.index(id_chat_terakhir_dilihat) + 1 :]
+            if id_chat_terakhir_dilihat in semua_id
+            else pesan
+        )
+        nama_bot = {p.name for p in match.players.values() if p.bot}
+        if any(m["sender"] in nama_bot and m["sender"] != otak.nama for m in pesan_baru):
+            return False
+        self.lantai.setdefault(match.id, {})[otak.nama] = niat
+        with room_service.lock:
+            match.bot_berpikir.add(otak.nama)  # pemain melihat awan berpikir selama kalimat disusun
+        return True
 
     # LANGKAH OTAK: baca keadaan game → bot berpikir → vote/aksi langsung → kalimat lewat lantai bicara.
     async def brain_turn(self, code, match, otak):
@@ -283,6 +316,7 @@ class NPCService:
                 otak.segera = False  # snapshot ini sudah memuat chat pemicunya
                 snapshot = snapshot_berlabel(match.snapshot(otak.nama), match.labels)
                 id_chat_terakhir_dilihat = match.messages[-1]["id"] if match.messages else None
+                # Huruf kecil di kartu bot untuk pemantauan: I terima input, L logika, O output.
                 match.bot_tahap[otak.nama] = "I"
             waktu_sekarang = time.time()
             otak.langkah += 1
@@ -383,17 +417,14 @@ class NPCService:
                 try:
                     await asyncio.to_thread(PersistenceService(code).record_trace, jejak)
                 except PersistenceError:
-                    pass
-            if (
-                pesan_terkirim
-            ):  # di latar: lantai bicara tidak ditahan selama NLU membaca kalimat ini
+                    pass  # gagal simpan tidak menghentikan bot; jejak tetap ada di memori checker
+            # Di latar: lantai bicara tidak ditahan selama NLU membaca kalimat ini.
+            if pesan_terkirim:
                 self._spawn(
                     catat_nlu(
                         match, otak.nama, pesan_terkirim["message"], id_pesan, self.runtime, code
                     )
                 )
-        except asyncio.CancelledError:
-            raise
         except Exception as error:
             gagal = True
             logger.exception("Langkah otak %s gagal.", otak.nama)
@@ -414,66 +445,45 @@ class NPCService:
             otak.sibuk = False
             otak.langkah_terakhir = time.time()
 
-    # Keputusan masih berlaku jika room, pertandingan, dan fasenya sama serta deadline belum lewat.
-    def _berlaku(self, code, match, key):
-        room = room_service.rooms.get(code)
-        return bool(
-            room
-            and room.match is match
-            and not match.winner
-            and key == (match.id, match.round, match.phase)
-            and time.time() < match.deadline
-        )
+    # Dipanggil jam permainan tiap 0,5 detik: menyuruh bot yang sudah waktunya melangkah, tanpa menunggu
+    # manusia mengirim chat.
+    def jalankan_bot_yang_sudah_waktunya(self):
+        waktu_sekarang = time.time()
+        with room_service.lock:
+            # INPUT: pertandingan yang masih berjalan
+            id_pertandingan_aktif = {
+                r.match.id for r in room_service.rooms.values() if r.match and not r.match.winner
+            }
 
-    # Vote/aksi rahasia diterapkan segera. Hasil: (masih berlaku, pesan penolakan engine atau None).
-    def _kirim_vote_atau_aksi(self, code, match, fase, otak, keputusan_aksi):
-        with room_service.lock:
-            if not self._berlaku(code, match, fase):
-                return False, None
-            # Otak sudah memutuskan fase ini: tunggu/abstain miliknya dihormati, bukan diganti aksi acak
-            # engine. Ditandai setelah keputusan ada, sehingga langkah yang error/timeout sebelum pernah
-            # memutuskan apa pun tetap mendapat aksi cadangan engine di akhir fase.
-            match.npc_decisions.add((fase[1], fase[2], otak.nama))
-            try:
-                if keputusan_aksi["action"] == "vote":
-                    match.vote(otak.nama, match.username(keputusan_aksi["target"]))
-                elif keputusan_aksi["action"] in AKSI_RAHASIA:
-                    match.act(
-                        otak.nama,
-                        keputusan_aksi["action"],
-                        match.username(keputusan_aksi["target"]),
-                    )
-                    self.runtime.catat_aksi(
-                        otak, match.round, keputusan_aksi["action"], keputusan_aksi["target"]
-                    )
-            except ValueError as error:
-                return True, str(error)
-            return True, None
+            # PROSES: buang data pertandingan yang sudah selesai, supaya memori server tidak penuh
+            self.preparing &= id_pertandingan_aktif
+            self.lantai = {m: bot for m, bot in self.lantai.items() if m in id_pertandingan_aktif}
+            for match_id in [m for m in riwayat_nlu if m not in id_pertandingan_aktif]:
+                del riwayat_nlu[match_id]
+            self.runtime.lupakan_kecuali(id_pertandingan_aktif)
 
-    # LANTAI BICARA: paling banyak LANTAI_MAKS bot menyusun/mengetik chat bersamaan per pertandingan (LLM
-    # menulis paralel). Ditolak bila lantai penuh, bila bot lain sedang menulis rencana kembar (intent dan
-    # target sama: tidak ada tuduhan atau pertanyaan serentak yang sama), atau bila rencana dibuat sebelum
-    # chat bot lain masuk. Bot yang ditolak memutuskan ulang di langkah berikutnya dengan chat terbaru.
-    def _ambil_giliran_bicara(self, match, otak, id_chat_terakhir_dilihat, rencana_chat):
-        penyusun = self.lantai.get(match.id, {})
-        niat = (rencana_chat.get("intent"), rencana_chat.get("target"))
-        if len(penyusun) >= LANTAI_MAKS or niat in penyusun.values():
-            return False
-        with room_service.lock:
-            pesan = list(match.messages)
-        semua_id = [m["id"] for m in pesan]
-        pesan_baru = (
-            pesan[semua_id.index(id_chat_terakhir_dilihat) + 1 :]
-            if id_chat_terakhir_dilihat in semua_id
-            else pesan
-        )
-        nama_bot = {p.name for p in match.players.values() if p.bot}
-        if any(m["sender"] in nama_bot and m["sender"] != otak.nama for m in pesan_baru):
-            return False
-        self.lantai.setdefault(match.id, {})[otak.nama] = niat
-        with room_service.lock:
-            match.bot_berpikir.add(otak.nama)  # pemain melihat awan berpikir selama kalimat disusun
-        return True
+            # OUTPUT: tiap room menyiapkan otak bot, atau menjalankan bot yang sudah waktunya
+            for room in list(room_service.rooms.values()):
+                match = room.match
+                if not match or match.winner or not match.ai_controlled:
+                    continue  # belum ada game, sudah selesai, atau bukan game ber-AI
+                if match.phase == "preparing":
+                    # Layar persiapan: muat otak dan siapkan ingatan bot sekali per pertandingan.
+                    if match.id not in self.preparing:
+                        self.preparing.add(match.id)
+                        self._spawn(self.prepare(room.code, match))
+                    continue
+                lama_fase_berjalan = match.phase_length() - (match.deadline - waktu_sekarang)
+                nama_bot_hidup = sorted(p.name for p in match.players.values() if p.bot and p.alive)
+                for urutan, nama in enumerate(nama_bot_hidup):
+                    otak = self.runtime.otak_bot(match.id, nama)
+                    if otak is None:
+                        continue  # otak gagal dimuat: engine mengisi aksi cadangan di deadline
+                    if not otak.sibuk and self._sudah_waktunya_melangkah(
+                        otak, match, lama_fase_berjalan, waktu_sekarang, urutan
+                    ):
+                        otak.sibuk = True
+                        self._spawn(self.brain_turn(room.code, match, otak))
 
     # Hentikan request NPC ketika backend shutdown supaya tidak ada task yang tertinggal.
     async def close(self):

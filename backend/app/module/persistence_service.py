@@ -38,10 +38,6 @@ class PersistenceService:
         id_room = queries.ensure_room(database, self.room_code)
         return id_room, queries.ensure_player(database, id_room, username)
 
-    # SERVICE PENYIMPANAN: pastikan pemain terdaftar dalam ruangan melalui satu transaksi.
-    def ensure_player(self, username: str) -> None:
-        self._run(lambda database: self._pastikan_room_dan_pemain(database, username))
-
     # SERVICE CHAT SOCKET: simpan pesan pemain, status pemain, dan konteks fase dalam satu transaksi.
     def record_player_message(
         self,
