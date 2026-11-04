@@ -38,13 +38,11 @@ class MySQLIntegration(unittest.TestCase):
         username = "sql-test-" + uuid4().hex[:10]
         persistence_service.ensure_player(username)
         persistence_service.ensure_player(username)
-        persistence_service.update_player_status(username=username, status="gagged")
         message_id = persistence_service.record_player_message(
             username=username,
             message="'quoted'; --",
             status="active",
         )
-        persistence_service.set_phase("tribunal")
         with SessionLocal() as db:
             self.assertEqual(
                 db.execute(

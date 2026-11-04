@@ -27,13 +27,8 @@ class SocketGameController:
     """Chat per ruangan; engine di memori, pesan dicatat ke MySQL. `sid` = ID koneksi Socket.IO."""
 
     # CONSTRUCTOR: simpan dependensi dan pemetaan socket → akun, ruangan, dan token login.
-    def __init__(
-        self,
-        sio: socketio.AsyncServer,
-        persistence: PersistenceService,
-    ) -> None:
+    def __init__(self, sio: socketio.AsyncServer) -> None:
         self.sio = sio
-        self.persistence = persistence
         self.socket_players: dict[str, str] = {}
         self.socket_rooms: dict[str, str] = {}
         self.socket_tokens: dict[str, str] = {}
@@ -269,11 +264,8 @@ class SocketGameController:
 
 
 # FUNCTION WIRING: buat controller dan daftarkan method-nya sebagai handler event Socket.IO.
-def register_socket_handlers(
-    sio: socketio.AsyncServer,
-    persistence: PersistenceService,
-) -> SocketGameController:
-    pengendali = SocketGameController(sio, persistence)
+def register_socket_handlers(sio: socketio.AsyncServer) -> SocketGameController:
+    pengendali = SocketGameController(sio)
     sio.on("connect", pengendali.connect)
     sio.on("disconnect", pengendali.disconnect)
     sio.on("register_player", pengendali.register_player)

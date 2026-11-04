@@ -53,7 +53,7 @@ file saja tidak berarti route tersebut dibuka pada aplikasi utama.
    `backend/app/module/npc_brain` (IndoBERT -> fuzzy hasil ekspor notebook -> NLG
    tervalidasi) -> aksi/vote engine serta chat. Fase diperiksa ulang
    sebelum keputusan diterapkan. Vote/aksi langsung diterapkan; chat bot melewati
-   "lantai bicara" (`NPCService._ambil_lantai`): paling banyak `LANTAI_MAKS` (3) bot
+   "lantai bicara" (`NPCService._ambil_giliran_bicara`): paling banyak `LANTAI_MAKS` (3) bot
    menyusun/mengetik bersamaan per pertandingan tanpa rencana kembar (intent + target
    sama), dan rencana yang lebih tua dari chat bot lain dibatalkan lalu diputuskan
    ulang. Mode `NPC_METHOD=llm` mempertahankan jalur lama
@@ -135,5 +135,5 @@ Skrip `live_auth_smoke.py`, `live_match_smoke.py`, dan `mysql_smoke.py` adalah a
 manual yang dapat mengakses layanan/database sesuai konfigurasinya; skrip ini
 tidak dijalankan oleh pola `test_*.py` di atas.
 
-Filter riwayat panel dan download CSV memakai tanggal WIB, room, dan sender_kind yang sama (all/human/bot/legacy). Legacy tidak ditebak sebagai manusia atau bot. CSV berisi chat_id dan isi_chat, lalu bacaan IndoBERT saat game
+Filter riwayat panel dan download CSV memakai tanggal WIB, room, dan sender_kind yang sama (all/human/bot/legacy). Legacy tidak ditebak sebagai manusia atau bot. CSV berisi teks_chat dan chat_id, lalu bacaan IndoBERT saat game
 berjalan: intent, confidence, target, dan konteks (maks 12 chat sebelumnya yang ikut dibaca; kosong untuk pesan lama).

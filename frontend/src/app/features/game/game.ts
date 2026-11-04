@@ -230,12 +230,6 @@ export class Game implements OnInit, OnDestroy {
     })).filter((item) => item.count > 0);
   }
 
-  get compositionLabel(): string {
-    return this.composition
-      .map((item) => `${item.count} ${this.roleNames[item.role] ?? item.role}`)
-      .join(' · ');
-  }
-
   // Jumlah Hitman: dari komposisi server, atau dari role yang dibuka setelah pertandingan selesai.
   get hitmanCount(): number {
     const game = this.game;
@@ -478,11 +472,6 @@ export class Game implements OnInit, OnDestroy {
 
   colorFor(name: string): string {
     return TAG_COLORS[this.playerIndex(name) % TAG_COLORS.length];
-  }
-
-  // Warna chip pemilih sama dengan label nama pemilih di meja dan chat.
-  voterColor(name: string): string {
-    return this.colorFor(name);
   }
 
   // PANAS VOTE: 0 = tanpa suara, 1 = suara sudah mencapai mayoritas pemain hidup (bingkai paling merah).

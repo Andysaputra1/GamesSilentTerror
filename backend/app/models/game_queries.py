@@ -77,14 +77,6 @@ def insert_message(
     )
 
 
-# QUERY UPDATE: ubah fase ruangan yang ditunjuk ID; tidak menjalankan engine ronde.
-def set_phase(database: Session, room_id: int, phase: str):
-    return database.execute(
-        text("UPDATE game_sessions SET phase = :phase WHERE id = :room_id"),
-        {"room_id": room_id, "phase": phase},
-    ).rowcount
-
-
 # Lengkapi pesan tersimpan dengan konteks pertandingan, ronde, dan fase.
 def set_message_context(database, message_id, *, sender_kind, context, reply_to_id=None):
     database.execute(

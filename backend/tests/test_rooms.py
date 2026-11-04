@@ -59,7 +59,7 @@ class SocketRoomTests(unittest.IsolatedAsyncioTestCase):
         room = rooms.create("alice")
         rooms.join(room.code, "bob")
         sio = Mock(emit=AsyncMock(), leave_room=AsyncMock())
-        controller = SocketGameController(sio, Mock())
+        controller = SocketGameController(sio)
         controller.socket_players.update({"alice-sid": "alice", "bob-sid": "bob"})
         controller.socket_rooms.update({"alice-sid": room.code, "bob-sid": room.code})
         rooms.leave(room.code, "bob")
@@ -94,7 +94,7 @@ class SocketRoomTests(unittest.IsolatedAsyncioTestCase):
                         room.match.players["alice"].gagged = True
                     return real_begin(*args)
 
-                controller = SocketGameController(sio, Mock())
+                controller = SocketGameController(sio)
                 controller.socket_players["sid"] = "alice"
                 controller.socket_rooms["sid"] = room.code
                 with (
@@ -114,7 +114,7 @@ class SocketRoomTests(unittest.IsolatedAsyncioTestCase):
         other = rooms.create("bob")
         rooms.set_bot(room.code, "alice", True)
         sio = Mock(emit=AsyncMock(), enter_room=AsyncMock())
-        controller = SocketGameController(sio, Mock())
+        controller = SocketGameController(sio)
         controller.socket_players["sid"] = "alice"
         controller.socket_rooms["sid"] = room.code
         with (

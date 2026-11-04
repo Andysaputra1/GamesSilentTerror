@@ -175,11 +175,12 @@ dilewati; key OpenRouter dan URL tunnel di menu ini ikut dipakai rantai tersebut
 untuk benar-benar menguji jawaban; mode API memakai saldo OpenRouter.
 
 Riwayat menampilkan semua pesan chat yang tercatat, pemain dan bot. Download
-menghasilkan CSV UTF-8 (BOM) dengan tepat dua kolom: chat_id, isi_chat. Filter tanggal
+menghasilkan CSV UTF-8 (BOM) dengan kolom format dataset NLU (`KOLOM_CSV` di
+`controller/api/panel.py`), termasuk teks_chat dan chat_id. Filter tanggal
 opsional menggunakan hari WIB, batas awal inklusif dan akhir sampai penghujung hari.
 Download selalu semua room, meski tampilan sedang memilih satu room. CSV mempertahankan
 isi pesan persis termasuk tanda kutip dan baris baru; ketika mengimpor ke spreadsheet,
-perlakukan isi_chat sebagai teks agar isi pesan tidak dievaluasi sebagai formula.
+perlakukan teks_chat sebagai teks agar isi pesan tidak dievaluasi sebagai formula.
 ID dipakai untuk urutan stabil; pesan baru selama export tidak ditambahkan ke snapshot export.
 
 Di frontend Vercel, route /panel mengarah ke origin BACKEND_URL + /panel, jadi set

@@ -79,7 +79,7 @@ class EngineTests(unittest.TestCase):
             ["NOX", "ECHO"],
             skin_map={"host": "kiera", "tamu": "kiera", "baru": "dexter"},
         )
-        skins = {name: game.get_skin(name) for name in game.players}
+        skins = {name: p.skin_id for name, p in game.players.items()}
         # tamu kalah cepat dari host untuk kiera; NOX (arthur) dan ECHO (dexter) ikut bergeser.
         self.assertEqual(
             skins,
@@ -89,7 +89,7 @@ class EngineTests(unittest.TestCase):
         self.assertEqual({p["name"]: p["skin_id"] for p in game.snapshot("tamu")["players"]}, skins)
         # Lebih dari 6 peserta: semua skin terpakai, sisanya boleh kembar.
         crowded = Match(list("abcdefgh"), [])
-        self.assertEqual({crowded.get_skin(name) for name in "abcdef"}, set(ALL_SKINS))
+        self.assertEqual({crowded.players[name].skin_id for name in "abcdef"}, set(ALL_SKINS))
 
     def test_four_player_mode_and_roster_based_timers(self):
         for count in range(4, 11):
@@ -787,7 +787,7 @@ class SocketGameTests(unittest.IsolatedAsyncioTestCase):
         from app.module.auth_service import SessionValidationError
 
         sio = Mock(emit=AsyncMock())
-        controller = SocketGameController(sio, Mock())
+        controller = SocketGameController(sio)
         controller.socket_players["sid"] = "alice"
         controller.socket_tokens["sid"] = "revoked-test-token"
         with patch(
@@ -804,7 +804,7 @@ class SocketGameTests(unittest.IsolatedAsyncioTestCase):
         rooms.set_bot(room.code, "alice", True)
         rooms.start(room.code, "alice")
         sio = Mock(emit=AsyncMock(), enter_room=AsyncMock())
-        controller = SocketGameController(sio, Mock())
+        controller = SocketGameController(sio)
         controller.socket_players["sid"] = "alice"
         controller.socket_rooms["sid"] = room.code
         with (

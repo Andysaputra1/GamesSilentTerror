@@ -544,7 +544,7 @@
                       [attr.title]="gabungNamaTampilan(votersFor(player.name))"
                     >
                       @for (voter of votersFor(player.name).slice(0, 4); track voter) {
-                        <span class="voter-badge" [style.--chip]="voterColor(voter)">{{
+                        <span class="voter-badge" [style.--chip]="colorFor(voter)">{{
                           ambilNamaTampilan(voter).slice(0, 2)
                         }}</span>
                       }

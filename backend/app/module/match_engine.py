@@ -309,11 +309,6 @@ class Match:
             event or "Permainan dimulai. Diskusikan alibi tanpa membocorkan identitasmu."
         )
 
-    # GETTER: ambil skin_id pemain, aman dipanggil dari luar Match.
-    def get_skin(self, name: str) -> str:
-        pemain = self.players.get(name)
-        return pemain.skin_id if pemain else "dexter"
-
     # HELPER: pemain yang masih bisa bertindak (hidup, pertandingan belum selesai); Hostage dicek per aksi.
     def actor(self, name):
         pemain = self.players.get(name)

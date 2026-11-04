@@ -852,7 +852,6 @@ describe('Game', () => {
     state.game.composition = { hitman: 2, spy: 1, stalker: 1, civilian: 4 };
     const splash = render().querySelector('.splash') as HTMLElement;
     expect(splash.querySelectorAll('.comp-chip').length).toBe(4);
-    expect(component.compositionLabel).toBe('2 Hitman · 1 Spy · 1 Stalker · 4 Civilian');
     expect(splash.querySelectorAll('.prep-card').length).toBe(3);
     expect(splash.querySelector('.prep-target')?.textContent).toContain('Buka kartu role');
     expect(splash.querySelector('.prep-actions')?.textContent).not.toContain('Sandera');

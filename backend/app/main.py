@@ -22,7 +22,6 @@ from app.module.mysql_connector import engine, database_is_ready
 from app.config.settings import settings
 from app.controller.realtime.socket_handlers import register_socket_handlers
 from app.module.analysis_service import analysis_service
-from app.module.persistence_service import persistence_service
 from app.module.npc_service import NPCService
 from app.module.npc_brain.runtime import brain_runtime
 from app.module.npc_config_service import load_npc_configuration
@@ -86,7 +85,7 @@ app.include_router(api_router)
 
 # The former Node real-time server is hosted alongside FastAPI on port 8000.
 sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins=settings.allowed_origins)
-socket_controller = register_socket_handlers(sio, persistence_service)
+socket_controller = register_socket_handlers(sio)
 npc_service = NPCService(sio, broadcast=socket_controller.emit_room, analysis=analysis_service)
 
 # Uvicorn targets this object so FastAPI and Socket.IO share one backend port.

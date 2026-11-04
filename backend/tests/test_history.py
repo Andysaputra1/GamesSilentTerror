@@ -15,7 +15,7 @@ class ChatDurabilityTests(unittest.IsolatedAsyncioTestCase):
         persistence.record_player_message.return_value = 42
         if db_fails:
             persistence.record_player_message.side_effect = PersistenceError("DB unavailable")
-        controller = SocketGameController(sio, Mock())
+        controller = SocketGameController(sio)
         controller.socket_players["sid"] = "alice"
         controller.socket_rooms["sid"] = room.code
         with (

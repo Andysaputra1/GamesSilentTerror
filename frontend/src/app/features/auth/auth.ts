@@ -69,7 +69,6 @@ export class Auth implements OnInit, AfterViewInit {
   username = '';
   password = '';
   errorMessage = '';
-  hasAttemptedSubmit = false;
   isSubmitting = false;
   passwordVisible = false;
   registerName = '';
@@ -324,7 +323,6 @@ export class Auth implements OnInit, AfterViewInit {
   kirimLogin(): void {
     if (!isPlatformBrowser(this.platformId) || this.isSubmitting) return;
 
-    this.hasAttemptedSubmit = true;
     this.username = this.username.trim();
     this.errorMessage = this.validateCredentials();
     if (this.errorMessage) return;

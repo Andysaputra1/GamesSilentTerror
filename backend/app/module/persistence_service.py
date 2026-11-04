@@ -126,22 +126,5 @@ class PersistenceService:
 
         return self._run(simpan_pesan_bot)
 
-    # SERVICE PENYIMPANAN: ubah status pemain secara transaksional, bukan keputusan aturan permainan.
-    def update_player_status(self, *, username: str, status: str) -> None:
-        # CALLBACK TRANSAKSI: pastikan pemain ada lalu perbarui statusnya.
-        def simpan_status_pemain(database):
-            _, id_pemain = self._pastikan_room_dan_pemain(database, username)
-            queries.update_player_status(database, id_pemain, status)
-
-        self._run(simpan_status_pemain)
-
-    # SERVICE PENYIMPANAN: simpan nama fase ruangan; fungsi ini tidak menjalankan timer/voting.
-    def set_phase(self, phase: str) -> None:
-        # CALLBACK TRANSAKSI: pastikan ruangan ada lalu simpan fase yang diminta.
-        def simpan_fase(database):
-            queries.set_phase(database, queries.ensure_room(database, self.room_code), phase)
-
-        self._run(simpan_fase)
-
 
 persistence_service = PersistenceService()
