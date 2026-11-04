@@ -82,7 +82,7 @@ class WriterChainTests(unittest.TestCase):
     def setUp(self):
         k = self.runtime.konfigurasi
         self.awal = (k.penulis, list(k.urutan_penulis), k.model_openrouter, k.model_tautan)
-        # Tanpa jaringan: cek jalur (Claude 8 token, endpoint OpenRouter/link) diganti mock.
+        # Tanpa jaringan: cek jalur (endpoint OpenRouter/link) diganti mock.
         self.cek = self.enterContext(patch.object(type(self.runtime), "_cek_penulis"))
         self.enterContext(patch("app.module.npc_brain.runtime.ai_runtime.current", konfigurasi_ai))
 

@@ -1,8 +1,8 @@
 """FILE INI DIHASILKAN OTOMATIS oleh scripts/ekspor_otak_npc.py. JANGAN DIEDIT MANUAL.
 
 Sumber : npc_nlg.ipynb
-Sidik  : 227faf14f71758e8
-Dibuat : 2026-11-04 04:03 UTC
+Sidik  : e62999d39c50fb0c
+Dibuat : 2026-11-04 04:41 UTC
 
 Perubahan logika bot dilakukan di notebook skripsi, dijalankan ulang sampai semua
 skenario/pengujian lulus, lalu diekspor ulang dengan skrip ini.
@@ -19,20 +19,9 @@ Alurnya
 # ruff: noqa
 # fmt: off
 
-
-# Pengganti fungsi tampilan notebook; backend tidak menampilkan tabel.
-def display(*args, **kwargs):
-    return None
-
 import hashlib
 
-import inspect
-
 import json
-
-import os
-
-import random
 
 import re
 
@@ -48,44 +37,11 @@ from pathlib import Path
 
 from time import monotonic, perf_counter
 
-import numpy as np
-
-import pandas as pd
-
-INTENT_MODEL_DIR = Path("models/notebook_standalone/intent_classifier_transformer")
-
-TARGET_MODEL_DIR = Path("models/target_classifier/target_classifier_transformer")
-
-FOLDER_HASIL = Path("hasil_npc")
-
-BERKAS_ENV = Path("../.env")
-
 KONTEKS_MAKS = 12
-
-# GPU dipakai bila tersedia agar evaluasi cepat; tanpa PyTorch/GPU otomatis CPU (backend game memakai CPU).
-def perangkat_nlu():
-    try:
-        import torch
-
-        return "cuda" if torch.cuda.is_available() else "cpu"
-    except ImportError:
-        return "cpu"
-
-NLU_DEVICE = perangkat_nlu()
-
-PENULIS_NLG = "otomatis"
-
-URUTAN_PENULIS = ["openrouter", "tautan"]
-
-MODEL_CLAUDE = "claude-opus-5-5"
 
 MODEL_OPENROUTER = "qwen/qwen3-14b"
 
 MODEL_TAUTAN = "qwen3:14b"
-
-REGION_BEDROCK = "us-east-1"
-
-EFFORT_CLAUDE = None
 
 MAKS_TOKEN_LLM = 1024
 
@@ -99,8 +55,6 @@ JEDA_MAKS_DETIK = 300
 
 MAKS_PERCOBAAN_LLM = 2
 
-N_UJI_LLM = 36
-
 PANJANG_MAKS = 220
 
 KALIMAT_MAKS = 2
@@ -108,8 +62,6 @@ KALIMAT_MAKS = 2
 JUMLAH_CHAT_KONTEKS = 12
 
 MIRIP_MAKS = 0.75
-
-MAKS_EVALUASI = 600
 
 PERSONA = {
     "santai": {"deskripsi": "santai dan ramah, memakai aku/kamu, sesekali 'sih', 'deh', atau 'nih'",
@@ -554,15 +506,6 @@ class NLUIndoBERT:
                 hasil.append({"pemain": daftar_pemain[terbaik], "relasi": label_intent, "prob": float(probs[terbaik, kolom])})
         return hasil or [{"pemain": "tidak_diketahui", "relasi": label_intent, "prob": None}]
 
-# Memuat kedua model bila tersedia; jika belum dilatih, kembalikan None dengan pesan jelas.
-def muat_nlu():
-    hilang = [str(path) for path in (INTENT_MODEL_DIR, TARGET_MODEL_DIR) if not Path(path).is_dir()]
-    if hilang:
-        print("Model IndoBERT belum tersedia:", hilang)
-        print("Latih nlu_baru.ipynb (intent) dan nlu_target.ipynb (target) terlebih dahulu.")
-        return None
-    return NLUIndoBERT(INTENT_MODEL_DIR, TARGET_MODEL_DIR, NLU_DEVICE)
-
 # Aturan nama, sumber kedua target neutral: pemain roster yang disebut nama atau panggilannya di teks. Pencocokan sama
 # dengan samarkan_nama: nama persis, atau panggilan/akhiran (_nama_cocok) yang cocok dengan tepat satu pemain; kata
 # ganti, istilah game, dan kata umum (common_words) tidak pernah dianggap nama. Pengirim tidak dihitung.
@@ -614,18 +557,7 @@ def anotasi_chat(nlu, chat, riwayat, daftar_pemain):
                 sama["sumber"].append("nama")
     return {**chat, "intent": intent, "conf_intent": confidence, "target": target, "sumber_nlu": "indobert"}
 
-# Membaca berkas .env sederhana (NAMA=nilai); nama tidak peka huruf besar/kecil, nilai tidak pernah dicetak.
-def baca_env(path):
-    nilai = {}
-    if Path(path).is_file():
-        for baris in Path(path).read_text(encoding="utf-8").splitlines():
-            baris = baris.strip()
-            if baris and not baris.startswith("#") and "=" in baris:
-                nama, isi = baris.split("=", 1)
-                nilai[nama.strip().upper()] = isi.strip().strip('"').strip("'")
-    return nilai
-
-JALUR_PENULIS = ("claude_bedrock", "claude_api", "openrouter", "tautan")
+JALUR_PENULIS = ("openrouter", "tautan")
 
 # Kode HTTP → (status, permanen). Permanen: jalur dimatikan sampai dicek ulang; sementara: diistirahatkan.
 def status_http(kode):
@@ -708,57 +640,6 @@ class PenulisDasar:
         if klien is not None:
             klien.close()
 
-class PenulisClaude(PenulisDasar):
-    """Claude lewat Anthropic SDK: Claude API langsung, atau Amazon Bedrock memakai Bedrock API key."""
-
-    def __init__(self, jalur, api_key, model=None, region=None, transport=None):
-        import anthropic
-
-        bedrock = jalur == "claude_bedrock"
-        super().__init__(jalur, model or (f"anthropic.{MODEL_CLAUDE}" if bedrock else MODEL_CLAUDE))
-        self.anthropic = anthropic
-        # transport hanya untuk pengujian (transport tiruan dari pustaka HTTP SDK, httpx2 pada anthropic 1.x).
-        opsi = {"http_client": anthropic.DefaultHttpxClient(transport=transport)} if transport else {}
-        if bedrock:
-            # Bedrock API key dikirim sebagai x-api-key sekaligus bearer token agar diterima endpoint Messages Bedrock.
-            opsi.update(base_url=f"https://bedrock-mantle.{region or REGION_BEDROCK}.api.aws/anthropic", auth_token=api_key)
-        else:
-            opsi["base_url"] = "https://api.anthropic.com"  # eksplisit: tidak mengikuti ANTHROPIC_BASE_URL di environment
-        # Satu pengulangan singkat untuk gangguan sesaat; gagal berikutnya ditangani rantai (jalur berikutnya).
-        self.klien = anthropic.Anthropic(api_key=api_key, timeout=BATAS_WAKTU_DETIK, max_retries=1, **opsi)
-
-    # Satu permintaan Messages API → (respons, "ok") atau (None, kode HTTP / status koneksi).
-    def _minta(self, sistem, pesan, maks_token, batas=BATAS_WAKTU_DETIK, **opsi):
-        a = self.anthropic
-        try:
-            respons = self.klien.messages.create(model=self.model, max_tokens=maks_token, system=sistem, timeout=batas,
-                                                 messages=[{"role": "user", "content": pesan}], **opsi)
-        except a.APIStatusError as e:
-            return None, e.status_code
-        except a.APITimeoutError:
-            return None, "timeout"
-        except a.APIConnectionError:
-            return None, "tidak terhubung"
-        self.catat_token(respons.usage.input_tokens, respons.usage.output_tokens)
-        return respons, "ok"
-
-    def _tulis(self, sistem, pesan):
-        usaha = {"output_config": {"effort": EFFORT_CLAUDE}} if EFFORT_CLAUDE else {}
-        respons, hasil = self._minta(sistem, pesan, MAKS_TOKEN_LLM, **usaha)
-        if respons is None:
-            return self.gagal_dari(hasil)
-        # Model menolak atau kehabisan token: kalimat ini gagal, jalurnya tetap sehat.
-        if respons.stop_reason in ("refusal", "max_tokens"):
-            return None, respons.stop_reason
-        teks = "".join(blok.text for blok in respons.content if blok.type == "text").strip()
-        return self.berhasil(teks) if teks else (None, "kosong")
-
-    # Satu pesan pendek dengan batas token normal (reasoning Opus bisa wajib): memastikan key, izin model, dan
-    # endpoint benar-benar berfungsi. Tagihan mengikuti token yang terpakai, bukan batasnya.
-    def _cek(self):
-        respons, hasil = self._minta("Balas: ok", "ok", MAKS_TOKEN_LLM, batas=BATAS_CEK_DETIK)
-        return "ok" if respons is not None else self.gagal_dari(hasil)[1]
-
 class PenulisHTTP(PenulisDasar):
     """Dasar jalur HTTP (httpx) untuk OpenRouter dan link LLM sendiri."""
 
@@ -809,7 +690,7 @@ class PenulisOpenRouter(PenulisHTTP):
     def __init__(self, api_key, model=None, transport=None):
         super().__init__("openrouter", model or MODEL_OPENROUTER, {"Authorization": f"Bearer {api_key}"}, transport)
 
-    # Qwen3: penalaran dimatikan agar cepat; Claude memang tanpa penalaran bila tidak diminta.
+    # Qwen3: penalaran dimatikan agar cepat; model lain memakai bawaannya.
     def _tambahan(self):
         return {"reasoning": {"enabled": False}} if "qwen3" in self.model.casefold() else {}
 
@@ -976,7 +857,7 @@ class PenulisBerantai:
                 for p in self.daftar]
 
 # Rantai dari urutan prioritas dan key/link yang tersedia; jalur tanpa key dilewati dengan keterangan.
-def buat_rantai(urutan, kunci, model=None, region=None, token_tautan=None):
+def buat_rantai(urutan, kunci, model=None, token_tautan=None):
     anggota, keterangan, model = [], {}, model or {}
     for jalur in dict.fromkeys(urutan):  # duplikat dibuang, prioritas dipertahankan
         if jalur not in JALUR_PENULIS:
@@ -987,32 +868,11 @@ def buat_rantai(urutan, kunci, model=None, region=None, token_tautan=None):
             try:
                 if jalur == "openrouter":
                     anggota.append(PenulisOpenRouter(kunci[jalur], model.get(jalur)))
-                elif jalur == "tautan":
-                    anggota.append(PenulisTautan(kunci[jalur], model.get(jalur), token_tautan))
                 else:
-                    anggota.append(PenulisClaude(jalur, kunci[jalur], model.get(jalur), region))
-            except Exception as e:  # mis. paket anthropic/httpx belum terpasang
+                    anggota.append(PenulisTautan(kunci[jalur], model.get(jalur), token_tautan))
+            except Exception as e:  # mis. paket httpx belum terpasang
                 keterangan[jalur] = f"gagal disiapkan ({type(e).__name__})"
     return (PenulisBerantai(anggota) if anggota else None), keterangan
-
-# Rantai sesuai PENULIS_NLG dari .env/environment, dicek dulu sebelum dipakai; nilai key tidak pernah dicetak.
-def buat_penulis():
-    if PENULIS_NLG == "templat":
-        return None
-    env = {**baca_env(BERKAS_ENV), **{k.upper(): v for k, v in os.environ.items()}}
-    urutan = [PENULIS_NLG] if PENULIS_NLG in JALUR_PENULIS else URUTAN_PENULIS
-    kunci = {"claude_bedrock": env.get("AMAZON_API_KEY"), "claude_api": env.get("ANTHROPIC_API_KEY"),
-             "openrouter": env.get("OPENROUTER_API_KEY") or env.get("OPENROUTER_DEFAULT"),
-             "tautan": env.get("LLM_TAUTAN_URL")}
-    rantai, keterangan = buat_rantai(urutan, kunci, {"tautan": env.get("LLM_TAUTAN_MODEL")},
-                                     token_tautan=env.get("LLM_TAUTAN_TOKEN"))
-    cek = {jalur: (model, hasil) for jalur, model, hasil in rantai.cek()} if rantai else {}
-    display(pd.DataFrame([{"prioritas": i + 1, "jalur": jalur, "model": cek.get(jalur, (None, None))[0],
-                           "hasil cek": cek[jalur][1] if jalur in cek else keterangan.get(jalur)}
-                          for i, jalur in enumerate(dict.fromkeys(urutan))]).style.hide(axis="index"))
-    if rantai is not None and rantai.terdepan() is None:
-        print("Tidak ada jalur LLM yang siap setelah cek; evaluasi LLM memakai templat.")
-    return rantai if rantai is not None and rantai.terdepan() is not None else None
 
 MAKSUD_AKSI = {
     "ungkap": "Mengaku sebagai Stalker dan menyampaikan hasil Peek bahwa {t} adalah Hitman, lalu mengajak semua vote {t}.",
@@ -1163,7 +1023,3 @@ def tulis_pesan(p, konteks, penulis=None, persona="santai", hindari=()):
 
     # 3) Cadangan: tidak ada varian yang lolos aturan, jadi varian pertama yang dikirim.
     return selesai(dinilai[0], "templat_cadangan")
-
-# Konteks NLG dari satu baris rencana (di game: dari ingatan bot dan snapshot).
-def konteks_dari(r):
-    return {"roster": r["roster"], "chat_terbaru": r["chat_terbaru"]}

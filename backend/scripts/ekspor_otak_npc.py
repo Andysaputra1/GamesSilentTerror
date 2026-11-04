@@ -43,7 +43,7 @@ BAGIAN_NLG = {
     "## Pipeline `tulis_pesan`",
 }
 
-# Import khusus notebook (tampilan/grafik) diganti stub; sisanya dipertahankan apa adanya.
+# Import khusus notebook (tampilan/grafik) dibuang; sisanya dipertahankan apa adanya.
 IMPORT_DIBUANG = {"matplotlib.pyplot", "IPython.display"}
 # Variabel tingkat modul yang memuat model, memanggil API, atau berisi data demo.
 VARIABEL_DIBUANG = {
@@ -89,11 +89,6 @@ Alurnya
 """
 # ruff: noqa
 # fmt: off
-
-
-# Pengganti fungsi tampilan notebook; backend tidak menampilkan tabel.
-def display(*args, **kwargs):
-    return None
 
 '''
 

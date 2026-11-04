@@ -1,8 +1,8 @@
 """FILE INI DIHASILKAN OTOMATIS oleh scripts/ekspor_otak_npc.py. JANGAN DIEDIT MANUAL.
 
 Sumber : npc_fuzzy.ipynb
-Sidik  : 5c6bbaca7dc71b03
-Dibuat : 2026-11-04 04:03 UTC
+Sidik  : fdab664267f31375
+Dibuat : 2026-11-04 04:41 UTC
 
 Perubahan logika bot dilakukan di notebook skripsi, dijalankan ulang sampai semua
 skenario/pengujian lulus, lalu diekspor ulang dengan skrip ini.
@@ -22,20 +22,7 @@ Alurnya
 # ruff: noqa
 # fmt: off
 
-
-# Pengganti fungsi tampilan notebook; backend tidak menampilkan tabel.
-def display(*args, **kwargs):
-    return None
-
-import hashlib
-
-import importlib.util
-
-import json
-
 import math
-
-import random
 
 import re
 
@@ -45,10 +32,6 @@ from dataclasses import dataclass, field
 
 from functools import lru_cache
 
-from pathlib import Path
-
-from time import perf_counter
-
 import numpy as np
 
 import pandas as pd
@@ -56,14 +39,6 @@ import pandas as pd
 import skfuzzy as fuzz
 
 from skfuzzy import control as ctrl
-
-INTENT_MODEL_DIR = Path("models/notebook_standalone/intent_classifier_transformer")
-
-TARGET_MODEL_DIR = Path("models/target_classifier/target_classifier_transformer")
-
-MATCH_ENGINE = Path("../../../Games/backend/app/module/match_engine.py")
-
-NLU_DEVICE = "cpu"
 
 PERAN = ("civilian", "spy", "stalker", "hitman")
 
@@ -141,14 +116,6 @@ def waktu_berjalan(ingatan, view):
         return 0.0
     return float(np.clip((view["waktu"] - mulai) / view["durasi"][view["fase"]], 0, 1))
 
-TOKEN_KANDIDAT = "KANDIDAT_X"
-
-TOKEN_PENGIRIM = "PENGIRIM_X"
-
-TOKEN_PEMAIN = "PEMAIN_X"
-
-TOKEN_TIDAK_DIKETAHUI = "TIDAK_DIKETAHUI"
-
 KATA_GANTI = {
     "aku", "saya", "gw", "gue", "gua", "dia", "kamu", "kau", "lu", "lo", "elu",
     "anda", "mereka", "kalian", "kita", "kami", "semua", "si",
@@ -168,163 +135,6 @@ def _nama_cocok(word, name):
         return True
     sisa = w[len(n):] if w.startswith(n) else None
     return sisa is not None and (sisa in AKHIRAN_NAMA or set(sisa) == {n[-1]})
-
-# Mengganti nama pemain dan panggilannya dengan token peran agar model tidak menghafal nama.
-def samarkan_nama(text, daftar_pemain, kandidat, pengirim, common_words):
-    lowered = {name.casefold(): name for name in daftar_pemain}
-
-    def token_for(name):
-        if name == kandidat:
-            return TOKEN_KANDIDAT
-        return TOKEN_PENGIRIM if name == pengirim else TOKEN_PEMAIN
-
-    def replace(match):
-        word = match.group(0)
-        key = word.casefold()
-        if key in lowered:
-            return token_for(lowered[key])
-        if key in KATA_GANTI or key in ISTILAH_GAME or key in common_words:
-            return word
-        matches = [name for name in daftar_pemain if _nama_cocok(word, name)]
-        return token_for(matches[0]) if len(matches) == 1 else word
-
-    return re.sub(r"\w+", replace, text)
-
-NAMA_KANONIK = (
-    ("Raka", "Lala", "Sari", "Naya", "Dito", "Kiki", "Fajar", "Tio", "Bima", "Wawan"),
-    ("Dito", "Kiki", "Fajar", "Tio", "Bima", "Wawan", "Raka", "Lala", "Sari", "Naya"),
-    ("Bima", "Wawan", "Raka", "Lala", "Sari", "Naya", "Dito", "Kiki", "Fajar", "Tio"),
-)
-
-# Varian teks untuk Model 1: nama pemain dan panggilannya diganti nama yang dikenal model, dengan aturan
-# pencocokan yang sama seperti samarkan_nama. Tanpa nama pemain, teks dipakai apa adanya.
-def varian_nama_intent(text, daftar_pemain, common_words):
-    lowered = {name.casefold(): name for name in daftar_pemain}
-
-    def pemain(word):
-        key = word.casefold()
-        if key in lowered:
-            return lowered[key]
-        if key in KATA_GANTI or key in ISTILAH_GAME or key in common_words:
-            return None
-        matches = [name for name in daftar_pemain if _nama_cocok(word, name)]
-        return matches[0] if len(matches) == 1 else None
-
-    urutan = {}
-    for word in re.findall(r"\w+", text):
-        nama = pemain(word)
-        if nama is not None:
-            urutan.setdefault(nama, len(urutan))
-    if not urutan:
-        return [text]
-
-    def ganti(set_nama):
-        def replace(match):
-            nama = pemain(match.group(0))
-            return match.group(0) if nama is None else set_nama[urutan[nama] % len(set_nama)]
-        return re.sub(r"\w+", replace, text)
-
-    return [ganti(set_nama) for set_nama in NAMA_KANONIK]
-
-# Menyusun satu teks pasangan (pesan, kandidat) dari pesan utama, konteks, dan roster.
-def buat_teks_pasangan(pengirim, teks_chat, chat_sebelumnya, daftar_pemain, kandidat, common_words, label_intent=None):
-
-    def peran(name):
-        if name == "tidak_diketahui":
-            return TOKEN_TIDAK_DIKETAHUI
-        if name == kandidat:
-            return TOKEN_KANDIDAT
-        return TOKEN_PENGIRIM if name == pengirim else TOKEN_PEMAIN
-
-    # Konteks terbaru ditulis lebih dulu agar yang terpotong adalah pesan paling lama.
-    bagian = []
-    for pesan in reversed(chat_sebelumnya):
-        relasi = ", ".join(f"{t['relasi']} {peran(t['pemain'])}" for t in pesan["target"])
-        anotasi = f"{pesan['label_intent']}: {relasi}" if relasi else pesan["label_intent"]
-        teks = samarkan_nama(pesan["teks_chat"], daftar_pemain, kandidat, pengirim, common_words)
-        bagian.append(f"{peran(pesan['pengirim'])}: {teks} [{anotasi}]")
-
-    sekarang = samarkan_nama(teks_chat, daftar_pemain, kandidat, pengirim, common_words)
-    konteks = " | ".join(bagian) if bagian else "tidak ada"
-    awal = f"intent {label_intent} || " if label_intent else ""
-    return f"{awal}pesan sekarang {peran(pengirim)}: {sekarang} || konteks: {konteks}"
-
-class NLUIndoBERT:
-    """Model 1 (intent) dan Model 2 (target) IndoBERT tersimpan; hanya inferensi, tanpa training atau unduhan."""
-
-    def __init__(self, intent_dir, target_dir, device="cpu"):
-        import torch
-        from transformers import AutoModelForSequenceClassification, AutoTokenizer
-
-        self.torch = torch
-        self.device = torch.device(device)
-        self.intent_tokenizer = AutoTokenizer.from_pretrained(intent_dir, local_files_only=True)
-        self.intent_model = AutoModelForSequenceClassification.from_pretrained(
-            intent_dir, local_files_only=True).to(self.device).eval()
-        self.target_tokenizer = AutoTokenizer.from_pretrained(target_dir, local_files_only=True)
-        self.target_model = AutoModelForSequenceClassification.from_pretrained(
-            target_dir, local_files_only=True).to(self.device).eval()
-        builder = json.loads((Path(target_dir) / "pair_builder.json").read_text(encoding="utf-8"))
-        self.common_words = frozenset(builder["common_words"])
-        # Ambang aturan minimal satu target yang dipilih dari validation saat training nlu_target.
-        path_ambang = Path(target_dir) / "ambang_target.json"
-        self.ambang = (float(json.loads(path_ambang.read_text(encoding="utf-8")).get("transformer", 0.0))
-                       if path_ambang.is_file() else 0.0)
-
-    # Probabilitas kelas untuk sekumpulan teks.
-    def _probabilitas(self, tokenizer, model, texts, max_length):
-        encoded = tokenizer(texts, return_tensors="pt", truncation=True, padding=True, max_length=max_length)
-        encoded = {name: value.to(self.device) for name, value in encoded.items()}
-        with self.torch.inference_mode():
-            return self.torch.softmax(model(**encoded).logits, dim=-1).cpu().numpy()
-
-    # Model 1: label intent dan confidence 0–1. Dengan roster, nama pemain diganti nama yang dikenal model
-    # (varian_nama_intent) dan probabilitas ketiga varian dirata-ratakan.
-    def intent(self, teks, daftar_pemain=()):
-        config = self.intent_model.config
-        varian = varian_nama_intent(teks, list(daftar_pemain), self.common_words) if daftar_pemain else [teks]
-        probs = self._probabilitas(self.intent_tokenizer, self.intent_model, varian,
-                                   getattr(config, "nlu_max_length", 128)).mean(axis=0)
-        index = int(probs.argmax())
-        label = {"offense": "offend", "defense": "defend"}.get(config.id2label[index], config.id2label[index])
-        return label, float(probs[index])
-
-    # Model 2: relasi setiap pemain roster terhadap pesan ini: offend/defend (dituduh/dibela) atau neutral (diajak
-    # bicara atau dibicarakan). Sama dengan gabung_target di nlu_target: pesan neutral boleh tanpa target, dan aturan
-    # minimal satu target serta "tidak_diketahui" hanya untuk offend/defend.
-    def target(self, pengirim, teks, konteks, daftar_pemain, label_intent):
-        config = self.target_model.config
-        labels = [config.id2label[i] for i in range(len(config.id2label))]
-        if label_intent == "neutral" and "neutral" not in labels:
-            return []  # model target lama belum mengenal relasi neutral
-        texts = [buat_teks_pasangan(pengirim, teks, konteks, daftar_pemain, kandidat, self.common_words, label_intent)
-                 for kandidat in daftar_pemain]
-        probs = self._probabilitas(self.target_tokenizer, self.target_model, texts,
-                                   getattr(config, "nlu_max_length", 512))
-        hasil = []
-        for kandidat, baris in zip(daftar_pemain, probs):
-            relasi = labels[int(baris.argmax())]
-            if relasi != "tidak_ada":
-                hasil.append({"pemain": kandidat, "relasi": relasi, "prob": float(baris.max())})
-        if label_intent == "neutral":
-            # Target pesan neutral selalu berelasi neutral (aturan dataset nlu_target); tanpa target = untuk semua.
-            return [t for t in hasil if t["relasi"] == "neutral"]
-        # Aturan minimal satu target (hanya offend/defend): sama dengan evaluasi di nlu_target.
-        if not hasil and self.ambang > 0 and label_intent in labels:
-            kolom = labels.index(label_intent)
-            terbaik = int(probs[:, kolom].argmax())
-            if probs[terbaik, kolom] >= self.ambang:
-                hasil.append({"pemain": daftar_pemain[terbaik], "relasi": label_intent, "prob": float(probs[terbaik, kolom])})
-        return hasil or [{"pemain": "tidak_diketahui", "relasi": label_intent, "prob": None}]
-
-# Memuat kedua model bila tersedia; jika belum dilatih, kembalikan None dengan pesan jelas.
-def muat_nlu():
-    hilang = [str(path) for path in (INTENT_MODEL_DIR, TARGET_MODEL_DIR) if not Path(path).is_dir()]
-    if hilang:
-        print("Model IndoBERT belum tersedia:", hilang)
-        print("Latih nlu_baru.ipynb (intent) dan nlu_target.ipynb (target) terlebih dahulu.")
-        return None
-    return NLUIndoBERT(INTENT_MODEL_DIR, TARGET_MODEL_DIR, NLU_DEVICE)
 
 # Aturan nama, sumber kedua target neutral: pemain roster yang disebut nama atau panggilannya di teks. Pencocokan sama
 # dengan samarkan_nama: nama persis, atau panggilan/akhiran (_nama_cocok) yang cocok dengan tepat satu pemain; kata
@@ -1721,14 +1531,6 @@ def format_npc(rencana_c, rencana_v, rencana_a):
     else:
         action, target = "wait", None
     return {"action": action, "target": target, "message": templat_pesan(rencana_c) if rencana_c["kirim"] else ""}
-
-# Menampilkan tabel dengan angka ringkas.
-def tampilkan(tabel, presisi=3):
-    display(tabel.style.format(precision=presisi, na_rep="—").hide(axis="index").set_properties(
-        **{"white-space": "normal", "text-align": "left"}))
-
-KOLOM_BUKTI = ["pemain", "tekanan", "dukungan", "plin_plan", "alihkan_tuduhan", "menuduh_orang_baik", "penuduh_dibungkam",
-               "ikut_salah_eksekusi", "klaim_role_bermasalah", "p_sandera", "p_gag", "volume_info", "diam"]
 
 BATASAN_NLG = [
     "Pertahankan intent dan target rencana; jangan menambah atau mengganti target.",
