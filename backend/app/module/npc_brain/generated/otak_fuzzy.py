@@ -1,8 +1,8 @@
 """FILE INI DIHASILKAN OTOMATIS oleh scripts/ekspor_otak_npc.py. JANGAN DIEDIT MANUAL.
 
 Sumber : npc_fuzzy.ipynb
-Sidik  : 3be60fcbf4b4c929
-Dibuat : 2026-11-04 06:23 UTC
+Sidik  : 544b7a0c8adad9b4
+Dibuat : 2026-11-04 07:05 UTC
 
 Perubahan logika bot dilakukan di notebook skripsi, dijalankan ulang sampai semua
 skenario/pengujian lulus, lalu diekspor ulang dengan skrip ini.
@@ -642,25 +642,30 @@ def hitung_bukti(ingatan, view, publik=False):
     # Klaim bersih palsu dari Hitman bisa membersihkan rekannya bila Hitman lebih dari satu: bobotnya dipotong.
     bobot_klaim_bersih = 1.0 if jumlah_hitman == 1 else 0.5
 
+    # Yang tersingkir atau disandera tidak bisa lagi mengeksekusi, jadi tuduhannya bukan tekanan. Tuduhan korban Hostage
+    # tetap menjadi bukti lewat penuduh_dibungkam.
+    bersuara = [q for q in hidup if not p_sandera[q]]
+
     baris = []
     for p in roster:
-        sumber = max(1, len([q for q in hidup if q not in (p, pengamat)]))
+        sumber = max(1, len([q for q in bersuara if q not in (p, pengamat)]))
 
-        # Tekanan dan dukungan: satu pemain dihitung sekali (bobot terbesar), baik lewat chat maupun vote.
+        # Tekanan dan dukungan: satu pemain dihitung sekali (nilai terbarunya), baik lewat chat maupun vote.
         penuduh, pembela = {}, {}
         for chat, pasangan in relasi:
             s = chat["pengirim"]
-            if s in (p, pengamat):
+            if s in (p, pengamat) or s not in bersuara:
                 continue
             for target, rel in pasangan:
                 if target == p:
                     kumpulan = penuduh if rel == "offend" else pembela
                     kumpulan[s] = max(kumpulan.get(s, 0.0), _luruh(chat["ronde"], R, PELURUHAN))
         for v in votes:
-            if v["target"] == p and v["pemilih"] not in (p, pengamat):
+            if v["target"] == p and v["pemilih"] not in (p, pengamat) and v["pemilih"] in bersuara:
                 penuduh[v["pemilih"]] = max(penuduh.get(v["pemilih"], 0.0), _luruh(v["ronde"], R, PELURUHAN))
         for s, bobot in klaim["bersih_peek"].get(p, {}).items():
-            pembela[s] = max(pembela.get(s, 0.0), bobot)
+            if s in bersuara:
+                pembela[s] = max(pembela.get(s, 0.0), bobot)
 
         # Plin-plan: berganti sikap ke target yang sama, atau vote tidak sejalan dengan ucapan.
         sikap = [(chat["ronde"], target, rel) for chat, pasangan in relasi if chat["pengirim"] == p

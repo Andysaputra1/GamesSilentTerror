@@ -323,8 +323,9 @@ const SUMBER_NLG = {
 const PARAMETER = {
   kecurigaan: 'Seberapa kuat pemain dianggap Hitman (0–1), hasil akhir metode.',
   tekanan:
-    'Tuduhan dan vote pemain lain ke pemain ini, dibagi jumlah pemain lain yang hidup; meluruh per ronde.',
-  dukungan: 'Pembelaan pemain lain, termasuk klaim bersih dari pengaku Stalker.',
+    'Tuduhan dan vote ke pemain ini dari yang masih bisa bersuara, dibagi jumlah mereka (hidup, tidak disandera); meluruh per ronde.',
+  dukungan:
+    'Pembelaan dari yang masih bisa bersuara, termasuk klaim bersih dari pengaku Stalker.',
   plin_plan: 'Berganti sikap ke target yang sama, atau vote tidak sesuai ucapannya.',
   alihkan_tuduhan:
     'Balasan pertama sesudah dituduh: menuduh orang lain 1, membela diri sekaligus menuduh 0,5, hanya membela 0; dirata-ratakan per balasan.',
