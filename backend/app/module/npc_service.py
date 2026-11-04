@@ -77,6 +77,7 @@ def isi_jejak(trace, match, otak, npc, rencana, tulisan, penolakan, durasi_ms, d
             "target": npc["target"],
             "chat": {
                 "aksi": rencana["aksi"],
+                "jenis": rencana.get("jenis"),
                 "target": rencana["target"],
                 "klaim": rencana.get("klaim", False),
                 "alasan": rencana["alasan"][:2],

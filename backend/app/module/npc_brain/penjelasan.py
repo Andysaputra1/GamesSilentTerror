@@ -234,7 +234,7 @@ def _rencana(rencana, *kunci):
 def _keputusan(hasil):
     return {
         "chat": _rencana(
-            hasil.get("rencana_chat"), "kirim", "aksi", "intent", "target", "klaim", "skor"
+            hasil.get("rencana_chat"), "kirim", "aksi", "jenis", "intent", "target", "klaim", "skor"
         ),
         "vote": _rencana(hasil.get("rencana_vote"), "aksi", "target", "skor"),
         "aksi": _rencana(hasil.get("rencana_aksi"), "aksi", "target", "skor"),
@@ -327,7 +327,8 @@ def _blok_kandidat(modul, metode, jejak, rencana, peran, judul, ambang):
     else:
         terpilih = next((r for r in rows if _cocok(r, rencana or {})), None) or rows[0]
     blok["kandidat"] = _tabel(rows, ["aksi", "target", "prioritas", "input"])
-    sistem = _sistem_fuzzy(modul, terpilih.get("aksi"), peran)
+    # Kandidat chat mencatat sistemnya sendiri, karena satu aksi bisa dinilai sistem berbeda per jenis.
+    sistem = terpilih.get("sistem") or _sistem_fuzzy(modul, terpilih.get("aksi"), peran)
     detail = (
         _detail_fuzzy(modul, sistem, terpilih.get("input") or {}, terpilih.get("prioritas"))
         if sistem
@@ -527,7 +528,7 @@ def _masukan(masukan):
     r = masukan["rencana"]
     prompt = masukan.get("prompt")
     return {
-        **{k: _nilai(r.get(k)) for k in ("aksi", "intent", "target", "klaim", "bukti", "penanya",
+        **{k: _nilai(r.get(k)) for k in ("aksi", "jenis", "intent", "target", "klaim", "bukti", "penanya",
                                           "cadangan") if r.get(k) is not None},
         "prompt": prompt[:MAKS_PROMPT] if isinstance(prompt, str) else None,
     }  # fmt: skip

@@ -846,7 +846,8 @@ function planText(r, chat = false) {
   if (DIAM.includes(r.aksi)) return `${r.aksi.replace('_', ' ')} — ${r.alasan?.[0] || ''}`;
   const intent = chat && r.intent ? ` (${r.intent}${r.klaim ? ', mengaku role' : ''})` : '';
   const skor = typeof r.skor === 'number' ? ` · skor ${teks(r.skor)}` : '';
-  return `${r.aksi}${r.target ? ` → ${r.target}` : ''}${intent}${skor}`;
+  const jenis = chat && r.jenis ? ` · ${r.jenis.replaceAll('_', ' ')}` : '';
+  return `${r.aksi}${jenis}${r.target ? ` → ${r.target}` : ''}${intent}${skor}`;
 }
 function engineText(e) {
   if (!e) return '—';
@@ -1122,6 +1123,7 @@ function masukanNlg(m) {
     keyValues(
       [
         ['Aksi chat', `${m.aksi}${m.target ? ` → ${m.target}` : ''}`],
+        ['Jenis', m.jenis],
         ['Intent', m.intent],
         ['Mengaku role', m.klaim],
         ['Alasan yang boleh dipakai', m.bukti],

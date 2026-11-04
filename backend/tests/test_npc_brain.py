@@ -57,8 +57,11 @@ class BrainRuntimeTests(unittest.TestCase):
         self.assertEqual(len(otak_fuzzy.SEMUA_SISTEM), 21)
         dihapus = "bela_diri h_bela_diri jawab h_jawab info_sandera sandera lindung".split()
         self.assertFalse(set(dihapus) & set(otak_fuzzy.SEMUA_SISTEM))
-        self.assertNotIn("info_sandera", otak_fuzzy.URUTAN_AKSI)
-        self.assertNotIn("info_sandera", otak_fuzzy.INTENT_AKSI)
+        self.assertEqual(
+            otak_fuzzy.URUTAN_AKSI, ["bela_diri", "jawab", "bela_orang", "tuduh", "tanya_info"]
+        )
+        self.assertEqual(set(otak_fuzzy.INTENT_AKSI), set(otak_fuzzy.URUTAN_AKSI))
+        self.assertLessEqual({"ajak_bicara", "klaim_palsu"}, set(otak_fuzzy.SEMUA_SISTEM))
         self.assertNotIn("info_sandera", nlg.VARIASI)
         self.assertNotIn("info_sandera", nlg.MAKSUD_AKSI)
 

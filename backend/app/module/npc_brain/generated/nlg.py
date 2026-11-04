@@ -1,8 +1,8 @@
 """FILE INI DIHASILKAN OTOMATIS oleh scripts/ekspor_otak_npc.py. JANGAN DIEDIT MANUAL.
 
 Sumber : npc_nlg.ipynb
-Sidik  : 58a1edeb62a58756
-Dibuat : 2026-11-04 07:48 UTC
+Sidik  : ed528f2934438ddf
+Dibuat : 2026-11-04 09:03 UTC
 
 Perubahan logika bot dilakukan di notebook skripsi, dijalankan ulang sampai semua
 skenario/pengujian lulus, lalu diekspor ulang dengan skrip ini.
@@ -166,6 +166,13 @@ VARIASI = {
 def kelompok_varian(p):
     if p["aksi"] == "jawab":
         return "jawab_target" if p["target"] else "jawab_netral"
+    # Sementara sampai Fase 8: jenis baru memakai kelompok kalimat lama.
+    if p.get("jenis") == "hasil_peek":
+        return "ungkap"
+    if p.get("jenis") == "klaim_peek":
+        return "klaim_palsu"
+    if p["aksi"] == "tanya_info" and p["target"]:
+        return "ajak_bicara"
     if p["aksi"] == "bela_orang" and p["klaim"]:
         return "bela_orang_klaim"
     if p["aksi"] == "tanya_info" and p["bukti"]:
