@@ -853,7 +853,7 @@ class ChatOrderTests(unittest.TestCase):
             )
             tabel, _ = otak_fuzzy.hitung_bukti(ingatan, view)
             budi = tabel[tabel["pemain"] == "Budi"].iloc[0]
-            self.assertEqual(budi["alihkan_tuduhan"], 0.5)  # dituduh lalu menuduh pihak ketiga
+            self.assertEqual(budi["alihkan_tuduhan"], 1.0)  # dituduh lalu hanya menuduh pihak ketiga
 
 
 class ChatTimeTests(unittest.TestCase):

@@ -27,7 +27,8 @@ MAKS_PROMPT = 2500  # karakter prompt LLM di masukan NLG
 
 # Kolom tabel tersangka: bukti, lalu nilai antara khas metode.
 KOLOM_BUKTI = ["kecurigaan", "tekanan", "dukungan", "plin_plan", "alihkan_tuduhan", "penuduh_dibungkam",
-               "ikut_salah_eksekusi", "menuduh_orang_baik", "klaim_role_bermasalah", "p_sandera", "diam"]  # fmt: skip
+               "ikut_salah_eksekusi", "memihak_hitman", "menuduh_orang_baik", "klaim_role_bermasalah",
+               "p_sandera", "diam"]  # fmt: skip
 KOLOM_METODE = {
     "fuzzy": [
         "sentimen_sosial",
@@ -39,12 +40,11 @@ KOLOM_METODE = {
     ],
 }
 KOLOM_HITMAN = ["pemain", "ancaman", "kambing_hitam", "menuduh_tim", "pengaruh", "mengaku_role_penting",
-                "kecurigaan_publik", "dukungan_suara", "p_sandera", "tidak_dijaga", "ancaman_sekarang",
+                "kecurigaan_publik", "dukungan_suara", "ancaman_sekarang", "jejak_tuduhan",
                 "ancaman_langsung", "ancaman_peran"]  # fmt: skip
 KOLOM_LINDUNG = [
     "pemain",
     "terancam",
-    "kepercayaan",
     "menuduh_tersangka",
     "mengaku_stalker",
     "pengaruh",
@@ -158,7 +158,6 @@ def _identitas(bot, view):
 
 def _pengetahuan(pengetahuan, bot):
     hasil = _nilai(dict(pengetahuan or {}))
-    hasil.pop("peran", None)  # sudah ada di identitas
     intel = getattr(getattr(bot, "ingatan", None), "intel", None)
     if intel:  # hasil Peek milik bot sendiri
         hasil["intel"] = [

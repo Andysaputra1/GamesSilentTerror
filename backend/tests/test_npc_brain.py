@@ -450,7 +450,7 @@ class NPCServiceBrainTests(unittest.IsolatedAsyncioTestCase):
 
 class HostageResultTests(unittest.TestCase):
     # Bot Hitman memakai hasil Hostage pasti dari server (me.syndicate_hostages), bukan dugaan dari aktivitas
-    # target: ingatan yang baru melihat snapshot siang tetap tahu korban berhasil dan target yang dijaga.
+    # target: ingatan yang baru melihat snapshot siang tetap tahu berapa malam Hostage ke target yang sama gagal.
     def test_hitman_brains_use_certain_hostage_results(self):
         import importlib
 
@@ -462,23 +462,26 @@ class HostageResultTests(unittest.TestCase):
         game.act("hitman", "hostage", "civilian")
         game.act("spy", "guard", "civilian")
         game.resolve_night()
-        game.round, game.phase = 2, "night"
+        game.round, game.phase = 2, "day"
+        M = importlib.import_module("app.module.npc_brain.generated.otak_fuzzy")
+
+        def gagal_beruntun(snapshot):
+            ingatan = M.Ingatan("hitman")
+            view = ingatan.sinkron_snapshot(snapshot, time.time())
+            return M.pengetahuan_peran(ingatan, view)["gagal_beruntun"]
+
+        self.assertEqual(gagal_beruntun(game.snapshot("hitman")), {"civilian": 1})
+        # Tanpa catatan server tidak ada kesimpulan dari pengumuman roster.
+        snapshot = game.snapshot("hitman")
+        snapshot["me"]["syndicate_hostages"] = []
+        self.assertEqual(gagal_beruntun(snapshot), {})
+        # Hostage semalam berhasil: rangkaian gagal terputus.
+        game.phase = "night"
         game.actions.clear()
         game.act("hitman", "hostage", "civilian2")
         game.resolve_night()
         game.round, game.phase = 3, "day"
-        M = importlib.import_module("app.module.npc_brain.generated.otak_fuzzy")
-        ingatan = M.Ingatan("hitman")
-        view = ingatan.sinkron_snapshot(game.snapshot("hitman"), time.time())
-        tahu = M.pengetahuan_peran(ingatan, view)
-        self.assertEqual(tahu["korban_saya"], {"civilian2"})
-        self.assertEqual(tahu["dijaga"], {"civilian": 1})
-        # Tanpa catatan server tidak ada kesimpulan dari pengumuman roster.
-        snapshot = game.snapshot("hitman")
-        snapshot["me"]["syndicate_hostages"] = []
-        ingatan = M.Ingatan("hitman")
-        tahu = M.pengetahuan_peran(ingatan, ingatan.sinkron_snapshot(snapshot, time.time()))
-        self.assertEqual((tahu["korban_saya"], tahu["dijaga"]), (set(), {}))
+        self.assertEqual(gagal_beruntun(game.snapshot("hitman")), {})
 
 
 class ExportFreshnessTests(unittest.TestCase):

@@ -326,13 +326,18 @@ const PARAMETER = {
     'Tuduhan dan vote pemain lain ke pemain ini, dibagi jumlah pemain lain yang hidup; meluruh per ronde.',
   dukungan: 'Pembelaan pemain lain, termasuk klaim bersih dari pengaku Stalker.',
   plin_plan: 'Berganti sikap ke target yang sama, atau vote tidak sesuai ucapannya.',
-  alihkan_tuduhan: 'Setelah dituduh, malah menuduh orang lain alih-alih membela diri.',
+  alihkan_tuduhan:
+    'Balasan pertama sesudah dituduh: menuduh orang lain 1, membela diri sekaligus menuduh 0,5, hanya membela 0; dirata-ratakan per balasan.',
   penuduh_dibungkam:
     'Pernah dituduh pemain yang kemudian disandera (diumumkan) atau diduga di-Gag (jejak aksi Hitman).',
   ikut_salah_eksekusi:
     'Ikut mendorong eksekusi warga: vote, ikut menuduh, atau penuduh pertama, dikali kepastian korban warga (1 bila game berlanjut di room satu Hitman atau jumlah Hitman yang diumumkan tetap; selain itu 1 − k/(N − 1)). Tidak dihitung bila korban diketahui Hitman.',
+  memihak_hitman:
+    'Pernah membela pemain yang kini terbukti Hitman; rendah bila hanya mengulang klaim bersih pengaku Stalker lain.',
+  jejak_kedua: 'Nilai terbesar dari ikut_salah_eksekusi dan memihak_hitman, input kedua sistem jejak.',
   menuduh_orang_baik: 'Menuduh atau vote pemain yang pasti orang baik menurut bot.',
-  klaim_role_bermasalah: 'Klaim role bermasalah: bentrok, dibantah, atau hasil Peek palsu.',
+  klaim_role_bermasalah:
+    'Klaim role bermasalah: pasti bohong 1; klaim terbukti salah atau disebut Hitman oleh pengaku tunggal 0,8; bentrok 0,6.',
   p_sandera: 'Korban Hostage yang diumumkan server (1) atau bukan (0); korban pasti bukan Hitman.',
   diam: 'Belum bicara di ronde ini (0–1 menurut waktu yang lewat).',
   warga_terdesak: 'Makin sedikit warga bebas, makin mendesak (0–1).',
@@ -346,8 +351,10 @@ const PARAMETER = {
   bendera: 'Behavior Tree: bendera merah aktif bila nilai bukti ≥ ambangnya.',
   ancaman: 'Hitman: seberapa berbahaya pemain (menuduh, berpengaruh, mengaku role penting).',
   kambing_hitam: 'Hitman: seberapa mudah pemain dijadikan tersangka oleh warga.',
+  jejak_tuduhan:
+    'Hitman: seberapa jelas pemain ini menuduh Syndicate, makin sedikit orang yang dituduhnya makin tinggi; jejak bila ia dibungkam.',
   terancam: 'Spy: seberapa mungkin pemain diincar Hitman malam ini.',
-  kepercayaan: 'Seberapa bisa dipercaya (1 = pasti bersih).',
+  kepercayaan: 'Input bela orang dan Guard: seberapa bisa dipercaya (1 = pasti bersih).',
 };
 // Nama lama tetap dikenali karena jejak lama di checker_traces masih memakainya.
 for (const [lama, baru] of Object.entries({
