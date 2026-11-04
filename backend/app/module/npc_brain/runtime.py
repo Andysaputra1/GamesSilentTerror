@@ -47,13 +47,6 @@ PENULIS_VALID = {"otomatis", "templat"}
 # Jalur rantai penulis: openrouter dan tautan (link LLM sendiri, mis. Ollama lewat tunnel).
 JALUR_PENULIS = JALUR_PENULIS_NPC
 
-# Label SVM lama → intent NLU baru; hanya dipakai bila IndoBERT tidak tersedia.
-INTENT_SVM = {
-    "accusing": "offend", "persuading": "offend", "bluffing": "offend", "deflecting": "offend",
-    "menuduh": "offend", "membujuk": "offend", "menggertak": "offend", "mengelak": "offend",
-    "defending": "defend", "membela": "defend", "offend": "offend", "defend": "defend",
-}  # fmt: skip
-
 # Lokasi default model IndoBERT: artifacts backend, lalu folder skripsi di sebelah repo Games.
 FOLDER_MODEL = {
     "intent": ("intent", "models/notebook_standalone/intent_classifier_transformer"),
@@ -95,55 +88,6 @@ class NLUBersama:
         return self._ingat(
             kunci, lambda: self.nlu.target(pengirim, teks, konteks, daftar_pemain, label_intent)
         )
-
-
-class NLUCadangan:
-    """Pengganti IndoBERT: intent dari SVM lama dan target dari nama pemain yang disebut.
-
-    Kualitasnya jauh di bawah IndoBERT; sumber NLU dicatat di trace agar data penelitian
-    dari mode ini bisa dipisahkan. Pesan neutral tidak diberi target di sini: anotasi_chat
-    memberi target neutral lewat aturan nama saja (sama dengan persepsi notebook).
-    """
-
-    ambang = 0.0
-
-    def __init__(self, analysis=None, common_words=frozenset()):
-        self.analysis = analysis
-        self.common_words = frozenset(common_words)
-
-    def intent(self, teks, daftar_pemain=()):
-        try:
-            label = self.analysis.predict_intent(teks) if self.analysis else "neutral"
-        except Exception:
-            return "neutral", 0.0
-        return INTENT_SVM.get(str(label).lower(), "neutral"), 0.7
-
-    def target(self, pengirim, teks, konteks, daftar_pemain, label_intent):
-        if label_intent == "neutral":
-            return []
-        kata = {w.casefold() for w in re.findall(r"\w+", teks)}
-        disebut = [p for p in daftar_pemain if p != pengirim and p.casefold() in kata]
-        if (
-            not disebut
-            and label_intent == "defend"
-            and re.search(r"\b(aku|saya|gw|gue)\b", teks, re.I)
-        ):
-            disebut = [pengirim]
-        return [{"pemain": p, "relasi": label_intent, "prob": None} for p in disebut] or [
-            {"pemain": "tidak_diketahui", "relasi": label_intent, "prob": None}
-        ]
-
-
-# Kata umum dari pair_builder.json model target (bila folder ada) untuk aturan nama NLU cadangan;
-# tanpa berkas itu hanya kata ganti dan istilah game yang dilindungi.
-def kata_umum(target_dir) -> frozenset:
-    path = Path(target_dir) / "pair_builder.json" if target_dir else None
-    if not path or not path.is_file():
-        return frozenset()
-    try:
-        return frozenset(json.loads(path.read_text(encoding="utf-8"))["common_words"])
-    except (OSError, ValueError, KeyError):
-        return frozenset()
 
 
 # Target NLU → teks pendek untuk panel, mis. "NOX: offend (0.91)".
@@ -275,7 +219,7 @@ class BrainRuntime:
     _gagal_pada = None  # waktu (monotonic) pemuatan terakhir gagal; None = belum pernah gagal
 
     # STARTUP: muat modul otak, NLU, dan penulis di thread latar agar server langsung melayani request.
-    def mulai_memuat(self, analysis=None):
+    def mulai_memuat(self):
         with self.lock:
             # Sudah dimuat (termasuk lewat muat_sekarang) atau sedang dimuat: jangan memuat ulang,
             # karena pemuatan ulang di latar mengganti NLU dan modul yang sedang dipakai bot.
@@ -290,22 +234,22 @@ class BrainRuntime:
                 return
             self.status.update(gagal=False, detail="Memuat otak NPC…", progres=0.0)
             self._thread = threading.Thread(
-                target=self._muat, args=(analysis,), daemon=True, name="muat-otak-npc"
+                target=self._muat, daemon=True, name="muat-otak-npc"
             )
             self._thread.start()
 
     # Dipakai test dan skrip: muat sinkron.
-    def muat_sekarang(self, analysis=None, nlu=None):
-        self._muat(analysis, nlu)
+    def muat_sekarang(self, nlu=None):
+        self._muat(nlu)
 
-    def _muat(self, analysis=None, nlu=None):
+    def _muat(self, nlu=None):
         try:
             self._set(detail="Memuat logika fuzzy…", progres=0.1)
             for metode, nama in METODE_MODUL.items():
                 self.modul[metode] = importlib.import_module(f"app.module.npc_brain.generated.{nama}")
             self.nlg = importlib.import_module("app.module.npc_brain.generated.nlg")
             self._set(detail="Memuat NLU IndoBERT (intent dan target)…", progres=0.35)
-            self.nlu = nlu if nlu is not None else self._buat_nlu(analysis)
+            self.nlu = nlu if nlu is not None else self._buat_nlu()
             self._set(detail="Menyiapkan penulis kalimat…", progres=0.85)
             # Rantai dibangun sekarang dan dicek di latar: permainan tidak menunggu jaringan, dan jalur
             # yang belum selesai dicek tetap boleh dicoba (kegagalannya ditangani rantai).
@@ -320,19 +264,15 @@ class BrainRuntime:
                 detail="Otak NPC gagal dimuat; bot memakai aksi cadangan engine.",
             )  # fmt: skip
 
-    def _buat_nlu(self, analysis):
+    # Tanpa IndoBERT otak dianggap gagal dimuat: bot memakai aksi cadangan engine.
+    def _buat_nlu(self):
         intent_dir = folder_model(settings.npc_intent_model_dir, "intent")
         target_dir = folder_model(settings.npc_target_model_dir, "target")
-        if intent_dir and target_dir:
-            try:
-                model = self.nlg.NLUIndoBERT(intent_dir, target_dir, settings.npc_nlu_device)
-                logger.info("IndoBERT dimuat dari %s dan %s", intent_dir, target_dir)
-                return NLUBersama(model, "indobert")
-            except Exception:
-                logger.exception("IndoBERT gagal dimuat; memakai NLU cadangan.")
-        else:
-            logger.warning("Folder IndoBERT tidak ditemukan; memakai NLU cadangan (SVM + nama).")
-        return NLUBersama(NLUCadangan(analysis, kata_umum(target_dir)), "cadangan")
+        if not intent_dir or not target_dir:
+            raise FileNotFoundError("Folder model IndoBERT tidak ditemukan.")
+        model = self.nlg.NLUIndoBERT(intent_dir, target_dir, settings.npc_nlu_device)
+        logger.info("IndoBERT dimuat dari %s dan %s", intent_dir, target_dir)
+        return NLUBersama(model, "indobert")
 
     # RANTAI PENULIS sesuai urutan panel: key OpenRouter dan link LLM (Docker/tunnel) dari Konfigurasi AI
     # panel. Jalur tanpa key/link dilewati; semua gagal → templat.

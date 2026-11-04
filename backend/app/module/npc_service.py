@@ -163,13 +163,12 @@ async def catat_nlu(match, pengirim, teks, message_id=None, runtime=brain_runtim
 
 
 class NPCService:
-    def __init__(self, sio, *, broadcast=None, runtime=None, analysis=None):
+    def __init__(self, sio, *, broadcast=None, runtime=None):
         self.sio = sio
         self.broadcast = broadcast or sio.emit
         self.tasks = set()
         self.preparing = set()
         self.runtime = runtime or brain_runtime
-        self.analysis = analysis
         # Lantai bicara: match_id → {bot yang sedang menyusun/mengetik chat: (intent, target) rencananya}.
         self.lantai: dict[str, dict[str, tuple]] = {}
 
@@ -233,7 +232,7 @@ class NPCService:
     async def prepare(self, code, match):
         detail = "AI siap."
         try:
-            self.runtime.mulai_memuat(self.analysis)
+            self.runtime.mulai_memuat()
             while True:
                 status = self.runtime.ringkasan()
                 with room_service.lock:

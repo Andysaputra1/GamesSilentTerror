@@ -21,7 +21,6 @@ from app.controller.middleware.cors import configure_cors
 from app.module.mysql_connector import engine, database_is_ready
 from app.config.settings import settings
 from app.controller.realtime.socket_handlers import register_socket_handlers
-from app.module.analysis_service import analysis_service
 from app.module.npc_service import NPCService
 from app.module.npc_brain.runtime import brain_runtime
 from app.module.npc_config_service import load_npc_configuration
@@ -31,12 +30,9 @@ logger = logging.getLogger("shadow_heist")
 
 
 @asynccontextmanager
-# LIFECYCLE ASYNC: muat SVM dan cek MySQL saat startup; tutup pool koneksi saat aplikasi berhenti.
+# LIFECYCLE ASYNC: cek MySQL saat startup; tutup pool koneksi saat aplikasi berhenti.
 async def lifespan(_: FastAPI):
-    """Load the classifier and validate connectivity without changing schema."""
-    # TAHAP 0: saat backend mulai, muat model SVM dari file ke memori.
-    # Ini bukan training/upload; file model harus sudah tersedia di server.
-    analysis_service.load_model()
+    """Validate connectivity without changing schema."""
     if database_is_ready():
         logger.info("Koneksi MySQL siap.")
         from app.module.ai_runtime_service import load_panel_configuration
@@ -54,7 +50,7 @@ async def lifespan(_: FastAPI):
         logger.error("Koneksi awal MySQL gagal.")
 
     # Otak NPC (IndoBERT + fuzzy + NLG) dimuat di latar agar server langsung melayani.
-    brain_runtime.mulai_memuat(analysis_service)
+    brain_runtime.mulai_memuat()
 
     # Timer server tidak bergantung pada tab pemain atau kecepatan respons LLM.
     async def game_clock():
@@ -86,7 +82,7 @@ app.include_router(api_router)
 # The former Node real-time server is hosted alongside FastAPI on port 8000.
 sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins=settings.allowed_origins)
 socket_controller = register_socket_handlers(sio)
-npc_service = NPCService(sio, broadcast=socket_controller.emit_room, analysis=analysis_service)
+npc_service = NPCService(sio, broadcast=socket_controller.emit_room)
 
 # Uvicorn targets this object so FastAPI and Socket.IO share one backend port.
 asgi_app = socketio.ASGIApp(sio, other_asgi_app=app)

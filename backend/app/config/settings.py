@@ -67,7 +67,6 @@ class Settings(MySQLSettings):
             raise ValueError("OLLAMA_MODEL harus 4, 8, atau 14.")
         return models[selected]
 
-    intent_model_path: Path = BACKEND_DIR / "artifacts" / "svm" / "intent_classifier.pkl"
 
     # OTAK NPC (hasil ekspor notebook skripsi): penulis kalimat dan lokasi IndoBERT.
     # otomatis = rantai penulis LLM (urutan di bawah, bisa diubah di panel), semua gagal → templat;

@@ -6,28 +6,21 @@
 - pemuatan otak yang gagal dicoba ulang setelah jeda; path model yang salah dicatat.
 """
 
-import re
 import time
 import unittest
 from unittest.mock import AsyncMock, Mock, patch
 
 from app.module.npc_brain import runtime as runtime_modul
-from app.module.npc_brain.runtime import BrainRuntime, NLUBersama, NLUCadangan, folder_model
+from app.module.npc_brain.runtime import BrainRuntime, NLUBersama, folder_model
+from tests.nlu_palsu import NLUPalsu
 from app.module.npc_service import NPCService
 from app.module.room_service import RoomService
-
-
-class KataKunci:
-    """Pengganti SVM: kalimat berisi 'curiga' terbaca menuduh agar bot yang dituduh membela diri."""
-
-    def predict_intent(self, teks):
-        return "accusing" if re.search(r"curiga|vote", teks.casefold()) else "neutral"
 
 
 def runtime_siap():
     runtime = BrainRuntime()
     runtime.konfigurasi.penulis = "templat"
-    runtime.muat_sekarang(nlu=NLUBersama(NLUCadangan(KataKunci()), "cadangan"))
+    runtime.muat_sekarang(nlu=NLUBersama(NLUPalsu(r"curiga|vote"), "cadangan"))
     return runtime
 
 

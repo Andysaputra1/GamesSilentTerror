@@ -44,16 +44,6 @@ fill openrouter_default with your default OpenRouter key, or configure your own 
 later in /panel. Keep BACKEND_DOMAIN=backendthesis.andylabs.site and
 FRONTEND_ORIGIN=https://silent-terror.andylabs.site.
 
-The .pkl classifier is intentionally ignored by Git. Upload the trusted existing
-artifact from your own PC; the backend will not be ready without it. Example from
-Windows CMD, using the actual clone directory on the VM:
-
-```bat
-scp backend\artifacts\svm\intent_classifier.pkl azureuser@70.153.8.162:~/GamesSilentTerror/backend/artifacts/svm/intent_classifier.pkl
-```
-
-Do not load a pickle file from an unknown source. It is executable Python data.
-
 ```bash
 sudo docker volume create shadow_heist_mysql_data
 sudo docker compose --env-file .env.azure -f docker-compose.azure.yml up -d mysql
@@ -77,7 +67,7 @@ curl -fsS https://backendthesis.andylabs.site/api/auth/google/config
 ```
 
 Caddy obtains and renews HTTPS certificates after DNS and ports 80/443 work.
-/ready checks schema and SVM without contacting an AI service. One backend worker
+/ready checks the schema without contacting an AI service. One backend worker
 is intentional: game rooms and Google nonces live in one process. Restarting the
 backend interrupts active games but does not delete archived chat.
 

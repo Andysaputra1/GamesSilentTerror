@@ -2113,7 +2113,6 @@ function showNpc(data, { form = true } = {}) {
   renderChain();
   const nlu = {
     indobert: 'IndoBERT (intent + target)',
-    cadangan: 'Cadangan: SVM + nama yang disebut (IndoBERT tidak ditemukan)',
   };
   const writer = status.penulis_aktif
     ? writerLabel(status.penulis) + (status.model_penulis ? ` (${status.model_penulis})` : '')

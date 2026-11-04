@@ -31,7 +31,6 @@ backend/
       create_user.py            # CLI akun tambahan untuk multiplayer lokal
     schemas/                    # Validasi request/response API
   artifacts/
-    svm/intent_classifier.pkl   # Model ML privat, terpisah dari model database
     indobert/                   # Model NLU intent dan target
   deployment/                   # Dockerfile Azure dan proxy
   migrations/                   # SQL untuk membuat/mengubah struktur tabel

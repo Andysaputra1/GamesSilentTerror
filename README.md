@@ -38,7 +38,7 @@ Semua AI ada di **otak bot** (NPC yang ikut bermain). Chat manusia hanya diotori
 
 Game hanya memakai otak Fuzzy. Utility AI dan Behavior Tree diarsipkan di luar repo, di `../arsip_bt_utility_2026-11-03/` (isi dan cara menariknya kembali ada di README folder itu). Angka keseimbangan di `GAME_CONCEPT.md` diukur dengan metode campuran, jadi belum berlaku untuk Fuzzy saja.
 
-Tanpa model IndoBERT, bot tetap bermain dengan NLU cadangan (SVM + nama yang disebut) yang kualitasnya lebih rendah; sumber NLU tercatat di trace dan terlihat di panel menu **Otak NPC**.
+Tanpa model IndoBERT, otak bot gagal dimuat: bot tidak chat dan hanya memakai aksi cadangan engine. Statusnya terlihat di panel menu **Otak NPC**.
 
 ## Persiapan
 
@@ -74,19 +74,7 @@ cp .env.example .env
 
 Lakukan penyalinan hanya saat setup awal; jangan menimpa `.env` yang sudah dikonfigurasi. File ini menyimpan konfigurasi lokal dan secret, sehingga tidak boleh di-commit.
 
-### 3. Siapkan model SVM — untuk analisis pesan manusia
-
-Minta artifact terlatih `intent_classifier.pkl` kepada pengelola proyek, lalu letakkan di:
-
-```text
-backend/artifacts/svm/intent_classifier.pkl
-```
-
-File `.pkl` sengaja diabaikan Git dan **tidak tersedia hanya dengan clone repository**. Gunakan hanya artifact tepercaya karena pemuatan pickle dapat menjalankan kode.
-
-Tanpa model SVM, pesan pemain masih bisa diteruskan dan bot tetap bermain, tetapi analisis intent pesan manusia tidak tersedia, dan NLU cadangan bot (dipakai bila IndoBERT tidak ada) hanya menghasilkan intent netral. Lihat [panduan artifact SVM](backend/artifacts/svm/README.md).
-
-### 4. Siapkan otak NPC (IndoBERT + fuzzy + NLG)
+### 3. Siapkan otak NPC (IndoBERT + fuzzy + NLG)
 
 Bot memakai logika notebook skripsi (`training/prethesis/ai_2_dataset_baru`). Kode logikanya sudah ada di `backend/app/module/npc_brain/generated/` (hasil ekspor, jangan diedit manual). Yang perlu disalin hanyalah dua folder model IndoBERT (±440 MB masing-masing, diabaikan Git):
 
@@ -339,7 +327,6 @@ backend/              Python FastAPI + Socket.IO
     models/           Query SQL terparameterisasi
     schemas/          Validasi request/response API
   public/panel/       Halaman panel administrator
-  artifacts/svm/      Model intent SVM privat, disediakan terpisah
   artifacts/indobert/ Model IndoBERT intent + target untuk otak NPC (disalin manual)
   migrations/         Skema SQL V01–V10 (lokal dan Azure)
   deployment/         Konfigurasi produksi Azure (Dockerfile, Caddy)
@@ -349,7 +336,7 @@ ai-docker/            LLM penulis kalimat bot (Qwen3 4B/14B) di laptop + tunnel 
 docker-compose.yml    Service development dan volume
 ```
 
-Alur chat manusia: **pesan → otorisasi → validasi ulang fase/hak chat → penyimpanan MySQL → broadcast**. Secara terpisah, timer menjalankan bot: **snapshot privat → IndoBERT (baca chat) → fuzzy → NLG → validasi IndoBERT → aksi/vote/chat** (mode `llm` lama tetap tersedia). Analisis lama SVM → agresivitas → fuzzy 2 input dan balasan NOX sudah dihapus; model SVM hanya dipakai sebagai NLU cadangan bila IndoBERT tidak ada.
+Alur chat manusia: **pesan → otorisasi → validasi ulang fase/hak chat → penyimpanan MySQL → broadcast**. Secara terpisah, timer menjalankan bot: **snapshot privat → IndoBERT (baca chat) → fuzzy → NLG → validasi IndoBERT → aksi/vote/chat**. Analisis lama SVM → agresivitas → fuzzy 2 input dan balasan NOX sudah dihapus; model SVM hanya dipakai sebagai NLU cadangan bila IndoBERT tidak ada.
 
 Dengan container aplikasi sudah berjalan:
 

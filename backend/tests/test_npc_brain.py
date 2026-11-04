@@ -7,36 +7,26 @@ import asyncio
 import contextlib
 import json
 import random
-import re
 import time
 import unittest
 from unittest.mock import AsyncMock, Mock, patch
 
 from app.module.match_engine import Match
-from app.module.npc_brain.runtime import BrainRuntime, NLUBersama, NLUCadangan
+from app.module.npc_brain.runtime import BrainRuntime, NLUBersama
 from app.module.npc_service import LANTAI_MAKS, NPCService, catat_nlu
 from app.module.persistence_service import PersistenceError
 from app.module.room_service import RoomService
+from tests.nlu_palsu import NLUPalsu
 
 AKSI_RAHASIA = {"gag", "hostage", "guard", "peek"}
-
-
-class AnalisisKataKunci:
-    """Pengganti SVM: label lama dari kata kunci supaya NLU cadangan bisa dipakai di test."""
-
-    def predict_intent(self, teks):
-        kecil = teks.casefold()
-        if re.search(r"bukan hitman|jangan vote|jangan buru|disandera|percaya", kecil):
-            return "defending"
-        if re.search(r"curiga|hitman|vote|mencurigakan", kecil):
-            return "accusing"
-        return "neutral"
 
 
 def runtime_siap():
     runtime = BrainRuntime()
     runtime.konfigurasi.penulis = "templat"
-    runtime.muat_sekarang(nlu=NLUBersama(NLUCadangan(AnalisisKataKunci()), "cadangan"))
+    pola_offend = r"curiga|hitman|vote|mencurigakan"
+    pola_defend = r"bukan hitman|jangan vote|jangan buru|disandera|percaya"
+    runtime.muat_sekarang(nlu=NLUBersama(NLUPalsu(pola_offend, pola_defend), "cadangan"))
     return runtime
 
 
@@ -89,7 +79,7 @@ class BrainRuntimeTests(unittest.TestCase):
         model.intent.assert_called_once_with("Gw curiga sama tester.", ("tester", "NOX"))
 
     def test_baca_chat_adds_neutral_targets_from_the_name_rule(self):
-        # NLU cadangan tidak memberi target untuk pesan neutral; aturan nama di anotasi_chat yang memberinya.
+        # NLU palsu tidak memberi target untuk pesan neutral; aturan nama di anotasi_chat yang memberinya.
         roster = ["human", "NOX", "ECHO", "VEIL"]
         sapa = self.runtime.baca_chat([], "human", "Vei, kamu semalam ngapain?", roster)
         self.assertEqual(sapa["intent"], "neutral")

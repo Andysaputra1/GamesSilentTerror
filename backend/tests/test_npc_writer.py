@@ -17,8 +17,9 @@ from pydantic import SecretStr
 from app.config.settings import Settings
 from app.controller.api.panel import require_panel
 from app.module.npc_brain.runtime import (
-    JALUR_PENULIS, BrainRuntime, NLUBersama, NLUCadangan, OtakBot,
+    JALUR_PENULIS, BrainRuntime, NLUBersama, OtakBot,
 )  # fmt: skip
+from tests.nlu_palsu import NLUPalsu
 
 RAHASIA = {
     "openrouter": "sk-or-rahasia-uji",
@@ -30,7 +31,7 @@ RAHASIA = {
 def runtime_siap():
     runtime = BrainRuntime()
     runtime.konfigurasi.penulis = "templat"
-    runtime.muat_sekarang(nlu=NLUBersama(NLUCadangan(None), "cadangan"))
+    runtime.muat_sekarang(nlu=NLUBersama(NLUPalsu(), "cadangan"))
     return runtime
 
 

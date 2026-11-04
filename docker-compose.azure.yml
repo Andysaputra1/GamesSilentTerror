@@ -51,7 +51,6 @@ services:
       OLLAMA_MODEL: '14'
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://127.0.0.1:11434}
       OLLAMA_TUNNEL_TOKEN: ${OLLAMA_TUNNEL_TOKEN:-}
-      INTENT_MODEL_PATH: /models/intent_classifier.pkl
       # Otak NPC (lihat .env.example). Nilai bawaan wajib diisi karena variabel kosong mengalahkan
       # default backend (mis. urutan rantai kosong mematikan semua jalur LLM).
       NPC_WRITER: ${NPC_WRITER:-otomatis}
@@ -63,8 +62,6 @@ services:
       DATABASE_POOL_SIZE: '5'
       DATABASE_MAX_OVERFLOW: '5'
       SQL_ECHO: 'false'
-    volumes:
-      - ./backend/artifacts/svm:/models:ro
     healthcheck:
       test:
         [
