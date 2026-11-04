@@ -39,8 +39,8 @@ class KodeAlurTests(unittest.TestCase):
         self.assertEqual(langkah["parameter"][3]["bawaan"], "False")
         self.assertEqual(langkah["baris"][0]["jenis"], "param")
         jenis = {b["teks"].strip(): b["jenis"] for b in langkah["baris"]}
-        self.assertEqual(jenis["return view, hasil, konteks"], "output")
-        self.assertEqual(jenis["hasil = modul.putuskan(bot.ingatan, view)"], "inti")
+        self.assertEqual(jenis["return view, keputusan, konteks"], "output")
+        self.assertEqual(jenis["keputusan = modul.putuskan(bot.ingatan, view)"], "inti")
         # Fungsi ber-lru_cache dan konstanta modul juga terbaca dari sumber aslinya.
         nama = {p["nama"]: p for p in kode_node("fl_3")}
         self.assertIn(

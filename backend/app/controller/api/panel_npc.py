@@ -196,7 +196,7 @@ KODE_ALUR = {
             ("sinkron_snapshot(", "ingatan diperbarui (NLU chat baru di sini)"),
             ("modul.putuskan(", "logika metode bot"),
             ("jelaskan(bot", "penjelasan untuk panel"),
-            ('hasil["waktu"]', "lama tiap tahap dicatat"),
+            ('keputusan["waktu"]', "lama tiap tahap dicatat"),
         ]),
         (G + "otak_fuzzy", "Ingatan.sinkron_snapshot", [
             ("self.catat_eksekusi(", "eksekusi Tribunal dicatat"),

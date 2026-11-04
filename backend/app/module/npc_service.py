@@ -295,7 +295,7 @@ class NPCService:
                     match.bot_tahap[otak.nama] = "L"
                 return self.runtime.langkah(otak, snapshot, waktu_sekarang)
 
-            pandangan, keputusan, konteks = await asyncio.wait_for(
+            view, keputusan, konteks = await asyncio.wait_for(
                 loop.run_in_executor(self.runtime.eksekutor_keputusan, pikirkan_langkah),
                 timeout=BATAS_LANGKAH_DETIK,
             )
@@ -344,7 +344,7 @@ class NPCService:
                             pesan_terkirim = match.add_message(otak.nama, kalimat["teks"])
                             # Kalimat sudah tampil; awan berpikir hilang bersama pesan.
                             match.bot_berpikir.discard(otak.nama)
-                            self.runtime.catat_chat(otak, pandangan, rencana_chat, kalimat["teks"])
+                            self.runtime.catat_chat(otak, view, rencana_chat, kalimat["teks"])
 
             # OUTPUT 3: jejak untuk panel checker (tanpa role pemain lain), siaran chat, bacaan IndoBERT
             jejak = None

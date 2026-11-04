@@ -507,25 +507,29 @@ class BrainRuntime:
     # simulasi tahap yang sedang berjalan (flowchart live).
     def langkah(self, bot: OtakBot, snapshot, sekarang, selalu_jelaskan=False, lapor=_tanpa_lapor):
         modul = self.modul[bot.metode]
-        mulai, lama = time.perf_counter(), len(bot.ingatan.chat)
+        mulai, jumlah_chat_sebelumnya = time.perf_counter(), len(bot.ingatan.chat)
         lapor("nlu")
         view = bot.ingatan.sinkron_snapshot(snapshot, sekarang, self.nlu)
-        t_nlu = time.perf_counter()
+        selesai_nlu = time.perf_counter()
         lapor("logika")
-        hasil = modul.putuskan(bot.ingatan, view)
-        t_logika = time.perf_counter()
+        keputusan = modul.putuskan(bot.ingatan, view)
+        selesai_logika = time.perf_counter()
         lapor("penjelasan")
-        hasil["nlu_baru"] = [
+        keputusan["nlu_baru"] = [
             {"pengirim": c["pengirim"], "teks": c["teks"], "intent": c.get("intent"),
              "confidence": c.get("conf_intent"), "target": teks_target(c.get("target"))}
-            for c in bot.ingatan.chat[lama:]
+            for c in bot.ingatan.chat[jumlah_chat_sebelumnya:]
         ]  # fmt: skip
-        if selalu_jelaskan or hasil["nlg"] is not None or hasil["npc_decision"]["action"] != "wait":
-            hasil["penjelasan"] = jelaskan(bot, modul, view, hasil)
-        hasil["waktu"] = {
-            "nlu_ms": round((t_nlu - mulai) * 1000, 1),
-            "logika_ms": round((t_logika - t_nlu) * 1000, 1),
-            "penjelasan_ms": round((time.perf_counter() - t_logika) * 1000, 1),
+        if (
+            selalu_jelaskan
+            or keputusan["nlg"] is not None
+            or keputusan["npc_decision"]["action"] != "wait"
+        ):
+            keputusan["penjelasan"] = jelaskan(bot, modul, view, keputusan)
+        keputusan["waktu"] = {
+            "nlu_ms": round((selesai_nlu - mulai) * 1000, 1),
+            "logika_ms": round((selesai_logika - selesai_nlu) * 1000, 1),
+            "penjelasan_ms": round((time.perf_counter() - selesai_logika) * 1000, 1),
         }
         # Konteks NLG: chat terbaru sepanjang konteks prompt, dan suara Tribunal sebagai pemicu bela diri/bela orang.
         chat = sorted(bot.ingatan.chat, key=lambda c: c["waktu"])[-self.nlg.JUMLAH_CHAT_KONTEKS :]
@@ -538,7 +542,7 @@ class BrainRuntime:
             ],
             "suara_tribunal": dict(view["suara_tribunal"]),
         }  # fmt: skip
-        return view, hasil, konteks
+        return view, keputusan, konteks
 
     # NLG (thread penulis): rencana → kalimat, dengan pengaman aturan dan validasi IndoBERT.
     # pakai_llm=False: hanya templat, dipakai sebagai cadangan cepat saat penulis LLM melewati batas waktu.
