@@ -126,5 +126,3 @@ class PersistenceService:
 
         return self._run(simpan_pesan_bot)
 
-
-persistence_service = PersistenceService()

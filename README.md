@@ -33,9 +33,8 @@ Semua AI ada di **otak bot** (NPC yang ikut bermain). Chat manusia hanya diotori
 | --- | --- | --- |
 | **IndoBERT** (2 model: intent + target) | NLU otak bot: membaca chat publik menjadi intent (menuduh, membela, dll.) dan siapa yang dituju | Setiap kali bot mengambil langkah, untuk chat terbaru di ruangan (satu model dipakai bersama semua bot, hasilnya di-cache per pesan) |
 | **IndoBERT** (validasi ulang) | Memastikan kalimat yang ditulis bot memang terbaca sesuai rencana (misalnya benar-benar menuduh X) | Setiap kali bot akan mengirim chat, sebelum kalimat dikirim (`NPC_VALIDATE_NLG=true`) |
-| **Fuzzy Mamdani** | Penalaran bot: memilih tuduhan, pembelaan, vote, dan skill malam | Setiap langkah bot, untuk semua bot (`NPC_METHOD=fuzzy`); metode tiap bot dicatat di tabel `match_bots` |
+| **Fuzzy Mamdani** | Penalaran bot: memilih tuduhan, pembelaan, vote, dan skill malam | Setiap langkah bot, untuk semua bot; metode tiap bot dicatat di tabel `match_bots` |
 | **NLG** (rantai penulis LLM atau templat) | Mengubah rencana bot menjadi kalimat | Saat bot memutuskan bicara. Jalur LLM yang gagal dilewati; tanpa jalur yang hidup, bot memakai templat |
-| **LLM mode lama** (`NPC_METHOD=llm`) | Bot yang sepenuhnya digerakkan LLM, sebagai pembanding | Hanya bila mode ini dipilih |
 
 Game hanya memakai otak Fuzzy. Utility AI dan Behavior Tree diarsipkan di luar repo, di `../arsip_bt_utility_2026-11-03/` (isi dan cara menariknya kembali ada di README folder itu). Angka keseimbangan di `GAME_CONCEPT.md` diukur dengan metode campuran, jadi belum berlaku untuk Fuzzy saja.
 
@@ -98,7 +97,7 @@ backend/artifacts/indobert/target/   ← models/target_classifier/target_classif
 
 Folder target harus memuat `pair_builder.json` dan `ambang_target.json` hasil `nlu_target.ipynb`. Pada mesin pengembang yang menyimpan repo skripsi di `a_skripsi/training/prethesis`, backend juga menemukan model di sana secara otomatis.
 
-Pengaturan di `.env` (lihat `.env.example`): `NPC_METHOD` (`fuzzy`, atau `llm` untuk mode lama; nilai lama `campuran`, `utility`, dan `bt` dibaca sebagai `fuzzy`), `NPC_WRITER` (`otomatis` atau `templat`), `NPC_WRITER_ORDER` (prioritas rantai penulis: `openrouter`, `tautan`), dan `NPC_OPENROUTER_MODEL`. Hanya dua LLM yang dipakai: OpenRouter dan LLM sendiri lewat link (Ollama di Docker yang dibuka lewat tunnel, lihat `ai-docker/`). Key OpenRouter dan link diambil dari panel **Konfigurasi AI**. Metode, urutan rantai, model OpenRouter, dan model link bisa diubah dari panel **Otak NPC** (tombol **Tes koneksi semua prioritas** memeriksa semua jalur).
+Pengaturan di `.env` (lihat `.env.example`): `NPC_WRITER` (`otomatis` atau `templat`), `NPC_WRITER_ORDER` (prioritas rantai penulis: `openrouter`, `tautan`), dan `NPC_OPENROUTER_MODEL`. Hanya dua LLM yang dipakai: OpenRouter dan LLM sendiri lewat link (Ollama di Docker yang dibuka lewat tunnel, lihat `ai-docker/`). Key OpenRouter dan link diambil dari panel **Konfigurasi AI**. Urutan rantai, model OpenRouter, dan model link bisa diubah dari panel **Otak NPC** (tombol **Tes koneksi semua prioritas** memeriksa semua jalur).
 
 Setelah mengubah logika bot di notebook, jalankan ulang notebook sampai skenario/pengujiannya lulus, lalu ekspor ulang:
 
@@ -150,9 +149,7 @@ docker compose -f docker-compose.gpu.yml logs -f ollama-models
 ```
 
 CPU dapat sangat lambat, khususnya 14B. Mulai dari 8B dan pastikan alokasi
-memori Docker cukup. Jika request kehabisan waktu, naikkan
-`OLLAMA_TIMEOUT_SECONDS` (misalnya `600`) di `.env`, lalu recreate backend.
-Menambah timeout tidak mengatasi RAM yang kurang; gunakan mode API jika mesin
+memori Docker cukup. Gunakan mode API jika mesin
 tidak sanggup. Model yang tidak muat di memori bisa gagal, bukan hanya lambat.
 
 Startup pertama mengunduh image dan model, sehingga dapat memakan waktu. Tunggu unduhan selesai sebelum mencoba chat. `Ctrl+C` keluar dari tampilan log tanpa mematikan container. Service `ollama-models` yang selesai dengan exit code `0` adalah normal: tugasnya hanya menyiapkan model.
@@ -242,11 +239,11 @@ Script ini menulis `PANEL_USERNAME=administrator` dan `PANEL_PASSWORD_HASH`, ser
 
 | Menu | Isi |
 | --- | --- |
-| 01 Konfigurasi AI | Provider AI (`api`/`docker`), model, key OpenRouter, link LLM sendiri; tombol cek/tes koneksi |
+| 01 Konfigurasi AI | Provider AI (`api`/`docker`), model, key OpenRouter, link LLM sendiri. Tes koneksi ada di menu Otak NPC |
 | 02 Checker | Jejak setiap chat manusia (otorisasi → simpan → siar) dan setiap langkah bot (NLU, penalaran, penulis kalimat) per ruangan |
 | 03 Riwayat chat | Arsip chat dari MySQL dengan filter dan ekspor CSV, termasuk intent dan target hasil IndoBERT tiap chat |
 | 04 Manajemen user | Tambah user, reset password akun lokal, hapus akun tanpa menghapus riwayat chat |
-| 05 Otak NPC | Metode penalaran, rantai penulis kalimat, status NLU IndoBERT |
+| 05 Otak NPC | Rantai penulis kalimat, tes koneksi tiap prioritas, status NLU IndoBERT |
 | 06 Survei | Mengatur pertanyaan survei, ringkasan jawaban per metode bot, dan ekspor CSV |
 | 07 Simulasi | Pertandingan tiruan dengan bot (metode dipilih per bot): chat seperti room asli, flowchart proses AI yang menyala sesuai tahap, dan kode asli tiap tahap |
 | 08 Dokumen | ERD database dan penjelasan Proses AI (`backend/public/dokumen`: salinan hasil pembuat dokumen di `communicationfolder/`, folder yang tidak ikut repo) |

@@ -25,8 +25,7 @@ from app.module.match_engine import (
     snapshot_berlabel,
 )
 from app.module.npc_brain.generated import otak_fuzzy
-from app.module.npc_brain.runtime import BrainRuntime
-from app.module.npc_service import NPCService, npc_context, riwayat_nlu
+from app.module.npc_service import NPCService, riwayat_nlu
 from app.module.room_service import Room, RoomService
 
 ENAM = ["hitman", "spy", "stalker", "civilian", "civilian2", "civilian3"]
@@ -215,9 +214,8 @@ class SchedulerExtraTimeTests(unittest.IsolatedAsyncioTestCase):
         room = Room("ABC123", "human", ["human"], match=game)
         game.ai_controlled = True
         rooms.rooms[room.code] = room
-        runtime = BrainRuntime()
-        runtime.konfigurasi.metode = "llm"
-        runtime.siapkan_pertandingan(game, room.code)
+        runtime = Mock()
+        runtime.otak_bot.return_value = Mock(sibuk=False)
         service = NPCService(Mock(emit=AsyncMock()), runtime=runtime)
         game.round, game.phase = 2, "tribunal"
         game.npc_decisions = {(2, "tribunal", bot) for bot in ("NOX", "ECHO", "VEIL")}
@@ -229,13 +227,12 @@ class SchedulerExtraTimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(game.tribunal_extra)
         with (
             patch("app.module.npc_service.room_service", rooms),
-            patch.object(service, "_schedule_llm") as jadwal,
+            patch.object(service, "_sudah_waktunya_melangkah", return_value=False) as jadwal,
         ):
             service.schedule()
-        elapsed = jadwal.call_args.args[3]
+        elapsed = jadwal.call_args.args[2]
         self.assertAlmostEqual(elapsed, game.durations["tribunal"], delta=1)
         await service.close()
-        runtime.tutup()
 
 
 class HostageTieTests(unittest.TestCase):
@@ -455,9 +452,11 @@ class TeamChatTests(unittest.TestCase):
             self.assertEqual((me["can_team_chat"], me["team_messages"]), (False, []))
             with self.assertRaises(ValueError):
                 game.add_team_message(bot, "bot belum bicara")
-            konteks = json.dumps(npc_context(game, bot), ensure_ascii=False)
-            self.assertNotIn(RAHASIA_HITMAN, konteks)
-            self.assertNotIn(RAHASIA_SPY, konteks)
+            pandangan = json.dumps(
+                snapshot_berlabel(game.snapshot(bot), game.labels), ensure_ascii=False
+            )
+            self.assertNotIn(RAHASIA_HITMAN, pandangan)
+            self.assertNotIn(RAHASIA_SPY, pandangan)
             ingatan = otak_fuzzy.Ingatan(bot)
             ingatan.sinkron_snapshot(snapshot_berlabel(game.snapshot(bot), game.labels), 1.0)
             self.assertEqual(ingatan.chat, [])

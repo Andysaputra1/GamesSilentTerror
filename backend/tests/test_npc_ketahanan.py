@@ -24,9 +24,8 @@ class KataKunci:
         return "accusing" if re.search(r"curiga|vote", teks.casefold()) else "neutral"
 
 
-def runtime_siap(metode="fuzzy"):
+def runtime_siap():
     runtime = BrainRuntime()
-    runtime.konfigurasi.metode = metode
     runtime.konfigurasi.penulis = "templat"
     runtime.muat_sekarang(nlu=NLUBersama(NLUCadangan(KataKunci()), "cadangan"))
     return runtime
@@ -34,7 +33,7 @@ def runtime_siap(metode="fuzzy"):
 
 class BrainTurnKetahananTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
-        self.runtime = runtime_siap("fuzzy")
+        self.runtime = runtime_siap()
         self.rooms = RoomService()
         self.room = self.rooms.create("human")
         self.rooms.set_bot(self.room.code, "human", True)

@@ -27,8 +27,7 @@ backend/
       game_queries.py           # SELECT/INSERT/UPDATE pemain dan chat
     module/                     # Logika password, sesi login, AI, dan game
       mysql_connector.py        # Engine, connection pool, session, health probe
-      ollama_client.py          # Klien HTTP Ollama
-      openrouter_client.py      # Klien HTTP OpenRouter
+      ollama_client.py          # Cek model di link Ollama
       create_user.py            # CLI akun tambahan untuk multiplayer lokal
     schemas/                    # Validasi request/response API
   artifacts/

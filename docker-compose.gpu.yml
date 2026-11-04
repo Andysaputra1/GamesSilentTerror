@@ -62,7 +62,6 @@ services:
       - '8000'
     environment:
       AI_PROVIDER: '${AI_PROVIDER:-api}'
-      APP_ENVIRONMENT: '${APP_ENVIRONMENT:-development}'
       PANEL_ENCRYPTION_KEY: '${PANEL_ENCRYPTION_KEY:-}'
       PANEL_USERNAME: '${PANEL_USERNAME:-administrator}'
       PANEL_PASSWORD_HASH: '${PANEL_PASSWORD_HASH:-}'
@@ -74,15 +73,10 @@ services:
       GOOGLE_CLIENT_ID: '${GOOGLE_CLIENT_ID:-}'
       OLLAMA_BASE_URL: 'http://ollama:11434'
       OLLAMA_MODEL: '${OLLAMA_MODEL:-8}'
-      OLLAMA_TIMEOUT_SECONDS: '${OLLAMA_TIMEOUT_SECONDS:-180}'
-      OLLAMA_MAX_OUTPUT_TOKENS: '${OLLAMA_MAX_OUTPUT_TOKENS:-160}'
-      OLLAMA_CONTEXT_LENGTH: '${OLLAMA_CONTEXT_LENGTH:-2048}'
-      OPENAI_MAX_OUTPUT_TOKENS: '${OPENAI_MAX_OUTPUT_TOKENS:-320}'
       AUTH_SESSION_HOURS: '${AUTH_SESSION_HOURS:-24}'
       CORS_ORIGINS: '${CORS_ORIGINS:-http://localhost:4200,http://127.0.0.1:4200}'
       # Otak NPC: model IndoBERT dibaca dari backend/artifacts/indobert/{intent,target}.
       # Nilai bawaan wajib diisi karena variabel kosong mengalahkan default backend.
-      NPC_METHOD: '${NPC_METHOD:-fuzzy}'
       NPC_WRITER: '${NPC_WRITER:-otomatis}'
       NPC_WRITER_ORDER: '${NPC_WRITER_ORDER:-openrouter,tautan}'
       NPC_OPENROUTER_MODEL: '${NPC_OPENROUTER_MODEL:-}'

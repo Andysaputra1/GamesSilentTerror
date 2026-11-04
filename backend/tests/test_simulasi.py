@@ -22,7 +22,7 @@ class SimulasiTests(unittest.TestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
         self.layanan = modul.SimulasiService()
-        self.awal = self.layanan.mulai("Andy Saputra", ["fuzzy", "fuzzy", "fuzzy"])
+        self.awal = self.layanan.mulai("Andy Saputra", 3)
 
     def test_chat_admin_dibaca_nlu_lalu_setiap_bot_melangkah_dengan_waktu_tiap_tahap(self):
         bots = [p for p in self.awal["pemain"] if not p["manusia"]]
@@ -76,7 +76,7 @@ class SimulasiTests(unittest.TestCase):
 
     def test_simulasi_terlama_dibuang(self):
         for _ in range(modul.MAKS_SIMULASI):
-            self.layanan.mulai("A", ["fuzzy", "fuzzy", "fuzzy"])
+            self.layanan.mulai("A", 3)
         with self.assertRaises(KeyError):
             asyncio.run(self.layanan.jalankan(self.awal["id"], "jalan"))
 

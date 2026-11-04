@@ -145,17 +145,15 @@
               <span class="eyebrow">NPC BRAIN</span>
               <h2>Otak NPC</h2>
               <p>
-                Metode penalaran bot (hasil notebook skripsi), rantai penulis kalimat, dan status
-                NLU IndoBERT.
+                Rantai penulis kalimat bot dan status NLU IndoBERT.
               </p>
             </div>
             <button id="refresh-npc" class="secondary">Refresh</button>
           </div>
           <div class="ai-layout">
             <section class="config-panel" aria-label="Pengaturan otak NPC">
-              <h3>01 / Metode dan penulis</h3>
+              <h3>01 / Penulis kalimat</h3>
               <form id="npc-form">
-                <label>Metode penalaran<select id="npc-method"></select></label>
                 <label>Penulis kalimat<select id="npc-writer"></select></label>
                 <fieldset id="npc-chain-box" class="chain-box">
                   <legend>Prioritas rantai penulis</legend>
@@ -186,7 +184,7 @@
                   dengan IndoBERT</label
                 >
                 <p class="hint">
-                  Metode berlaku untuk pertandingan berikutnya; rantai penulis langsung dipakai. Key
+                  Rantai penulis langsung dipakai. Key
                   OpenRouter dan link LLM (Docker/tunnel) diatur di menu Konfigurasi AI. Nilai key
                   tidak pernah ditampilkan.
                 </p>
@@ -420,7 +418,7 @@
             </div>
             <span class="badge">Qwen3 &middot; 14B</span>
           </div>
-          <div class="ai-layout">
+          <div class="ai-layout ai-layout--tunggal">
             <section class="config-panel" aria-label="Pengaturan koneksi">
               <h3>01 / Koneksi model</h3>
               <form id="config-form">
@@ -500,35 +498,6 @@
                 <strong>Konfigurasi yang sedang digunakan</strong>
                 <p id="active-config">Memuat konfigurasi server...</p>
                 <small id="config-draft"></small>
-              </div>
-            </section>
-            <section class="probe-panel" aria-label="Pengujian AI">
-              <h3>02 / Uji skenario game</h3>
-              <p class="hint">
-                Menggunakan konfigurasi yang sudah tersimpan. Skenario ini terpisah dari room
-                pemain. Satu tes mengirim satu request LLM; mode API memakai saldo provider.
-              </p>
-              <form id="probe-form">
-                <label
-                  >Skenario<select id="probe-scenario">
-                    <option value="discussion">Diskusi siang · respons alibi</option>
-                    <option value="vote">Tribunal · keputusan voting</option>
-                    <option value="night">Malam · keputusan Guard</option>
-                  </select></label
-                >
-                <label
-                  >Teks pemain<textarea id="probe-message" rows="4" maxlength="1000" required>
-Aku melihat Pemain_B menghindari pertanyaan. Apa alibimu?</textarea>
-                </label>
-                <div class="form-actions">
-                  <button id="check-ai" type="submit">Jalankan pengujian</button
-                  ><span id="probe-progress" class="hint" role="status"></span>
-                </div>
-              </form>
-              <p id="ai-status" role="status" aria-live="polite">Belum diperiksa.</p>
-              <div id="probe-result" class="report empty-state">
-                Hasil tes akan menampilkan status AI, durasi, request, respons, dan keputusan yang
-                dihasilkan.
               </div>
             </section>
           </div>

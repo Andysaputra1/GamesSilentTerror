@@ -33,7 +33,7 @@ $sesi = Masuk-Panel
 $npc = (Panel GET '/api/panel/npc' -sesi $sesi).status
 Write-Host "Backend $Backend | NLU: $($npc.nlu) | penulis berikut: $($npc.penulis) ($($npc.model_penulis)) | rantai: $($npc.urutan_penulis -join ' > ')"
 
-$sim = Panel POST '/api/panel/simulasi' @{ nama = 'Penguji'; metode = $metode } $sesi 120
+$sim = Panel POST '/api/panel/simulasi' @{ nama = 'Penguji'; jumlah_bot = $metode.Count } $sesi 120
 $bot = @($sim.pemain | Where-Object { -not $_.manusia })
 Write-Host ("Simulasi {0}: {1}" -f $sim.id, (($bot | ForEach-Object { "$($_.nama)=$($_.metode)" }) -join ', '))
 Write-Host ''

@@ -1,6 +1,6 @@
 import json
 import unittest
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import Mock, patch
 from cryptography.fernet import Fernet
 from pydantic import SecretStr
 from fastapi import FastAPI
@@ -122,10 +122,6 @@ class PanelSecretsTests(unittest.TestCase):
             self.assertEqual(ai_runtime.current().ollama_model, "qwen3:4b-instruct")
             bad = self.client.put("/api/panel/config", json={**body, "model": "qwen3 4b; rm"})
             self.assertEqual(bad.status_code, 400)
-            reply = AsyncMock(return_value="OK")
-            with patch("app.controller.api.panel.local_reply", reply):
-                self.assertTrue(self.client.post("/api/panel/check-ai").json()["active"])
-            self.assertEqual(reply.call_args.kwargs["config"].ollama_model, "qwen3:4b-instruct")
 
     def test_missing_encryption_key_cannot_save_plaintext(self):
         with patch.object(settings, "panel_encryption_key", None):

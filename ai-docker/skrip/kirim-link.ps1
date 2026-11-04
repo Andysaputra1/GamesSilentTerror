@@ -26,7 +26,7 @@ try {
     $npc = (Panel GET '/api/panel/npc' -sesi $sesi).status
     $urutan = @('tautan') + @($npc.urutan_penulis | Where-Object { $_ -ne 'tautan' })
     if ((@($npc.urutan_penulis) -join ',') -ne ($urutan -join ',')) {
-        $ubah = @{ metode = $npc.metode; penulis = $npc.penulis_diminta; validasi = $npc.validasi; urutan_penulis = $urutan }
+        $ubah = @{ penulis = $npc.penulis_diminta; validasi = $npc.validasi; urutan_penulis = $urutan }
         $npc = (Panel PUT '/api/panel/npc' $ubah $sesi).status
     }
 

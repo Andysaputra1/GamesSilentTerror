@@ -38,7 +38,7 @@ async function request(alamat, isi, metode = 'GET') {
     body: isi ? JSON.stringify(isi) : undefined,
     // Uji AI dan cek rantai penulis menunggu provider; simulasi menunggu otak + LLM beberapa bot.
     signal: AbortSignal.timeout(
-      /\/simulasi/.test(alamat) ? 180000 : /\/(test-ai|cek-penulis)$/.test(alamat) ? 60000 : 15000,
+      /\/simulasi/.test(alamat) ? 180000 : /\/cek-penulis$/.test(alamat) ? 60000 : 15000,
     ),
   });
   if (generasiAwal !== generation) throw new Error('Sesi telah berubah. Respons lama diabaikan.');
@@ -81,9 +81,6 @@ function clearSession() {
   $('sim-chat').replaceChildren();
   $('sim-detail').textContent = '';
   $('sim-status').hidden = true;
-  $('probe-result').replaceChildren();
-  $('ai-status').textContent = 'Belum diperiksa.';
-  $('probe-progress').textContent = '';
   $('npc-status').replaceChildren();
   $('survey-rows').replaceChildren();
   $('survey-method-rows').replaceChildren();
@@ -192,9 +189,6 @@ function keySourceView() {
 }
 // Sinkronkan form dan ringkasan dengan konfigurasi yang tersimpan di server.
 function showConfig(data) {
-  $('probe-result').replaceChildren();
-  $('probe-result').classList.add('empty-state');
-  $('probe-result').textContent = 'Jalankan pengujian untuk memeriksa konfigurasi ini.';
   const source =
     data.provider === 'docker'
       ? 'LLM lokal (Ollama)'
@@ -206,10 +200,9 @@ function showConfig(data) {
     (data.provider === 'docker'
       ? ` Tujuan: ${data.endpoint}`
       : data.api_configured
-        ? ' Key tersedia; koneksi belum diperiksa.'
+        ? ' Key tersedia; uji koneksinya di menu Otak NPC.'
         : ' Key belum tersedia; AI belum siap digunakan.');
   $('config-draft').textContent = 'Konfigurasi ini berlaku untuk pesan AI berikutnya.';
-  $('ai-status').textContent = 'Belum diperiksa untuk konfigurasi ini.';
   $('provider').value = data.provider;
   $('key-source').value = data.key_source;
   keyAvailability = {
@@ -291,7 +284,6 @@ const traceDetails = new Map(); // id → jejak lengkap (dengan penjelasan), dim
 // label, arti parameter, dan tampilan penalarannya tetap ada agar jejak lama di database bisa dibuka.
 const METODE_LABEL = {
   fuzzy: 'Fuzzy Mamdani',
-  llm: 'LLM (mode lama)',
   utility: 'Utility AI (jejak lama)',
   bt: 'Behavior Tree (jejak lama)',
 };
@@ -303,7 +295,6 @@ const METODE_CARA = {
   utility:
     'Setiap pilihan diberi pertimbangan 0–1 lewat kurva. Utilitas = bobot × Π(n + (1 − n)(1 − 1/k)n) (kompensasi IAUS, k = jumlah pertimbangan). Pilihan terbesar dipakai bila melewati ambang atau utilitas diam.',
   bt: 'Pohon dibaca dari atas. Selector mencoba cabang berurutan dan berhenti di cabang pertama yang berhasil; Sequence berhenti di syarat pertama yang gagal. Aksi pada cabang yang berhasil menjadi keputusan.',
-  llm: 'Satu prompt LLM memutuskan aksi dan pesan sekaligus; tidak ada penalaran metode.',
 };
 const ROLE_LABEL = { hitman: 'Hitman', spy: 'Spy', stalker: 'Stalker', civilian: 'Civilian' };
 const FASE_LABEL = {
@@ -1951,7 +1942,7 @@ async function bukaMenu(namaMenu) {
   if (namaMenu === 'simulasi') renderSim();
 }
 
-// OTAK NPC: isi pilihan dari server agar panel tidak perlu tahu daftar metode.
+// OTAK NPC: isi pilihan dari server agar panel tidak perlu tahu daftar penulis.
 function fillSelect(select, options, value) {
   select.replaceChildren(
     ...Object.entries(options).map(([key, label]) => {
@@ -2108,7 +2099,6 @@ function showNpc(data, { form = true } = {}) {
   const chain = status.rantai_penulis ?? [];
   npcChainStatus = Object.fromEntries(chain.map((row) => [row.jalur, row]));
   if (form || !npcChain.length) {
-    fillSelect($('npc-method'), data.pilihan.metode, status.metode);
     fillSelect($('npc-writer'), data.pilihan.penulis, status.penulis_diminta);
     $('npc-validate').checked = status.validasi;
     npcChain = chain.map((row) => ({
@@ -2478,7 +2468,6 @@ $('key-source').onchange = () => {
 };
 $('config-form').onsubmit = handle(async () => {
   $('save-config').disabled = true;
-  $('check-ai').disabled = true;
   try {
     const data = await request(
       '/api/panel/config',
@@ -2502,42 +2491,6 @@ $('config-form').onsubmit = handle(async () => {
     notice('Konfigurasi tersimpan. Sumber AI yang sedang digunakan terlihat di bawah formulir.');
   } finally {
     $('save-config').disabled = false;
-    $('check-ai').disabled = false;
-  }
-});
-$('probe-form').onsubmit = handle(async () => {
-  if ($('check-ai').disabled) return;
-  $('check-ai').disabled = true;
-  $('save-config').disabled = true;
-  const epoch = generation,
-    started = performance.now();
-  $('ai-status').textContent = 'Memproses teks, menyusun prompt, lalu menunggu provider...';
-  $('probe-result').textContent = 'Pengujian sedang berjalan. Hasil sebelumnya telah dibersihkan.';
-  const timer = setInterval(() => {
-    $('probe-progress').textContent =
-      `${((performance.now() - started) / 1000).toFixed(1)} dtk berjalan`;
-  }, 100);
-  try {
-    const data = await request(
-      '/api/panel/test-ai',
-      { message: $('probe-message').value.trim(), scenario: $('probe-scenario').value },
-      'POST',
-    );
-    if (epoch !== generation || !token) return;
-    $('ai-status').textContent = data.message_status;
-    renderReport($('probe-result'), data);
-  } catch (error) {
-    if (epoch === generation) {
-      $('ai-status').textContent = 'Pemeriksaan gagal: ' + error.message;
-      $('probe-result').textContent =
-        'Hasil belum tersedia. Periksa koneksi lalu jalankan ulang pengujian.';
-    }
-    throw error;
-  } finally {
-    clearInterval(timer);
-    $('probe-progress').textContent = '';
-    $('save-config').disabled = false;
-    $('check-ai').disabled = false;
   }
 });
 $('refresh-checker').onclick = handle(async () => {
@@ -2562,7 +2515,7 @@ $('sim-setup').onsubmit = handle(async () => {
     '/api/panel/simulasi',
     {
       nama: $('sim-name').value.trim() || 'Pemain',
-      metode: Array(Number($('sim-count').value) - 1).fill('fuzzy'), // semua pemain selain kamu
+      jumlah_bot: Number($('sim-count').value) - 1, // semua pemain selain kamu
     },
     'Menyiapkan pertandingan…',
   );
@@ -2622,7 +2575,6 @@ $('npc-form').onsubmit = handle(async () => {
     const data = await request(
       '/api/panel/npc',
       {
-        metode: $('npc-method').value,
         penulis: $('npc-writer').value,
         validasi: $('npc-validate').checked,
         urutan_penulis: npcChain.filter((item) => item.dipakai).map((item) => item.jalur),
@@ -2642,7 +2594,6 @@ $('npc-form').onsubmit = handle(async () => {
 // Refresh manual memuat ulang form dari server (editan yang belum disimpan dibuang).
 $('refresh-npc').onclick = handle(() => loadNpc());
 for (const id of [
-  'npc-method',
   'npc-writer',
   'npc-validate',
   'npc-openrouter-model',

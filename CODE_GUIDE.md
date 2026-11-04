@@ -56,8 +56,7 @@ file saja tidak berarti route tersebut dibuka pada aplikasi utama.
    "lantai bicara" (`NPCService._ambil_giliran_bicara`): paling banyak `LANTAI_MAKS` (3) bot
    menyusun/mengetik bersamaan per pertandingan tanpa rencana kembar (intent + target
    sama), dan rencana yang lebih tua dari chat bot lain dibatalkan lalu diputuskan
-   ulang. Mode `NPC_METHOD=llm` mempertahankan jalur lama
-   (satu prompt LLM) sebagai pembanding. Utility AI dan Behavior Tree diarsipkan di luar
+   ulang. Utility AI dan Behavior Tree diarsipkan di luar
    repo, di `../arsip_bt_utility_2026-11-03/` (cara menariknya kembali ada di README folder
    itu). Nilai lama `campuran`, `utility`, dan `bt` di `.env` atau `panel_configuration`
    dibaca sebagai `fuzzy`, dan jejak lama tetap bisa dibuka di panel. Angka keseimbangan di

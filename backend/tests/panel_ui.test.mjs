@@ -49,52 +49,6 @@ async function login(w) {
   await w.document.querySelector('#login-form').onsubmit({ preventDefault() {} });
 }
 
-test('probe renders request/response as text and clears stale results on config change', async (t) => {
-  const w = setup(t, (path) =>
-    path === '/api/panel/test-ai'
-      ? response({
-          active: true,
-          valid_decision: true,
-          duration_ms: 1234,
-          timings: { llm_ms: 1000 },
-          message: '<img src=x onerror=alert(1)>',
-          output: { action: 'wait', message: 'Alibi?' },
-          request: { body: { max_tokens: 320 } },
-          response: { status_code: 200 },
-          message_status: 'Berhasil',
-        })
-      : undefined,
-  );
-  await login(w);
-  await w.document.querySelector('#probe-form').onsubmit({ preventDefault() {} });
-  const report = w.document.querySelector('#probe-result');
-  assert.match(report.textContent, /1.23 dtk/);
-  assert.match(report.textContent, /max_tokens/);
-  assert.equal(report.querySelector('img'), null);
-  assert.equal(w.document.querySelector('#check-ai').disabled, false);
-  await w.document.querySelector('#config-form').onsubmit({ preventDefault() {} });
-  assert.doesNotMatch(report.textContent, /Alibi\?/);
-});
-
-test('late probe response cannot restore private results after logout', async (t) => {
-  let finish;
-  const w = setup(t, (path) =>
-    path === '/api/panel/test-ai'
-      ? new Promise((resolve) => {
-          finish = resolve;
-        })
-      : undefined,
-  );
-  await login(w);
-  const pending = w.document.querySelector('#probe-form').onsubmit({ preventDefault() {} });
-  await settle();
-  await w.document.querySelector('#logout').onclick({ preventDefault() {} });
-  finish(response({ active: true, output: 'PRIVATE-RESULT' }));
-  await pending;
-  assert.equal(w.document.querySelector('#workspace').hidden, true);
-  assert.doesNotMatch(w.document.body.textContent, /PRIVATE-RESULT/);
-});
-
 test('failed logout keeps session available for retry and does not claim success', async (t) => {
   const w = setup(t, (path) =>
     path === '/api/panel/logout' ? response({ detail: 'Database unavailable' }, 503) : undefined,
@@ -163,7 +117,6 @@ test('NPC brain menu shows the writer chain, reorders it, and saves method and p
     nlu: 'indobert',
     penulis: 'openrouter',
     model_penulis: 'anthropic/claude-opus-5.5',
-    metode: 'fuzzy',
     penulis_diminta: 'otomatis',
     validasi: true,
     penulis_aktif: true,
@@ -177,7 +130,6 @@ test('NPC brain menu shows the writer chain, reorders it, and saves method and p
     pertandingan_aktif: 2,
   };
   const pilihan = {
-    metode: { fuzzy: 'Fuzzy', llm: 'LLM' },
     penulis: { otomatis: 'Rantai LLM', templat: 'Templat' },
     jalur_penulis: {
       openrouter: { label: 'OpenRouter', sumber: 'API key di menu Konfigurasi AI' },
@@ -194,7 +146,7 @@ test('NPC brain menu shows the writer chain, reorders it, and saves method and p
     if (path !== '/api/panel/npc') return undefined;
     if (options.method === 'PUT') {
       saved = JSON.parse(options.body);
-      return response({ status: { ...status, metode: saved.metode }, pilihan });
+      return response({ status, pilihan });
     }
     return response({ status, pilihan });
   });
@@ -210,7 +162,6 @@ test('NPC brain menu shows the writer chain, reorders it, and saves method and p
     doc.querySelector('#npc-status').textContent,
     /OpenRouter \(anthropic\/claude-opus-5.5\)/,
   );
-  assert.equal(doc.querySelector('#npc-method').value, 'fuzzy');
   const rows = () => [...doc.querySelectorAll('#npc-chain li')];
   assert.deepEqual(
     rows().map((row) => row.querySelector('strong').textContent),
@@ -231,8 +182,6 @@ test('NPC brain menu shows the writer chain, reorders it, and saves method and p
     box.onchange();
   };
   toggle('LLM sendiri');
-  doc.querySelector('#npc-method').value = 'llm';
-  doc.querySelector('#npc-method').dispatchEvent(new w.Event('change'));
   doc.querySelector('#npc-openrouter-model').value = ' anthropic/claude-sonnet-5.5 ';
   doc.querySelector('#npc-openrouter-model').dispatchEvent(new w.Event('input'));
   // Model link: bawaan Konfigurasi AI + model yang ditemukan di link.
@@ -246,7 +195,6 @@ test('NPC brain menu shows the writer chain, reorders it, and saves method and p
   assert.ok(refreshes.length > 0);
   refreshes.splice(0).forEach((refresh) => refresh());
   await settle();
-  assert.equal(doc.querySelector('#npc-method').value, 'llm');
   assert.equal(doc.querySelector('#npc-openrouter-model').value, ' anthropic/claude-sonnet-5.5 ');
   assert.equal(doc.querySelector('#npc-link-model').value, 'qwen3:4b-instruct');
   assert.equal(rows()[0].querySelector('strong').textContent, '1. OpenRouter');
@@ -256,14 +204,12 @@ test('NPC brain menu shows the writer chain, reorders it, and saves method and p
   assert.match(doc.querySelector('#notice').textContent, /Simpan perubahan dulu/);
   await doc.querySelector('#npc-form').onsubmit({ preventDefault() {} });
   assert.deepEqual(saved, {
-    metode: 'llm',
     penulis: 'otomatis',
     validasi: true,
     urutan_penulis: ['openrouter'],
     model_openrouter: 'anthropic/claude-sonnet-5.5',
     model_tautan: 'qwen3:4b-instruct',
   });
-  assert.equal(doc.querySelector('#npc-method').value, 'llm');
   await doc.querySelector('#check-writers').onclick({ preventDefault() {} });
   assert.equal(checked, 1);
   assert.equal(doc.querySelector('#check-writers').disabled, true);
@@ -777,10 +723,9 @@ test('simulation shows chat with NLU, live bot positions on the flowchart, and n
   await login(w);
   const doc = w.document;
   await doc.querySelector('[data-menu=simulasi]').onclick({ preventDefault() {} });
-  assert.equal(doc.querySelector('#sim-bots'), null); // tidak ada lagi pilihan metode per bot
   doc.querySelector('#sim-count').value = '4'; // 4 pemain = kamu + 3 bot
   await doc.querySelector('#sim-setup').onsubmit({ preventDefault() {} });
-  assert.deepEqual(mulai.metode, ['fuzzy', 'fuzzy', 'fuzzy']);
+  assert.equal(mulai.jumlah_bot, 3);
   assert.match(doc.querySelector('#sim-chat').textContent, /Permainan dimulai/);
   assert.match(doc.querySelector('#sim-status').textContent, /Fuzzy Mamdani/);
   doc.querySelector('#sim-message').value = human.message;

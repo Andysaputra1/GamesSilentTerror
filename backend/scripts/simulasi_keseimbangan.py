@@ -1,6 +1,6 @@
 """Simulasi keseimbangan komposisi role dengan aturan engine terbaru.
 
-Semua kursi bot otak Fuzzy hasil ekspor notebook (seperti NPC_METHOD=fuzzy), label NLU sempurna dari rencana
+Semua kursi bot otak Fuzzy hasil ekspor notebook label NLU sempurna dari rencana
 pengirim, LANGKAH keputusan per fase, engine Match asli. Angka lama di GAME_CONCEPT diukur dengan metode campuran.
 
 Pemakaian (dari folder backend, Python dengan numpy + pandas, mis. venv prethesis):

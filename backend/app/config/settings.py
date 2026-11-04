@@ -17,10 +17,6 @@ PROJECT_DIR = BACKEND_DIR.parent
 
 # Jalur rantai penulis kalimat NPC yang dipakai game (bagian dari JALUR_PENULIS notebook npc_nlg).
 JALUR_PENULIS_NPC = ("openrouter", "tautan")
-# Jalur Claude yang sudah dihapus: diabaikan bila masih ada di .env atau konfigurasi tersimpan.
-JALUR_PENULIS_LAMA = ("claude_bedrock", "claude_api")
-# Metode otak yang sudah diarsipkan: di .env atau konfigurasi tersimpan dibaca sebagai fuzzy.
-METODE_NPC_LAMA = ("campuran", "utility", "bt")
 # penyedia/model (mis. qwen/qwen3-14b); segmen tidak boleh diawali titik agar path URL tetap lurus.
 POLA_MODEL_OPENROUTER = re.compile(r"[a-z0-9][a-z0-9._-]*/[A-Za-z0-9_:-][A-Za-z0-9._:-]*")
 
@@ -35,7 +31,6 @@ class Settings(MySQLSettings):
     )
 
     app_name: str = "Shadow Heist Python Backend"
-    app_environment: str = "development"
     panel_encryption_key: SecretStr | None = None
     panel_username: str = "administrator"
     panel_password_hash: SecretStr | None = None
@@ -54,9 +49,6 @@ class Settings(MySQLSettings):
     ai_provider: Literal["api", "docker"] = "api"
     ollama_base_url: str = "http://localhost:11435"
     ollama_model: str = "qwen3:8b"
-    ollama_timeout_seconds: float = Field(default=180.0, gt=0)
-    ollama_max_output_tokens: int = Field(default=160, ge=1, le=2000)
-    ollama_context_length: int = Field(default=2048, ge=512)
 
     @field_validator("ollama_model", mode="before")
     @classmethod
@@ -75,16 +67,12 @@ class Settings(MySQLSettings):
             raise ValueError("OLLAMA_MODEL harus 4, 8, atau 14.")
         return models[selected]
 
-    openai_timeout_seconds: float = Field(default=30.0, gt=0)
-    openai_max_output_tokens: int = Field(default=320, ge=64, le=2_000)
     intent_model_path: Path = BACKEND_DIR / "artifacts" / "svm" / "intent_classifier.pkl"
 
-    # OTAK NPC (hasil ekspor notebook skripsi): metode penalaran, penulis kalimat, dan lokasi IndoBERT.
-    # fuzzy = semua bot memakai Fuzzy Mamdani; llm = mode lama satu prompt, sebagai pembanding.
-    npc_method: Literal["fuzzy", "llm"] = "fuzzy"
+    # OTAK NPC (hasil ekspor notebook skripsi): penulis kalimat dan lokasi IndoBERT.
     # otomatis = rantai penulis LLM (urutan di bawah, bisa diubah di panel), semua gagal → templat;
-    # templat = tanpa LLM sama sekali; claude = nilai lama, diperlakukan seperti otomatis.
-    npc_writer: Literal["otomatis", "claude", "templat"] = "otomatis"
+    # templat = tanpa LLM sama sekali.
+    npc_writer: Literal["otomatis", "templat"] = "otomatis"
     # Prioritas awal rantai penulis: OpenRouter → LLM sendiri lewat link (Docker/tunnel).
     npc_writer_order: str = ",".join(JALUR_PENULIS_NPC)
     # Model OpenRouter penulis kalimat; kosong = openrouter_model (qwen/qwen3-14b).
@@ -94,12 +82,6 @@ class Settings(MySQLSettings):
     npc_target_model_dir: Path | None = None
     npc_nlu_device: Literal["cpu", "cuda"] = "cpu"
     npc_step_seconds: float = Field(default=3.0, ge=1.0, le=30.0)
-
-    @field_validator("npc_method", mode="before")
-    @classmethod
-    # VALIDATOR: .env lama dengan metode yang sudah diarsipkan tetap bisa start, sebagai fuzzy.
-    def archived_method_as_fuzzy(cls, value: object) -> object:
-        return "fuzzy" if value in METODE_NPC_LAMA else value
 
     @field_validator("npc_intent_model_dir", "npc_target_model_dir", mode="before")
     @classmethod
@@ -112,7 +94,6 @@ class Settings(MySQLSettings):
     # VALIDATOR: daftar jalur dipisah koma tanpa duplikat; nama yang tidak dikenal ditolak saat startup.
     def validate_writer_order(cls, value: object) -> str:
         jalur = [j.strip() for j in str(value or "").split(",") if j.strip()]
-        jalur = [j for j in jalur if j not in JALUR_PENULIS_LAMA]
         if not set(jalur) <= set(JALUR_PENULIS_NPC) or len(set(jalur)) != len(jalur):
             raise ValueError("NPC_WRITER_ORDER hanya boleh berisi " + ", ".join(JALUR_PENULIS_NPC))
         return ",".join(jalur)

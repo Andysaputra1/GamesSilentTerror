@@ -438,6 +438,8 @@ nav button[aria-current] { border-radius: 8px; }
 .ai-layout { display: grid; grid-template-columns: minmax(270px,.8fr) minmax(0,1.2fr); gap: 30px; align-items: start; }
 .config-panel { border-right: 1px solid #293546; padding-right: 30px; min-width: 0; }
 .probe-panel, .report, .split > div { min-width: 0; }
+.ai-layout--tunggal { grid-template-columns: minmax(270px, 640px); }
+.ai-layout--tunggal .config-panel { border-right: 0; padding-right: 0; }
 .ai-layout h3 { margin-top: 0; margin-bottom: 20px; }
 .ai-layout .info { margin: 20px 0 0; }
 textarea { width: 100%; min-height: 110px; max-height: 360px; resize: vertical; padding: 12px 14px; background: #0d141e; color: #e5ecf5; border: 1px solid #334055; border-radius: 8px; font: inherit; line-height: 1.6; }

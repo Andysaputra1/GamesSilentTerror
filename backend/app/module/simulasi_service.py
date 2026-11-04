@@ -23,10 +23,10 @@ MULAI_FASE = 2.0  # detik setelah fase mulai sebelum bot melangkah (sama dengan 
 
 
 class Simulasi:
-    def __init__(self, nama, metode):
-        bots = list(BOT_NAMES[: len(metode)])
+    def __init__(self, nama, jumlah_bot):
+        bots = list(BOT_NAMES[:jumlah_bot])
         self.match = Match([PEMAIN], bots, now=0.0, labels=label_unik({PEMAIN: nama}, bots))
-        self.otak = brain_runtime.buat_otak(self.match, dict(zip(bots, metode)))
+        self.otak = brain_runtime.buat_otak(self.match, bots)
         self.id = self.match.id
         self.jam = MULAI_FASE  # waktu permainan (detik sejak mulai)
         self.riwayat = []  # riwayat pencatat NLU (konteks target)
@@ -176,11 +176,11 @@ class SimulasiService:
     def __init__(self):
         self.simulasi: OrderedDict[str, Simulasi] = OrderedDict()
 
-    def mulai(self, nama, metode):
+    def mulai(self, nama, jumlah_bot):
         if not brain_runtime.status["siap"]:
             brain_runtime.mulai_memuat()
             raise RuntimeError(brain_runtime.status["detail"])
-        sim = Simulasi(nama, metode)
+        sim = Simulasi(nama, jumlah_bot)
         self.simulasi[sim.id] = sim
         while len(self.simulasi) > MAKS_SIMULASI:
             self.simulasi.popitem(last=False)

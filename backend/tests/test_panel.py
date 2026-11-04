@@ -2,15 +2,13 @@ import base64
 import json
 import unittest
 from datetime import date, datetime
-from unittest.mock import patch, AsyncMock
+from unittest.mock import patch
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
-import httpx
-from app.config.settings import Settings, settings
+from app.config.settings import settings
 from app.controller.api.panel import router, require_panel, history_filter, validate_endpoint
 from app.module.password_service import hash_password
-from app.module.openrouter_client import generate_reply
 
 # Bacaan NLU satu pesan seperti yang disimpan pencatat NLU (BrainRuntime.baca_chat), beserta konteksnya.
 NLU_CONTOH = json.dumps(
@@ -52,7 +50,6 @@ class PanelTests(unittest.TestCase):
         self.assertEqual(
             self.client.put("/api/panel/config", json={"provider": "api"}).status_code, 401
         )
-        self.assertEqual(self.client.post("/api/panel/check-ai").status_code, 401)
 
     def test_html_has_no_embedded_password_and_csp(self):
         page = self.client.get("/panel")
@@ -125,28 +122,6 @@ class PanelTests(unittest.TestCase):
             with self.assertRaises(HTTPException):
                 validate_endpoint("https://metadata.test")
 
-    def test_check_ai_error_is_not_reported_active(self):
-        self.app.dependency_overrides[require_panel] = lambda: "fixture-token"
-        with patch(
-            "app.controller.api.panel.api_reply",
-            AsyncMock(side_effect=ValueError("secret must not leak")),
-        ):
-            result = self.client.post("/api/panel/check-ai")
-            self.assertFalse(result.json()["active"])
-            self.assertNotIn("secret must not leak", result.text)
-
-    def test_check_ai_credit_failure_is_actionable_without_secrets(self):
-        self.app.dependency_overrides[require_panel] = lambda: "fixture-token"
-        response = httpx.Response(
-            402, request=httpx.Request("POST", "https://openrouter.ai"), text="secret"
-        )
-        error = httpx.HTTPStatusError("secret", request=response.request, response=response)
-        with patch("app.controller.api.panel.api_reply", AsyncMock(side_effect=error)):
-            result = self.client.post("/api/panel/check-ai")
-        self.assertFalse(result.json()["active"])
-        self.assertIn("kredit", result.json()["message"])
-        self.assertNotIn("secret", result.text)
-
     def test_empty_room_is_archived_and_db_failure_removes_live_room(self):
         from types import SimpleNamespace
         from app.controller.api.rooms import router as room_router
@@ -175,26 +150,6 @@ class PanelTests(unittest.TestCase):
             factory.return_value.archive_new_room.side_effect = PersistenceError("fail")
             self.assertEqual(self.client.post("/api/rooms").status_code, 503)
             self.assertEqual(set(rooms.rooms), before)
-
-
-class OpenRouterTests(unittest.IsolatedAsyncioTestCase):
-    async def test_fixed_qwen_payload_and_no_secret_in_body(self):
-        client = AsyncMock()
-        client.post.return_value = httpx.Response(
-            200,
-            request=httpx.Request("POST", "https://openrouter.ai"),
-            json={"choices": [{"message": {"content": "OK"}}]},
-        )
-        with patch("app.module.openrouter_client.httpx.AsyncClient") as factory:
-            factory.return_value.__aenter__.return_value = client
-            result = await generate_reply(
-                "hello", config=Settings(_env_file=None, openrouter_api_key="fixture-key")
-            )
-        self.assertEqual(result, "OK")
-        self.assertEqual(client.post.call_args.kwargs["json"]["model"], "qwen/qwen3-14b")
-        self.assertEqual(
-            client.post.call_args.kwargs["headers"]["Authorization"], "Bearer fixture-key"
-        )
 
 
 class HistoryFilterTests(unittest.TestCase):

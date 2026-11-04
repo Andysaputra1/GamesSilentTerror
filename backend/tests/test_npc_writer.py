@@ -4,7 +4,6 @@ Tidak ada panggilan jaringan: cek jalur diganti mock dan jalur rantai memakai ke
 """
 
 import json
-import os
 import threading
 import time
 import unittest
@@ -15,10 +14,8 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
-from app.config.settings import METODE_NPC_LAMA, Settings
+from app.config.settings import Settings
 from app.controller.api.panel import require_panel
-from app.module.match_engine import Match
-from app.module.npc_brain import runtime as runtime_modul
 from app.module.npc_brain.runtime import (
     JALUR_PENULIS, BrainRuntime, NLUBersama, NLUCadangan, OtakBot,
 )  # fmt: skip
@@ -103,9 +100,6 @@ class WriterChainTests(unittest.TestCase):
         self.assertEqual([b["jalur"] for b in status["rantai_penulis"]], ["tautan", "openrouter"])
         self.assertEqual(baris["tautan"]["keadaan"], "dipakai")
         self.assertEqual((status["penulis"], status["penulis_aktif"]), ("tautan", True))
-        # Jalur Claude lama di konfigurasi tersimpan diabaikan, bukan membuat seluruh konfigurasi ditolak.
-        status = self.runtime.atur(urutan_penulis=["claude_bedrock", "openrouter", "claude_api"])
-        self.assertEqual(status["urutan_penulis"], ["openrouter"])
 
     # Model link dipilih di panel; kosong = model Konfigurasi AI (OLLAMA_MODEL).
     def test_link_model_follows_panel_choice(self):
@@ -130,7 +124,7 @@ class WriterChainTests(unittest.TestCase):
             self.assertNotIn(rahasia, teks)
 
     def test_invalid_writer_config_is_rejected_without_partial_changes(self):
-        metode = self.runtime.konfigurasi.metode
+        penulis = self.runtime.konfigurasi.penulis
         for salah in (
             {"urutan_penulis": ["gpt"]},
             {"urutan_penulis": ["openrouter", "openrouter"]},
@@ -138,10 +132,8 @@ class WriterChainTests(unittest.TestCase):
             {"model_tautan": "qwen3 14b"},
         ):
             with self.assertRaises(ValueError):
-                self.runtime.atur(metode="llm", **salah)
-            self.assertEqual(self.runtime.konfigurasi.metode, metode)
-        # Nilai lama "claude" diterima sebagai rantai otomatis.
-        self.assertEqual(self.runtime.atur(penulis="claude")["penulis_diminta"], "otomatis")
+                self.runtime.atur(penulis="templat", **salah)
+            self.assertEqual(self.runtime.konfigurasi.penulis, penulis)
 
     def test_template_mode_disables_every_path(self):
         status = self.runtime.atur(penulis="templat")
@@ -263,14 +255,15 @@ class NpcConfigStoreTests(unittest.TestCase):
             patch.object(layanan, "brain_runtime") as runtime,
             patch.object(layanan.PersistenceService, "_run") as baca,
         ):
-            baca.return_value = {"metode": "bt", "penulis": "claude", "validasi": True}
+            # Baris produksi lama masih memuat kunci metode; kuncinya diabaikan.
+            baca.return_value = {"metode": "fuzzy", "penulis": "otomatis", "validasi": True}
             layanan.load_npc_configuration()
             runtime.atur.assert_called_once_with(
-                metode="bt", penulis="claude", validasi=True,
+                penulis="otomatis", validasi=True,
                 urutan_penulis=None, model_openrouter=None, model_tautan=None,
             )  # fmt: skip
             runtime.atur.side_effect = ValueError("jalur tidak dikenal")
-            baca.return_value = {"metode": "bt", "urutan_penulis": ["gpt"]}
+            baca.return_value = {"urutan_penulis": ["gpt"]}
             with self.assertLogs("shadow_heist.npc_config", "WARNING"):
                 layanan.load_npc_configuration()  # tidak melempar error saat startup
 
@@ -278,7 +271,7 @@ class NpcConfigStoreTests(unittest.TestCase):
         from app.module import npc_config_service as layanan
         from app.module.persistence_service import PersistenceError
 
-        sebelum = {"metode": "fuzzy", "penulis_diminta": "otomatis", "validasi": True,
+        sebelum = {"penulis_diminta": "otomatis", "validasi": True,
                    "urutan_penulis": ["openrouter", "tautan"], "model_openrouter": "",
                    "model_tautan": ""}  # fmt: skip
         with (
@@ -286,11 +279,11 @@ class NpcConfigStoreTests(unittest.TestCase):
             patch.object(layanan.PersistenceService, "_run", side_effect=PersistenceError("db")),
         ):
             runtime.ringkasan.return_value = sebelum
-            runtime.atur.return_value = {**sebelum, "metode": "llm", "urutan_penulis": ["tautan"]}
+            runtime.atur.return_value = {**sebelum, "urutan_penulis": ["tautan"]}
             with self.assertRaises(PersistenceError):
-                layanan.save_npc_configuration("llm", "otomatis", True, ["tautan"], "")
+                layanan.save_npc_configuration("otomatis", True, ["tautan"], "")
         runtime.atur.assert_called_with(
-            metode="fuzzy", penulis="otomatis", validasi=True,
+            penulis="otomatis", validasi=True,
             urutan_penulis=["openrouter", "tautan"], model_openrouter="", model_tautan="",
         )  # fmt: skip
 
@@ -307,72 +300,6 @@ class WriterSettingsTests(unittest.TestCase):
         ):
             with self.assertRaises(ValueError):
                 Settings(**salah)
-        # .env lama dengan jalur Claude tetap bisa start; jalur itu diabaikan.
-        self.assertEqual(
-            Settings(
-                npc_writer_order="claude_bedrock,claude_api,openrouter,tautan"
-            ).npc_writer_order,
-            "openrouter,tautan",
-        )
-
-
-# Produksi bisa masih menyimpan metode yang sudah diarsipkan: aplikasi harus tetap start dan membacanya sebagai fuzzy.
-class ArchivedMethodCompatibilityTests(unittest.TestCase):
-    def test_env_value_is_read_as_fuzzy_and_unknown_value_still_fails(self):
-        self.assertEqual(Settings.model_fields["npc_method"].default, "fuzzy")
-        self.assertEqual(METODE_NPC_LAMA, ("campuran", "utility", "bt"))
-        for lama in METODE_NPC_LAMA:
-            with self.subTest(lama=lama), patch.dict(os.environ, {"NPC_METHOD": lama}):
-                self.assertEqual(Settings().npc_method, "fuzzy")
-        with patch.dict(os.environ, {"NPC_METHOD": "llm"}):
-            self.assertEqual(Settings().npc_method, "llm")
-        with patch.dict(os.environ, {"NPC_METHOD": "salah"}), self.assertRaises(ValueError):
-            Settings()
-
-    def test_runtime_built_from_old_env_prepares_fuzzy_bots(self):
-        with patch.object(runtime_modul, "settings", Settings(npc_method="campuran")):
-            runtime = BrainRuntime()
-        self.addCleanup(runtime.tutup)
-        self.assertEqual(runtime.ringkasan()["metode"], "fuzzy")
-        runtime.konfigurasi.penulis = "templat"
-        runtime.muat_sekarang(nlu=NLUBersama(NLUCadangan(), "cadangan"))
-        match = Match(["human"], ["NOX", "ECHO", "VEIL"], now=0.0)
-        rows = runtime.siapkan_pertandingan(match, "LAMA01")
-        self.assertEqual({r["method"] for r in rows}, {"fuzzy"})  # bukan cadangan llm
-        self.assertIsNotNone(runtime.otak_bot(match.id, "NOX").ingatan)
-
-    def test_stored_row_is_read_as_fuzzy_and_keeps_its_other_fields(self):
-        from app.module import npc_config_service as layanan
-
-        for lama in METODE_NPC_LAMA:
-            runtime = BrainRuntime()
-            self.addCleanup(runtime.tutup)
-            baris = {"metode": lama, "penulis": "templat", "validasi": False,
-                     "urutan_penulis": ["tautan"], "model_openrouter": "qwen/qwen3-14b",
-                     "model_tautan": "qwen3:14b"}  # fmt: skip
-            with (
-                self.subTest(lama=lama),
-                patch.object(layanan, "brain_runtime", runtime),
-                patch.object(layanan.PersistenceService, "_run", return_value=baris),
-                self.assertNoLogs("shadow_heist.npc_config", "WARNING"),
-            ):
-                ringkasan = layanan.load_npc_configuration()
-                self.assertEqual(ringkasan["metode"], "fuzzy")
-                self.assertEqual(runtime.konfigurasi.metode, "fuzzy")
-                # Metode lama tidak membuat seluruh baris dibuang: pengaturan lain tetap berlaku.
-                self.assertEqual(ringkasan["penulis_diminta"], "templat")
-                self.assertFalse(ringkasan["validasi"])
-                self.assertEqual(ringkasan["urutan_penulis"], ["tautan"])
-                self.assertEqual(ringkasan["model_openrouter"], "qwen/qwen3-14b")
-                self.assertEqual(ringkasan["model_tautan"], "qwen3:14b")
-
-    def test_unknown_stored_method_is_still_rejected(self):
-        runtime = BrainRuntime()
-        self.addCleanup(runtime.tutup)
-        sebelum = runtime.konfigurasi.metode
-        with self.assertRaises(ValueError):
-            runtime.atur(metode="salah")
-        self.assertEqual(runtime.konfigurasi.metode, sebelum)
 
 
 class PanelWriterApiTests(unittest.TestCase):
@@ -387,7 +314,7 @@ class PanelWriterApiTests(unittest.TestCase):
         self.panel = panel
 
     def test_save_sends_order_and_model_to_runtime(self):
-        ringkasan = {"metode": "llm", "penulis_diminta": "otomatis", "validasi": True,
+        ringkasan = {"penulis_diminta": "otomatis", "validasi": True,
                      "urutan_penulis": ["openrouter", "tautan"], "model_openrouter": "",
                      "model_tautan": "qwen3:4b-instruct"}  # fmt: skip
         with (
@@ -397,35 +324,31 @@ class PanelWriterApiTests(unittest.TestCase):
             runtime.atur.return_value = ringkasan
             response = self.client.put(
                 "/api/panel/npc",
-                json={"metode": "llm", "penulis": "otomatis", "validasi": True,
+                json={"penulis": "otomatis", "validasi": True,
                       "urutan_penulis": ["openrouter", "tautan"], "model_openrouter": "",
                       "model_tautan": "qwen3:4b-instruct"},
             )  # fmt: skip
         self.assertEqual(response.status_code, 200)
         runtime.atur.assert_called_once_with(
-            metode="llm", penulis="otomatis", validasi=True,
+            penulis="otomatis", validasi=True,
             urutan_penulis=["openrouter", "tautan"], model_openrouter="",
             model_tautan="qwen3:4b-instruct",
         )  # fmt: skip
         simpan.assert_called_once()
         bad = self.client.put(
             "/api/panel/npc",
-            json={"metode": "fuzzy", "penulis": "otomatis", "urutan_penulis": ["gpt"]},
+            json={"penulis": "otomatis", "urutan_penulis": ["gpt"]},
         )
         self.assertEqual(bad.status_code, 422)
 
     # Panel tidak lagi menawarkan metode yang sudah diarsipkan; hanya nilai tersimpan lama yang dibaca fuzzy.
-    def test_archived_methods_are_not_offered_or_accepted(self):
+    def test_method_choice_is_gone_and_simulation_bot_count_is_limited(self):
         data = self.client.get("/api/panel/npc").json()
-        self.assertEqual(set(data["pilihan"]["metode"]), {"fuzzy", "llm"})
-        for metode in METODE_NPC_LAMA:
-            with self.subTest(metode=metode):
-                ubah = self.client.put(
-                    "/api/panel/npc", json={"metode": metode, "penulis": "otomatis"}
-                )
-                self.assertEqual(ubah.status_code, 422)
-                simulasi = self.client.post("/api/panel/simulasi", json={"metode": [metode] * 3})
-                self.assertEqual(simulasi.status_code, 422)
+        self.assertNotIn("metode", data["pilihan"])
+        self.assertNotIn("metode", data["status"])
+        for jumlah in (2, 10):
+            simulasi = self.client.post("/api/panel/simulasi", json={"jumlah_bot": jumlah})
+            self.assertEqual(simulasi.status_code, 422)
 
     def test_check_endpoint_rebuilds_and_checks_in_background(self):
         with patch("app.controller.api.panel_npc.brain_runtime") as runtime:

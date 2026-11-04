@@ -26,7 +26,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from app.config.settings import (
-    BACKEND_DIR, JALUR_PENULIS_LAMA, JALUR_PENULIS_NPC, METODE_NPC_LAMA, POLA_MODEL_OPENROUTER,
+    BACKEND_DIR, JALUR_PENULIS_NPC, POLA_MODEL_OPENROUTER,
     PROJECT_DIR, settings,
 )  # fmt: skip
 from app.module.ai_runtime_service import ai_runtime
@@ -39,13 +39,11 @@ logger = logging.getLogger("shadow_heist.npc_brain")
 warnings.filterwarnings("ignore", category=DeprecationWarning, module=r"skfuzzy(\..*)?")
 
 METODE_MODUL = {"fuzzy": "otak_fuzzy"}
-METODE_VALID = {"fuzzy", "llm"}
 # Nama model di link LLM (Ollama/OpenAI), mis. qwen3:4b-instruct atau qwen3:14b.
 POLA_MODEL_TAUTAN = re.compile(
     r"[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9._-]+)*(?::[A-Za-z0-9._-]+)?"
 )
-# "claude" = nilai lama penulis, diperlakukan seperti otomatis.
-PENULIS_VALID = {"otomatis", "claude", "templat"}
+PENULIS_VALID = {"otomatis", "templat"}
 # Jalur rantai penulis: openrouter dan tautan (link LLM sendiri, mis. Ollama lewat tunnel).
 JALUR_PENULIS = JALUR_PENULIS_NPC
 
@@ -198,7 +196,6 @@ class OtakBot:
 
 @dataclass
 class KonfigurasiNPC:
-    metode: str = "fuzzy"
     penulis: str = "otomatis"
     validasi: bool = True
     # Prioritas rantai penulis; jalur yang tidak tercantum dinonaktifkan.
@@ -252,8 +249,7 @@ class BrainRuntime:
         self.penulis = None
         self.keterangan_penulis = {}  # jalur → alasan tidak masuk rantai (mis. key belum diisi)
         self.konfigurasi = KonfigurasiNPC(
-            settings.npc_method,
-            "otomatis" if settings.npc_writer == "claude" else settings.npc_writer,
+            settings.npc_writer,
             settings.npc_validate_nlg,
             settings.npc_writer_order.split(",") if settings.npc_writer_order else [],
             settings.npc_openrouter_model,
@@ -430,25 +426,19 @@ class BrainRuntime:
                 self._cek_tertunda -= 1
                 self.status["sedang_cek_penulis"] = self._cek_tertunda > 0
 
-    # PANEL: ubah metode/penulis/validasi/rantai saat server berjalan. Metode berlaku untuk pertandingan
-    # berikutnya; rantai penulis langsung dipakai kalimat berikutnya. Semua nilai divalidasi dulu (atomik).
+    # PANEL: ubah penulis/validasi/rantai saat server berjalan; rantai penulis langsung dipakai kalimat
+    # berikutnya. Semua nilai divalidasi dulu (atomik).
     def atur(
         self,
-        metode=None,
         penulis=None,
         validasi=None,
         urutan_penulis=None,
         model_openrouter=None,
         model_tautan=None,
     ):
-        if metode in METODE_NPC_LAMA:  # baris panel_configuration dari sebelum arsip BT dan Utility
-            metode = "fuzzy"
-        if metode is not None and metode not in METODE_VALID:
-            raise ValueError("Metode NPC tidak dikenal.")
         if penulis is not None and penulis not in PENULIS_VALID:
             raise ValueError("Penulis kalimat tidak dikenal.")
         if urutan_penulis is not None:
-            urutan_penulis = [j for j in urutan_penulis if j not in JALUR_PENULIS_LAMA]
             if not set(urutan_penulis) <= set(JALUR_PENULIS) or len(set(urutan_penulis)) != len(
                 urutan_penulis
             ):
@@ -466,12 +456,10 @@ class BrainRuntime:
         with self.lock:
             k = self.konfigurasi
             sebelum = (k.penulis, list(k.urutan_penulis), k.model_openrouter, k.model_tautan)
-            if metode is not None:
-                k.metode = metode
             if validasi is not None:
                 k.validasi = bool(validasi)
             if penulis is not None:
-                k.penulis = "otomatis" if penulis == "claude" else penulis
+                k.penulis = penulis
             if urutan_penulis is not None:
                 k.urutan_penulis = urutan_penulis
             if model_openrouter is not None:
@@ -495,7 +483,6 @@ class BrainRuntime:
             berikut = penulis.terdepan() if penulis else None
             return {
                 **self.status,
-                "metode": self.konfigurasi.metode,
                 "penulis_diminta": self.konfigurasi.penulis,
                 "validasi": self.konfigurasi.validasi,
                 "penulis_aktif": berikut is not None,
@@ -537,13 +524,13 @@ class BrainRuntime:
             })  # fmt: skip
         return baris
 
-    # Sekali per pertandingan: metode, persona, dan ingatan setiap bot.
+    # Sekali per pertandingan: persona dan ingatan setiap bot.
     def siapkan_pertandingan(self, match, room_code):
         with self.lock:
             if match.id in self.pertandingan:
                 return []
             bots = sorted(p.name for p in match.players.values() if p.bot)
-            otak = self.buat_otak(match, {nama: self.konfigurasi.metode for nama in bots})
+            otak = self.buat_otak(match, bots)
             self.pertandingan[match.id] = otak
             return [
                 {"match_id": match.id, "room_code": room_code, "bot_name": b.nama,
@@ -551,16 +538,15 @@ class BrainRuntime:
                 for b in otak.values()
             ]  # fmt: skip
 
-    # Otak tiap bot dengan metode {nama: metode}; dipakai juga simulasi panel (tidak didaftarkan di sini).
-    def buat_otak(self, match, metode):
-        bots = sorted(metode)
+    # Otak tiap bot; dipakai juga simulasi panel (tidak didaftarkan di sini).
+    def buat_otak(self, match, bots):
+        bots = sorted(bots)
         cepat = match.durations == phase_durations(len(match.players), True)
         otak = {}
         for nama in bots:
-            m = metode[nama] if metode[nama] == "llm" or metode[nama] in self.modul else "llm"
             persona = self.nlg.persona_bot(nama, bots) if self.nlg else "santai"
-            ingatan = self.modul[m].Ingatan(nama, cepat=cepat) if m in self.modul else None
-            otak[nama] = OtakBot(nama, m, persona, match.players[nama].role, ingatan)
+            ingatan = self.modul["fuzzy"].Ingatan(nama, cepat=cepat)
+            otak[nama] = OtakBot(nama, "fuzzy", persona, match.players[nama].role, ingatan)
         return otak
 
     def otak_bot(self, match_id, nama) -> OtakBot | None:

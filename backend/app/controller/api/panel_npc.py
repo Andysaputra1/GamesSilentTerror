@@ -23,10 +23,6 @@ from app.module.simulasi_service import simulasi_service
 router = APIRouter(tags=["panel-npc"], route_class=SafeValidationRoute)
 
 PILIHAN = {
-    "metode": {
-        "fuzzy": "Fuzzy Logic Mamdani",
-        "llm": "LLM murni (mode lama, pembanding)",
-    },
     "penulis": {
         "otomatis": "Rantai LLM sesuai prioritas; semua gagal → templat",
         "templat": "Templat bervariasi saja (tanpa LLM)",
@@ -43,8 +39,7 @@ PILIHAN = {
 
 
 class NPCConfig(BaseModel):
-    metode: Literal["fuzzy", "llm"]
-    penulis: Literal["otomatis", "claude", "templat"]  # "claude" = nilai lama, sama dengan otomatis
+    penulis: Literal["otomatis", "templat"]
     validasi: bool = True
     # None = pertahankan urutan/model yang tersimpan (klien panel lama).
     urutan_penulis: list[Literal["openrouter", "tautan"]] | None = Field(default=None, max_length=2)
@@ -60,11 +55,10 @@ def npc_status(token=Depends(require_panel)):
 
 
 @router.put("/api/panel/npc")
-# PANEL: simpan konfigurasi. Metode berlaku untuk pertandingan berikutnya; rantai penulis langsung.
+# PANEL: simpan konfigurasi; rantai penulis langsung dipakai.
 def npc_update(body: NPCConfig, token=Depends(require_panel)):
     try:
         status = save_npc_configuration(
-            body.metode,
             body.penulis,
             body.validasi,
             body.urutan_penulis,
@@ -86,8 +80,8 @@ def npc_check_writers(token=Depends(require_panel)):
 
 class SimulasiBaru(BaseModel):
     nama: str = Field(default="Pemain", min_length=1, max_length=40)
-    # Metode tiap bot, urut NOX, ECHO, ... (3–9 bot: 4–10 pemain bersama admin).
-    metode: list[Literal["fuzzy"]] = Field(min_length=3, max_length=9)
+    # 3–9 bot: 4–10 pemain bersama admin.
+    jumlah_bot: int = Field(ge=3, le=9)
 
 
 class SimulasiAksi(BaseModel):
@@ -102,7 +96,7 @@ class SimulasiAksi(BaseModel):
 # SIMULASI: pertandingan tiruan dengan otak, NLU, dan NLG asli; tidak menyentuh room atau database.
 def simulasi_mulai(body: SimulasiBaru, token=Depends(require_panel)):
     try:
-        return simulasi_service.mulai(body.nama.strip() or "Pemain", body.metode)
+        return simulasi_service.mulai(body.nama.strip() or "Pemain", body.jumlah_bot)
     except RuntimeError as error:
         raise HTTPException(503, f"Otak NPC belum siap: {error} Coba lagi sebentar.") from error
 

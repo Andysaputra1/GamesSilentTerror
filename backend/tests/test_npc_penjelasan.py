@@ -71,7 +71,7 @@ class PenjelasanMetodeTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.langkah = {}
-        runtime = runtime_siap("fuzzy")
+        runtime = runtime_siap()
         cls.langkah["fuzzy"] = kumpulkan(runtime)
         runtime.tutup()
 
@@ -209,7 +209,7 @@ class CheckerPenjelasanTests(unittest.TestCase):
         )
 
     def test_room_summary_uses_live_match_then_traces_then_archive(self):
-        runtime = runtime_siap("fuzzy")
+        runtime = runtime_siap()
         rooms = RoomService()
         room = rooms.create("human")
         rooms.set_bot(room.code, "human", True)
@@ -243,7 +243,7 @@ class CheckerPenjelasanTests(unittest.TestCase):
 
 class NPCServicePenjelasanTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
-        self.runtime = runtime_siap("fuzzy")
+        self.runtime = runtime_siap()
         self.rooms = RoomService()
         self.room = self.rooms.create("human")
         self.rooms.set_bot(self.room.code, "human", True)

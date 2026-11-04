@@ -35,7 +35,6 @@ services:
       mysql:
         condition: service_healthy
     environment:
-      APP_ENVIRONMENT: production
       MYSQL_HOST: mysql
       MYSQL_PORT: '3306'
       MYSQL_DATABASE: shadow_heist
@@ -55,7 +54,6 @@ services:
       INTENT_MODEL_PATH: /models/intent_classifier.pkl
       # Otak NPC (lihat .env.example). Nilai bawaan wajib diisi karena variabel kosong mengalahkan
       # default backend (mis. urutan rantai kosong mematikan semua jalur LLM).
-      NPC_METHOD: ${NPC_METHOD:-fuzzy}
       NPC_WRITER: ${NPC_WRITER:-otomatis}
       NPC_WRITER_ORDER: ${NPC_WRITER_ORDER:-openrouter,tautan}
       NPC_OPENROUTER_MODEL: ${NPC_OPENROUTER_MODEL:-}

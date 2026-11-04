@@ -12,7 +12,6 @@ from fastapi.testclient import TestClient
 from app.controller.api.rooms import router
 from app.controller.middleware.auth import require_authenticated_user
 from app.module.match_engine import PREPARATION_MIN_SECONDS, Match, snapshot_berlabel
-from app.module.npc_service import npc_context
 from app.module.room_service import RoomService
 
 RAHASIA = " Role tetap dirahasiakan sampai permainan selesai."
@@ -281,9 +280,6 @@ class LeaveRoomTests(unittest.TestCase):
         from app.module.npc_brain.generated import otak_fuzzy
 
         self.rooms.leave(self.room.code, "alice")
-        context = npc_context(self.match, "NOX")
-        self.assertIn({"name": "alice", "alive": False, "hostage": False}, context["players"])
-        self.assertNotIn("alice", context["legal_actions"]["gag"])
         snapshot = snapshot_berlabel(self.match.snapshot("NOX"), self.match.labels)
         alice = next(p for p in snapshot["players"] if p["name"] == "alice")
         self.assertEqual((alice["alive"], alice["left"]), (False, True))

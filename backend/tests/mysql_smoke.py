@@ -13,7 +13,7 @@ from sqlalchemy import text
 
 from app.main import app
 from app.module.mysql_connector import SessionLocal
-from app.module.persistence_service import PersistenceError, persistence_service
+from app.module.persistence_service import PersistenceError, PersistenceService
 
 
 @unittest.skipUnless(os.getenv("STRUCTURE_TEST_DB") == "1", "requires disposable MySQL")
@@ -36,9 +36,9 @@ class MySQLIntegration(unittest.TestCase):
         # Endpoint analisis lama (/api/analyze) sudah dihapus.
         self.assertEqual(client.post("/api/analyze", headers=headers, json={}).status_code, 404)
         username = "sql-test-" + uuid4().hex[:10]
-        persistence_service.ensure_player(username)
-        persistence_service.ensure_player(username)
-        message_id = persistence_service.record_player_message(
+        PersistenceService().ensure_player(username)
+        PersistenceService().ensure_player(username)
+        message_id = PersistenceService().record_player_message(
             username=username,
             message="'quoted'; --",
             status="active",
@@ -59,7 +59,7 @@ class MySQLIntegration(unittest.TestCase):
         # An invalid write must also roll back the player inserted earlier in the same transaction.
         bad_name = "rollback-" + uuid4().hex[:10]
         with self.assertRaises(PersistenceError):
-            persistence_service.record_player_message(
+            PersistenceService().record_player_message(
                 username=bad_name,
                 message="bad",
                 status="INVALID",

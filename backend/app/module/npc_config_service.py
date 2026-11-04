@@ -1,4 +1,4 @@
-"""Konfigurasi otak NPC dari panel (metode, penulis kalimat, rantai penulis, validasi); .env tetap nilai awal.
+"""Konfigurasi otak NPC dari panel (penulis kalimat, rantai penulis, validasi); .env tetap nilai awal.
 
 Disimpan di baris panel_configuration id=2 agar tidak bercampur dengan konfigurasi provider LLM
 (id=1) yang ditulis ulang utuh oleh save_panel_configuration.
@@ -29,7 +29,6 @@ def load_npc_configuration():
         try:
             # Baris lama tanpa urutan/model penulis → None → nilai .env dipertahankan.
             brain_runtime.atur(
-                metode=stored.get("metode"),
                 penulis=stored.get("penulis"),
                 validasi=stored.get("validasi"),
                 urutan_penulis=stored.get("urutan_penulis"),
@@ -43,11 +42,10 @@ def load_npc_configuration():
 
 # Validasi lewat runtime terlebih dahulu, simpan nilai efektifnya, lalu kembalikan ringkasan terbaru.
 def save_npc_configuration(
-    metode, penulis, validasi, urutan_penulis=None, model_openrouter=None, model_tautan=None
+    penulis, validasi, urutan_penulis=None, model_openrouter=None, model_tautan=None
 ):
     before = brain_runtime.ringkasan()
     summary = brain_runtime.atur(
-        metode=metode,
         penulis=penulis,
         validasi=validasi,
         urutan_penulis=urutan_penulis,
@@ -55,7 +53,6 @@ def save_npc_configuration(
         model_tautan=model_tautan,
     )
     config = {
-        "metode": summary["metode"],
         "penulis": summary["penulis_diminta"],
         "validasi": summary["validasi"],
         "urutan_penulis": summary["urutan_penulis"],
@@ -77,7 +74,6 @@ def save_npc_configuration(
     except Exception:
         # Gagal simpan: kembalikan runtime ke konfigurasi sebelumnya agar panel dan server konsisten.
         brain_runtime.atur(
-            metode=before["metode"],
             penulis=before["penulis_diminta"],
             validasi=before["validasi"],
             urutan_penulis=before["urutan_penulis"],

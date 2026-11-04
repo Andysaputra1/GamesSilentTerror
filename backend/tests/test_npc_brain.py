@@ -15,6 +15,7 @@ from unittest.mock import AsyncMock, Mock, patch
 from app.module.match_engine import Match
 from app.module.npc_brain.runtime import BrainRuntime, NLUBersama, NLUCadangan
 from app.module.npc_service import LANTAI_MAKS, NPCService, catat_nlu
+from app.module.persistence_service import PersistenceError
 from app.module.room_service import RoomService
 
 AKSI_RAHASIA = {"gag", "hostage", "guard", "peek"}
@@ -32,9 +33,8 @@ class AnalisisKataKunci:
         return "neutral"
 
 
-def runtime_siap(metode="fuzzy"):
+def runtime_siap():
     runtime = BrainRuntime()
-    runtime.konfigurasi.metode = metode
     runtime.konfigurasi.penulis = "templat"
     runtime.muat_sekarang(nlu=NLUBersama(NLUCadangan(AnalisisKataKunci()), "cadangan"))
     return runtime
@@ -150,8 +150,6 @@ class BrainRuntimeTests(unittest.TestCase):
 
     def test_invalid_panel_values_are_rejected(self):
         with self.assertRaises(ValueError):
-            self.runtime.atur(metode="acak")
-        with self.assertRaises(ValueError):
             self.runtime.atur(penulis="gpt")
 
     # Satu pertandingan penuh: semua peserta bot memakai otak, keputusan diterapkan ke engine asli.
@@ -239,7 +237,7 @@ class BrainRuntimeTests(unittest.TestCase):
 
 class NPCServiceBrainTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
-        self.runtime = runtime_siap("fuzzy")
+        self.runtime = runtime_siap()
         self.rooms = RoomService()
         self.room = self.rooms.create("human")
         self.rooms.set_bot(self.room.code, "human", True)
@@ -295,6 +293,21 @@ class NPCServiceBrainTests(unittest.IsolatedAsyncioTestCase):
         self.persistence.record_bot_message.assert_called_once()
         self.sio.emit.assert_awaited_once()
         self.assertEqual(otak.riwayat, [self.match.messages[-1]["message"]])
+
+    async def test_unsaved_bot_chat_is_never_broadcast(self):
+        await self.service.prepare(self.room.code, self.match)
+        self.match.begin()
+        otak = self.runtime.otak_bot(self.match.id, "NOX")
+        with self.rooms.lock:
+            self.match.add_message("human", "Aku curiga NOX, dia Hitman. Ayo vote NOX!")
+        jumlah_pesan = len(self.match.messages)
+        self.match.deadline = time.time() + 60
+        self.persistence.record_bot_message.side_effect = PersistenceError("fixture")
+        with patch("app.module.npc_service.asyncio.sleep", AsyncMock()):
+            await self.service.brain_turn(self.room.code, self.match, otak)
+        self.persistence.record_bot_message.assert_called_once()
+        self.assertEqual(len(self.match.messages), jumlah_pesan)
+        self.sio.emit.assert_not_awaited()
 
     async def test_stale_decision_is_not_applied(self):
         await self.service.prepare(self.room.code, self.match)
