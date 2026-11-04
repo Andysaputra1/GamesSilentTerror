@@ -2,13 +2,15 @@
    dengan layar kuesioner di akhir game. */
 :host {
   position: relative;
-  z-index: 5;
   display: block;
   flex: none;
 }
 
+/* z-index di catatannya, bukan di :host: stacking context di :host mengurung pop-up survei
+   di bawah header Main, sehingga papan nama dan profil menimpa pop-up. */
 .reminder {
   position: relative;
+  z-index: 5;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
@@ -191,6 +193,10 @@
   border-bottom: 1px dashed rgb(139 90 43 / 0.45);
 }
 
+.survey-dialog__head > div {
+  min-width: 0;
+}
+
 .survey-dialog__head p {
   margin: 0;
   font: 17px var(--font-hand);
@@ -201,6 +207,7 @@
   margin: 2px 0 0;
   font: 800 clamp(24px, 3vw, 32px)/1.1 var(--font-display);
   color: #5b311b;
+  overflow-wrap: anywhere;
 }
 
 .survey-dialog__close {
@@ -261,6 +268,21 @@
   from {
     opacity: 0;
     translate: 0 -10px;
+  }
+}
+
+/* Target sentuh tablet dan HP. */
+@media (max-width: 1100px) {
+  .reminder__fill,
+  .survey-dialog__close {
+    min-height: 40px;
+  }
+
+  .reminder__close {
+    top: 2px;
+    right: 2px;
+    width: 40px;
+    height: 40px;
   }
 }
 

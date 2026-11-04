@@ -298,9 +298,9 @@
   }
 
   .case-file-close {
-    min-height: 32px;
+    min-height: 40px;
     padding: 6px 8px 6px 10px;
-    font-size: 8px;
+    font-size: 10px;
   }
 
   .case-file-tabs {
@@ -308,9 +308,9 @@
   }
 
   .case-file-tab {
-    min-height: 38px;
+    min-height: 44px;
     padding: 9px 12px;
-    font-size: 8px;
+    font-size: 10px;
   }
 
   .case-file-panel {

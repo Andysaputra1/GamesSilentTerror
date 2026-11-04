@@ -92,6 +92,14 @@ p {
   cursor: pointer;
 }
 
+/* Target sentuh tablet dan HP. */
+@media (max-width: 1099px) {
+  .invite-later {
+    min-height: 44px;
+    padding: 0 6px;
+  }
+}
+
 .invite-enter:focus-visible,
 .invite-later:focus-visible {
   outline: 2px solid #754122;

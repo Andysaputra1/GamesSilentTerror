@@ -3,15 +3,50 @@
    Desktop/tablet: binder kulit satu layar (main-page.css).
    HP (<= 640px): binder dilepas, dua halaman menjadi kertas bertumpuk dengan gutter 16px;
    halaman boleh bergulir vertikal agar teks dan tombol tetap berukuran nyaman.
+   HP landscape (tinggi <= 480px): kertas yang sama, tetapi berdampingan.
    ========================================================================== */
 
 @media (max-width: 1100px) {
   .suspect-deck {
     padding: 8% 6% 6%;
   }
+
+  /* Target sentuh di tablet: ukuran cqw terlalu kecil untuk jari saat binder menyempit. */
+  .join-input {
+    min-height: 40px;
+  }
+
+  .capacity-back {
+    min-height: 32px;
+  }
+
+  .capacity-slider input[type='range'] {
+    height: 32px;
+  }
+
+  .capacity-slider input[type='range']::-webkit-slider-runnable-track {
+    height: 6px;
+  }
+
+  .capacity-slider input[type='range']::-moz-range-track {
+    height: 6px;
+  }
+
+  .capacity-slider input[type='range']::-webkit-slider-thumb {
+    width: 22px;
+    height: 22px;
+    margin-top: -9px;
+    border-width: 3px;
+  }
+
+  .capacity-slider input[type='range']::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-width: 3px;
+  }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 640px), (max-height: 480px) {
   :host {
     height: auto;
     min-height: 100dvh;
@@ -180,9 +215,10 @@
   }
 
   .capacity-back {
-    top: 16px;
-    left: 20px;
-    padding: 6px 0;
+    top: 8px;
+    left: 12px;
+    min-height: 40px;
+    padding: 6px 8px;
     font-size: 12px;
   }
 
@@ -208,7 +244,7 @@
   }
 
   .capacity-slider input[type='range'] {
-    height: 28px;
+    height: 40px;
   }
 
   /* Selector vendor dipisah: satu pseudo-element asing membatalkan seluruh daftar selector. */
@@ -248,4 +284,18 @@
     padding-top: 14px;
   }
 
+}
+
+@media (max-height: 480px) and (min-width: 641px) {
+  .binder-content {
+    flex-direction: row;
+  }
+
+  .binder-page,
+  .binder-page--left,
+  .binder-page--right {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+  }
 }

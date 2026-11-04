@@ -96,7 +96,7 @@ import { STORAGE } from './storage';
     .profile-trigger svg { flex: none; opacity: .85; transition: transform 160ms ease; }
     .profile-trigger[aria-expanded='true'] svg { transform: rotate(180deg); }
     .profile-actions { position: absolute; right: 0; top: calc(100% + 8px); width: min(280px, 85vw);
-      max-height: min(520px, calc(100dvh - 24px)); overflow-y: auto; overscroll-behavior: contain;
+      max-height: min(520px, calc(100dvh - 72px)); overflow-y: auto; overscroll-behavior: contain;
       padding: 16px; border: 2px solid #6d4025; border-radius: 12px; background: #fff7e5;
       color: var(--paper-ink); box-shadow: 0 14px 32px rgb(20 8 2 / .42); }
     .profile-actions p { margin: 0 0 8px; color: var(--paper-label);
@@ -124,8 +124,10 @@ import { STORAGE } from './storage';
     .name-actions button { padding: 8px 12px; border: 1px solid #6d4025; border-radius: 7px;
       background: #f5eadb; color: var(--paper-ink); }
     .name-actions button[type=submit] { background: #344c3d; color: #fff7e5; }
-    @media (max-height: 620px) {
-      .profile-actions { top: auto; bottom: calc(100% + 8px); }
+    /* Tablet dan HP: kontrol di dalam menu cukup besar untuk disentuh. */
+    @media (max-width: 1099px) {
+      .edit-name { padding: 10px; }
+      .name-actions button { min-height: 40px; }
     }
   `,
 })

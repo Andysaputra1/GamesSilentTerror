@@ -181,3 +181,9 @@ textarea:focus {
   filter: grayscale(0.35);
   cursor: not-allowed;
 }
+/* Target sentuh tablet dan HP: seluruh label pilihan bisa diketuk. */
+@media (max-width: 1099px) {
+  .choices label {
+    min-height: 44px;
+  }
+}
