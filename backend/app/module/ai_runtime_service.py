@@ -96,7 +96,7 @@ def muat_konfigurasi_ai():
 
 
 # Simpan konfigurasi AI dari panel ke DB dan memori, supaya langsung berlaku tanpa restart.
-# Alur: 1 baca isi lama (baris dikunci) -> 2 susun isi baru dan enkripsi key -> 3 uji dekripsi -> 4 tulis DB -> 5 simpan ke memori
+# Alur: 1 baca isi lama (baris dikunci) -> 2 susun isi baru dan enkripsi key -> 3 uji dekripsi-> 4 tulis DB -> 5 simpan ke memori
 def save_panel_configuration(
     provider,
     endpoint,
