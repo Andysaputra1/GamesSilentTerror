@@ -325,21 +325,21 @@ const PARAMETER = {
   tekanan:
     'Tuduhan dan vote pemain lain ke pemain ini, dibagi jumlah pemain lain yang hidup; meluruh per ronde.',
   dukungan: 'Pembelaan pemain lain, termasuk klaim bersih dari pengaku Stalker.',
-  inkonsistensi: 'Berganti sikap ke target yang sama, atau vote tidak sesuai ucapannya.',
-  pengalihan: 'Setelah dituduh, malah menuduh orang lain alih-alih membela diri.',
-  dituduh_korban:
+  plin_plan: 'Berganti sikap ke target yang sama, atau vote tidak sesuai ucapannya.',
+  alihkan_tuduhan: 'Setelah dituduh, malah menuduh orang lain alih-alih membela diri.',
+  penuduh_dibungkam:
     'Pernah dituduh pemain yang kemudian disandera (diumumkan) atau diduga di-Gag (jejak aksi Hitman).',
-  dorong_salah_eksekusi:
+  ikut_salah_eksekusi:
     'Ikut mendorong eksekusi warga: vote, ikut menuduh, atau penuduh pertama, dikali kepastian korban warga (1 bila game berlanjut di room satu Hitman atau jumlah Hitman yang diumumkan tetap; selain itu 1 − k/(N − 1)). Tidak dihitung bila korban diketahui Hitman.',
-  serang_bersih: 'Menuduh atau vote pemain yang pasti bersih menurut bot.',
-  klaim: 'Klaim role bermasalah: bentrok, dibantah, atau hasil Peek palsu.',
+  menuduh_orang_baik: 'Menuduh atau vote pemain yang pasti orang baik menurut bot.',
+  klaim_role_bermasalah: 'Klaim role bermasalah: bentrok, dibantah, atau hasil Peek palsu.',
   p_sandera: 'Korban Hostage yang diumumkan server (1) atau bukan (0); korban pasti bukan Hitman.',
   diam: 'Belum bicara di ronde ini (0–1 menurut waktu yang lewat).',
-  urgensi: 'Makin sedikit warga bebas, makin mendesak (0–1).',
-  porsi_fase: 'Bagian fase yang sudah berjalan (0–1).',
+  warga_terdesak: 'Makin sedikit warga bebas, makin mendesak (0–1).',
+  waktu_berjalan: 'Bagian fase yang sudah berjalan (0–1).',
   keunggulan: 'Selisih kecurigaan tersangka teratas dari tersangka kedua (0–1).',
   keyakinan: 'Fuzzy vote: keyakinan pada kandidat teratas (0–1).',
-  kesiapan: 'Fuzzy vote: kesiapan mengunci vote (0–100) dari keyakinan dan urgensi.',
+  kesiapan: 'Fuzzy vote: kesiapan mengunci vote (0–100) dari keyakinan dan warga terdesak.',
   prioritas: 'Keluaran fuzzy 0–100 untuk tindakan chat atau aksi rahasia.',
   utilitas: 'Skor Utility AI 0–1. Nilai pertimbangan sudah melalui kurva.',
   poin: 'Behavior Tree: jumlah poin bendera merah yang aktif; kecurigaan = poin / 5.',
@@ -349,6 +349,19 @@ const PARAMETER = {
   terancam: 'Spy: seberapa mungkin pemain diincar Hitman malam ini.',
   kepercayaan: 'Seberapa bisa dipercaya (1 = pasti bersih).',
 };
+// Nama lama tetap dikenali karena jejak lama di checker_traces masih memakainya.
+for (const [lama, baru] of Object.entries({
+  inkonsistensi: 'plin_plan',
+  pengalihan: 'alihkan_tuduhan',
+  dituduh_korban: 'penuduh_dibungkam',
+  dorong_salah_eksekusi: 'ikut_salah_eksekusi',
+  serang_bersih: 'menuduh_orang_baik',
+  klaim: 'klaim_role_bermasalah',
+  urgensi: 'warga_terdesak',
+  porsi_fase: 'waktu_berjalan',
+})) {
+  PARAMETER[lama] = `Nama lama ${baru.replaceAll('_', ' ')}. ${PARAMETER[baru]}`;
+}
 // Nilai → teks ringkas: angka dibulatkan, boolean ya/tidak, kosong menjadi —.
 function teks(value) {
   if (value === null || value === undefined || value === '') return '—';
@@ -1268,7 +1281,7 @@ const ALUR_AI = {
     kode: 'hitung_bukti · pengetahuan_peran · fitur_hitman / fitur_lindung',
     tujuan: 'Mengubah riwayat permainan menjadi angka 0–1 per pemain.',
     proses:
-      'Dari chat ber-NLU dan vote dihitung tekanan, dukungan, inkonsistensi, pengalihan, klaim, diam, dll. Hitman juga menilai ancaman; Spy menilai siapa yang perlu di-Guard.',
+      'Dari chat ber-NLU dan vote dihitung tekanan, dukungan, plin plan, alihkan tuduhan, klaim role bermasalah, diam, dll. Hitman juga menilai ancaman; Spy menilai siapa yang perlu di-Guard.',
     keluaran: 'Tabel bukti (lihat tab Parameter).',
     alasan:
       'Penalaran menerima angka, bukan teks chat, jadi nilainya bisa diperiksa di tab Parameter.',
@@ -1308,7 +1321,7 @@ const ALUR_AI = {
     kode: 'fuzzy(nama, a, b) · nilai_kecurigaan (HIERARKI)',
     tujuan: 'Menggabungkan aturan menjadi satu angka.',
     proses:
-      'Keluaran aturan digabung (max), lalu centroid → 0–100. Bertingkat: sosial, perilaku, jejak, pribadi, ucapan, bukti_keras → kecurigaan.',
+      'Keluaran aturan digabung (max), lalu centroid → 0–100. Bertingkat: sentimen_sosial, perilaku_mencurigakan, jejak, kejanggalan, ucapan, bukti_keras → kecurigaan.',
     keluaran: 'Kecurigaan 0–1 dan prioritas 0–100.',
     alasan: 'Centroid membuat nilai berubah halus saat bukti berubah.',
   },

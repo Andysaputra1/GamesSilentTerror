@@ -199,7 +199,7 @@ class BrainExtraTimeTests(unittest.TestCase):
         sekarang = game.deadline - 5
         for nama, ingatan in otak.items():
             view = ingatan.sinkron_snapshot(game.snapshot(nama), sekarang)
-            self.assertEqual(otak_fuzzy.porsi_fase(ingatan, view), 1.0)
+            self.assertEqual(otak_fuzzy.waktu_berjalan(ingatan, view), 1.0)
             aksi = otak_fuzzy.putuskan(ingatan, view)["npc_decision"]["action"]
             if nama in ("spy", "hitman"):
                 self.assertNotEqual(aksi, "vote", nama)

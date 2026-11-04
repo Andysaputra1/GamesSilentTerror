@@ -207,8 +207,8 @@ KODE_ALUR = {
         (G + "otak_fuzzy", "hitung_bukti", [
             ('"tekanan": min(', "tekanan: tuduhan + vote ke pemain ini"),
             ('"dukungan": min(', "dukungan: pembelaan dari pemain lain"),
-            ('"inkonsistensi": min(', "berganti sikap atau vote tidak sesuai ucapan"),
-            ('"pengalihan": ', "menuduh balik setelah dituduh"),
+            ('"plin_plan": min(', "berganti sikap atau vote tidak sesuai ucapan"),
+            ('"alihkan_tuduhan": ', "menuduh balik setelah dituduh"),
             ('"diam": diam', "belum bicara di ronde ini"),
         ]),
         (G + "otak_fuzzy", "pengetahuan_peran", []),

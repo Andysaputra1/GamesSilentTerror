@@ -52,6 +52,29 @@ VARIABEL_DIBUANG = {
 # Nama fungsi tampilan notebook: penugasan yang memakai nama ini adalah demo.
 NAMA_TAMPILAN = {"plt", "display", "tampilkan"}
 
+# Isi "Alurnya" di docstring tiap modul hasil ekspor; harus mengikuti putuskan dan tulis_pesan di notebook.
+ALUR_MODUL = {
+    "otak_fuzzy": """\
+1. Ingatan.sinkron_snapshot mencatat snapshot privat bot (chat baru dibaca anotasi_chat) dan memberi view
+2. putuskan dipanggil game sekali tiap langkah bot:
+   2.1 hitung_bukti: tabel bukti per pemain dan konteks permainan
+   2.2 pengetahuan_peran: fakta pasti menurut role
+   2.3 Warga: nilai_kecurigaan lalu terapkan_pengetahuan; Spy juga fitur_lindung
+   2.4 Hitman: hitung_bukti publik, nilai_kecurigaan, fitur_hitman, lalu nilai_ancaman
+   2.5 Chat: chat_pasti bila ada hasil Peek yang harus diungkap, selain itu keputusan_chat
+   2.6 Vote: vote_pasti, selain itu keputusan_vote_hitman (Hitman) atau keputusan_vote (warga), lalu pertahanan_suara
+   2.7 Aksi rahasia: keputusan_aksi
+   2.8 Keluaran: format_npc untuk engine dan siapkan_nlg untuk penulis kalimat""",
+    "nlg": """\
+1. tulis_pesan menerima payload rencana chat dari siapkan_nlg, konteks, penulis, dan persona
+2. LLM, bila aktif, paling banyak MAKS_PERCOBAAN_LLM kali:
+   2.1 buat_prompt menyusun prompt, lalu penulis.tulis meminta kalimat
+   2.2 nilai_kalimat memeriksa aturan, kalimat_mirip menolak parafrase kalimat yang baru terdengar
+   2.3 Lolos: kalimat dipakai. Ditolak: alasannya ikut ke percobaan berikutnya
+3. Templat: kalimat_templat dicoba satu per satu, varian pertama yang lolos aturan dipakai
+4. Cadangan: tidak ada varian yang lolos, varian pertama tetap dipakai""",
+}
+
 KEPALA = '''"""FILE INI DIHASILKAN OTOMATIS oleh scripts/ekspor_otak_npc.py. JANGAN DIEDIT MANUAL.
 
 Sumber : {sumber}
@@ -60,6 +83,9 @@ Dibuat : {waktu}
 
 Perubahan logika bot dilakukan di notebook skripsi, dijalankan ulang sampai semua
 skenario/pengujian lulus, lalu diekspor ulang dengan skrip ini.
+
+Alurnya
+{alur}
 """
 # ruff: noqa
 # fmt: off
@@ -184,6 +210,7 @@ def ekspor(nama_modul: str, path_notebook: Path, pilih_sel) -> dict:
             sumber=path_notebook.name,
             sidik=sidik,
             waktu=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
+            alur=ALUR_MODUL[nama_modul],
         )
         + "\n\n".join(bagian)
         + "\n"

@@ -299,9 +299,9 @@ class LeaveRoomTests(unittest.TestCase):
         self.assertEqual(ingatan.eksekusi, [])
         self.assertEqual(ingatan.keluar, [{"ronde": 1, "pemain": "alice", "hitman": None}])
         tabel, _ = otak_fuzzy.hitung_bukti(ingatan, view)
-        self.assertTrue((tabel["dorong_salah_eksekusi"] == 0).all())
+        self.assertTrue((tabel["ikut_salah_eksekusi"] == 0).all())
         # Room 1 Hitman dan game berlanjut: yang keluar pasti bukan Hitman.
-        self.assertIn("alice", otak_fuzzy.pengetahuan_peran(ingatan, view)["bersih"])
+        self.assertIn("alice", otak_fuzzy.pengetahuan_peran(ingatan, view)["pasti_orang_baik"])
 
     def test_http_leave_returns_left_twice_and_rejects_outsiders(self):
         app = FastAPI()

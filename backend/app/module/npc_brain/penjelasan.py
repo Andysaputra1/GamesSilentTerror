@@ -26,12 +26,19 @@ MAKS_TEKS = 240  # karakter per teks
 MAKS_PROMPT = 2500  # karakter prompt LLM di masukan NLG
 
 # Kolom tabel tersangka: bukti, lalu nilai antara khas metode.
-KOLOM_BUKTI = ["kecurigaan", "tekanan", "dukungan", "inkonsistensi", "pengalihan", "dituduh_korban",
-               "dorong_salah_eksekusi", "serang_bersih", "klaim", "p_sandera", "diam"]  # fmt: skip
+KOLOM_BUKTI = ["kecurigaan", "tekanan", "dukungan", "plin_plan", "alihkan_tuduhan", "penuduh_dibungkam",
+               "ikut_salah_eksekusi", "menuduh_orang_baik", "klaim_role_bermasalah", "p_sandera", "diam"]  # fmt: skip
 KOLOM_METODE = {
-    "fuzzy": ["sosial", "perilaku", "jejak", "pribadi", "ucapan", "bukti_keras"],
+    "fuzzy": [
+        "sentimen_sosial",
+        "perilaku_mencurigakan",
+        "jejak",
+        "kejanggalan",
+        "ucapan",
+        "bukti_keras",
+    ],
 }
-KOLOM_HITMAN = ["pemain", "ancaman", "kambing_hitam", "menuduh_saya", "pengaruh", "klaim_peran",
+KOLOM_HITMAN = ["pemain", "ancaman", "kambing_hitam", "menuduh_tim", "pengaruh", "mengaku_role_penting",
                 "kecurigaan_publik", "dukungan_suara", "p_sandera", "tidak_dijaga", "ancaman_sekarang",
                 "ancaman_langsung", "ancaman_peran"]  # fmt: skip
 KOLOM_LINDUNG = [
@@ -39,7 +46,7 @@ KOLOM_LINDUNG = [
     "terancam",
     "kepercayaan",
     "menuduh_tersangka",
-    "klaim_stalker",
+    "mengaku_stalker",
     "pengaruh",
 ]
 
@@ -326,7 +333,7 @@ def _blok_kandidat(modul, metode, jejak, rencana, peran, judul, ambang):
     return blok
 
 
-# Vote warga metode fuzzy: keyakinan_vote(kecurigaan, keunggulan) → kesiapan_vote(keyakinan, urgensi).
+# Vote warga metode fuzzy: keyakinan_vote(kecurigaan, keunggulan) → kesiapan_vote(keyakinan, warga_terdesak).
 def _vote_fuzzy(modul, rows):
     if not rows or "kesiapan" not in rows[0]:
         return {}
@@ -337,7 +344,7 @@ def _vote_fuzzy(modul, rows):
         _detail_fuzzy(modul, "kesiapan_vote", r, r.get("kesiapan")),
     ]
     return {
-        "kandidat": _tabel(rows, ["kandidat", "kecurigaan", "keunggulan", "keyakinan", "urgensi", "kesiapan",
+        "kandidat": _tabel(rows, ["kandidat", "kecurigaan", "keunggulan", "keyakinan", "warga_terdesak", "kesiapan",
                                   "porsi_tribunal"]),
         "sistem": [s for s in sistem if s],
     }  # fmt: skip

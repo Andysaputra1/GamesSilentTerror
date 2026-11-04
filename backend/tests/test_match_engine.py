@@ -852,7 +852,7 @@ class ChatOrderTests(unittest.TestCase):
             )
             tabel, _ = otak_fuzzy.hitung_bukti(ingatan, view)
             budi = tabel[tabel["pemain"] == "Budi"].iloc[0]
-            self.assertEqual(budi["pengalihan"], 0.5)  # dituduh lalu menuduh pihak ketiga
+            self.assertEqual(budi["alihkan_tuduhan"], 0.5)  # dituduh lalu menuduh pihak ketiga
 
 
 class DisplayNameTests(unittest.TestCase):

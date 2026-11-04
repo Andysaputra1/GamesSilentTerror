@@ -1,11 +1,20 @@
 """FILE INI DIHASILKAN OTOMATIS oleh scripts/ekspor_otak_npc.py. JANGAN DIEDIT MANUAL.
 
 Sumber : npc_nlg.ipynb
-Sidik  : c1364e283bb90eac
-Dibuat : 2026-11-04 03:30 UTC
+Sidik  : 227faf14f71758e8
+Dibuat : 2026-11-04 04:03 UTC
 
 Perubahan logika bot dilakukan di notebook skripsi, dijalankan ulang sampai semua
 skenario/pengujian lulus, lalu diekspor ulang dengan skrip ini.
+
+Alurnya
+1. tulis_pesan menerima payload rencana chat dari siapkan_nlg, konteks, penulis, dan persona
+2. LLM, bila aktif, paling banyak MAKS_PERCOBAAN_LLM kali:
+   2.1 buat_prompt menyusun prompt, lalu penulis.tulis meminta kalimat
+   2.2 nilai_kalimat memeriksa aturan, kalimat_mirip menolak parafrase kalimat yang baru terdengar
+   2.3 Lolos: kalimat dipakai. Ditolak: alasannya ikut ke percobaan berikutnya
+3. Templat: kalimat_templat dicoba satu per satu, varian pertama yang lolos aturan dipakai
+4. Cadangan: tidak ada varian yang lolos, varian pertama tetap dipakai
 """
 # ruff: noqa
 # fmt: off
@@ -585,7 +594,7 @@ def pemain_disebut(teks, daftar_pemain, pengirim, common_words):
 #           daftar_pemain = roster.
 # Keluaran: chat yang sama + intent, conf_intent (0–1), target [{pemain, relasi, prob, sumber}], dan sumber_nlu.
 #           sumber = ["indobert"], ["nama"], atau keduanya. Hanya relasi offend/defend yang menjadi bukti (relasi_chat);
-#           target neutral menandai pemain yang diajak bicara (konteks "ditanya").
+#           target neutral menandai pemain yang diajak bicara (konteks "penanya").
 # Dipakai oleh: Ingatan.sinkron_snapshot (setiap chat baru).
 def anotasi_chat(nlu, chat, riwayat, daftar_pemain):
     intent, confidence = nlu.intent(chat["teks"], daftar_pemain)
