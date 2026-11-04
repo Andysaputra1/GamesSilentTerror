@@ -903,6 +903,7 @@ test('menu dokumen membuka semua dokumen sistem, AI, dan NLU di tab baru', async
       '/panel/dokumen/kode-nlu-intent',
       '/panel/dokumen/kode-nlu-target',
       '/panel/dokumen/diagram-alir-fuzzy',
+      '/panel/dokumen/bedah-otak-fuzzy',
       '/panel/dokumen/kode-fuzzy',
     ],
   );

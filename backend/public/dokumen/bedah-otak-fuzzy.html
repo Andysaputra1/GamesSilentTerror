@@ -1,0 +1,1110 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bedah Otak Fuzzy</title>
+<style>
+:root {
+  --bg: #f7f6f2; --panel: #ffffff; --fg: #20242a; --muted: #5d6570; --rule: #d9d6cc;
+  --accent: #0b6b6b; --code: #eeeadf; --kode: #e7e3d6; --kode-fg: #4c4a3c;
+  --setuju: #d8eedd; --setuju-fg: #1c5a2d; --usul: #fbe9c6; --usul-fg: #71500b;
+  --live: #d6e6f7; --live-fg: #164a7a; --tolak: #f6d9d6; --tolak-fg: #7c2a22;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14181c; --panel: #1c2228; --fg: #e4e8ec; --muted: #a0aab4; --rule: #333c45;
+    --accent: #5ec4bf; --code: #262d34; --kode: #333a40; --kode-fg: #d6d9cf;
+    --setuju: #1f3c29; --setuju-fg: #a9dfb7; --usul: #443414; --usul-fg: #f2d290;
+    --live: #1b3550; --live-fg: #aed2f4; --tolak: #472421; --tolak-fg: #f0b9b3;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+main { max-width: 980px; margin: 0 auto; padding: 24px 16px 64px; }
+h1 { font-size: 1.9rem; line-height: 1.25; margin: .2em 0 .4em; }
+h2 { font-size: 1.45rem; margin: 2.4em 0 .6em; padding-top: .6em; border-top: 2px solid var(--rule); }
+h3 { font-size: 1.15rem; margin: 2em 0 .4em; }
+h4 { font-size: 1rem; margin: 1.3em 0 .3em; }
+p { margin: .6em 0; }
+a { color: var(--accent); }
+code { background: var(--code); padding: .1em .35em; border-radius: 4px; font: .88em ui-monospace, SFMono-Regular, Consolas, monospace; overflow-wrap: anywhere; }
+pre { background: var(--code); padding: 12px 14px; border-radius: 8px; overflow-x: auto; font: .84rem/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; }
+pre code { background: none; padding: 0; }
+.tabel { overflow-x: auto; margin: .7em 0 1em; }
+table { border-collapse: collapse; width: 100%; background: var(--panel); font-size: .93rem; }
+th, td { border: 1px solid var(--rule); padding: 7px 9px; text-align: left; vertical-align: top; }
+th { background: var(--code); font-weight: 600; }
+.kotak { background: var(--panel); border: 1px solid var(--rule); border-left: 5px solid var(--accent); border-radius: 6px; padding: 10px 16px; margin: 1em 0; }
+.kotak.tunda { border-left-color: var(--usul-fg); }
+nav ol { padding-left: 1.4em; margin: .4em 0; }
+ul, ol { padding-left: 1.4em; }
+li { margin: .25em 0; }
+.b { display: inline-block; padding: .05em .55em; border-radius: 999px; font-size: .78rem; font-weight: 600; white-space: nowrap; }
+.k { background: var(--kode); color: var(--kode-fg); }
+.s { background: var(--setuju); color: var(--setuju-fg); }
+.u { background: var(--usul); color: var(--usul-fg); }
+.l { background: var(--live); color: var(--live-fg); }
+.t { background: var(--tolak); color: var(--tolak-fg); }
+.kecil { color: var(--muted); font-size: .9rem; }
+</style>
+</head>
+<body>
+<main>
+<h1>Bedah Otak Fuzzy</h1>
+<p class="kecil">Catatan pembahasan otak bot, disusun 3 November 2026. Sumber rinci: <code>plan/ide-rombak.md</code> dan <code>plan/daftar-tindakan.md</code>. Rencana kerja: <code>plan/plan05.md</code>.</p>
+
+<div class="kotak">
+<p><strong>Keadaan sekarang</strong></p>
+<ul>
+<li><strong>Seluruh pembedahan sudah selesai.</strong> Keluaran, tindakan, kecurigaan, ancaman, kambing hitam, konteks, pengetahuan, dan fitur role sudah final. Fuzzy akan turun dari 28 sistem menjadi 21 sistem.</li>
+<li><strong>Logika Fuzzy belum diubah.</strong> Dokumen ini berisi rancangan final. Pengerjaannya ada di <code>plan/plan05.md</code>.</li>
+<li><strong>Aturan game baru sudah live di backend</strong> (commit <code>2d0e9b9</code>): Guard boleh ke target yang sama berturut-turut, vote seri menambah waktu sekali, rekan Spy saling tahu, chat tim malam, dan seri Hostage manusia lawan bot memakai pilihan manusia. Bot belum memakai aturan ini. Status deploy frontend di Vercel belum diperiksa, dan tampilannya belum dilihat di browser.</li>
+<li><strong>Arsip Fuzzy saja sudah masuk <code>main</code></strong> (commit <code>1f11806</code>), dan label metode sudah dihapus dari layar pemain (commit <code>a51be3f</code>). Status deploy kedua commit itu belum diperiksa. Berkas arsip ada di <code>a_skripsi/arsip_bt_utility_2026-11-03/</code>.</li>
+</ul>
+<p><strong>Arti label:</strong> <span class="b k">kode sekarang</span> sudah berjalan, <span class="b l">live</span> aturan game baru yang sudah berjalan, <span class="b s">disetujui</span> rancangan yang disetujui tetapi belum dikerjakan, <span class="b u">belum dijawab</span> usulan yang masih menunggu keputusan, <span class="b t">ditolak</span> tidak dipakai.</p>
+</div>
+
+<nav aria-label="Daftar isi">
+<p><strong>Daftar isi</strong></p>
+<ol>
+<li><a href="#alur">Peta alur</a></li>
+<li><a href="#konsep">Konsep fuzzy dan Mamdani</a></li>
+<li><a href="#bahan">Bahan mentah</a></li>
+<li><a href="#tindakan">Daftar tindakan per sesi</a></li>
+<li><a href="#memilih">Cara memilih setiap tindakan</a></li>
+<li><a href="#kecurigaan">Menilai kecurigaan</a></li>
+<li><a href="#ancaman">Menilai ancaman dan kambing hitam</a></li>
+<li><a href="#input">Konteks, pengetahuan, dan fitur role</a></li>
+<li><a href="#sistem">21 sistem fuzzy</a></li>
+<li><a href="#metode">Metode, kecepatan, dan keseimbangan</a></li>
+<li><a href="#daftar">Keputusan, kekurangan, dan hal terbuka</a></li>
+</ol>
+</nav>
+
+<h2 id="alur">1. Peta alur</h2>
+<p>Bot menjalankan alur yang sama setiap kali melangkah. Frontend hanya mengirim perintah pemain manusia. Aturan game dan keputusan bot semuanya ada di backend.</p>
+<pre><code>Server game mengirim snapshot khusus untuk bot
+   ↓
+Bahan mentah   : snapshot, label chat IndoBERT, ingatan bot
+   ↓
+Input          : bukti per pemain, konteks permainan, pengetahuan pasti, fitur role
+   ↓
+Menilai pemain : kecurigaan, ancaman, kambing hitam
+   ↓
+Memilih        : izin, calon tindakan, nilai fuzzy, ambang, aturan bersama
+   ↓
+Keluaran       : rencana chat, vote, aksi rahasia
+   ↓
+Paket ke game  : {action, target, message}; kalimat ditulis LLM</code></pre>
+<p><span class="b k">kode sekarang</span> Paket akhir dirakit oleh <code>format_npc</code>. Bila ada aksi rahasia, aksi itu yang dikirim. Bila tidak ada, bot mengirim vote. Bila keduanya tidak ada, bot mengirim <code>wait</code>. Kalimat chat diisi terpisah, jadi bot bisa vote sambil chat.</p>
+
+<h2 id="konsep">2. Konsep fuzzy dan Mamdani</h2>
+<p><strong>Fuzzy logic</strong> membolehkan satu nilai masuk ke beberapa kelompok dengan derajat 0–1, misalnya "sedang 0,67" dan "tinggi 0,33". Derajat bukan peluang. Derajat menunjukkan seberapa cocok nilai itu dengan sebuah kata. <strong>Mamdani</strong> adalah salah satu metode untuk mengambil keputusan dengan fuzzy logic, dan bagian MAKA pada aturannya berupa kata dengan kurva.</p>
+<div class="tabel"><table>
+<tr><th>Bagian</th><th>Fungsinya</th><th>Ditentukan oleh</th></tr>
+<tr><td>Kurva input</td><td>Mengubah angka menjadi kata beserta derajatnya</td><td>Perancang</td></tr>
+<tr><td>Aturan JIKA–MAKA</td><td>Mengubah kata masukan menjadi kata keluaran</td><td>Perancang</td></tr>
+<tr><td>Kurva output</td><td>Bentuk kata keluaran. Di game: rendah 0–30, sedang 35–65, tinggi 70–100</td><td>Perancang</td></tr>
+<tr><td>Centroid</td><td>Memotong kurva output setinggi kekuatan aturan, menggabungkannya, lalu mencari titik beratnya</td><td>Dihitung program</td></tr>
+<tr><td>Ambang</td><td>Mengubah angka hasil menjadi pilihan, misalnya kesiapan vote ≥ 45. Ini langkah sesudah fuzzy selesai</td><td>Perancang</td></tr>
+</table></div>
+<h4>Contoh kipas, suhu 29°C</h4>
+<ol>
+<li>Suhu terbaca hangat 0,7 dan panas 0,3.</li>
+<li>Aturan "hangat → sedang" menyala 0,7, dan "panas → kencang" menyala 0,3.</li>
+<li>Segitiga sedang (35–50–65) dipotong setinggi 0,7, sehingga luasnya 13,65. Segitiga kencang (70–85–100) dipotong setinggi 0,3, sehingga luasnya 7,65.</li>
+<li>Titik berat = (13,65 × 50 + 7,65 × 85) ÷ (13,65 + 7,65) ≈ 62,6%.</li>
+<li>Kalau hanya memakai titik puncak, hasilnya 0,7 × 50 + 0,3 × 85 = 60,5%. Cara ini mirip Sugeno dan lebih mudah dihitung, tetapi game memakai Mamdani dengan centroid.</li>
+</ol>
+
+<h2 id="bahan">3. Bahan mentah</h2>
+<p>Semua bahan ini dipakai bersama oleh seluruh tindakan.</p>
+<h3>Snapshot yang dibaca bot</h3>
+<p><span class="b s">disetujui</span> Daftar yang dikurangi supaya lebih sederhana. <code>Match.snapshot</code> tetap mengirim data lain untuk tampilan pemain. Sebagian kolom Spy dan chat tim sudah <span class="b l">live</span>, tetapi bot belum membacanya. Nama <code>spy_allies</code>, <code>spy_actions</code>, dan <code>team_messages</code> sudah dipakai engine.</p>
+<div class="tabel"><table>
+<tr><th>Kelompok</th><th>Isi</th><th>Siapa yang menerima</th></tr>
+<tr><td>Keadaan game</td><td><code>round</code>, <code>phase</code>, <code>deadline</code>, <code>composition</code>, <code>hitman_remaining</code>, <code>tribunal_extra</code></td><td>semua</td></tr>
+<tr><td>Pemain</td><td><code>name</code>, <code>alive</code>, <code>left</code>, <code>hostage</code>, <code>hostage_round</code></td><td>semua</td></tr>
+<tr><td>Chat</td><td><code>messages</code></td><td>semua</td></tr>
+<tr><td>Vote</td><td><code>tribunal_votes</code></td><td>semua</td></tr>
+<tr><td>Status sendiri</td><td><code>role</code>, <code>can_chat</code>, <code>can_vote</code>, <code>can_cancel_vote</code>, <code>gagged</code></td><td>diri sendiri</td></tr>
+<tr><td>Skill sendiri</td><td><code>ability</code>, <code>can_act</code>, <code>action</code>, <code>can_cancel_action</code>, <code>last_guard</code></td><td>diri sendiri</td></tr>
+<tr><td>Khusus Stalker</td><td><code>intel</code></td><td>Stalker</td></tr>
+<tr><td>Khusus Spy</td><td><code>spy_allies</code>, <code>spy_actions</code>, <code>team_messages</code></td><td>Spy, kosong di room 4–6</td></tr>
+<tr><td>Khusus Hitman</td><td><code>allies</code>, <code>ally_actions</code>, <code>syndicate_hostages</code>, <code>ally_gags</code>, <code>team_messages</code></td><td>Hitman</td></tr>
+</table></div>
+<p>Dihapus dari data bot: <code>alive</code>, <code>hostage</code>, dan <code>vote</code> milik sendiri, serta <code>next_gag</code> dan <code>next_peek</code>.</p>
+<p><strong>Arti yang sering ditanyakan:</strong> <code>left</code> menandai pemain yang keluar. Pemain itu dianggap tersingkir, tetapi bukan korban Tribunal, jadi tidak menjadi bukti salah eksekusi. Bila tidak ada lagi anggota manusia, room dihapus. Manusia yang mati tetapi masih di room tidak menghentikan game. Korban <code>hostage</code> tetap hidup dan tidak bisa chat, vote, atau memakai skill. <code>can_act</code> berarti boleh memakai skill sekarang dan tidak ada hubungannya dengan chat. Hasil Guard sengaja tidak dikirim, karena akan membocorkan target Hitman.</p>
+
+<h3>Chat sesudah diberi label</h3>
+<div class="tabel"><table>
+<tr><th>Kelompok</th><th>Isi</th><th>Dibuat oleh</th></tr>
+<tr><td>Chat asli</td><td><code>id</code>, <code>ronde</code>, <code>fase</code>, <code>waktu</code>, <code>pengirim</code>, <code>teks</code></td><td>snapshot dan ingatan bot</td></tr>
+<tr><td>Intent</td><td><code>intent</code> (<code>offend</code>, <code>defend</code>, <code>neutral</code>), <code>conf_intent</code></td><td>IndoBERT Model 1</td></tr>
+<tr><td>Target</td><td><code>target</code> = daftar <code>{pemain, relasi, prob, sumber}</code></td><td>IndoBERT Model 2 dan aturan nama</td></tr>
+</table></div>
+<ul>
+<li>Hanya chat <code>offend</code> atau <code>defend</code> dengan <code>conf_intent</code> ≥ 0,60 yang menjadi bukti.</li>
+<li><strong>Aturan nama</strong> (<code>pemain_disebut</code>) hanya berjalan pada chat <code>neutral</code>. Aturan ini mengenali nama utuh, atau kata yang cocok dengan tepat satu pemain.</li>
+<li><code>target.prob</code> hanya jejak dan tidak memengaruhi keputusan.</li>
+<li>Klaim role, Gag, dan Peek dibaca lewat pola kata, bukan IndoBERT.</li>
+<li><span class="b s">disetujui</span> <code>sumber_nlu</code> dihapus karena tidak dibaca dan nilainya selalu <code>"indobert"</code>. <code>target.sumber</code> tetap untuk jejak di panel.</li>
+<li>Chat tim malam tidak diberi label dan tidak menjadi bukti.</li>
+</ul>
+<p><span class="b s">disetujui</span> Ide #25 sudah final: label IndoBERT tetap tiga, dan setiap kalimat jenis baru diberi rencana label berikut. Contoh kalimat tiap jenis diuji, lalu dataset ketiga label ditambah dan model dilatih ulang oleh pemilik proyek, memakai <code>plan/plan03.md</code> dan <code>ATURAN_LABEL.md</code>. Hasil uji menentukan jumlah datanya. Label klaim role tetap pekerjaan belakangan.</p>
+<p>Beberapa kalimat belum jelas labelnya menurut <code>ATURAN_LABEL.md</code>, misalnya persuade tanpa nama, buka role tanpa sangkalan, dan "aku orang baik". Daftarnya ada di <code>plan/plan05.md</code> bagian Fase 10, dan menunggu keputusan pemilik proyek.</p>
+<div class="tabel"><table>
+<tr><th>Jenis baru</th><th>Intent rencana</th><th>Target</th></tr>
+<tr><td><code>bela_diri</code> persuade</td><td><code>defend</code></td><td>bot sendiri</td></tr>
+<tr><td><code>bela_orang</code> persuade</td><td><code>defend</code></td><td>pemain yang dibela</td></tr>
+<tr><td><code>tuduh</code> ajak vote</td><td><code>offend</code></td><td>tersangka atau kambing hitam</td></tr>
+<tr><td><code>tanya_info</code> gali tersangka</td><td><code>neutral</code></td><td>tersangka atau kambing hitam</td></tr>
+<tr><td><code>jawab</code></td><td><code>neutral</code>, atau <code>offend</code> ke tersangka di paket</td><td>sesuai paket</td></tr>
+</table></div>
+
+<h3>Ingatan bot</h3>
+<p><span class="b s">disetujui</span> Bentuk sesudah dirapikan:</p>
+<div class="tabel"><table>
+<tr><th>Kelompok</th><th>Isi</th></tr>
+<tr><td>Chat</td><td><code>chat</code></td></tr>
+<tr><td>Vote</td><td><code>vote</code>, <code>vote_bot</code> (ronde, target, alasan; baru)</td></tr>
+<tr><td>Pemain tersingkir</td><td><code>eksekusi</code>, <code>keluar</code></td></tr>
+<tr><td>Waktu</td><td><code>mulai_fase</code>; setiap pesan juga membawa waktu dari server (baru)</td></tr>
+<tr><td>Tindakan bot</td><td><code>aksi_bot</code>, ditambah <code>alasan</code> (baru)</td></tr>
+<tr><td>Pengetahuan rahasia</td><td><code>intel</code>, <code>gag_bot</code></td></tr>
+<tr><td>Data dasar</td><td><code>nama_bot</code>, <code>cepat</code>, <code>jumlah_awal</code>, <code>peran</code></td></tr>
+</table></div>
+<p>Yang dihapus: <code>pilihan_syndicate</code> dan <code>aksi_rahasia</code>. Alasan diambil dari logika, lalu disimpan supaya bot bisa menjawab "kenapa kamu vote Budi?".</p>
+
+<h2 id="tindakan">4. Daftar tindakan per sesi</h2>
+<p><span class="b s">disetujui</span> Tabel berikut adalah susunan sesudah rombak. Di kode sekarang masih ada <code>ungkap</code>, <code>klaim_palsu</code>, <code>info_sandera</code>, dan <code>ajak_bicara</code> sebagai tindakan sendiri. Di siang, jumlah tindakan turun dari 11 menjadi 7.</p>
+
+<h3>Siang</h3>
+<div class="tabel"><table>
+<tr><th>Kelompok</th><th>Tindakan</th><th>Jenis</th><th>Civilian</th><th>Spy</th><th>Stalker</th><th>Hitman</th></tr>
+<tr><td>Chat umum</td><td><code>bela_diri</code></td><td>tanpa bukti</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td></tr>
+<tr><td></td><td></td><td>dengan bukti: buka role</td><td>✓</td><td>✓</td><td>✓</td><td>✓ palsu</td></tr>
+<tr><td></td><td></td><td>dengan bukti: role + bukti aksi</td><td>—</td><td>✓</td><td>✓</td><td>✓ palsu</td></tr>
+<tr><td></td><td></td><td>dengan bukti: tunjuk orang lain</td><td>✓</td><td>✓</td><td>✓</td><td>✓ kambing hitam</td></tr>
+<tr><td></td><td></td><td>persuade</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td></tr>
+<tr><td></td><td><code>jawab</code></td><td>logika kirim paket data, NLG merangkai</td><td>✓</td><td>✓</td><td>✓</td><td>✓ kambing hitam</td></tr>
+<tr><td></td><td><code>tuduh</code></td><td>dengan bukti: daftar alasan tuduh</td><td>✓</td><td>✓</td><td>✓</td><td>—</td></tr>
+<tr><td></td><td></td><td>dengan bukti: hasil Peek Hitman</td><td>—</td><td>—</td><td>✓</td><td>—</td></tr>
+<tr><td></td><td></td><td>bukti dimanipulasi: pelintir, balik tuduh, serang korban Gag</td><td>—</td><td>—</td><td>—</td><td>✓</td></tr>
+<tr><td></td><td></td><td>bukti karangan: klaim Peek palsu</td><td>—</td><td>—</td><td>—</td><td>✓</td></tr>
+<tr><td></td><td><code>bela_orang</code></td><td>dengan bukti: hasil Peek bersih</td><td>—</td><td>—</td><td>✓</td><td>—</td></tr>
+<tr><td></td><td></td><td>dengan bukti: diklaim bersih pengaku Stalker</td><td>✓</td><td>✓</td><td>✓</td><td>—</td></tr>
+<tr><td></td><td></td><td>tanpa bukti: ada yang membela</td><td>✓</td><td>✓</td><td>✓</td><td>✓ rekan</td></tr>
+<tr><td></td><td></td><td>tanpa bukti: belum ada bukti kuat</td><td>✓</td><td>✓</td><td>✓</td><td>✓ rekan</td></tr>
+<tr><td></td><td></td><td>persuade</td><td>✓</td><td>✓</td><td>✓</td><td>✓ rekan</td></tr>
+<tr><td></td><td><code>tanya_info</code></td><td>ke semua: ruangan hening</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td></tr>
+<tr><td></td><td></td><td>ke semua: klaim bentrok (saat belum yakin)</td><td>✓</td><td>✓</td><td>✓</td><td>—</td></tr>
+<tr><td></td><td></td><td>ke semua: pertanyaan umum</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td></tr>
+<tr><td></td><td></td><td>ke satu orang: pemain diam</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td></tr>
+<tr><td></td><td></td><td>ke satu orang: gali tersangka</td><td>✓</td><td>✓</td><td>✓</td><td>✓ kambing hitam</td></tr>
+<tr><td></td><td><code>tunggu</code></td><td></td><td>✓</td><td>✓</td><td>✓</td><td>✓</td></tr>
+<tr><td>Aksi rahasia</td><td><code>gag</code></td><td></td><td>—</td><td>—</td><td>—</td><td>✓</td></tr>
+</table></div>
+
+<h3>Tribunal</h3>
+<p>Dari sesi siang, 18 baris chat dibawa dan 4 baris tidak: <code>tanya_info</code> ruangan hening, pertanyaan umum, pemain diam, serta <code>gag</code>. Alasannya, Tribunal singkat dan jatah inisiatifnya kecil, jadi chat harus membantu keputusan vote.</p>
+<div class="tabel"><table>
+<tr><th>Kelompok</th><th>Tindakan</th><th>Jenis</th><th>Civilian</th><th>Spy</th><th>Stalker</th><th>Hitman</th></tr>
+<tr><td>Chat umum</td><td><code>bela_diri</code></td><td>semua jenis sesi siang</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td></tr>
+<tr><td></td><td><code>jawab</code></td><td>logika kirim paket data, NLG merangkai</td><td>✓</td><td>✓</td><td>✓</td><td>✓ kambing hitam</td></tr>
+<tr><td></td><td><code>tuduh</code></td><td>semua jenis sesi siang</td><td>✓</td><td>✓</td><td>✓</td><td>✓ manipulasi</td></tr>
+<tr><td></td><td></td><td>ajak vote</td><td>✓</td><td>✓</td><td>✓</td><td>✓ kambing hitam</td></tr>
+<tr><td></td><td><code>bela_orang</code></td><td>semua jenis sesi siang</td><td>✓</td><td>✓</td><td>✓</td><td>✓ rekan</td></tr>
+<tr><td></td><td><code>tanya_info</code></td><td>ke semua: klaim bentrok (saat belum yakin)</td><td>✓</td><td>✓</td><td>✓</td><td>—</td></tr>
+<tr><td></td><td></td><td>ke satu orang: gali tersangka</td><td>✓</td><td>✓</td><td>✓</td><td>✓ kambing hitam</td></tr>
+<tr><td></td><td><code>tunggu</code></td><td></td><td>✓</td><td>✓</td><td>✓</td><td>✓</td></tr>
+<tr><td>Vote</td><td><code>vote</code></td><td>hasil Peek Hitman: langsung vote</td><td>—</td><td>—</td><td>✓</td><td>—</td></tr>
+<tr><td></td><td></td><td>sangat yakin: langsung vote</td><td>✓</td><td>✓</td><td>✓</td><td>—</td></tr>
+<tr><td></td><td></td><td>cukup yakin: setelah separuh Tribunal</td><td>✓</td><td>✓</td><td>✓</td><td>—</td></tr>
+<tr><td></td><td></td><td>ikut suara terbanyak</td><td>✓</td><td>✓</td><td>✓</td><td>✓ ke warga</td></tr>
+<tr><td></td><td></td><td>paksa vote saat kritis</td><td>✓</td><td>✓</td><td>✓</td><td>—</td></tr>
+<tr><td></td><td></td><td>kambing hitam teratas</td><td>—</td><td>—</td><td>—</td><td>✓</td></tr>
+<tr><td></td><td></td><td>rekan masih bisa selamat: samakan suara</td><td>—</td><td>—</td><td>—</td><td>✓</td></tr>
+<tr><td></td><td></td><td>rekan pasti dieksekusi: ikut vote rekan</td><td>—</td><td>—</td><td>—</td><td>✓</td></tr>
+<tr><td></td><td></td><td>waktu tambahan: pindah suara, tidak wajib</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td></tr>
+<tr><td></td><td><code>tunggu</code></td><td>paruh awal Tribunal</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td></tr>
+<tr><td></td><td><code>abstain</code></td><td>warga belum yakin dan tidak kritis; Hitman: belum ada suara warga</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td></tr>
+<tr><td></td><td><code>tidak_bisa</code></td><td>disandera, dieksekusi, atau sudah vote</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td></tr>
+</table></div>
+
+<h3>Malam</h3>
+<div class="tabel"><table>
+<tr><th>Kelompok</th><th>Tindakan</th><th>Jenis</th><th>Civilian</th><th>Spy</th><th>Stalker</th><th>Hitman</th></tr>
+<tr><td>Chat rahasia</td><td><code>chat_tim</code></td><td>memberi alasan, hanya bila ada rekan manusia</td><td>—</td><td>✓</td><td>—</td><td>✓</td></tr>
+<tr><td>Aksi rahasia</td><td><code>hostage</code></td><td>warga dengan ancaman terbesar, dengan penalti jejak</td><td>—</td><td>—</td><td>—</td><td>✓</td></tr>
+<tr><td></td><td></td><td>bot kedua mengikuti bot pertama</td><td>—</td><td>—</td><td>—</td><td>✓</td></tr>
+<tr><td></td><td></td><td>pindah ke pilihan rekan manusia saat terkunci</td><td>—</td><td>—</td><td>—</td><td>✓</td></tr>
+<tr><td></td><td><code>guard</code></td><td>orang yang yakin orang baik dan paling mungkin disandera</td><td>—</td><td>✓</td><td>—</td><td>—</td></tr>
+<tr><td></td><td></td><td>diri sendiri</td><td>—</td><td>✓</td><td>—</td><td>—</td></tr>
+<tr><td></td><td><code>peek</code></td><td>tersangka terkuat, ditambah nilai bila infonya minim</td><td>—</td><td>—</td><td>✓</td><td>—</td></tr>
+<tr><td></td><td></td><td>pengaku Spy atau Civilian yang mencurigakan</td><td>—</td><td>—</td><td>✓</td><td>—</td></tr>
+<tr><td></td><td><code>tidak_bisa</code></td><td>tidak punya aksi, disandera, dieksekusi, atau Peek belum tersedia</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td></tr>
+</table></div>
+
+<h2 id="memilih">5. Cara memilih setiap tindakan</h2>
+<p><span class="b s">disetujui</span> Bagian ini adalah rancangan, kecuali bila diberi label lain. Kalimat pada kolom Contoh hanya ilustrasi, karena kalimat di game ditulis LLM.</p>
+
+<h3>Aturan bersama chat</h3>
+<div class="tabel"><table>
+<tr><th>Jenis chat</th><th>Tindakan</th><th>Siang</th><th>Tribunal</th></tr>
+<tr><td>Inisiatif</td><td><code>tuduh</code>, <code>bela_orang</code>, <code>tanya_info</code></td><td>3</td><td>2</td></tr>
+<tr><td>Reaktif</td><td><code>bela_diri</code>, <code>jawab</code></td><td>8</td><td>5</td></tr>
+</table></div>
+<ul>
+<li><strong>Urutan:</strong> hasil Peek Hitman, lalu <code>bela_diri</code>, lalu <code>jawab</code>, lalu chat inisiatif. Antar-chat inisiatif, nilai fuzzy tertinggi yang menang, dan bot diam bila nilainya di bawah 40. <code>bela_diri</code> dan <code>jawab</code> tidak lagi punya sistem fuzzy, jadi langsung dikirim bila ada pemicu dan batas reaktif belum habis.</li>
+<li><strong>Jeda:</strong> 12% durasi fase. Di room 7 pemain, siang 140 detik memberi jeda sekitar 17 detik, dan Tribunal 83 detik memberi jeda sekitar 10 detik. Pemicu dari orang berbeda boleh langsung dibalas. Pemicu baru dari orang yang sama menunggu jeda.</li>
+<li><strong>Satu chat pemicu dibalas sekali:</strong> bot tidak membandingkan isi kalimat. Hanya chat sesudah chat terakhir bot yang dianggap belum dijawab.</li>
+<li><strong>Anti-gema:</strong> bot tidak mengulang tuduhan atau pembelaan yang sudah disuarakan 2 orang lain, kecuali klaim Stalker.</li>
+</ul>
+
+<h3 id="bela-diri"><code>bela_diri</code></h3>
+<p><strong>Kapan jadi pilihan:</strong></p>
+<div class="tabel"><table>
+<tr><th>Pengguna</th><th>Syarat</th></tr>
+<tr><td>Semua role</td><td>Ada yang menuduh bot sesudah chat terakhir bot, atau saat Tribunal ada yang mem-vote bot dan bot belum membela diri di fase itu</td></tr>
+</table></div>
+<p><strong>Jenisnya dipilih berurutan. Yang pertama cocok langsung dipakai:</strong></p>
+<div class="tabel"><table>
+<tr><th>No</th><th>Syarat</th><th>Jenis</th><th>Contoh</th></tr>
+<tr><td>1</td><td>terdesak, role belum dibuka, punya bukti aksi</td><td>role + bukti aksi</td><td>"Aku Spy, semalam aku jaga Budi."</td></tr>
+<tr><td>2</td><td>terdesak, role belum dibuka</td><td>buka role</td><td>"Aku cuma Civilian."</td></tr>
+<tr><td>3</td><td>ronde ≤ 2 dan penuduh ≤ 1</td><td>persuade: terlalu awal</td><td>"Masih terlalu awal, buktinya belum ada."</td></tr>
+<tr><td>4</td><td>ada tersangka atau kambing hitam dengan nilai ≥ 0,40</td><td>tunjuk orang lain; saat hampir kalah ditambah bahaya salah vote</td><td>"Yang lebih mencurigakan justru Budi."</td></tr>
+<tr><td>5</td><td>hampir kalah</td><td>persuade: bahaya salah vote</td><td>"Kalau salah vote, kita bisa kalah."</td></tr>
+<tr><td>6</td><td>selain itu</td><td>tanpa bukti</td><td>"Aku bukan Hitman."</td></tr>
+</table></div>
+<ul>
+<li><strong>Terdesak:</strong> porsi suara ke bot ≥ 0,3, tekanan ≥ 0,5, atau hampir kalah (<code>warga_terdesak</code> ≥ 0,75).</li>
+<li><strong>Bukti aksi:</strong> Spy memakai <code>last_guard</code>, dan Stalker memakai <code>intel</code>. Role dibuka paling banyak sekali per game.</li>
+<li><strong>Hitman:</strong> mengaku Civilian bila risiko di bawah 0,6, dan mengaku Spy palsu bila risiko ≥ 0,6. Klaim Stalker palsu hanya ada di <code>tuduh</code>.</li>
+<li><strong>Role asli tidak pernah dikirim ke LLM.</strong> Logika hanya mengirim <code>role_diakui</code> dan <code>bukti_klaim</code>, sehingga LLM tidak tahu klaim itu jujur atau bohong.</li>
+<li>Persuade bisa dipakai warga dan Hitman dengan cara yang sama.</li>
+<li>Dulu <code>tuduh</code> bisa mengalahkan <code>bela_diri</code> di Fuzzy, misalnya 85 lawan 58. Aturan urutan di atas menutup celah itu.</li>
+</ul>
+
+<h3 id="jawab"><code>jawab</code></h3>
+<p><strong>Kapan jadi pilihan (pemicu sementara):</strong></p>
+<div class="tabel"><table>
+<tr><th>No</th><th>Syarat</th></tr>
+<tr><td>1</td><td>chat dikirim pemain lain</td></tr>
+<tr><td>2</td><td>chat dikirim di fase ini, sesudah chat terakhir bot</td></tr>
+<tr><td>3</td><td>label intent chat itu <code>neutral</code></td></tr>
+<tr><td>4</td><td>chat menyebut bot, lewat target <code>neutral</code>, aturan nama, atau nama bot yang tertulis</td></tr>
+</table></div>
+<p><code>jawab</code> selalu dikirim bila ada pemicu dan batas reaktif belum habis. <strong>Tidak ada jenis.</strong> Logika menyiapkan paket data, lalu LLM merangkai jawaban yang sesuai dengan pertanyaan. Pola kata pertanyaan dan templat per kata kunci tidak dipakai. Templat umum tetap menjadi cadangan saat LLM gagal, ditolak, atau melewati batas waktu.</p>
+<div class="tabel"><table>
+<tr><th>Data untuk NLG</th><th>Isi</th><th>Batas</th></tr>
+<tr><td><code>pertanyaan</code>, <code>penanya</code></td><td>teks chat dan pengirimnya</td><td>—</td></tr>
+<tr><td><code>kondisi</code></td><td>yakin: kecurigaan tertinggi ≥ 0,7 dan keunggulan ≥ 0,5; agak yakin: kecurigaan tertinggi ≥ 0,40; selain itu ragu. Hitman memakai nilai kambing hitam dengan batas yang sama</td><td>kata, bukan angka</td></tr>
+<tr><td><code>tersangka</code></td><td>nama dan 1–2 alasan, atau kosong</td><td>hanya tersangka teratas</td></tr>
+<tr><td><code>pendapat_pemain</code></td><td>curiga, percaya, atau belum tahu, dengan 1 alasan</td><td>hanya pemain yang disebut di pertanyaan</td></tr>
+<tr><td><code>tindakan_sebelumnya</code></td><td>vote, tuduh, atau bela: ronde, target, alasan</td><td>1–2 tindakan publik terakhir</td></tr>
+<tr><td><code>jawaban_role</code></td><td>"aku orang baik", untuk semua role</td><td>tetap</td></tr>
+<tr><td><code>chat_saya_ronde_ini</code></td><td>jumlah chat bot di ronde ini</td><td>—</td></tr>
+</table></div>
+<p><strong>Instruksi untuk NLG:</strong> jawab hanya yang ditanyakan dan abaikan data lain; bila ditanya role, jawab "aku orang baik" tanpa nama role; bila ragu, boleh bilang belum yakin dan jangan mengarang tersangka; jangan menyebut angka atau istilah sistem; maksimal 1–2 kalimat.</p>
+<p><strong>Tidak dikirim:</strong> role asli, aksi rahasia, sumber pengetahuan seperti hasil Peek, dan angka mentah. Hasil Peek hanya menjadi pendapat, misalnya "aku yakin Budi aman". Pemeriksa kalimat untuk <code>jawab</code> menerima <code>neutral</code>, atau <code>offend</code> hanya ke tersangka di paket.</p>
+
+<h3 id="tuduh"><code>tuduh</code></h3>
+<p><strong>Kapan jadi pilihan:</strong></p>
+<div class="tabel"><table>
+<tr><th>Pengguna</th><th>Syarat</th><th>Penilaian</th></tr>
+<tr><td>Stalker</td><td>sudah Peek Hitman yang masih hidup</td><td>tanpa nilai fuzzy, langsung dikirim</td></tr>
+<tr><td>Orang baik</td><td>kecurigaan tersangka teratas ≥ 0,40, dan alasannya bukan hanya "banyak yang menuduh"</td><td>sistem <code>tuduh</code></td></tr>
+<tr><td>Hitman</td><td>salah satu jenis di bawah cocok</td><td>sistem <code>h_tuduh</code></td></tr>
+</table></div>
+<p><strong>Jenis tuduhan Hitman dipilih berurutan. Yang pertama cocok langsung dipakai:</strong></p>
+<div class="tabel"><table>
+<tr><th>No</th><th>Syarat</th><th>Jenis</th><th>Contoh</th></tr>
+<tr><td>1</td><td>ada warga yang kena Gag ronde ini</td><td>serang korban Gag</td><td>"Citra dari tadi diam aja, curiga."</td></tr>
+<tr><td>2</td><td>ada penuduh, dan risiko Hitman ≥ 0,4</td><td>balik tuduh</td><td>"Andi nuduh aku tanpa bukti, justru dia yang aneh."</td></tr>
+<tr><td>3</td><td>ada kambing hitam dengan nilai ≥ 0,40</td><td>pelintir bukti publik</td><td>"Budi dituduh 3 orang, dia juga ngalihin tuduhan."</td></tr>
+</table></div>
+<p><strong>Klaim Peek palsu</strong> tetap pilihan terpisah dengan sistem <code>klaim_palsu</code>: sekali per game, risiko ≥ 0,4, dan targetnya penuduh terkuat. Contohnya "Aku Stalker, aku Peek X, dia Hitman." Hitman tidak boleh menyebut kata Gag saat menyerang korban Gag.</p>
+<p><strong>Daftar alasan tuduh orang baik:</strong> mengalihkan tuduhan; plin-plan; penuduhnya disandera atau di-Gag; ikut mendorong eksekusi warga; memihak Hitman yang sudah ketahuan; menuduh orang yang pasti baik; klaim role bermasalah. "Banyak yang menuduh" hanya alasan pendukung. Maksimal 2 alasan terkuat dikirim ke LLM.</p>
+
+<h3 id="bela-orang"><code>bela_orang</code></h3>
+<p><strong>Kapan jadi pilihan:</strong></p>
+<div class="tabel"><table>
+<tr><th>Pengguna</th><th>Syarat</th></tr>
+<tr><td>Warga</td><td>target ditekan (tekanan ≥ 0,25), dipercaya bot (≥ 0,5), bukan korban Hostage, dan belum dibela bot di fase ini</td></tr>
+<tr><td>Hitman</td><td>target adalah rekan yang ditekan (tekanan ≥ 0,25), belum sangat dicurigai publik (&lt; 0,5), suaranya belum mencapai 50%, risiko Hitman &lt; 0,6, dan belum dibela di fase ini</td></tr>
+</table></div>
+<p><strong>Jenisnya dipilih berurutan. Yang pertama cocok langsung dipakai:</strong></p>
+<div class="tabel"><table>
+<tr><th>No</th><th>Syarat</th><th>Jenis</th><th>Contoh</th></tr>
+<tr><td>1</td><td>Stalker, target hasil Peek bersih, target terancam</td><td>hasil Peek + klaim Stalker</td><td>"Aku Stalker, aku sudah Peek Budi, dia bukan Hitman."</td></tr>
+<tr><td>2</td><td>Stalker dengan hasil Peek bersih, atau Spy membela rekan Spy</td><td>yakin, tanpa menyebut sumber</td><td>"Aku yakin Budi bukan Hitman."</td></tr>
+<tr><td>3</td><td>pengaku Stalker bilang target bersih (<code>bersih_klaim</code> &gt; 0)</td><td>diklaim bersih</td><td>"Andi yang ngaku Stalker bilang Budi bersih."</td></tr>
+<tr><td>4</td><td>ronde ≤ 2 dan penuduh ≤ 1</td><td>persuade: terlalu awal</td><td>"Masih terlalu awal buat nuduh Budi."</td></tr>
+<tr><td>5</td><td>ada orang lain yang membela</td><td>tanpa bukti: ada yang membela</td><td>"Tuduhan ke Budi masih pendapat, ada yang membela juga."</td></tr>
+<tr><td>6</td><td>selain itu</td><td>tanpa bukti: belum ada bukti kuat</td><td>"Belum ada bukti kuat kalau Budi Hitman."</td></tr>
+</table></div>
+<p><strong>Terancam:</strong> porsi suara ke target ≥ 0,3, atau tekanannya ≥ 0,5. Hitman hanya memakai no. 4–6. Saat warga hampir kalah, no. 5 dan 6 ditambah kalimat bahaya salah vote. Korban Hostage tidak dibela lewat chat, karena sudah terlihat semua pemain. Bot tetap tahu korban pasti warga. <code>info_sandera</code> dihapus.</p>
+<p><strong>Bila klaim Stalker ternyata bohong:</strong></p>
+<div class="tabel"><table>
+<tr><th>Orang</th><th>Situasi</th><th>Tingkat curiga</th><th>Di kode</th></tr>
+<tr><td>Pengaku</td><td>bentrok dengan pengaku lain</td><td>sedang (0,6)</td><td>ada</td></tr>
+<tr><td>Pengaku</td><td>pemain yang dia bersihkan ternyata Hitman</td><td>tinggi (0,8)</td><td>belum</td></tr>
+<tr><td>Pengaku</td><td>menurut bot yang memang Stalker</td><td>penuh (1,0)</td><td>ada</td></tr>
+<tr><td>Pemain yang dibersihkan</td><td>klaim itu terbukti bohong</td><td>klaim bersih batal. Tambahan curiga sedang tidak ada di tiga tingkat final, jadi diasumsikan tidak dipakai</td><td>sebagian</td></tr>
+<tr><td>Pemain yang mengulang klaim</td><td>hanya ikut percaya</td><td>rendah, lewat <code>memihak_hitman</code>. Angkanya belum ditentukan</td><td>belum</td></tr>
+</table></div>
+
+<h3 id="tanya"><code>tanya_info</code></h3>
+<p><strong>Kapan jadi pilihan:</strong></p>
+<div class="tabel"><table>
+<tr><th>Pengguna</th><th>Syarat</th></tr>
+<tr><td>Warga</td><td>jatah inisiatif masih ada, dan salah satu jenis di bawah cocok</td></tr>
+<tr><td>Hitman</td><td>sama, tetapi tanpa jenis klaim bentrok</td></tr>
+</table></div>
+<p><strong>Jenisnya dipilih berurutan. Yang pertama cocok langsung dipakai:</strong></p>
+<div class="tabel"><table>
+<tr><th>No</th><th>Syarat</th><th>Jenis</th><th>Contoh</th></tr>
+<tr><td>1</td><td>dua orang mengaku role yang sama, dan bot belum tahu siapa yang bohong</td><td>klaim bentrok</td><td>"Budi sama Andi sama-sama ngaku Stalker, gimana nih?"</td></tr>
+<tr><td>2</td><td>ada bukti lemah (<code>alasan_curiga</code> ada), tetapi kecurigaan &lt; 0,40</td><td>gali tersangka</td><td>"Budi, kenapa kamu vote Eko kemarin?"</td></tr>
+<tr><td>3</td><td>ada pemain dengan <code>diam</code> ≥ 0,5, bukan korban, belum diajak ronde ini, dan obrolan sedang ramai atau hening sesudah ada chat</td><td>pemain diam</td><td>"Budi, pendapatmu gimana?"</td></tr>
+<tr><td>4</td><td>tidak ada chat cukup lama</td><td>ruangan hening</td><td>"Kok sepi ya, belum ada yang cerita."</td></tr>
+<tr><td>5</td><td>belum ada pertanyaan terbuka, dan bot belum bertanya di fase ini</td><td>pertanyaan umum</td><td>"Ada yang punya info?"</td></tr>
+</table></div>
+<p>Di Tribunal hanya no. 1 dan 2. Hitman memakai bukti publik ke kambing hitam untuk no. 2. Bot yang tahu pasti klaim itu bohong akan menuduh, bukan bertanya. Nilainya memakai sistem <code>tanya_info</code> dan <code>ajak_bicara</code> yang sudah ada, jadi tidak ada sistem fuzzy baru.</p>
+
+<h3 id="tunggu"><code>tunggu</code></h3>
+<p>Tidak ada jenis. Bot diam bila salah satu kondisi ini terjadi:</p>
+<div class="tabel"><table>
+<tr><th>No</th><th>Syarat</th><th>Contoh</th></tr>
+<tr><td>1</td><td>bot tidak boleh chat</td><td>kena Gag, disandera, atau dieksekusi</td></tr>
+<tr><td>2</td><td>masih jeda, dan tidak ada pemicu baru</td><td>baru chat beberapa detik lalu</td></tr>
+<tr><td>3</td><td>jatah habis, dan tidak ada pemicu baru</td><td>inisiatif sudah 3 kali di siang</td></tr>
+<tr><td>4</td><td>tidak ada pilihan chat</td><td>belum ada yang perlu ditanggapi</td></tr>
+<tr><td>5</td><td>semua nilai pilihan terlalu rendah</td><td>Fuzzy: di bawah 40</td></tr>
+</table></div>
+
+<h3 id="gag"><code>gag</code></h3>
+<p><strong>Kapan jadi pilihan:</strong></p>
+<div class="tabel"><table>
+<tr><th>Pengguna</th><th>Syarat</th></tr>
+<tr><td>Hitman</td><td>siang, Gag tim tersedia, target warga dan bukan korban Hostage. Ronde 1 boleh</td></tr>
+</table></div>
+<p><strong>Cara memakainya berurutan:</strong></p>
+<div class="tabel"><table>
+<tr><th>No</th><th>Syarat</th><th>Yang dilakukan</th><th>Target</th></tr>
+<tr><td>1</td><td>ada warga yang sangat berbahaya (ancaman semua ronde ≥ 0,7), tidak ada rekan manusia</td><td>pakai Gag sekarang</td><td>warga itu, walau belum bicara</td></tr>
+<tr><td>2</td><td>sebelum 60% siang, tidak ada rekan manusia, nilai cukup tinggi (Fuzzy ≥ 60)</td><td>pakai Gag</td><td>warga yang sudah bicara, dengan ancaman tertinggi</td></tr>
+<tr><td>3</td><td>sebelum 60% siang, selain itu</td><td>tunggu</td><td>—</td></tr>
+<tr><td>4</td><td>mulai 60% siang</td><td>wajib pakai Gag</td><td>warga dengan ancaman tertinggi, walau belum bicara</td></tr>
+</table></div>
+<p>Sistem <code>gag</code> kini memakai <code>ancaman_sekarang</code> dan <code>ancaman</code>, dan tabel aturannya tetap. <code>ancaman_sekarang</code> dihitung dari tuduhan atau vote ke Hitman ronde ini, tuduhan atau vote ke rekannya, dan klaim role penting. Gag dipakai bersama satu tim, jadi bot memberi kesempatan kepada Hitman manusia sampai 60% siang. Gag di awal siang hampir tidak meninggalkan bukti bagi bot warga, karena bot warga hanya menduga Gag pada pemain yang sudah 2 kali chat di siang itu. Usulan melarang Gag di ronde 1 <span class="b t">ditolak</span>.</p>
+
+<h3 id="ajak-vote"><code>tuduh</code> ajak vote</h3>
+<p><strong>Kapan jadi pilihan:</strong></p>
+<div class="tabel"><table>
+<tr><th>Pengguna</th><th>Syarat</th></tr>
+<tr><td>Warga</td><td>Tribunal, jatah inisiatif masih ada, target vote bot punya kecurigaan ≥ 0,40, dan belum memakai jenis ini di Tribunal ini</td></tr>
+<tr><td>Hitman</td><td>sama, dengan target kambing hitam yang nilainya ≥ 0,40</td></tr>
+</table></div>
+<p><strong>Jenisnya dipilih berurutan. Yang pertama cocok langsung dipakai:</strong></p>
+<div class="tabel"><table>
+<tr><th>No</th><th>Syarat</th><th>Jenis</th><th>Contoh</th></tr>
+<tr><td>1</td><td>sedang waktu tambahan karena seri</td><td>ajak pindah</td><td>"Seri nih, pindah ke Budi aja."</td></tr>
+<tr><td>2</td><td>suara terpecah ke ≥ 2 target</td><td>ajak menyatukan</td><td>"Suara kita jangan pecah, ke Budi aja."</td></tr>
+<tr><td>3</td><td>bot sudah vote</td><td>jelaskan vote</td><td>"Aku vote Budi, soalnya dia ngalihin tuduhan."</td></tr>
+</table></div>
+<p>Bot yang vote karena paksa tidak mengajak orang lain. Anti-gema tetap berlaku.</p>
+
+<h3 id="vote-warga"><code>vote</code> warga</h3>
+<p><strong>Kapan jadi pilihan:</strong> Tribunal, boleh vote, dan ada target yang layak. Korban Hostage dan pemain pasti bersih, termasuk rekan Spy, tidak pernah di-vote.</p>
+<div class="tabel"><table>
+<tr><th>No</th><th>Syarat</th><th>Yang dilakukan</th><th>Contoh</th></tr>
+<tr><td>1</td><td>punya hasil Peek Hitman</td><td>vote dia sekarang</td><td>Stalker sudah tahu Budi Hitman</td></tr>
+<tr><td>2</td><td>sangat yakin (Fuzzy: kesiapan ≥ 75)</td><td>vote sekarang</td><td>buktinya kuat dan unggul</td></tr>
+<tr><td>3</td><td>paruh awal Tribunal</td><td>tunggu</td><td>masih menunggu diskusi</td></tr>
+<tr><td>4</td><td>cukup yakin (Fuzzy: kesiapan ≥ 45)</td><td>vote</td><td>paruh akhir, buktinya cukup</td></tr>
+<tr><td>5</td><td>≥ 2 suara masuk, pemimpin suara layak, dan kecurigaannya ≥ 0,35</td><td>ikut pemimpin</td><td>supaya suara warga tidak pecah</td></tr>
+<tr><td>6</td><td>kritis: warga bebas unggul ≤ 2 dari Hitman yang hidup (<code>warga_terdesak</code> ≥ 0,75)</td><td>paksa vote tersangka teratas</td><td>lebih baik mencoba daripada tidak vote</td></tr>
+<tr><td>7</td><td>selain itu</td><td>abstain</td><td>warga masih punya waktu</td></tr>
+</table></div>
+<p>Paksa vote hanya dipakai saat kritis, dan harus lolos uji A/B saat dikerjakan. Saat dipaksa, pemain dengan <code>bersih_klaim</code> ≥ 0,5 dilewati. Bila semua nilainya 0, bot memilih acak.</p>
+
+<h3 id="vote-hitman"><code>vote</code> Hitman</h3>
+<div class="tabel"><table>
+<tr><th>No</th><th>Syarat</th><th>Yang dilakukan</th><th>Contoh</th></tr>
+<tr><td>1</td><td>rekan memimpin suara dan pasti dieksekusi</td><td>ikut vote rekan</td><td>Budi 4 suara, pesaing 1, sisa pemilih 1</td></tr>
+<tr><td>2</td><td>Hitman atau rekan memimpin, dan masih bisa selamat</td><td>samakan suara dengan pesaing</td><td>Budi 2 suara, Eko 1, Hitman ikut vote Eko</td></tr>
+<tr><td>3</td><td>paruh awal Tribunal, dan tidak terdesak</td><td>tunggu</td><td>masih melihat arah suara</td></tr>
+<tr><td>4</td><td>belum ada suara warga</td><td>abstain</td><td>tanpa eksekusi lebih menguntungkan Hitman</td></tr>
+<tr><td>5</td><td>pemimpin suara adalah warga yang layak</td><td>ikut pemimpin</td><td>Citra memimpin, Hitman ikut</td></tr>
+<tr><td>6</td><td>selain itu</td><td>vote kambing hitam teratas</td><td>suara warga yang layak belum memimpin</td></tr>
+</table></div>
+<p><strong>Pasti dieksekusi:</strong> suara rekan melebihi pesaing terkuat ditambah semua sisa pemilih. <strong>Terdesak:</strong> minimal 30% suara mengarah ke Hitman, atau pemimpin suara adalah Hitman atau rekannya. No. 2–6 sudah ada di kode, dan no. 1 baru.</p>
+
+<h3 id="seri">Seri Tribunal</h3>
+<p><span class="b l">live</span> Aturan game:</p>
+<ol>
+<li>Saat waktu Tribunal habis dan suara seri, waktu ditambah 30 detik sekali. Mode cepat ditambah 10 detik.</li>
+<li>Bila masih seri, tidak ada yang dieksekusi, lalu masuk malam.</li>
+<li>Bila tidak ada suara sama sekali, itu bukan seri, jadi tidak ada tambahan.</li>
+<li>Suara lama tetap berlaku. Manusia boleh membatalkan dan memilih ulang.</li>
+</ol>
+<p><span class="b s">disetujui</span> Bot, belum dikerjakan: setiap bot menilai ulang sekali. Pindah suara tidak wajib dan boleh ke nama yang tidak seri. Warga pindah hanya bila ada target lain yang lebih dicurigai. Hitman memakai tabelnya, termasuk mempertahankan seri untuk melindungi rekan.</p>
+
+<h3 id="hostage"><code>hostage</code></h3>
+<p><strong>Kapan jadi pilihan:</strong> Hitman, malam, masih hidup, dan targetnya warga yang belum disandera. Skill selalu dipakai bila ada target.</p>
+<div class="tabel"><table>
+<tr><th>No</th><th>Syarat</th><th>Target</th><th>Contoh</th></tr>
+<tr><td>1</td><td>saat bot terkunci, Hitman manusia sudah memilih</td><td>pilihan Hitman manusia</td><td>manusia memilih Citra, bot pindah ke Citra</td></tr>
+<tr><td>2</td><td>rekan bot sudah memilih target yang layak</td><td>pilihan rekan bot</td><td>bot kedua mengikuti bot pertama</td></tr>
+<tr><td>3</td><td>selain itu</td><td>warga dengan nilai tertinggi</td><td>lihat penalti di bawah</td></tr>
+</table></div>
+<p>Sistem fuzzy <code>sandera</code> dihapus, jadi nilai ini langsung memakai <code>ancaman</code> dari <a href="#ancaman">bagian 7</a>. Target yang gagal disandera 2 malam berturut-turut dilewati selama masih ada target lain.</p>
+<p><strong>Penalti jejak:</strong> menuduh Hitman hanya menjadi pertimbangan, karena korban yang menuduh dia bisa membongkar role-nya.</p>
+<pre><code>jejak_tuduhan = bobot ÷ jumlah orang yang dia tuduh
+nilai = ancaman × (1 − 0,5 × jejak_tuduhan)
+Bobot 1,0 bila tuduhan di ronde ini, 0,6 bila ronde lalu.</code></pre>
+<div class="tabel"><table>
+<tr><th>Warga</th><th>Perilaku</th><th>Ancaman</th><th><code>jejak_tuduhan</code></th><th>Nilai akhir</th></tr>
+<tr><td>Andi</td><td>ronde ini hanya menuduh Hitman</td><td>0,8</td><td>1,0</td><td>0,40</td></tr>
+<tr><td>Eko</td><td>ronde ini menuduh Hitman dan 1 pemain lain</td><td>0,8</td><td>0,5</td><td>0,60</td></tr>
+<tr><td>Citra</td><td>tidak menuduh Hitman</td><td>0,7</td><td>0</td><td>0,70</td></tr>
+</table></div>
+<p>Hitman memilih Citra. Angka ancaman di tabel hanya contoh hitungan penalti. Angka 0,5 masih perkiraan dan disetel lewat simulasi. Gag tidak memakai penalti ini.</p>
+<p><span class="b l">live</span> Pada seri pilihan Hostage antara manusia dan bot, pilihan manusia yang dipakai. Seri sesama manusia memakai pilihan paling awal.</p>
+
+<h3 id="guard"><code>guard</code></h3>
+<p><strong>Kapan jadi pilihan:</strong> Spy, malam, masih hidup, tidak disandera. <span class="b l">live</span> Target yang sama boleh dijaga berturut-turut.</p>
+<div class="tabel"><table>
+<tr><th>No</th><th>Syarat</th><th>Target</th><th>Contoh</th></tr>
+<tr><td>1</td><td>bot sudah membuka role, dan ronde ini masih dituduh atau di-vote</td><td>diri sendiri</td><td>Dodi mengaku Spy dan masih ditekan</td></tr>
+<tr><td>2</td><td>ada orang yang yakin orang baik</td><td>yang paling mungkin disandera</td><td>Andi keras menuduh tersangka kuat</td></tr>
+<tr><td>3</td><td>selain itu</td><td>diri sendiri</td><td>tidak yakin pada siapa pun</td></tr>
+</table></div>
+<p><strong>Yakin orang baik:</strong> rekan Spy, atau pemain dengan kecurigaan &lt; 0,3 yang bukan korban Hostage. <strong>Paling mungkin disandera</strong> berarti nilai <code>terancam</code> tertinggi (<a href="#fitur-spy">rumusnya di bagian 8</a>). Sistem fuzzy <code>lindung</code> dihapus, jadi Guard langsung memakai nilai ini. Bila seri, rekan Spy didahulukan, lalu menurut nama. Spy menghindari target rekan Spy selama masih ada target lain. Spy tidak mengikuti pilihan manusia.</p>
+
+<h3 id="peek"><code>peek</code></h3>
+<p><strong>Kapan jadi pilihan:</strong> Stalker, malam, masih hidup, tidak disandera, dan Peek tersedia (ronde 1, 3, 5, dan seterusnya).</p>
+<div class="tabel"><table>
+<tr><th>No</th><th>Syarat</th><th>Target</th><th>Contoh</th></tr>
+<tr><td>1</td><td>ada pemain yang belum di-Peek, belum pasti bersih, dan bukan korban Hostage</td><td>nilai tertinggi</td><td>Budi paling dicurigai</td></tr>
+<tr><td>2</td><td>semua pemain terlewat</td><td>pemain hidup mana pun selain diri sendiri</td><td>supaya skill tidak terbuang</td></tr>
+</table></div>
+<p>Nilai naik karena kecurigaan dan informasi yang masih sedikit. Pengaku Spy atau Civilian dengan kecurigaan ≥ 0,40 mendapat tambahan nilai lewat input <code>kurang_info</code>. Pengaku Stalker tetap bisa terpilih lewat kecurigaan, karena klaim bohong belum membuktikan dia Hitman. Bila hasilnya Hitman, siang berikutnya Stalker mengungkap dan langsung vote. Bila bersih, hasil itu menjadi dasar <code>bela_orang</code>.</p>
+
+<h3 id="chat-tim"><code>chat_tim</code></h3>
+<p><span class="b l">live</span> Chat manusia: hanya malam, untuk Hitman atau Spy yang hidup dan tidak disandera, di room yang sejak awal punya ≥ 2 pemain role itu. Kanal Hitman dan Spy terpisah. Pesan tidak tampil untuk warga, dan tidak masuk chat publik, ingatan bukti, atau NLU.</p>
+<p><span class="b s">disetujui</span> Pesan bot, belum dikerjakan:</p>
+<div class="tabel"><table>
+<tr><th>Pengguna</th><th>Syarat</th></tr>
+<tr><td>Hitman, Spy</td><td>malam, ada rekan manusia yang hidup, dan bot belum terkunci. Sesama bot tidak mengobrol</td></tr>
+</table></div>
+<div class="tabel"><table>
+<tr><th>No</th><th>Pemicu</th><th>Role</th><th>Contoh</th></tr>
+<tr><td>1</td><td>bot baru memilih target</td><td>Hitman, Spy</td><td>"Aku incar Andi, dia ngaku Stalker."</td></tr>
+<tr><td>2</td><td>rekan memilih target lain, dan nilainya minimal 80% nilai target bot</td><td>Hitman</td><td>"Oke, Citra juga bagus."</td></tr>
+<tr><td>3</td><td>rekan memilih target lain, dan bot tidak setuju</td><td>Hitman</td><td>"Aku lebih pilih Andi, dia ngaku Stalker."</td></tr>
+<tr><td>4</td><td>rekan memilih target yang sama</td><td>Spy</td><td>"Andi sudah kamu jaga, aku jaga Citra."</td></tr>
+<tr><td>5</td><td>Hitman pindah saat terkunci</td><td>Hitman</td><td>"Oke, aku ikut Citra."</td></tr>
+</table></div>
+<ul>
+<li>Pesan ditulis LLM, dengan templat sebagai cadangan, dan paling banyak 3 pesan per malam.</li>
+<li>Bot terkunci pada 15 detik terakhir di mode standar, dan 10 detik terakhir di mode cepat. Manusia tetap boleh mengganti pilihan sampai waktu habis.</li>
+<li>Saat terkunci, bot Hitman pindah ke pilihan rekan manusia bila manusia sudah memilih. Aturan ini tidak berlaku untuk Spy.</li>
+<li>LLM menerima target bot, alasan, pilihan rekan, dan chat tim terbaru. <strong>LLM hanya menentukan kalimat, bukan target.</strong></li>
+<li>Arahan: tanggapi chat terakhir bila perlu, pakai fakta dari data saja, jangan bilang target berubah kecuali datanya menyatakan begitu, tulis 1–2 kalimat santai tanpa angka atau istilah sistem, dan jangan mengaku bot atau AI.</li>
+</ul>
+
+<h2 id="kecurigaan">6. Menilai kecurigaan</h2>
+<p>Kecurigaan menjawab "seberapa mungkin orang ini Hitman?". Nilainya 0–1. <span class="b s">disetujui</span> Semua tahap di bagian ini sudah final. Nama di bawah adalah nama baru dan belum diterapkan di kode. Nama lama: <code>sosial</code>, <code>perilaku</code>, <code>pribadi</code>, <code>inkonsistensi</code>, <code>pengalihan</code>, <code>dituduh_korban</code>, <code>dorong_salah_eksekusi</code>, <code>serang_bersih</code>, <code>klaim</code>.</p>
+<pre><code>BUKTI                        TAHAP 1                  TAHAP 2         TAHAP 3
+
+tekanan ───────────────┐
+                       ├─→ sentimen_sosial ───────┐
+dukungan ──────────────┘                          │
+                                                  ├─→ ucapan ──────┐
+plin_plan ─────────────┐                          │                │
+                       ├─→ perilaku_mencurigakan ─┘                │
+alihkan_tuduhan ───────┘                                           │
+                                                                   ├─→ KECURIGAAN
+penuduh_dibungkam ─────┐                                           │
+                       ├─→ jejak ─────────────────┐                │
+ikut_salah_eksekusi    │                          │                │
+atau memihak_hitman ───┘                          ├─→ bukti_keras ─┘
+                                                  │
+menuduh_orang_baik ────┐                          │
+                       ├─→ kejanggalan ───────────┘
+klaim_role_bermasalah ─┘</code></pre>
+<p><strong>Kenapa dipasangkan:</strong> satu sistem dengan 8 input membutuhkan 3⁸ = 6.561 aturan, sedangkan 7 sistem dua input hanya 63 aturan. Bukti dipasangkan menurut kesamaan makna. Pembagian ini pilihan perancang dan belum dibandingkan dengan pasangan lain.</p>
+
+<h3>Kurva rendah, sedang, tinggi</h3>
+<div class="tabel"><table>
+<tr><th>Kata</th><th>Mulai</th><th>Penuh</th><th>Hilang</th></tr>
+<tr><td>rendah</td><td>0</td><td>0–0,2</td><td>0,5</td></tr>
+<tr><td>sedang</td><td>0,2</td><td>0,5</td><td>0,8</td></tr>
+<tr><td>tinggi</td><td>0,5</td><td>0,8–1</td><td>tidak hilang</td></tr>
+</table></div>
+<div class="tabel"><table>
+<tr><th>Nilai</th><th>Rendah</th><th>Sedang</th><th>Tinggi</th></tr>
+<tr><td>0 atau 0,2</td><td>1</td><td>0</td><td>0</td></tr>
+<tr><td>0,25</td><td>0,83</td><td>0,17</td><td>0</td></tr>
+<tr><td>0,35</td><td>0,5</td><td>0,5</td><td>0</td></tr>
+<tr><td>0,5</td><td>0</td><td>1</td><td>0</td></tr>
+<tr><td>0,65</td><td>0</td><td>0,5</td><td>0,5</td></tr>
+<tr><td>0,75</td><td>0</td><td>0,17</td><td>0,83</td></tr>
+<tr><td>0,8 atau 1</td><td>0</td><td>0</td><td>1</td></tr>
+</table></div>
+<p>Semua sistem memakai kurva input yang sama, dan jumlah derajatnya selalu 1. Kurva output punya titik tengah 15, 50, dan 85, jadi hasil setiap sistem berada di antara 0,15 dan 0,85. Notebook menulis angka-angka ini sebagai rancangan awal yang diturunkan dari aturan game. Rujukan metodenya: Zadeh 1965, Mamdani &amp; Assilian 1975, Raju, Zhou &amp; Kisner 1991, dan Ruspini 1969.</p>
+
+<h3 id="sentimen"><code>sentimen_sosial</code></h3>
+<p><strong>Arti:</strong> kecenderungan meja terhadap seorang pemain, lebih banyak yang mencurigai atau yang membela. Nilai tinggi berarti sentimennya buruk. Ini opini meja, bukan kebenaran, jadi termasuk bukti lunak.</p>
+<p><strong>Cerita:</strong> bot menilai Budi. Andi, Eko, dan Citra menuduh Budi, sedangkan Fani membela Budi.</p>
+<ol>
+<li><strong>Hitung angka:</strong> <code>tekanan</code> = 3 ÷ 4 = 0,75, dan <code>dukungan</code> = 1 ÷ 4 = 0,25.</li>
+<li><strong>Ubah jadi kata:</strong> tekanan tinggi 0,83 dan sedang 0,17; dukungan rendah 0,83 dan sedang 0,17.</li>
+<li><strong>Cek tabel aturan:</strong> bagian terkuat adalah tekanan tinggi dan dukungan rendah.</li>
+<li><strong>Hasil:</strong> 0,65.</li>
+<li><strong>Dikirim ke:</strong> <code>ucapan</code>.</li>
+</ol>
+<p><strong>Hitungan masukan:</strong> jumlah orang ÷ jumlah pemain hidup yang tidak disandera, selain dia dan bot. Satu orang dihitung sekali, dan vote dihitung sebagai tuduhan. Ronde lalu bernilai 0,7. Pengaku Stalker yang menyebut seseorang bersih dihitung sebagai pembela. Tuduhan bot sendiri tidak dihitung.</p>
+<div class="tabel"><table>
+<tr><th>Tekanan ↓ / Dukungan →</th><th>rendah</th><th>sedang</th><th>tinggi</th></tr>
+<tr><th>rendah</th><td>rendah</td><td>rendah</td><td>rendah</td></tr>
+<tr><th>sedang</th><td>sedang</td><td>rendah</td><td>rendah</td></tr>
+<tr><th>tinggi</th><td>tinggi</td><td>sedang</td><td>sedang</td></tr>
+</table></div>
+<div class="tabel"><table>
+<tr><th>Tekanan</th><th>Dukungan</th><th>Hasil</th><th>Artinya</th></tr>
+<tr><td>0</td><td>0</td><td>0,15</td><td>tidak ada yang menuduh</td></tr>
+<tr><td>0,25</td><td>0</td><td>0,23</td><td>sedikit yang menuduh</td></tr>
+<tr><td>0,5</td><td>0</td><td>0,50</td><td>setengah orang menuduh</td></tr>
+<tr><td>0,5</td><td>0,5</td><td>0,15</td><td>meja terbelah</td></tr>
+<tr><td>0,75</td><td>0</td><td>0,77</td><td>banyak yang menuduh</td></tr>
+<tr><td>0,75</td><td>0,25</td><td>0,65</td><td>pembela menurunkan nilainya</td></tr>
+<tr><td>1</td><td>0</td><td>0,85</td><td>semua menuduh</td></tr>
+<tr><td>1</td><td>0,5</td><td>0,50</td><td>semua menuduh, setengah juga membela</td></tr>
+<tr><td>1</td><td>1</td><td>0,50</td><td>ramai, tetapi tidak sepakat</td></tr>
+</table></div>
+<p>Hitman bisa membela rekan untuk menurunkan nilai ini. Pembelaan tidak menurunkan bukti keras, dan pembelanya bisa terkena <code>memihak_hitman</code>.</p>
+<p><span class="b u">bisa dibatalkan</span> Ide #31, diputuskan Claude supaya pembahasan berlanjut: pembagi di atas, dan tuduhan atau pembelaan dari pemain yang tersingkir atau disandera tidak dihitung. Tuduhan korban Hostage tetap masuk <code>penuduh_dibungkam</code>. Kode sekarang masih menghitung semuanya.</p>
+
+<h3 id="perilaku"><code>perilaku_mencurigakan</code></h3>
+<p><strong>Arti:</strong> apakah cara bicara orang ini aneh.</p>
+<p><strong>Cerita:</strong> di ronde 1 Budi membela Citra, lalu di ronde 2 Budi menuduh Citra. Di ronde 2 Andi menuduh Budi, dan balasan pertama Budi adalah "Eko tuh yang aneh."</p>
+<ol>
+<li><strong>Hitung angka:</strong> <code>plin_plan</code> = 1 ÷ 2 = 0,5, dan <code>alihkan_tuduhan</code> = 1 ÷ 1 = 1,0.</li>
+<li><strong>Ubah jadi kata:</strong> plin-plan sedang penuh, dan alihkan tuduhan tinggi penuh.</li>
+<li><strong>Cek tabel aturan:</strong> sedang dan tinggi menghasilkan tinggi.</li>
+<li><strong>Hasil:</strong> 0,85.</li>
+<li><strong>Dikirim ke:</strong> <code>ucapan</code>.</li>
+</ol>
+<h4>Hitungan <code>plin_plan</code></h4>
+<div class="tabel"><table>
+<tr><th>Kejadian</th><th>Poin</th><th>Contoh</th></tr>
+<tr><td>berganti sikap ke orang yang sama, dalam 1 ronde</td><td>+1</td><td>kemarin membela Citra, hari ini menuduh Citra</td></tr>
+<tr><td>mem-vote orang yang dia bela di ronde itu</td><td>+1</td><td>ucapan dan tindakan bertentangan</td></tr>
+<tr><td>mem-vote orang lain, padahal dia menuduh seseorang di ronde itu</td><td>+0,5</td><td>menuduh Citra, lalu mem-vote Eko</td></tr>
+</table></div>
+<p>Nilai akhirnya jumlah poin ÷ 2, paling tinggi 1, dan poin ronde lama dikali 0,7. Pembagi 2 mengubah poin ke skala 0–1 dan berarti 2 kejadian dianggap penuh. Angka ini pilihan perancang.</p>
+<h4>Rumus final <code>alihkan_tuduhan</code></h4>
+<p><span class="b s">disetujui</span> Jumlah nilai ÷ jumlah tuduhan yang dibalas. Nilai ronde lama dikali 0,7.</p>
+<div class="tabel"><table>
+<tr><th>Balasan pertama sesudah dituduh</th><th>Nilai</th></tr>
+<tr><td>hanya menuduh orang, siapa pun</td><td>1</td></tr>
+<tr><td>membela diri sekaligus menuduh</td><td>0,5</td></tr>
+<tr><td>hanya membela diri</td><td>0</td></tr>
+<tr><td>tidak membalas</td><td>tidak dihitung</td></tr>
+</table></div>
+<p>Contoh: Budi dituduh 3 kali dan membalas dengan menuduh, campuran, lalu membela diri. Hasilnya (1 + 0,5 + 0) ÷ 3 = 0,5. Kode sekarang masih memakai pembagi jumlah balasan + 1, dan nilai 0,4 untuk balik menuduh penuduh. Menuduh siapa pun kini bernilai 1, jadi warga yang membalas penuduhnya ikut terkena. Risiko ini diukur lewat simulasi.</p>
+<div class="tabel"><table>
+<tr><th>Plin-plan ↓ / Alihkan →</th><th>rendah</th><th>sedang</th><th>tinggi</th></tr>
+<tr><th>rendah</th><td>rendah (0,15)</td><td>rendah (0,15)</td><td>sedang (0,50)</td></tr>
+<tr><th>sedang</th><td>rendah (0,15)</td><td>sedang (0,50)</td><td>tinggi (0,85)</td></tr>
+<tr><th>tinggi</th><td>sedang (0,50)</td><td>tinggi (0,85)</td><td>tinggi (0,85)</td></tr>
+</table></div>
+<p>Satu perilaku saja paling tinggi sedang, dan dua perilaku bersama baru bisa tinggi. Sekali mengalihkan baru berpengaruh bila banyak orang juga menuduhnya:</p>
+<div class="tabel"><table>
+<tr><th>Tekanan</th><th><code>alihkan_tuduhan</code></th><th><code>perilaku_mencurigakan</code></th><th>Kecurigaan</th></tr>
+<tr><td>0</td><td>1,0</td><td>0,50</td><td>0,15</td></tr>
+<tr><td>0,25</td><td>1,0</td><td>0,50</td><td>0,18</td></tr>
+<tr><td>0,5</td><td>1,0</td><td>0,50</td><td>0,50</td></tr>
+<tr><td>0,75</td><td>1,0</td><td>0,50</td><td>0,50</td></tr>
+<tr><td>0,75</td><td>0,5</td><td>0,15</td><td>0,40</td></tr>
+</table></div>
+
+<h3 id="jejak"><code>jejak</code></h3>
+<p><strong>Arti:</strong> apakah kejadian di game menunjuk ke orang ini.</p>
+<p><strong>Cerita:</strong> di siang ronde 2, Budi menuduh Eko, lalu Budi dan 1 pemain lain mem-vote Eko dari 3 pemilih. Andi menuduh Budi. Eko dieksekusi dan game berlanjut, jadi Eko pasti warga. Malam itu Andi disandera. Sekarang ronde 3.</p>
+<ol>
+<li><strong>Hitung angka:</strong> <code>penuduh_dibungkam</code> = 1 × 1 × 0,9 = 0,90. <code>ikut_salah_eksekusi</code> = (0,33 + 0,3 + 0,2) × 0,9 = 0,75. <code>memihak_hitman</code> = 0.</li>
+<li><strong>Ubah jadi kata:</strong> 0,90 tinggi; 0,75 tinggi 0,83 dan sedang 0,17.</li>
+<li><strong>Cek tabel aturan:</strong> tinggi dan tinggi menghasilkan tinggi.</li>
+<li><strong>Hasil:</strong> 0,85.</li>
+<li><strong>Dikirim ke:</strong> <code>bukti_keras</code>.</li>
+</ol>
+<div class="tabel"><table>
+<tr><th>Bukti</th><th>Hitungan</th></tr>
+<tr><td><code>penuduh_dibungkam</code></td><td>Keyakinan korban (Hostage 1, karena diumumkan; Gag berupa dugaan) × bobot × 0,9 per ronde. Bobot: menuduh di ronde yang sama 1,0; ronde sebelumnya 0,6; vote terakhir sebelum dibungkam 0,6</td></tr>
+<tr><td><code>ikut_salah_eksekusi</code></td><td>Mem-vote korban: 0,5 × (1 − (pendorong − 1) ÷ pemilih). Ikut menuduh +0,3. Penuduh pertama +0,2. Dikali keyakinan korban warga dan 0,9 per ronde</td></tr>
+<tr><td><code>memihak_hitman</code></td><td>Baru: dulu membela orang yang kini terbukti Hitman = 0,8 × 0,9 per ronde. Kolom kedua <code>jejak</code> memakai nilai terbesar antara ini dan <code>ikut_salah_eksekusi</code></td></tr>
+</table></div>
+<div class="tabel"><table>
+<tr><th><code>penuduh_dibungkam</code> ↓ / kolom kedua →</th><th>rendah</th><th>sedang</th><th>tinggi</th></tr>
+<tr><th>rendah</th><td>rendah</td><td>sedang</td><td>tinggi</td></tr>
+<tr><th>sedang</th><td>sedang</td><td>tinggi</td><td>tinggi</td></tr>
+<tr><th>tinggi</th><td>tinggi</td><td>tinggi</td><td>tinggi</td></tr>
+</table></div>
+<div class="tabel"><table>
+<tr><th><code>penuduh_dibungkam</code></th><th>kolom kedua</th><th><code>jejak</code></th></tr>
+<tr><td>0</td><td>0</td><td>0,15</td></tr>
+<tr><td>0,9</td><td>0</td><td>0,85</td></tr>
+<tr><td>0</td><td>0,75</td><td>0,77</td></tr>
+<tr><td>0,9</td><td>0,75</td><td>0,85</td></tr>
+</table></div>
+<p>Satu jejak kuat sudah cukup untuk tinggi. Bukti ini bisa salah, karena Hitman bisa menyandera karena alasan lain, dan warga juga bisa salah vote.</p>
+
+<h3 id="kejanggalan"><code>kejanggalan</code></h3>
+<p><strong>Arti:</strong> apakah tindakan orang ini bertentangan dengan fakta yang bot tahu.</p>
+<p><strong>Cerita:</strong> Dodi, bot warga, tahu dirinya bersih. Budi menuduh Dodi sekali di ronde ini. Budi dan Andi sama-sama mengaku Stalker, padahal Stalker cuma satu.</p>
+<ol>
+<li><strong>Hitung angka:</strong> <code>menuduh_orang_baik</code> = 0,5, dan <code>klaim_role_bermasalah</code> = 0,6.</li>
+<li><strong>Ubah jadi kata:</strong> 0,5 sedang penuh; 0,6 sedang 0,67 dan tinggi 0,33.</li>
+<li><strong>Cek tabel aturan:</strong> sedang dan sedang menghasilkan sedang; sedang dan tinggi menghasilkan tinggi.</li>
+<li><strong>Hasil:</strong> 0,64.</li>
+<li><strong>Dikirim ke:</strong> <code>bukti_keras</code>.</li>
+</ol>
+<h4>Rumus <code>menuduh_orang_baik</code>, dua langkah</h4>
+<ol>
+<li>Setiap ronde, nilai lama dikali 0,7.</li>
+<li>Tambahkan kejadian ronde ini: chat menuduh orang pasti baik +0,5, dan vote ke orang pasti baik +1. Nilai paling tinggi 1.</li>
+</ol>
+<div class="tabel"><table>
+<tr><th>Ronde</th><th>Nilai lama × 0,7</th><th>Kejadian ronde ini</th><th>Nilai</th></tr>
+<tr><td>2</td><td>0</td><td>chat menuduh, +0,5</td><td>0,50</td></tr>
+<tr><td>3</td><td>0,35</td><td>chat menuduh, +0,5</td><td>0,85</td></tr>
+<tr><td>4</td><td>0,60</td><td>vote, +1</td><td>1</td></tr>
+<tr><td>5</td><td>0,70</td><td>tidak ada</td><td>0,70</td></tr>
+</table></div>
+<p>Mengaku Peek bot ini lalu menyebutnya Hitman langsung bernilai 1. Hanya bot warga yang memakai bukti ini. Pasti baik berarti diri sendiri, hasil Peek bersih, dan rekan Spy. Kode sekarang memberi vote 0,8 dan baru memotong nilai di akhir.</p>
+<h4>Rumus <code>klaim_role_bermasalah</code>, tiga tingkat</h4>
+<p>Nilai tertinggi yang berlaku dipakai, <strong>tanpa pengurangan per ronde</strong>.</p>
+<div class="tabel"><table>
+<tr><th>Nilai</th><th>Kejadian</th></tr>
+<tr><td>1</td><td>Pasti bohong: Stalker melihat pengaku Stalker; Spy di room 1 Spy melihat pengaku Spy; Spy di room 2 Spy melihat pengaku selain rekannya; mengaku Peek bot ini lalu menyebutnya Hitman</td></tr>
+<tr><td>0,8</td><td>Klaim terbukti salah, atau disebut Hitman oleh pengaku Stalker yang tidak bentrok</td></tr>
+<tr><td>0,6</td><td>Mengaku role yang sama melebihi jumlah role itu</td></tr>
+<tr><td>0</td><td>Selain itu, termasuk mengaku role sendirian. Disebut Hitman oleh pengaku yang bentrok tidak dihitung</td></tr>
+</table></div>
+<p><strong>Cara bot tahu ada klaim:</strong> lewat pola kata, bukan IndoBERT. Pola ditambah untuk "aku jaga X", bentuk "aku sih ..." dan "... nih aku", serta klaim Civilian. Klaim Civilian dikenali, tetapi bukan bukti bentrok, karena Civilian bisa banyak. Kalimat seperti "kalau aku stalker, ..." masih bisa salah terbaca. Label klaim di IndoBERT dikerjakan belakangan.</p>
+<div class="tabel"><table>
+<tr><th><code>menuduh_orang_baik</code> ↓ / <code>klaim_role_bermasalah</code> →</th><th>rendah</th><th>sedang</th><th>tinggi</th></tr>
+<tr><th>rendah</th><td>rendah</td><td>sedang</td><td>tinggi</td></tr>
+<tr><th>sedang</th><td>sedang</td><td>sedang</td><td>tinggi</td></tr>
+<tr><th>tinggi</th><td>sedang</td><td>tinggi</td><td>tinggi</td></tr>
+</table></div>
+<div class="tabel"><table>
+<tr><th><code>menuduh_orang_baik</code></th><th><code>klaim_role_bermasalah</code></th><th><code>kejanggalan</code></th></tr>
+<tr><td>0</td><td>0</td><td>0,15</td></tr>
+<tr><td>0,5</td><td>0</td><td>0,50</td></tr>
+<tr><td>1</td><td>0</td><td>0,50</td></tr>
+<tr><td>0</td><td>0,6</td><td>0,64</td></tr>
+<tr><td>0</td><td>0,8</td><td>0,85</td></tr>
+<tr><td>0</td><td>1</td><td>0,85</td></tr>
+<tr><td>0,5</td><td>0,6</td><td>0,64</td></tr>
+</table></div>
+<p>Menuduh orang baik saja paling tinggi sedang, karena warga juga bisa keliru. Klaim bermasalah yang kuat langsung tinggi.</p>
+
+<h3 id="ucapan"><code>ucapan</code></h3>
+<p><strong>Arti:</strong> gabungan bukti lunak, yaitu opini meja dan cara bicara.</p>
+<p><strong>Cerita:</strong> Budi dari contoh sebelumnya punya <code>sentimen_sosial</code> 0,65 dan <code>perilaku_mencurigakan</code> 0,85.</p>
+<ol>
+<li><strong>Hitung angka:</strong> masukannya hasil dua sistem di tahap 1.</li>
+<li><strong>Ubah jadi kata:</strong> 0,65 sedang 0,5 dan tinggi 0,5; 0,85 tinggi penuh.</li>
+<li><strong>Cek tabel aturan:</strong> sedang dan tinggi menghasilkan tinggi; tinggi dan tinggi menghasilkan tinggi.</li>
+<li><strong>Hasil:</strong> 0,85.</li>
+<li><strong>Dikirim ke:</strong> <code>kecurigaan</code>.</li>
+</ol>
+<div class="tabel"><table>
+<tr><th><code>sentimen_sosial</code> ↓ / <code>perilaku_mencurigakan</code> →</th><th>rendah</th><th>sedang</th><th>tinggi</th></tr>
+<tr><th>rendah</th><td>rendah</td><td>rendah</td><td>sedang</td></tr>
+<tr><th>sedang</th><td>rendah</td><td>sedang</td><td>tinggi</td></tr>
+<tr><th>tinggi</th><td>sedang</td><td>tinggi</td><td>tinggi</td></tr>
+</table></div>
+<div class="tabel"><table>
+<tr><th><code>sentimen_sosial</code></th><th><code>perilaku_mencurigakan</code></th><th><code>ucapan</code></th></tr>
+<tr><td>0,15</td><td>0,15</td><td>0,15</td></tr>
+<tr><td>0,50</td><td>0,50</td><td>0,50</td></tr>
+<tr><td>0,85</td><td>0,15</td><td>0,50</td></tr>
+<tr><td>0,15</td><td>0,85</td><td>0,50</td></tr>
+<tr><td>0,85</td><td>0,50</td><td>0,85</td></tr>
+</table></div>
+
+<h3 id="bukti-keras"><code>bukti_keras</code></h3>
+<p><strong>Arti:</strong> gabungan kejadian di game dan fakta yang bot tahu.</p>
+<p><strong>Cerita:</strong> Citra punya <code>jejak</code> 0,50 dan <code>kejanggalan</code> 0,50. Tidak ada yang kuat sendirian, tetapi keduanya menunjuk orang yang sama.</p>
+<ol>
+<li><strong>Hitung angka:</strong> masukannya hasil dua sistem di tahap 1.</li>
+<li><strong>Ubah jadi kata:</strong> keduanya sedang penuh.</li>
+<li><strong>Cek tabel aturan:</strong> sedang dan sedang menghasilkan tinggi.</li>
+<li><strong>Hasil:</strong> 0,85.</li>
+<li><strong>Dikirim ke:</strong> <code>kecurigaan</code>.</li>
+</ol>
+<div class="tabel"><table>
+<tr><th><code>jejak</code> ↓ / <code>kejanggalan</code> →</th><th>rendah</th><th>sedang</th><th>tinggi</th></tr>
+<tr><th>rendah</th><td>rendah</td><td>sedang</td><td>tinggi</td></tr>
+<tr><th>sedang</th><td>sedang</td><td>tinggi</td><td>tinggi</td></tr>
+<tr><th>tinggi</th><td>tinggi</td><td>tinggi</td><td>tinggi</td></tr>
+</table></div>
+<div class="tabel"><table>
+<tr><th><code>jejak</code></th><th><code>kejanggalan</code></th><th><code>bukti_keras</code></th></tr>
+<tr><td>0,15</td><td>0,15</td><td>0,15</td></tr>
+<tr><td>0,50</td><td>0,15</td><td>0,50</td></tr>
+<tr><td>0,50</td><td>0,50</td><td>0,85</td></tr>
+<tr><td>0,85</td><td>0,15</td><td>0,85</td></tr>
+<tr><td>0,15</td><td>0,85</td><td>0,85</td></tr>
+</table></div>
+
+<h3 id="kecurigaan-akhir"><code>kecurigaan</code> akhir</h3>
+<p><strong>Arti:</strong> keputusan akhir untuk seorang pemain. Ucapan saja paling tinggi sedang, sedangkan bukti keras tinggi langsung menghasilkan tinggi.</p>
+<p><strong>Cerita:</strong> Budi banyak dituduh dan bicaranya aneh, jadi <code>ucapan</code> 0,85. Tidak ada bukti keras, jadi <code>bukti_keras</code> 0,15.</p>
+<ol>
+<li><strong>Hitung angka:</strong> masukannya hasil tahap 2.</li>
+<li><strong>Ubah jadi kata:</strong> 0,85 tinggi penuh; 0,15 rendah penuh.</li>
+<li><strong>Cek tabel aturan:</strong> tinggi dan rendah menghasilkan sedang.</li>
+<li><strong>Hasil:</strong> 0,50. Ini cukup untuk menuduh, tetapi belum tinggi.</li>
+<li><strong>Dipakai oleh:</strong> <code>tuduh</code>, <code>vote</code>, <code>bela_orang</code>, <code>peek</code>, dan <code>guard</code>.</li>
+</ol>
+<div class="tabel"><table>
+<tr><th><code>ucapan</code> ↓ / <code>bukti_keras</code> →</th><th>rendah</th><th>sedang</th><th>tinggi</th></tr>
+<tr><th>rendah</th><td>rendah</td><td>sedang</td><td>tinggi</td></tr>
+<tr><th>sedang</th><td>sedang</td><td>sedang</td><td>tinggi</td></tr>
+<tr><th>tinggi</th><td>sedang</td><td>tinggi</td><td>tinggi</td></tr>
+</table></div>
+<div class="tabel"><table>
+<tr><th><code>ucapan</code></th><th><code>bukti_keras</code></th><th><code>kecurigaan</code></th></tr>
+<tr><td>0,15</td><td>0,15</td><td>0,15</td></tr>
+<tr><td>0,50</td><td>0,15</td><td>0,50</td></tr>
+<tr><td>0,85</td><td>0,15</td><td>0,50</td></tr>
+<tr><td>0,50</td><td>0,50</td><td>0,50</td></tr>
+<tr><td>0,85</td><td>0,50</td><td>0,85</td></tr>
+<tr><td>0,15</td><td>0,85</td><td>0,85</td></tr>
+</table></div>
+<p><strong>Contoh dari awal sampai akhir,</strong> memakai angka masukan langsung:</p>
+<div class="tabel"><table>
+<tr><th>Tahap</th><th>Budi: tekanan 0,5, mengalihkan 0,6</th><th>Citra: sama, ditambah penuduh dibungkam 0,8</th></tr>
+<tr><td><code>sentimen_sosial</code></td><td>0,50</td><td>0,50</td></tr>
+<tr><td><code>perilaku_mencurigakan</code></td><td>0,28</td><td>0,28</td></tr>
+<tr><td><code>ucapan</code></td><td>0,27</td><td>0,27</td></tr>
+<tr><td><code>jejak</code></td><td>0,15</td><td>0,85</td></tr>
+<tr><td><code>bukti_keras</code></td><td>0,15</td><td>0,85</td></tr>
+<tr><td><strong>Kecurigaan</strong></td><td><strong>0,26</strong></td><td><strong>0,85</strong></td></tr>
+</table></div>
+<h4>Fakta menimpa hasil</h4>
+<div class="tabel"><table>
+<tr><th>Fakta</th><th>Kecurigaan menjadi</th></tr>
+<tr><td>Korban Hostage</td><td>0</td></tr>
+<tr><td>Hasil Peek Hitman</td><td>1</td></tr>
+<tr><td>Pasti baik</td><td>0</td></tr>
+<tr><td>Diklaim bersih pengaku Stalker</td><td>Dikali (1 − bobot). Bobot 0,8, atau 0,4 bila bentrok, dan dipotong separuh di room 2 Hitman</td></tr>
+</table></div>
+<p><strong>Batas kecurigaan yang dipakai tindakan:</strong> ≥ 0,40 untuk menuduh; &lt; 0,40 dengan bukti lemah untuk menggali; &lt; 0,3 untuk dianggap orang baik oleh Spy; ≥ 0,35 untuk mengikuti pemimpin suara.</p>
+
+<h2 id="ancaman">7. Menilai ancaman dan kambing hitam</h2>
+<p><span class="b s">disetujui</span> Hanya bot Hitman yang memakai bagian ini. Tabel aturannya tetap seperti kode sekarang. Yang berubah adalah hitungan masukannya.</p>
+<h3>Ancaman</h3>
+<p><strong>Arti:</strong> seberapa berbahaya warga ini bagi tim Hitman. Dipakai <code>hostage</code> dan <code>gag</code>.</p>
+<p><strong>Cerita:</strong> Andi menuduh Hitman sekali lewat chat, tuduhannya diikuti seperempat pemain, Andi mengaku Stalker sendirian, dan kecurigaan publiknya 0,15.</p>
+<ol>
+<li><strong>Hitung angka:</strong> <code>menuduh_tim</code> = 0,5, <code>pengaruh</code> = 0,25, <code>mengaku_role_penting</code> = 1, dan <code>kredibilitas</code> = 1 − 0,15 = 0,85.</li>
+<li><strong>Ubah jadi kata:</strong> 0,5 sedang; 0,25 rendah 0,83 dan sedang 0,17; 1 tinggi; 0,85 tinggi.</li>
+<li><strong>Cek tabel aturan:</strong> <code>ancaman_langsung</code> menjadi sedang, dan <code>ancaman_peran</code> menjadi tinggi. Sedang dan tinggi menghasilkan tinggi.</li>
+<li><strong>Hasil:</strong> 0,50 dan 0,85, lalu <code>ancaman</code> 0,85.</li>
+<li><strong>Dipakai oleh:</strong> <code>hostage</code> dan <code>gag</code>.</li>
+</ol>
+<pre><code>menuduh_tim + pengaruh               → ancaman_langsung ┐
+                                                        ├─→ ancaman
+mengaku_role_penting + kredibilitas  → ancaman_peran ───┘</code></pre>
+<div class="tabel"><table>
+<tr><th>Masukan</th><th>Hitungan</th></tr>
+<tr><td><code>menuduh_tim</code></td><td>Chat menuduh Hitman +0,5, vote ke Hitman +1, dikali 0,7 per ronde, paling tinggi 1. Tuduhan ke rekan ikut dihitung dengan bobot lebih kecil. Angka bobot itu belum ditentukan, dan <code>plan05</code> memakai separuh sebagai asumsi. Kode sekarang memberi vote 0,8, tanpa rekan</td></tr>
+<tr><td><code>pengaruh</code></td><td>Berapa orang ikut menuduh target yang sama sesudah dia menuduh, dikali 0,7 per ronde, dibagi pemain hidup − 2. Sama dengan kode</td></tr>
+<tr><td><code>mengaku_role_penting</code></td><td>Stalker 1, Stalker bentrok 0,7, Spy 0,5</td></tr>
+<tr><td><code>kredibilitas</code></td><td>1 − kecurigaan publik</td></tr>
+</table></div>
+<div class="tabel"><table>
+<tr><th><code>ancaman_langsung</code> dan <code>ancaman_peran</code>: input pertama ↓ / kedua →</th><th>rendah</th><th>sedang</th><th>tinggi</th></tr>
+<tr><th>rendah</th><td>rendah</td><td>rendah</td><td>sedang</td></tr>
+<tr><th>sedang</th><td>sedang</td><td>sedang</td><td>tinggi</td></tr>
+<tr><th>tinggi</th><td>tinggi</td><td>tinggi</td><td>tinggi</td></tr>
+</table></div>
+<div class="tabel"><table>
+<tr><th><code>ancaman</code>: langsung ↓ / peran →</th><th>rendah</th><th>sedang</th><th>tinggi</th></tr>
+<tr><th>rendah</th><td>rendah</td><td>sedang</td><td>tinggi</td></tr>
+<tr><th>sedang</th><td>sedang</td><td>tinggi</td><td>tinggi</td></tr>
+<tr><th>tinggi</th><td>tinggi</td><td>tinggi</td><td>tinggi</td></tr>
+</table></div>
+<div class="tabel"><table>
+<tr><th>Warga</th><th><code>menuduh_tim</code></th><th><code>pengaruh</code></th><th><code>mengaku_role_penting</code></th><th><code>kredibilitas</code></th><th><code>ancaman</code></th></tr>
+<tr><td>Andi</td><td>0,5</td><td>0,25</td><td>1</td><td>0,85</td><td>0,85</td></tr>
+<tr><td>Fani</td><td>0</td><td>0</td><td>0,5</td><td>0,85</td><td>0,85</td></tr>
+<tr><td>Gita</td><td>0,5</td><td>0</td><td>0</td><td>0,85</td><td>0,85</td></tr>
+<tr><td>Citra</td><td>0,5</td><td>0</td><td>0</td><td>0,5</td><td>0,50</td></tr>
+<tr><td>Budi</td><td>0</td><td>0</td><td>0</td><td>0,85</td><td>0,50</td></tr>
+</table></div>
+<p>Budi diam dan dipercaya, jadi tetap punya ancaman sedang. Sistem <code>sandera</code> dihapus, sehingga Hostage langsung memakai <code>ancaman</code> sesudah <a href="#hostage">penalti jejak</a>. Banyak warga bisa bernilai sama, dan akibatnya dilihat di simulasi.</p>
+
+<h3 id="kambing">Kambing hitam</h3>
+<p><strong>Arti:</strong> seberapa enak warga ini dituduh tanpa membuat Hitman terlihat aneh. Dipakai <code>tuduh</code> dan <code>vote</code> Hitman.</p>
+<p><strong>Cerita:</strong> Eko sudah dicurigai publik 0,85, tetapi belum ada yang mem-vote dia.</p>
+<ol>
+<li><strong>Hitung angka:</strong> <code>kecurigaan_publik</code> = 0,85, dan <code>dukungan_suara</code> = 0.</li>
+<li><strong>Ubah jadi kata:</strong> tinggi penuh, dan rendah penuh.</li>
+<li><strong>Cek tabel aturan:</strong> tinggi dan rendah menghasilkan tinggi.</li>
+<li><strong>Hasil:</strong> 0,85.</li>
+<li><strong>Dipakai bila:</strong> nilainya ≥ 0,40, bukan rekan, dan bukan korban Hostage.</li>
+</ol>
+<div class="tabel"><table>
+<tr><th><code>kecurigaan_publik</code> ↓ / <code>dukungan_suara</code> →</th><th>rendah</th><th>sedang</th><th>tinggi</th></tr>
+<tr><th>rendah</th><td>rendah</td><td>rendah</td><td>sedang</td></tr>
+<tr><th>sedang</th><td>sedang</td><td>sedang</td><td>tinggi</td></tr>
+<tr><th>tinggi</th><td>tinggi</td><td>tinggi</td><td>tinggi</td></tr>
+</table></div>
+<div class="tabel"><table>
+<tr><th><code>kecurigaan_publik</code></th><th><code>dukungan_suara</code></th><th><code>kambing_hitam</code></th></tr>
+<tr><td>0,15</td><td>0</td><td>0,15</td></tr>
+<tr><td>0,15</td><td>0,5</td><td>0,15</td></tr>
+<tr><td>0,15</td><td>1</td><td>0,50</td></tr>
+<tr><td>0,5</td><td>0</td><td>0,50</td></tr>
+<tr><td>0,85</td><td>0</td><td>0,85</td></tr>
+</table></div>
+
+<h2 id="input">8. Konteks, pengetahuan, dan fitur role</h2>
+<p><span class="b s">disetujui</span> Semua nama di bagian ini final dan belum diterapkan di kode.</p>
+<h3 id="konteks">Konteks permainan: 13 nilai</h3>
+<div class="tabel"><table>
+<tr><th>Kelompok</th><th>Nilai</th><th>Isi</th><th>Nama lama</th></tr>
+<tr><td>Keadaan permainan</td><td><code>warga_terdesak</code></td><td>(5 − (warga bebas − Hitman hidup)) ÷ 4, dipotong 0–1. Kritis bila ≥ 0,75</td><td><code>urgensi</code></td></tr>
+<tr><td></td><td><code>waktu_berjalan</code></td><td>Bagian fase yang sudah berjalan, 0–1</td><td><code>porsi_fase</code></td></tr>
+<tr><td>Keadaan chat</td><td><code>chat_membingungkan</code></td><td>Porsi chat ronde ini yang tidak jelas. Minimal 0,8 bila ada klaim bentrok</td><td><code>ketidakjelasan</code></td></tr>
+<tr><td></td><td><code>chat_sepi</code></td><td>1 − chat ronde ini ÷ 4, paling rendah 0</td><td><code>sedikit_info</code></td></tr>
+<tr><td></td><td><code>ruangan_hening</code></td><td>Tidak ada chat selama batas waktu tertentu</td><td><code>hening</code></td></tr>
+<tr><td></td><td><code>ada_pertanyaan_baru</code></td><td>Ada pertanyaan dari pemain lain sejak chat terakhir bot</td><td><code>tanya_terbuka</code></td></tr>
+<tr><td></td><td><code>sudah_diajak</code></td><td>Pemain yang sudah disebut dalam pertanyaan ronde ini</td><td>sama</td></tr>
+<tr><td></td><td><code>sudah_disuarakan</code></td><td>Jumlah orang yang sudah menuduh atau membela tiap pemain di fase ini</td><td><code>gema_tuduh</code>, <code>gema_bela</code></td></tr>
+<tr><td></td><td><code>klaim_bentrok</code></td><td>Pengaku role yang sama dan belum jelas siapa yang bohong</td><td><code>konflik_klaim</code></td></tr>
+<tr><td>Keadaan bot dan suara</td><td><code>bot_dituduh_baru</code></td><td>Ada tuduhan atau vote baru ke bot</td><td>sama</td></tr>
+<tr><td></td><td><code>penanya</code></td><td>Pengirim chat <code>neutral</code> terbaru yang menyebut bot</td><td><code>ditanya</code></td></tr>
+<tr><td></td><td><code>porsi_suara</code></td><td>Porsi suara per target</td><td>sama</td></tr>
+<tr><td></td><td><code>jumlah_suara</code></td><td>Total suara</td><td>sama</td></tr>
+</table></div>
+<p><strong>Dihapus dari konteks:</strong> <code>warga_bebas</code> dan <code>hitman_hidup</code> (hanya bahan hitung), <code>jumlah_chat_ronde</code>, <code>dipanggil</code>, dan <code>sumber_panggilan</code>.</p>
+
+<h3 id="pengetahuan">Pengetahuan pasti: 4 nilai</h3>
+<div class="tabel"><table>
+<tr><th>Nilai</th><th>Isi</th></tr>
+<tr><td><code>hitman_diketahui</code></td><td>Hasil Peek Hitman, dan korban yang diumumkan Hitman</td></tr>
+<tr><td><code>pasti_orang_baik</code></td><td>Diri sendiri, Peek bersih, korban yang pasti warga, dan rekan Spy. Dulu <code>bersih</code>, tanpa rekan Spy</td></tr>
+<tr><td><code>rekan</code></td><td>Rekan Syndicate</td></tr>
+<tr><td><code>gagal_beruntun</code></td><td>Target yang Hostage-nya gagal berturut-turut</td></tr>
+</table></div>
+<p><strong>Dihapus:</strong> <code>pasti_hitman</code>, <code>peran</code>, <code>korban_saya</code>, <code>dijaga</code>, dan <code>tidak_dijaga</code>. Guard kini boleh berulang, jadi "pasti tidak dijaga" tidak berlaku lagi.</p>
+
+<h3 id="fitur-hitman">Fitur Hitman</h3>
+<div class="tabel"><table>
+<tr><th>Kelompok</th><th>Nilai</th><th>Isi</th></tr>
+<tr><td>Per warga</td><td><code>menuduh_tim</code>, <code>pengaruh</code>, <code>mengaku_role_penting</code>, <code>kredibilitas</code></td><td>Lihat <a href="#ancaman">bagian 7</a></td></tr>
+<tr><td></td><td><code>kecurigaan_publik</code>, <code>dukungan_suara</code></td><td>Citra warga di tabel publik, dan porsi suara ke dia</td></tr>
+<tr><td></td><td><code>ancaman_sekarang</code></td><td>Tuduhan dan vote ronde ini ke Hitman atau rekannya, ditambah klaim role bila dia sudah bicara</td></tr>
+<tr><td></td><td><code>bicara_ronde_ini</code></td><td>Sudah bicara di fase ini</td></tr>
+<tr><td></td><td><code>jejak_tuduhan</code></td><td>Baru. Bahan penalti Hostage</td></tr>
+<tr><td>Diri</td><td><code>risiko_saya</code>, <code>suara_saya</code></td><td>Kecurigaan publik Hitman sendiri, dan porsi suara ke dia</td></tr>
+<tr><td>Tim</td><td><code>korban_gag_tim</code></td><td>Korban Gag tim ronde ini, untuk jenis serang korban Gag</td></tr>
+</table></div>
+<p><strong>Dihapus:</strong> <code>tidak_dijaga</code>, <code>p_sandera</code>, dan <code>tekanan_saya</code>. Korban Hostage tidak masuk tabel ini.</p>
+
+<h3 id="fitur-spy">Fitur Spy</h3>
+<div class="tabel"><table>
+<tr><th>Nilai</th><th>Isi</th></tr>
+<tr><td><code>menuduh_tersangka</code></td><td>Seberapa keras dia menuduh pemain yang dicurigai bot</td></tr>
+<tr><td><code>mengaku_stalker</code></td><td>0,9; bentrok 0,5; pasti bohong 0</td></tr>
+<tr><td><code>pengaruh</code></td><td>Tuduhannya diikuti orang lain</td></tr>
+<tr><td><code>terancam</code></td><td>Nilai terbesar dari ketiganya, dengan <code>pengaruh</code> dikali 0,8</td></tr>
+</table></div>
+<p><strong>Dihapus:</strong> <code>kepercayaan</code>. Yakin orang baik sudah diperiksa di <a href="#guard">aturan Guard</a>.</p>
+
+<h2 id="sistem">9. 21 sistem fuzzy</h2>
+<p><span class="b s">disetujui</span> Kode sekarang punya 28 sistem. <code>bela_diri</code>, <code>h_bela_diri</code>, <code>jawab</code>, <code>h_jawab</code>, <code>info_sandera</code>, <code>sandera</code>, dan <code>lindung</code> dihapus. Hanya <code>gag</code> yang ganti masukan, dari <code>porsi_fase</code> menjadi <code>ancaman</code>, dan tabelnya tetap.</p>
+<div class="tabel"><table>
+<tr><th>Kelompok</th><th>Sistem</th><th>Masukan</th><th>Dipakai untuk</th></tr>
+<tr><td>Kecurigaan (7)</td><td><code>sentimen_sosial</code></td><td><code>tekanan</code>, <code>dukungan</code></td><td rowspan="7"><code>tuduh</code>, <code>vote</code>, <code>bela_orang</code>, <code>peek</code>, <code>guard</code></td></tr>
+<tr><td></td><td><code>perilaku_mencurigakan</code></td><td><code>plin_plan</code>, <code>alihkan_tuduhan</code></td></tr>
+<tr><td></td><td><code>jejak</code></td><td><code>penuduh_dibungkam</code>, terbesar dari <code>ikut_salah_eksekusi</code> dan <code>memihak_hitman</code></td></tr>
+<tr><td></td><td><code>kejanggalan</code></td><td><code>menuduh_orang_baik</code>, <code>klaim_role_bermasalah</code></td></tr>
+<tr><td></td><td><code>ucapan</code></td><td><code>sentimen_sosial</code>, <code>perilaku_mencurigakan</code></td></tr>
+<tr><td></td><td><code>bukti_keras</code></td><td><code>jejak</code>, <code>kejanggalan</code></td></tr>
+<tr><td></td><td><code>kecurigaan</code></td><td><code>ucapan</code>, <code>bukti_keras</code></td></tr>
+<tr><td>Ancaman (3)</td><td><code>ancaman_langsung</code></td><td><code>menuduh_tim</code>, <code>pengaruh</code></td><td rowspan="3"><code>hostage</code>, <code>gag</code></td></tr>
+<tr><td></td><td><code>ancaman_peran</code></td><td><code>mengaku_role_penting</code>, <code>kredibilitas</code></td></tr>
+<tr><td></td><td><code>ancaman</code></td><td><code>ancaman_langsung</code>, <code>ancaman_peran</code></td></tr>
+<tr><td>Kambing hitam (1)</td><td><code>kambing</code></td><td><code>kecurigaan_publik</code>, <code>dukungan_suara</code></td><td><code>tuduh</code> dan <code>vote</code> Hitman</td></tr>
+<tr><td>Chat warga (4)</td><td><code>tuduh</code></td><td><code>kecurigaan</code>, <code>keunggulan</code></td><td><code>tuduh</code></td></tr>
+<tr><td></td><td><code>bela_orang</code></td><td><code>tekanan</code>, <code>kepercayaan</code></td><td><code>bela_orang</code></td></tr>
+<tr><td></td><td><code>ajak_bicara</code></td><td><code>diam</code>, <code>kecurigaan</code></td><td><code>tanya_info</code> pemain diam</td></tr>
+<tr><td></td><td><code>tanya_info</code></td><td><code>chat_membingungkan</code>, <code>chat_sepi</code></td><td><code>tanya_info</code> lainnya</td></tr>
+<tr><td>Vote warga (2)</td><td><code>keyakinan_vote</code></td><td><code>kecurigaan</code>, <code>keunggulan</code></td><td><code>vote</code></td></tr>
+<tr><td></td><td><code>kesiapan_vote</code></td><td><code>keyakinan</code>, <code>warga_terdesak</code></td><td><code>vote</code></td></tr>
+<tr><td>Chat Hitman (2)</td><td><code>h_tuduh</code></td><td><code>kambing_hitam</code>, <code>risiko_saya</code></td><td><code>tuduh</code></td></tr>
+<tr><td></td><td><code>klaim_palsu</code></td><td><code>risiko_saya</code>, <code>suara_saya</code></td><td><code>tuduh</code> klaim Peek palsu</td></tr>
+<tr><td>Aksi rahasia (2)</td><td><code>gag</code></td><td><code>ancaman_sekarang</code>, <code>ancaman</code></td><td><code>gag</code></td></tr>
+<tr><td></td><td><code>intip</code></td><td><code>kecurigaan</code>, <code>kurang_info</code></td><td><code>peek</code></td></tr>
+</table></div>
+<p>Kurva input dan output tidak berubah. Tindakan <code>bela_diri</code>, <code>jawab</code>, <code>hostage</code>, dan <code>guard</code> dipilih dengan aturan berurutan, bukan sistem fuzzy sendiri.</p>
+
+<h2 id="metode">10. Metode, kecepatan, dan keseimbangan</h2>
+<h3>Keputusan metode</h3>
+<p><span class="b s">disetujui</span> User memutuskan game memakai Fuzzy saja, serta mengarsipkan BT dan Utility. Perbandingan metode (ide #30) berhenti, kecuali skripsi tetap membutuhkannya.</p>
+<p><strong>Alasan yang dipakai:</strong></p>
+<ul>
+<li>Bukti di game ini samar, dan fuzzy memang menilai derajat.</li>
+<li>Hierarki memisahkan bukti lunak (ucapan) dari bukti keras (kejadian dan fakta).</li>
+<li>Alasan keputusan mudah dijelaskan.</li>
+<li>Hasilnya paling stabil pada uji A/B di bawah.</li>
+</ul>
+<p><strong>Uji A/B paksa vote, 1 November</strong>, persentase warga menang di ukuran 6 pemain, sebelum aturan 3 November:</p>
+<div class="tabel"><table>
+<tr><th>Metode</th><th>Dengan paksa vote</th><th>Tanpa paksa vote</th><th>Selisih</th></tr>
+<tr><td>Fuzzy</td><td>52,0%</td><td>60,0%</td><td>8,0</td></tr>
+<tr><td>Utility</td><td>81,0%</td><td>30,5%</td><td>50,5</td></tr>
+<tr><td>BT</td><td>97,5%</td><td>61,5%</td><td>36,0</td></tr>
+</table></div>
+<p><strong>Ralat:</strong> pernyataan "Fuzzy paling dekat target 60,0%" hanya dari ukuran 6 pemain, dan tidak berlaku umum. Pilihan Fuzzy lebih bersandar pada sifat bukti yang samar, kestabilan pada uji A/B di atas, dan kemudahan menjelaskan. Pencarian riset hanya 3 kali dan tidak menemukan perbandingan langsung untuk game deduksi, jadi riset tidak menyatakan Fuzzy paling unggul.</p>
+<p class="kecil">Sumber yang terbaca: Applying fuzziness to enemy behavior in a serious game; Hungry Pigs; Whack the Head (Sugeno lebih cepat sekitar 2,7 ms); forum Urho3D; Game Developer; MultiMind; Auditing Belief-Conditioned LLM Agents.</p>
+
+<h3>Kecepatan logika</h3>
+<p>Ukur <code>putuskan</code> di laptop, 5 game 7 pemain, tanpa IndoBERT dan LLM. Angka ini termasuk kode bersama, dan Fuzzy memakai cache.</p>
+<div class="tabel"><table>
+<tr><th>Metode</th><th>Median</th><th>Rata-rata</th><th>95% di bawah</th><th>Terlama</th></tr>
+<tr><td>Utility</td><td>8,2 ms</td><td>9,1 ms</td><td>16,3 ms</td><td>65 ms</td></tr>
+<tr><td>Fuzzy</td><td>11,0 ms</td><td>12,9 ms</td><td>24,3 ms</td><td>137 ms</td></tr>
+<tr><td>BT</td><td>14,2 ms</td><td>15,0 ms</td><td>24,1 ms</td><td>79 ms</td></tr>
+</table></div>
+
+<h3>Data lambat produksi, 27 dan 29 Oktober</h3>
+<p>Sumbernya tabel <code>checker_traces</code>. Jejak terakhir tercatat 29 Oktober pukul 10:21:03, jadi kejadian "BT lama" yang dikeluhkan user tidak ada di data produksi ini.</p>
+<p><strong>Rata-rata per hari, dalam milidetik:</strong></p>
+<div class="tabel"><table>
+<tr><th>Tanggal</th><th>Metode</th><th>Langkah</th><th>NLU</th><th>Logika</th><th>LLM</th><th>Validasi</th><th>Total</th><th>Terlama</th></tr>
+<tr><td>29 Okt</td><td>BT</td><td>66</td><td>308</td><td>11</td><td>1850</td><td>6658</td><td>5100</td><td>38103</td></tr>
+<tr><td></td><td>Fuzzy</td><td>25</td><td>0</td><td>12</td><td>1560</td><td>7642</td><td>6391</td><td>35359</td></tr>
+<tr><td></td><td>Utility</td><td>77</td><td>184</td><td>9</td><td>1987</td><td>7663</td><td>5942</td><td>32481</td></tr>
+<tr><td>27 Okt</td><td>BT</td><td>229</td><td>55</td><td>15</td><td>1946</td><td>7732</td><td>4446</td><td>50077</td></tr>
+<tr><td></td><td>Fuzzy</td><td>182</td><td>107</td><td>18</td><td>2051</td><td>6402</td><td>2938</td><td>38042</td></tr>
+<tr><td></td><td>Utility</td><td>138</td><td>151</td><td>11</td><td>1951</td><td>6977</td><td>3528</td><td>35899</td></tr>
+</table></div>
+<p class="kecil">Total bisa lebih kecil daripada kolom Validasi, kemungkinan karena tiap kolom dirata-rata dari langkah yang berbeda. Ini belum dicek.</p>
+<p><strong>Langkah saat bot menulis kalimat, 14 hari, rata-rata dalam milidetik:</strong></p>
+<div class="tabel"><table>
+<tr><th>Metode</th><th>LLM</th><th>Validasi</th><th>NLG</th><th>NLG terlama</th><th>Langkah ≥ 15 detik</th></tr>
+<tr><td>BT</td><td>1856</td><td>4713</td><td>6353</td><td>23980</td><td>34 dari 295 (11,5%)</td></tr>
+<tr><td>Utility</td><td>1902</td><td>5101</td><td>6707</td><td>24829</td><td>28 dari 215 (13,0%)</td></tr>
+<tr><td>Fuzzy</td><td>1837</td><td>4872</td><td>6551</td><td>24917</td><td>21 dari 207 (10,1%)</td></tr>
+</table></div>
+<p>Logika hanya 9–18 ms, jadi lambatnya ada di tahap sesudah keputusan. Langkah terlama BT 50,1, 47,2, dan 41,1 detik, dengan sumber kalimat templat dan LLM 0. Polanya cocok dengan batas tulis 25 detik ditambah antrean, tetapi ini masih dugaan. Fuzzy dan Utility juga pernah mencapai 35,9–38 detik.</p>
+
+<h3>Keseimbangan Fuzzy saja</h3>
+<p>200 game per ukuran, 6 langkah per fase, sesudah aturan game 3 November, memakai bot saja dan label NLU sempurna. Pertandingan tanpa pemenang 0, dan aksi ilegal 0. Target warga menang 40–60%. Kolom terakhir adalah tabel lama metode campuran, sebelum aturan baru.</p>
+<div class="tabel"><table>
+<tr><th>Pemain</th><th>Hitman/Spy/Stalker</th><th>Warga menang</th><th>Margin</th><th>Rata-rata ronde</th><th>Terhadap target</th><th>Tabel lama</th></tr>
+<tr><td>4</td><td>1/1/1</td><td>40,0%</td><td>± 6,8</td><td>2,75</td><td>batas bawah</td><td>49,5%</td></tr>
+<tr><td>5</td><td>1/1/1</td><td>65,5%</td><td>± 6,6</td><td>3,53</td><td>terlalu tinggi</td><td>65,5%</td></tr>
+<tr><td>6</td><td>1/1/1</td><td>70,0%</td><td>± 6,4</td><td>4,52</td><td>terlalu tinggi</td><td>71,0%</td></tr>
+<tr><td>7</td><td>2/2/1</td><td>25,0%</td><td>± 6,0</td><td>4,95</td><td>terlalu rendah</td><td>46,5%</td></tr>
+<tr><td>8</td><td>2/2/1</td><td>28,0%</td><td>± 6,2</td><td>5,84</td><td>terlalu rendah</td><td>43,5%</td></tr>
+<tr><td>9</td><td>2/2/1</td><td>41,0%</td><td>± 6,8</td><td>6,85</td><td>masuk</td><td>50,0%</td></tr>
+<tr><td>10</td><td>2/2/1</td><td>46,5%</td><td>± 6,9</td><td>8,15</td><td>masuk</td><td>58,0%</td></tr>
+</table></div>
+<p>Komposisi disetel sesudah logika selesai, karena rombak logika bisa menggeser angka ini. Kandidat komposisi yang pernah diukur tercatat di <code>plan/plan05.md</code> bagian Fase 9.</p>
+
+<h3>Survei dan evaluasi</h3>
+<p><span class="b u">belum dijawab</span> Ide #30, sisa perbandingan metode. Data sekarang 72 jawaban, 11 pertandingan, dan 7 penjawab, dan semua 54 pertandingan bot bercampur, jadi jawaban ini tidak bisa dipakai membandingkan metode. Label metode di layar, misalnya "NOX · FL", dulu menunjukkan siapa bot, dan kini sudah dihapus lewat commit <code>a51be3f</code>. Aturan dan otak harus dibekukan sebelum data survei baru dikumpulkan.</p>
+<p>Pertanyaan survei: <code>keseruan</code>, <code>bot_manusiawi</code>, <code>chat_bot_masuk_akal</code>, <code>keputusan_bot</code>, <code>kesulitan</code>, dan <code>komentar</code>. Cara evaluasi lain yang dibahas:</p>
+<ul>
+<li><strong>Skenario tetap:</strong> situasi sama, dibandingkan dengan jawaban yang diharapkan, satu kali jalan.</li>
+<li><strong>Putar ulang chat pertandingan nyata:</strong> mengecek apakah tersangka teratas benar Hitman, karena role asli diketahui. Kecukupan datanya belum dicek.</li>
+<li><strong>Simulasi:</strong> tetap dipakai untuk keseimbangan menang-kalah.</li>
+</ul>
+
+<h2 id="daftar">11. Keputusan, kekurangan, dan hal terbuka</h2>
+<h3>Keputusan</h3>
+<div class="tabel"><table>
+<tr><th>Ide</th><th>Keputusan</th><th>Status</th></tr>
+<tr><td>#3, #11</td><td><code>ajak_bicara</code> masuk <code>tanya_info</code>, ditambah gali tersangka</td><td><span class="b s">disetujui</span></td></tr>
+<tr><td>#4</td><td><code>info_sandera</code> dihapus</td><td><span class="b s">disetujui</span></td></tr>
+<tr><td>#5</td><td>Rumus final <code>alihkan_tuduhan</code>. Label kalimat campuran diuji di pengayaan IndoBERT</td><td><span class="b s">disetujui</span></td></tr>
+<tr><td>#6</td><td><code>bela_diri</code> 3 jenis dengan aturan bersama</td><td><span class="b s">disetujui</span></td></tr>
+<tr><td>#7</td><td><code>jawab</code> memakai paket data dan LLM, dengan pemicu <code>neutral</code></td><td><span class="b s">disetujui</span></td></tr>
+<tr><td>#8, #12</td><td><code>tuduh</code> 3 jalur. Warga hanya menuduh dengan bukti. <code>ungkap</code> dan <code>klaim_palsu</code> masuk <code>tuduh</code></td><td><span class="b s">disetujui</span></td></tr>
+<tr><td>#9</td><td>Bukti baru <code>memihak_hitman</code></td><td><span class="b s">disetujui</span></td></tr>
+<tr><td>#10</td><td><code>bela_orang</code> berjenis, dan Hitman membela rekan secara opsional</td><td><span class="b s">disetujui</span></td></tr>
+<tr><td>#13</td><td>Ancaman Hitman ikut menghitung penuduh rekan</td><td><span class="b s">disetujui</span></td></tr>
+<tr><td>#14</td><td>Seri Tribunal menambah waktu sekali. Bagian bot belum dikerjakan</td><td><span class="b l">live</span></td></tr>
+<tr><td>#15</td><td>Chat Tribunal berbeda dari siang, ditambah ajak vote</td><td><span class="b s">disetujui</span></td></tr>
+<tr><td>#16</td><td>Jatah inisiatif 3/2, reaktif 8/5</td><td><span class="b s">disetujui</span></td></tr>
+<tr><td>#17</td><td>Simpan alasan vote, dan Hitman boleh ikut mem-vote rekan yang pasti dieksekusi</td><td><span class="b s">disetujui</span></td></tr>
+<tr><td>#18</td><td>Paksa vote hanya saat kritis, menunggu uji A/B</td><td><span class="b s">disetujui</span></td></tr>
+<tr><td>#19, #20, #21</td><td>Aturan Guard, penalti jejak Hostage, dan prioritas Peek</td><td><span class="b s">disetujui</span></td></tr>
+<tr><td>#22</td><td>Rekan Spy, chat tim, dan seri Hostage. Bagian bot belum dikerjakan</td><td><span class="b l">live</span></td></tr>
+<tr><td>#23</td><td>Skill malam dan Gag selalu dipakai. Gag wajib mulai 60% siang</td><td><span class="b s">disetujui</span></td></tr>
+<tr><td>#24, #26</td><td>Data snapshot dan ingatan bot disederhanakan</td><td><span class="b s">disetujui</span></td></tr>
+<tr><td>#25</td><td>Label IndoBERT tetap 3, dengan pengayaan data untuk kalimat jenis baru</td><td><span class="b s">disetujui</span></td></tr>
+<tr><td>#27</td><td>Melarang Gag di ronde 1</td><td><span class="b t">ditolak</span></td></tr>
+<tr><td>#28</td><td>Cara memilih ajak vote dan vote</td><td><span class="b s">disetujui</span></td></tr>
+<tr><td>#29</td><td>Guard boleh ke target yang sama berturut-turut. Bagian bot belum dikerjakan</td><td><span class="b l">live</span></td></tr>
+<tr><td>#31</td><td>Hitungan <code>tekanan</code> dan <code>dukungan</code> mengikuti pemain yang masih bisa bersuara</td><td><span class="b u">bisa dibatalkan</span></td></tr>
+<tr><td>#32</td><td>Pola kata klaim role diperluas, dan label IndoBERT klaim dikerjakan belakangan</td><td><span class="b s">disetujui</span></td></tr>
+<tr><td>Pembedahan akhir</td><td>Pohon kecurigaan, ancaman, kambing hitam, konteks 13 nilai, pengetahuan 4 nilai, fitur Hitman, fitur Spy, dan 21 sistem fuzzy</td><td><span class="b s">disetujui</span></td></tr>
+<tr><td>Nama</td><td><code>plin_plan</code>, <code>alihkan_tuduhan</code>, <code>penuduh_dibungkam</code>, <code>ikut_salah_eksekusi</code>, <code>menuduh_orang_baik</code>, <code>klaim_role_bermasalah</code>, <code>memihak_hitman</code>, <code>sentimen_sosial</code>, <code>perilaku_mencurigakan</code>, <code>kejanggalan</code>, <code>role_diakui</code>, dan nama konteks serta fitur di <a href="#input">bagian 8</a></td><td><span class="b s">disetujui</span></td></tr>
+</table></div>
+
+<h3>Kekurangan yang diterima sementara</h3>
+<div class="tabel"><table>
+<tr><th>Bagian</th><th>Kekurangan</th><th>Akibat</th></tr>
+<tr><td><code>jawab</code></td><td>Semua chat <code>neutral</code> yang menyebut bot dijawab, walau bukan pertanyaan</td><td>Bot bisa menanggapi sapaan atau komentar biasa</td></tr>
+<tr><td><code>jawab</code></td><td>Pertanyaan yang terbaca <code>offend</code> atau <code>defend</code> tidak dijawab</td><td>"Setuju vote Budi, Dodi?" bisa tidak dijawab</td></tr>
+<tr><td><code>jawab</code></td><td>Hasil bergantung pada label IndoBERT</td><td>Pertanyaan yang salah label bisa terlewat, atau masuk <code>bela_diri</code></td></tr>
+<tr><td><code>jawab</code></td><td>Bot saling menyebut bisa saling membalas</td><td>Chat bisa berantai sampai batas reaktif; perlu diukur saat dikerjakan</td></tr>
+<tr><td><code>jawab</code></td><td>Dua pertanyaan sebelum bot chat: hanya yang terbaru dijawab</td><td>Pertanyaan lama bisa terlewat</td></tr>
+<tr><td><code>jawab</code></td><td>Templat umum tidak membaca pertanyaan</td><td>Saat LLM gagal, jawaban bisa tidak nyambung</td></tr>
+<tr><td><code>chat_tim</code></td><td>Chat rekan manusia tidak mengubah target bot</td><td>Bot bisa menanggapi, tetapi tidak terbujuk oleh isi chat</td></tr>
+</table></div>
+
+<h3>Sisa aturan game yang sudah live</h3>
+<ul>
+<li>Keseimbangan sudah diukur untuk Fuzzy saja sebelum rombak logika, dan harus diukur ulang sesudah logika selesai.</li>
+<li>Panel chat tim dan keterangan seri belum dilihat di browser, dan status deploy Vercel belum diperiksa.</li>
+<li>Di HP, pesan tim baru tidak menaikkan penanda belum dibaca di tab Chat.</li>
+<li>Bot Hitman, lewat <code>tidak_dijaga</code>, masih menganggap target Guard semalam pasti tidak dijaga.</li>
+<li>Bot yang pertama melangkah saat waktu tambahan menghitung <code>mulai_fase</code> terlalu lambat.</li>
+<li>Prompt mode <code>llm</code> masih menyebut aturan Guard lama.</li>
+<li><code>proses-ai.html</code> dan <code>kode-*.html</code> masih menyebut aturan Guard lama. <code>arsitektur.html</code> ditambal langsung, jadi <code>aturan.py</code> dan <code>alur_sistem.py</code> di <code>communicationfolder/arsitektur-sistem-2026-10-20/sumber</code> perlu diperbarui, atau bangun ulang akan mengembalikan teks lama.</li>
+</ul>
+
+<h3>Masih terbuka</h3>
+<div class="tabel"><table>
+<tr><th>Topik</th><th>Yang menunggu</th><th>Status</th></tr>
+<tr><td>Ide #1</td><td>Ganti Mamdani ke Sugeno. Data menunjukkan bukan penyebab lambat</td><td><span class="b u">ditunda</span></td></tr>
+<tr><td>Ide #2</td><td>Pisah tekanan total dan tekanan ronde ini. Tidak dikerjakan di <code>plan05</code></td><td><span class="b u">belum dijawab</span></td></tr>
+<tr><td>Ide #30</td><td>Apakah skripsi masih membutuhkan perbandingan metode. Label metode di layar sudah dihapus</td><td><span class="b u">belum dijawab</span></td></tr>
+<tr><td>Ide #31</td><td>Perbaikan hitungan <code>tekanan</code> dan <code>dukungan</code></td><td><span class="b u">bisa dibatalkan</span></td></tr>
+<tr><td>Label kalimat baru</td><td>Persuade tanpa nama, buka role tanpa sangkalan, "aku orang baik", pertanyaan yang menuduh, dan kasus lain di <code>plan05</code> Fase 10</td><td><span class="b u">belum dijawab</span></td></tr>
+<tr><td>Angka perkiraan</td><td>Bobot tuduhan ke rekan, nilai pengulang klaim palsu, penalti jejak 0,5, batas Guard 0,3, dan setuju 80%. Disetel di <code>plan05</code> Fase 9</td><td><span class="b u">belum dijawab</span></td></tr>
+<tr><td>Label klaim role</td><td>Pekerjaan IndoBERT belakangan, sesudah uji main</td><td><span class="b u">ditunda</span></td></tr>
+<tr><td><code>plan04.md</code></td><td>Struktur controller belum dikerjakan, dan perlu disesuaikan karena tinggal Fuzzy</td><td><span class="b u">belum dijawab</span></td></tr>
+</table></div>
+<p>Temuan di kode yang perlu diselesaikan saat dikerjakan, misalnya bot belum tahu rekannya manusia atau bot, ada di <code>plan/plan05.md</code> bagian 4.3.</p>
+</main>
+</body>
+</html>
