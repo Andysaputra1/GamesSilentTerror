@@ -41,8 +41,10 @@ ai_runtime = AIRuntimeService()
 # Alur: 1 cek kunci server -> 2 buat cipher
 def _cipher():
     try:
+        # 1 cek kunci server
         if not settings.panel_encryption_key:
             raise ValueError()
+        # 2 buat cipher
         return Fernet(settings.panel_encryption_key.get_secret_value().encode())
     except ValueError as error:
         raise PersistenceError(
@@ -53,12 +55,15 @@ def _cipher():
 # Ubah isi baris DB menjadi nilai yang dipakai program. API key dibuka hanya untuk sumber kustom.
 # Alur: 1 salin isi baris -> 2 ambil key terenkripsi -> 3 dekripsi API key -> 4 dekripsi token tunnel
 def _decode_config(stored):
+    # 1 salin isi baris
     override = dict(stored)
     override.pop("api_backend", None)  # kunci lama; OpenAI langsung sudah dihapus
+    # 2 ambil key terenkripsi
     token = override.pop("ollama_tunnel_token_encrypted", None)
     encrypted = override.pop("openrouter_key_encrypted", None)
     source = override.setdefault("openrouter_key_source", "custom" if encrypted else "default")
     override["openrouter_custom_configured"] = bool(encrypted)
+    # 3 dekripsi API key
     if source == "custom":
         override["openrouter_api_key"] = None
     if encrypted and source == "custom":
@@ -70,6 +75,7 @@ def _decode_config(stored):
             raise PersistenceError(
                 "API key panel tidak dapat dibuka. Periksa PANEL_ENCRYPTION_KEY server."
             ) from error
+    # 4 dekripsi token tunnel
     # Token tunnel panel menimpa OLLAMA_TUNNEL_TOKEN .env; tanpa token panel, .env tetap dipakai.
     if token:
         try:
@@ -86,12 +92,16 @@ def _decode_config(stored):
 # Alur: 1 tarik data DB -> 2.1.1 ada isi -> 2.1.2 dekripsi key -> 2.1.3 simpan ke memori
 #                       \> 2.2.1 kosong -> 2.2.2 selesai, bot memakai .env
 def muat_konfigurasi_ai():
+    # 1 tarik data DB
     nilai = PersistenceService._run(
         lambda db: db.execute(text("SELECT config FROM panel_configuration WHERE id=1")).scalar()
     )
     stored = json.loads(nilai) if isinstance(nilai, str) else nilai
+    # 2.1.1 ada isi (2.2.1 kosong: 2.2.2 fungsi selesai, bot memakai .env)
     if stored:
+        # 2.1.2 dekripsi key
         override = _decode_config(stored)
+        # 2.1.3 simpan ke memori
         with ai_runtime.lock:
             ai_runtime.override = override
 
@@ -118,10 +128,12 @@ def save_panel_configuration(
     with ai_runtime.lock:
         # Kunci baris konfigurasi agar pembaruan sumber kunci tidak menimpa perubahan lain.
         def write(db):
+            # 1 baca isi lama (baris dikunci)
             previous = db.execute(
                 text("SELECT config FROM panel_configuration WHERE id=1 FOR UPDATE")
             ).scalar()
             previous = json.loads(previous) if isinstance(previous, str) else (previous or {})
+            # 2.1.1 susun isi baru dan enkripsi key
             # Model lokal (ai-docker: qwen3:4b-instruct/qwen3:14b); kosong = pilihan sebelumnya.
             stored["ollama_model"] = model or previous.get("ollama_model") or "qwen3:14b"
             source = key_source or (
@@ -132,6 +144,7 @@ def save_panel_configuration(
                     "custom" if previous.get("openrouter_key_encrypted") else "default",
                 )
             )
+            # 2.3.1 sumber key salah, 2.3.2 batal (DB tidak berubah)
             if source not in {"default", "custom"}:
                 raise ValueError("Sumber API key tidak valid.")
             stored["openrouter_key_source"] = source
@@ -146,13 +159,16 @@ def save_panel_configuration(
                 )
             elif previous.get("ollama_tunnel_token_encrypted") and not clear_tunnel_token:
                 stored["ollama_tunnel_token_encrypted"] = previous["ollama_tunnel_token_encrypted"]
+            # 2.3.1 key kosong, 2.3.2 batal (DB tidak berubah)
             if (
                 provider == "api"
                 and source == "custom"
                 and not stored.get("openrouter_key_encrypted")
             ):
                 raise ValueError("Isi API key sendiri sebelum memilih mode ini.")
+            # 3.1.1 uji dekripsi (3.2.1 gagal: 3.2.2 melempar error, DB tidak berubah)
             override = _decode_config(stored)
+            # 4 tulis DB
             db.execute(
                 text("""
                 INSERT INTO panel_configuration(id,config) VALUES(1,:config)
@@ -162,4 +178,5 @@ def save_panel_configuration(
             )
             return override
 
+        # 5 simpan ke memori (2.2.1 gagal baca: 2.2.2 _run melempar error, panel menerima gagal)
         ai_runtime.override = PersistenceService._run(write)
