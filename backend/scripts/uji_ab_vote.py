@@ -37,7 +37,10 @@ MODUL = {"fuzzy": muat("otak_fuzzy")}
 def label_rencana(rencana):
     if rencana["intent"] is None or rencana["target"] is None:
         return "neutral", []
-    return rencana["intent"], [{"pemain": rencana["target"], "relasi": rencana["intent"]}]
+    return rencana["intent"], [
+        {"pemain": rencana["target"], "relasi": rencana["intent"]},
+        *rencana.get("relasi_tambahan", []),
+    ]
 
 
 def satu_game(argumen):

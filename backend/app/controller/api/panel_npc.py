@@ -248,7 +248,7 @@ KODE_ALUR = {
     ],
     "fl_4": [
         (G + "otak_fuzzy", "keputusan_chat", [
-            ('c["aksi"] in ("bela_diri", "jawab")', "bela diri dan jawab dibalas tanpa nilai"),
+            ('c["aksi"] in AKSI_REAKTIF', "bela diri dan jawab dibalas tanpa nilai"),
             ('c["skor"] = fuzzy(sistem', "prioritas tiap kandidat chat"),
             ("calon.sort(", "prioritas tertinggi di depan"),
             ("< AMBANG_CHAT", "di bawah ambang: diam"),
