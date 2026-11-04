@@ -220,7 +220,6 @@ class Match:
                 "ready": not bots,
                 "detail": "Tidak ada bot di ruangan." if not bots else "Menyiapkan AI bot…",
                 "progress": 1.0 if not bots else 0.0,
-                "started_at": now,
                 "min_until": now + PREPARATION_MIN_SECONDS,
                 "ready_at": now if not bots else None,
             }
@@ -265,14 +264,6 @@ class Match:
             raise ValueError("Kartu role dibuka hanya oleh pemain manusia saat persiapan.")
         self.revealed.add(name)
         self.try_begin(time.time() if now is None else now)
-
-    # Manusia yang belum membuka kartu role (pemain yang sudah keluar tidak ditunggu).
-    def unrevealed(self):
-        return [
-            peserta.name
-            for peserta in self.players.values()
-            if not peserta.bot and peserta.alive and peserta.name not in self.revealed
-        ]
 
     # Jadwal bersama: minimal waktu baca, countdown setelah AI siap, dan batas maksimum tunggu.
     def _hitung_waktu_mulai(self):
@@ -797,11 +788,10 @@ class Match:
         self.messages = self.messages[-100:]
         return pesan
 
-    # Data layar persiapan: progres AI, hitung mundur mulai, jumlah manusia yang sudah siap dan sudah membuka kartu.
+    # Data layar persiapan: progres AI, hitung mundur mulai, jumlah manusia yang sudah siap, kartu sudah dibuka atau belum.
     def preparation_view(self, viewer):
         waktu_sekarang = time.time()
         persiapan = self.preparation
-        belum_buka_kartu = self.unrevealed()
         waktu_mulai = self._hitung_waktu_mulai()
         return {
             "ready": persiapan["ready"],
@@ -812,10 +802,7 @@ class Match:
             "agreed": len(self.ready_consents),
             "required": sum(not peserta.bot and peserta.alive for peserta in self.players.values()),
             "consented": viewer in self.ready_consents,
-            "bots": sum(peserta.bot for peserta in self.players.values()),
-            "elapsed": max(0, int(waktu_sekarang - persiapan["started_at"])),
             "revealed": viewer in self.revealed,
-            "unrevealed": len(belum_buka_kartu),
         }
 
     # Username dari label (target keputusan bot); nama yang bukan label dikembalikan apa adanya.

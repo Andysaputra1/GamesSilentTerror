@@ -37,10 +37,10 @@ class MySQLIntegration(unittest.TestCase):
         self.assertEqual(client.post("/api/analyze", headers=headers, json={}).status_code, 404)
         username = "sql-test-" + uuid4().hex[:10]
         # Dua pesan dari pemain yang sama tidak boleh membuat baris pemain ganda.
-        PersistenceService().record_player_message(
+        PersistenceService("local-lobby").record_player_message(
             username=username, message="pertama", status="active"
         )
-        message_id = PersistenceService().record_player_message(
+        message_id = PersistenceService("local-lobby").record_player_message(
             username=username,
             message="'quoted'; --",
             status="active",
@@ -61,7 +61,7 @@ class MySQLIntegration(unittest.TestCase):
         # An invalid write must also roll back the player inserted earlier in the same transaction.
         bad_name = "rollback-" + uuid4().hex[:10]
         with self.assertRaises(PersistenceError):
-            PersistenceService().record_player_message(
+            PersistenceService("local-lobby").record_player_message(
                 username=bad_name,
                 message="bad",
                 status="INVALID",

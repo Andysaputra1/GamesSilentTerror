@@ -17,8 +17,9 @@ class PreparationTests(unittest.TestCase):
 
     def reveal_all(self, match=None, now=0.5):
         match = match or self.match
-        for name in match.unrevealed():
-            match.reveal_role(name, now=now)
+        for name, pemain in match.players.items():
+            if not pemain.bot:
+                match.reveal_role(name, now=now)
 
     def test_timer_does_not_run_and_nothing_is_allowed_while_preparing(self):
         self.assertEqual(self.match.phase, "preparing")
@@ -33,7 +34,6 @@ class PreparationTests(unittest.TestCase):
         self.assertFalse(view["me"]["can_act"] or view["me"]["can_vote"])
         self.assertFalse(view["preparation"]["ready"])
         self.assertEqual(view["preparation"]["required"], 2)
-        self.assertEqual(view["preparation"]["bots"], 2)
 
     def test_ai_ready_starts_round_after_minimum_reading_time(self):
         self.reveal_all()
@@ -108,7 +108,7 @@ class PreparationTests(unittest.TestCase):
         self.match.tick(30.0)
         with unittest.mock.patch("app.module.match_engine.time.time", return_value=30.0):
             view = self.match.snapshot("alice")["preparation"]
-        self.assertEqual((view["unrevealed"], view["revealed"], view["elapsed"]), (2, False, 30))
+        self.assertFalse(view["revealed"])
         self.assertEqual(view["starts_in"], 10)
         self.match.tick(39.999)
         self.assertEqual(self.match.phase, "preparing")
@@ -128,7 +128,6 @@ class PreparationTests(unittest.TestCase):
     def test_reveal_does_not_skip_minimum_or_ai(self):
         self.reveal_all(now=1.0)
         self.assertTrue(self.match.snapshot("bob")["preparation"]["revealed"])
-        self.assertEqual(self.match.snapshot("bob")["preparation"]["unrevealed"], 0)
         self.match.tick(PREPARATION_MIN_SECONDS + 1)
         self.assertEqual(self.match.phase, "preparing")  # AI belum siap
 

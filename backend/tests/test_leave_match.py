@@ -207,7 +207,7 @@ class LeavePreparationAndBotTests(unittest.TestCase):
         match.mark_ai_ready(now=2)
         match.leave("bob", now=5)
         prep = match.snapshot("alice")["preparation"]
-        self.assertEqual((prep["required"], prep["unrevealed"]), (1, 0))
+        self.assertEqual(prep["required"], 1)
         match.tick(PREPARATION_MIN_SECONDS)  # waktu baca minimal lewat; tidak menunggu kartu bob
         self.assertEqual(match.phase, "day")
 

@@ -1,8 +1,5 @@
 import unittest
 
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-from app.controller.api.rooms import router
 from app.module.checker_service import MAKS_ROOM_LIVE, CheckerService
 
 
@@ -29,9 +26,3 @@ class CheckerTests(unittest.TestCase):
         self.assertEqual(len(checker.rooms), MAKS_ROOM_LIVE)
         self.assertEqual(checker.list("R00000"), [])
         self.assertEqual(len(checker.list("AKTIF0")), MAKS_ROOM_LIVE + 1)
-
-    def test_old_public_checker_is_retired(self):
-        app = FastAPI()
-        app.include_router(router)
-        with TestClient(app) as client:
-            self.assertEqual(client.get("/api/rooms/ABC123/checker").status_code, 410)

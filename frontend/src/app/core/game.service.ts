@@ -20,11 +20,8 @@ export interface Preparation {
   agreed: number;
   required: number;
   consented: boolean;
-  bots: number;
   // Status pembukaan role; tidak mempercepat countdown bersama (opsional untuk backend lama).
-  elapsed?: number;
   revealed?: boolean;
-  unrevealed?: number;
 }
 // Komposisi role room (publik); jumlah Hitman dan Spy mengikuti jumlah pemain dan ditentukan backend.
 export interface RoleComposition {

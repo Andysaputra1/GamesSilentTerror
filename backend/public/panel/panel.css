@@ -213,19 +213,6 @@ nav button[aria-current] {
   border-radius: 8px;
   font-size: 13px;
 }
-.health {
-  border-top: 1px solid #2a3444;
-  margin-top: 34px;
-  padding-top: 22px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-}
-.health h3,
-.health p {
-  margin: 0 0 8px;
-}
 .toolbar {
   display: flex;
   align-items: end;
@@ -259,12 +246,6 @@ nav button[aria-current] {
   grid-template-columns: 300px minmax(0, 1fr);
   gap: 25px;
   margin: 25px 0;
-}
-.trace-list {
-  display: grid;
-  gap: 8px;
-  max-height: 520px;
-  overflow: auto;
 }
 .trace {
   background: #192333;
@@ -368,8 +349,7 @@ footer span {
   .login-card {
     margin: 15px auto;
   }
-  .section-head,
-  .health {
+  .section-head {
     align-items: flex-start;
     flex-direction: column;
   }
@@ -490,7 +470,6 @@ a.metric .hint { display: block; margin-top: 6px; }
 .report summary { font-size: 12px; font-weight: 600; }
 .report pre { max-height: 320px; word-break: break-word; margin-bottom: 0; }
 .report pre.output { border-left: 3px solid #baf578; }
-.trace-title { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.6; font-weight: 500; }
 #notice:empty { display: none; }
 #notice:not(:empty) { position: fixed; bottom: 20px; right: 24px; z-index: 20; max-width: min(480px,calc(100vw - 48px)); padding: 16px 20px; margin: 0; background: #203328; border: 1px solid #597b4c; border-radius: 10px; color: #e1f4d8; box-shadow: 0 15px 45px #0006; font-size: 13px; }
 @media (max-width: 1000px) { .ai-layout { grid-template-columns: 1fr; }.config-panel { border-right: 0; padding-right: 0; border-bottom: 1px solid #293546; padding-bottom: 24px; }.metric-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }

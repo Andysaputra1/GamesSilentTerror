@@ -106,7 +106,7 @@ Commit database mendahului broadcast: pesan tetap dapat tercatat jika proses ber
 sebelum browser menerima broadcast; arsip bukan bukti penerimaan oleh setiap browser.
 
 Untuk melihat arsip, buka `/panel` pada origin backend melalui HTTPS dan login
-sebagai administrator. `/history` dan `/admin` mengarah ke panel baru.
+sebagai administrator.
 Semua API panel memakai sesi administrator terpisah dari akun pemain.
 
 Database lama tanpa `V5__chat_history`: jalankan `V05__chat_history.sql` (tabel migrasi di atas).
@@ -185,8 +185,6 @@ ID dipakai untuk urutan stabil; pesan baru selama export tidak ditambahkan ke sn
 
 Di frontend Vercel, route /panel mengarah ke origin BACKEND_URL + /panel, jadi set
 BACKEND_URL ke origin HTTPS backend dan redeploy frontend setelah backend tersedia.
-Checker publik lama /api/rooms/{code}/checker ditutup (410), dan /games/checker
-mengarahkan ke panel. /api/admin lama dan /api/history lama tidak dipasang lagi.
 
 
 ### Pilihan key OpenRouter

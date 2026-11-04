@@ -729,7 +729,6 @@ describe('Game', () => {
       agreed: 0,
       required: 1,
       consented: false,
-      bots: 1,
     };
     const request = vi.spyOn(TestBed.inject(GameService), 'request').mockReturnValue(of(state));
     component.code = 'ABC123';
@@ -844,7 +843,6 @@ describe('Game', () => {
       agreed: 0,
       required: 1,
       consented: false,
-      bots: 7,
     };
     component.game = state.game;
     expect(render().querySelector('.composition')).toBeNull();
@@ -1071,10 +1069,7 @@ describe('Game', () => {
       agreed: 0,
       required: 2,
       consented: false,
-      bots: 1,
-      elapsed,
       revealed,
-      unrevealed: revealed ? 1 : 2,
     };
     return state;
   }

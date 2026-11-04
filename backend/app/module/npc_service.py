@@ -367,7 +367,6 @@ class NPCService:
                                 message=kalimat["teks"],
                                 context={"match_id": match.id, "round_number": match.round,
                                          "phase": match.phase},
-                                reply_to_id=None,
                             )  # fmt: skip
                         except PersistenceError:
                             logger.warning(

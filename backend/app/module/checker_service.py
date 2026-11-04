@@ -21,9 +21,7 @@ def jejak_baru(code, sender, message):
         "intent": None,
         "provider": None,
         "model": None,
-        "prompt": None,
         "output": None,
-        "llm_error": None,
         "error": None,
         "message_id": None,
     }
@@ -69,7 +67,7 @@ class CheckerService:
         from app.module.npc_brain.runtime import brain_runtime
         from app.module.room_service import room_service
 
-        ringkasan = {"kode": code, "status": "arsip", "match_id": None, "fase": None, "ronde": None,
+        ringkasan = {"kode": code, "status": "arsip", "fase": None, "ronde": None,
                      "pemenang": None, "komposisi": None, "manusia": None, "bot": [], "sumber_bot": None}  # fmt: skip
 
         # Sumber 1: pertandingan live.
@@ -81,7 +79,7 @@ class CheckerService:
             if pertandingan is not None:
                 semua_peserta = pertandingan.players.values()
                 ringkasan.update(
-                    status="selesai" if pertandingan.winner else "live", match_id=pertandingan.id,
+                    status="selesai" if pertandingan.winner else "live",
                     fase=pertandingan.phase, ronde=pertandingan.round, pemenang=pertandingan.winner,
                     komposisi=dict(Counter(peserta.role for peserta in semua_peserta)),
                     manusia=sum(not peserta.bot for peserta in semua_peserta),
@@ -99,7 +97,6 @@ class CheckerService:
                     ringkasan["bot"].append({
                         "nama": peserta.name, "role": peserta.role, "status": status,
                         "metode": getattr(otak, "metode", None), "persona": getattr(otak, "persona", None),
-                        "langkah": getattr(otak, "langkah", 0),
                     })  # fmt: skip
                 ringkasan["sumber_bot"] = "live"
 
@@ -118,7 +115,6 @@ class CheckerService:
                     "nama": nama, "role": identitas.get("role"), "status": None,
                     "metode": identitas.get("metode") or provider.removeprefix("otak:") or None,
                     "persona": identitas.get("persona") or model.removeprefix("persona:") or None,
-                    "langkah": identitas.get("langkah"),
                 }  # fmt: skip
             ringkasan["bot"] = sorted(bot_per_nama.values(), key=lambda bot: bot["nama"])
             ringkasan["sumber_bot"] = "jejak" if ringkasan["bot"] else None
@@ -152,7 +148,7 @@ def _bot_arsip(code):
     id_pertandingan_terakhir = daftar_baris[0]["match_id"] if daftar_baris else None
     return [
         {"nama": baris["bot_name"], "role": baris["role"], "status": None, "metode": baris["method"],
-         "persona": baris["persona"], "langkah": None}
+         "persona": baris["persona"]}
         for baris in sorted(daftar_baris, key=lambda baris: baris["bot_name"])
         if baris["match_id"] == id_pertandingan_terakhir
     ]  # fmt: skip

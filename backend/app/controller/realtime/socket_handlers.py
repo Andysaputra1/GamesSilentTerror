@@ -100,11 +100,6 @@ class SocketGameController:
         self.socket_rooms[sid] = kode_room.strip().upper()
         await self.sio.enter_room(sid, self.socket_rooms[sid])
         logger.info("Pemain terkoneksi ke Socket: %s", sid)
-        await self.sio.emit(
-            "server_ready",
-            {"message": f"Python game server siap, {akun.display_name}."},
-            to=sid,
-        )
 
     # EVENT DISCONNECT: hapus pemetaan socket yang keluar; tidak menghapus keanggotaan lobby atau data MySQL.
     async def disconnect(self, sid: str) -> None:

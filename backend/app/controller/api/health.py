@@ -59,6 +59,6 @@ def ready():
     except PersistenceError:
         pass
     return JSONResponse(
-        {"ready": skema_siap, "schema_ready": skema_siap},
+        {"ready": skema_siap},
         status_code=200 if skema_siap else 503,
     )

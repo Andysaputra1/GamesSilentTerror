@@ -6,7 +6,6 @@ import logging
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.config.settings import settings
 from app.module.mysql_connector import SessionLocal
 from app.models import game_queries as queries
 
@@ -18,9 +17,9 @@ class PersistenceError(RuntimeError):
 
 
 class PersistenceService:
-    # CONSTRUCTOR: pilih kode ruangan penyimpanan; gunakan ruangan default untuk pemanggil tanpa kode.
-    def __init__(self, room_code: str | None = None):
-        self.room_code = room_code or settings.default_room_code
+    # CONSTRUCTOR: pilih kode ruangan penyimpanan.
+    def __init__(self, room_code: str):
+        self.room_code = room_code
 
     @staticmethod
     # STATIC METHOD TRANSAKSI: jalankan callback dengan commit/rollback otomatis dan terjemahkan error SQL.
@@ -103,9 +102,9 @@ class PersistenceService:
             )
         )
 
-    # Simpan pesan bot beserta konteks fase (dan ID pesan yang dijawab, bila ada).
-    def record_bot_message(self, *, username, message, context, reply_to_id=None):
-        # Simpan pesan bot lalu tautkan konteks fase dan pesan manusia yang dibalas.
+    # Simpan pesan bot beserta konteks fase.
+    def record_bot_message(self, *, username, message, context):
+        # Simpan pesan bot lalu tautkan konteks fase.
         def simpan_pesan_bot(database):
             id_room = queries.ensure_room(database, self.room_code)
             id_pesan = queries.insert_message(
@@ -115,9 +114,7 @@ class PersistenceService:
                 username=username,
                 message=message,
             )
-            queries.set_message_context(
-                database, id_pesan, sender_kind="bot", context=context, reply_to_id=reply_to_id
-            )
+            queries.set_message_context(database, id_pesan, sender_kind="bot", context=context)
             return id_pesan
 
         return self._run(simpan_pesan_bot)

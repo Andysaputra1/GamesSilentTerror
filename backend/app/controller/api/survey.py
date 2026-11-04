@@ -82,12 +82,6 @@ def survey_submit(code: str, body: SurveySubmission, user=Depends(require_authen
     )
 
 
-@router.get("/api/panel/survey/questions")
-# PANEL: semua pertanyaan, termasuk yang dinonaktifkan.
-def panel_questions(token=Depends(require_panel)):
-    return {"questions": survey_call(survey_service.all_questions)}
-
-
 @router.post("/api/panel/survey/questions", status_code=201)
 # PANEL: tambah pertanyaan baru beserta jenis, skala, dan arti ujung skala.
 def panel_create_question(body: Question, token=Depends(require_panel)):

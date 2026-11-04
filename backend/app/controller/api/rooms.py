@@ -204,11 +204,3 @@ def details(code: str, user=Depends(require_authenticated_user)):
 # CONTROLLER: minta service mengubah pilihan bot; hanya pembuat ruangan yang diizinkan.
 def bot(code: str, body: BotOption, user=Depends(require_authenticated_user)):
     return _jalankan_perintah_lobby(lambda: room_service.set_bot(code, user.username, body.enabled))
-
-
-# Tutup endpoint checker publik lama; data analisis hanya tersedia lewat panel.
-@router.get("/{code}/checker", include_in_schema=False)
-def checker(code: str):
-    raise HTTPException(
-        status_code=410, detail="Checker dipindahkan ke /panel dan memerlukan login administrator."
-    )

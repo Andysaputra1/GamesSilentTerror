@@ -90,7 +90,7 @@ def list_users(after_id=0, search=""):
         baris_akun = (
             database.execute(
                 text("""
-                SELECT u.id, u.username, u.display_name, u.is_active,
+                SELECT u.id, u.username, u.display_name,
                        CASE WHEN i.google_subject IS NOT NULL OR u.password_hash = 'google_only'
                             THEN 'google' ELSE 'password' END AS login_method
                 FROM user_accounts u LEFT JOIN account_identities i ON i.user_id = u.id

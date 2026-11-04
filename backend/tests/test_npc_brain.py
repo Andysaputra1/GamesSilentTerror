@@ -256,7 +256,7 @@ class NPCServiceBrainTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(r["method"], self.runtime.otak_bot(self.match.id, r["bot_name"]).metode)
         self.assertEqual(self.match.preparation["detail"], "AI siap: 5 bot.")
         self.assertTrue(all("metode" not in p for p in self.match.snapshot("human")["players"]))
-        self.match.reveal_role("human", now=self.match.preparation["started_at"])
+        self.match.reveal_role("human", now=self.match.preparation["min_until"] - 1)
         self.match.tick(self.match.preparation["min_until"])
         self.assertEqual(self.match.phase, "day")
 

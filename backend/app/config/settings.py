@@ -107,8 +107,6 @@ class Settings(MySQLSettings):
 
     auth_session_hours: int = Field(default=24, ge=1, le=24 * 30)
 
-    default_room_code: str = "local-lobby"
-
     # Pilih kunci bawaan atau kustom sesuai konfigurasi panel tanpa fallback diam-diam.
     @property
     def openrouter_api_key_value(self) -> str | None:

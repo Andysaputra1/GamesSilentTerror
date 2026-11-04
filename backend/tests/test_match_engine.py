@@ -765,9 +765,7 @@ class RoomGameTests(unittest.TestCase):
                 ).status_code,
                 400,
             )
-            self.assertEqual(client.get(base + "/checker").status_code, 410)
             self.assertEqual(client.post(base + "/start", json={"quick": True}).status_code, 200)
-            self.assertEqual(client.get(base + "/checker").status_code, 410)
             response = client.get(base + "/game")
             self.assertEqual(response.status_code, 200)
             self.assertEqual(len(response.json()["game"]["players"]), 6)
@@ -779,7 +777,6 @@ class RoomGameTests(unittest.TestCase):
                 next(n for n, p in self.room.match.players.items() if p.role == "hitman")
             ].alive = False
             self.room.match.check_winner()
-            self.assertEqual(client.get(base + "/checker").status_code, 410)
 
 
 class SocketGameTests(unittest.IsolatedAsyncioTestCase):

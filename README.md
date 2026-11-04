@@ -216,7 +216,7 @@ Gunakan `-f docker-compose.gpu.yml` jika memakai stack NVIDIA. Setiap teman logi
 
 ## Panel administrator
 
-Panel terpadu ada di http://localhost:8000/panel. Alamat lama `/admin` dan `/history` otomatis diarahkan ke sana. Panel memakai akun administrator tersendiri, **bukan** akun game.
+Panel terpadu ada di http://localhost:8000/panel. Panel memakai akun administrator tersendiri, **bukan** akun game.
 
 Siapkan password panel sekali dari root repository (membutuhkan Python dengan dependency backend, atau jalankan di container lalu salin hasilnya ke `.env`):
 
@@ -385,7 +385,6 @@ dikonfigurasi dalam `angular.json`; jangan menganggapnya sebagai tes siap pakai.
 
 ## Catatan keamanan
 
-Endpoint checker publik lama `GET /api/rooms/{code}/checker` sudah ditutup (HTTP 410).
 Trace/prompt hanya tersedia lewat `/panel` dengan sesi administrator. Data ini dapat
 berisi role dan intel privat NPC, sehingga administrator harus dipisahkan dari peserta
 eksperimen. Trace menunjukkan input/output aplikasi, bukan chain-of-thought internal model.

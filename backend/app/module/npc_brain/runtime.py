@@ -183,7 +183,7 @@ def folder_model(nilai, jenis) -> Path | None:
 
 # Daftar model di link LLM (Ollama /api/tags, atau OpenAI /v1/models) memakai klien penulis yang sama
 # (token tunnel ikut). Kosong bila link tidak menjawab.
-def _daftar_model_tautan(penulis, batas=8):
+def _daftar_model_tautan(penulis, batas):
     data, _ = penulis._minta("GET", f"{penulis.url}/api/tags", batas=batas)
     if isinstance(data, dict) and isinstance(data.get("models"), list):
         nama = [m.get("name") or m.get("model") for m in data["models"]]
@@ -327,14 +327,14 @@ class BrainRuntime:
                         "durasi_ms": round((time.monotonic() - mulai) * 1000),
                         "detail": status,
                     }
-                    hasil.append((p.jalur, p.model, status))
+                    hasil.append((p.jalur, status))
                     if p.jalur == "tautan":
                         self.model_tautan_tersedia = (
                             _daftar_model_tautan(p, self.nlg.BATAS_CEK_DETIK)
                             if status == "ok"
                             else []
                         )
-                logger.info("Cek penulis: %s", "; ".join(f"{j}={h}" for j, _, h in hasil))
+                logger.info("Cek penulis: %s", "; ".join(f"{j}={h}" for j, h in hasil))
         except Exception:
             logger.exception("Cek rantai penulis gagal.")
         finally:
@@ -343,7 +343,7 @@ class BrainRuntime:
                 self.status["sedang_cek_penulis"] = self._cek_tertunda > 0
 
     # Bangun ulang rantai (key/link/urutan terbaru) lalu cek semua jalurnya di latar.
-    # latar=False tersedia untuk pemanggil sinkron; panel membaca progres lewat polling.
+    # latar=False (cek sinkron) hanya dipakai tes; panel membaca progres lewat polling.
     def segarkan_penulis(self, latar=True):
         with self.lock:
             if self.nlg is None:
@@ -391,11 +391,11 @@ class BrainRuntime:
             self.segarkan_penulis()
             self._set(siap=True, gagal=False, progres=1.0, detail="AI siap.", nlu=self.nlu.sumber)
             logger.info("Otak NPC siap: NLU=%s", self.nlu.sumber)
-        except Exception as error:
+        except Exception:
             logger.exception("Otak NPC gagal dimuat.")
             self._gagal_pada = time.monotonic()
             self._set(
-                siap=False, gagal=True, galat=type(error).__name__,
+                siap=False, gagal=True,
                 detail="Otak NPC gagal dimuat; bot memakai aksi cadangan engine.",
             )  # fmt: skip
 

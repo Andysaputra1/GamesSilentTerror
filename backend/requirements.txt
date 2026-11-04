@@ -9,8 +9,6 @@ numpy
 networkx
 # scikit-fuzzy tidak mendeklarasikan numpy, networkx, dan scipy.
 scipy==1.17.1
-python-dotenv
-thefuzz
 httpx
 python-socketio
 google-auth[requests]>=2.40,<3

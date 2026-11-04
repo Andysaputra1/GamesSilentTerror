@@ -53,7 +53,6 @@ def main():
         roles = {state["me"]["role"]: name for name, state in states.items()}
         assert len(roles) == 4
         assert httpx.get("http://127.0.0.1:8000" + base + "/game").status_code == 401
-        assert owner.get(base + "/checker").status_code == 410
         print("PASS enam login, create/join/start, privasi dan autentikasi", flush=True)
 
         def state(name):
@@ -122,8 +121,6 @@ def main():
         result = wait_phase("finished", 3)
         assert result["winner"] == "civilians"
         assert all("role" in p for p in result["players"])
-        # Checker lama tetap ditutup setelah selesai; hasil dibaca dari snapshot game.
-        assert owner.get(base + "/checker").status_code == 410
         print(
             "PASS Hostage diam/tetap hidup, vote satu kali, eksekusi Hitman, WARGA MENANG. Room "
             + code,

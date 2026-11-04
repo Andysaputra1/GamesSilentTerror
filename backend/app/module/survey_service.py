@@ -345,12 +345,6 @@ class SurveyService:
                 raise SurveyAlreadySubmitted(PESAN_SUDAH_DIKIRIM) from error
             raise
 
-    # PANEL: semua pertanyaan, termasuk yang nonaktif.
-    def all_questions(self):
-        return PersistenceService._run(
-            lambda database: queries.list_questions(database, active_only=False)
-        )
-
     # PANEL: tambah pertanyaan; kode harus unik.
     def create_question(self, data):
         pertanyaan = validate_question(data)

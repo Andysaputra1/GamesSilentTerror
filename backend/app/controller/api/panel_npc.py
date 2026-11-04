@@ -128,7 +128,7 @@ def kode_alur(node: str, token=Depends(require_panel)):
         kode = kode_node(node)
     except KeyError as error:
         raise HTTPException(404, "Kotak flowchart tidak dikenal.") from error
-    return {"node": node, "kode": [{k: v for k, v in p.items() if k != "hilang"} for p in kode]}
+    return {"kode": [{k: v for k, v in p.items() if k != "hilang"} for p in kode]}
 
 
 # KODE ALUR: sumber fungsi/konstanta diambil dari modul yang sedang berjalan (bukan salinan), lalu setiap baris

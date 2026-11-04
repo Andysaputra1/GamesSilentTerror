@@ -58,9 +58,6 @@ class PanelTests(unittest.TestCase):
         self.assertIn("login-form", page.text)
         self.assertNotIn("Silent132", page.text)
         self.assertNotIn("Silent132", self.client.get("/panel/assets/panel.js").text)
-        self.assertEqual(
-            self.client.get("/admin", follow_redirects=False).headers["location"], "/panel"
-        )
 
     def test_documents_are_whitelisted_and_sandboxed(self):
         for nama, judul in [

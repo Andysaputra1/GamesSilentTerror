@@ -78,11 +78,11 @@ def insert_message(
 
 
 # Lengkapi pesan tersimpan dengan konteks pertandingan, ronde, dan fase.
-def set_message_context(database, message_id, *, sender_kind, context, reply_to_id=None):
+def set_message_context(database, message_id, *, sender_kind, context):
     database.execute(
         text("""
         UPDATE chat_messages SET sender_kind=:sender_kind, match_id=:match_id,
-            round_number=:round_number, phase=:phase, reply_to_id=:reply_to_id
+            round_number=:round_number, phase=:phase
         WHERE id=:id
     """),
         dict(
@@ -91,6 +91,5 @@ def set_message_context(database, message_id, *, sender_kind, context, reply_to_
             match_id=context.get("match_id"),
             round_number=context.get("round_number"),
             phase=context.get("phase"),
-            reply_to_id=reply_to_id,
         ),
     )

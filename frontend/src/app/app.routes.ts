@@ -10,7 +10,6 @@ import { activeMatchGuard } from './core/active-match.service';
 
 export const routes: Routes = [
   { path: 'panel', component: PanelRedirect },
-  { path: 'games/checker', redirectTo: '/panel', pathMatch: 'full' },
   { path: '', redirectTo: '/login', pathMatch: 'full' },
   { path: 'login', component: Auth, canActivate: [activeMatchGuard, loginRedirectGuard] },
   { path: 'main', component: MainPage, canActivate: [authGuard, activeMatchGuard] },

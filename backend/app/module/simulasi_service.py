@@ -56,7 +56,7 @@ class Simulasi:
             "detik": round(max(0.0, self.jam - mulai), 1), "durasi": m.phase_length() or None,
             "bisa_chat": not m.winner and m.can_chat(PEMAIN),
             "pemain": [
-                {"nama": m.labels[p.name], "manusia": not p.bot, "role": p.role, "hidup": p.alive,
+                {"nama": m.labels[p.name], "manusia": not p.bot, "role": p.role,
                  "status": "dieksekusi" if not p.alive else "disandera" if p.hostage
                  else "dibungkam" if p.gagged else "aktif",
                  "metode": getattr(self.otak.get(p.name), "metode", None),

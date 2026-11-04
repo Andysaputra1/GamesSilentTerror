@@ -85,7 +85,7 @@ describe('active match recovery', () => {
     TestBed.inject(ActiveMatchService)
       .lookup()
       .subscribe((value) => expect(value).toBe(null));
-    navigate('/games/checker').subscribe((value) => expect(value).toBe(true));
+    navigate('/panel').subscribe((value) => expect(value).toBe(true));
     TestBed.inject(HttpTestingController).expectNone((r) => r.url.includes('/api/rooms'));
   });
 

@@ -16,7 +16,7 @@ from typing import Literal
 from urllib.parse import urlsplit
 from tempfile import SpooledTemporaryFile
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from fastapi.responses import FileResponse, StreamingResponse, RedirectResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field, SecretStr
 from sqlalchemy import text
@@ -127,7 +127,7 @@ def login(body: Login, response: Response):
         )
 
     transaction(simpan_sesi)
-    return {"access_token": token_sesi, "username": settings.panel_username}
+    return {"access_token": token_sesi}
 
 
 # Hapus sesi panel terautentikasi dari database.
@@ -138,13 +138,6 @@ def logout(token=Depends(require_panel)):
             text("DELETE FROM panel_sessions WHERE token_hash=:token"), {"token": digest(token)}
         )
     )
-
-
-# Pertahankan URL lama dengan mengarahkannya ke panel terpadu.
-@router.get("/admin", include_in_schema=False)
-@router.get("/history", include_in_schema=False)
-def old_panel():
-    return RedirectResponse("/panel", status_code=307)
 
 
 # Sajikan halaman panel dengan kebijakan sumber konten dan tanpa cache.
@@ -213,7 +206,6 @@ def config_view():
             if ai_runtime.diatur_panel("ollama_tunnel_token")
             else "env" if settings.ollama_tunnel_token else "none"
         ),
-        "persisted": bool(ai_runtime.override),
     }
 
 
@@ -303,7 +295,7 @@ def rooms(after_id: int = Query(0, ge=0), token=Depends(require_panel)):
             dict(baris)
             for baris in database.execute(
                 text("""
-        SELECT s.id,s.room_code,s.created_at,COUNT(m.id) AS message_count,MAX(m.created_at) AS last_message_at
+        SELECT s.id,s.room_code,s.created_at,COUNT(m.id) AS message_count
         FROM game_sessions s LEFT JOIN chat_messages m ON m.game_session_id=s.id
         WHERE s.id > :after GROUP BY s.id,s.room_code,s.created_at ORDER BY s.id LIMIT 201
     """),
@@ -336,7 +328,7 @@ def checker(
     daftar_baris = transaction(
         lambda database: database.execute(
             text("""
-        SELECT id,JSON_REMOVE(trace,'$.penjelasan') AS trace,
+        SELECT JSON_REMOVE(trace,'$.penjelasan') AS trace,
         CONCAT(DATE_FORMAT(created_at,'%Y-%m-%d %H:%i:%s'), '|', id) AS trace_cursor
         FROM checker_traces WHERE room_code=:code
         AND CONCAT(DATE_FORMAT(created_at,'%Y-%m-%d %H:%i:%s'), '|', id) < :before
@@ -446,7 +438,7 @@ def history(
             dict(baris)
             for baris in database.execute(
                 text("""
-        SELECT m.id,m.sender_name,m.sender_kind,m.message,m.nlu,m.created_at,m.match_id,m.round_number,m.phase,s.room_code
+        SELECT m.id,m.sender_name,m.sender_kind,m.message,m.nlu,m.created_at,m.round_number,m.phase,s.room_code
         FROM chat_messages m LEFT JOIN game_sessions s ON s.id=m.game_session_id
         WHERE """ + syarat_sql + f" ORDER BY m.id {arah} LIMIT 201"),
                 parameter_sql,

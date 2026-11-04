@@ -11,7 +11,7 @@ Mulai dari **src/styles.css**, bagian DESIGN TOKENS dan MEJA KAYU:
 | --color-bg / --color-text | Warna dasar halaman dan teks |
 | --color-gold | Aksen fokus dan seleksi teks |
 | --font-body / --font-display / --font-hand | Font isi, judul, dan tulisan tangan |
-| --desk-text / --desk-muted | Teks di atas meja kayu |
+| --desk-text | Teks di atas meja kayu |
 | --desk-chip-bg / --desk-chip-line | Latar dan bingkai kontrol meja |
 | --paper-ink / --paper-label | Warna teks dan label di atas kertas |
 | --radius-control / --shadow-control | Sudut dan bayangan kontrol bersama |
