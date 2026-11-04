@@ -1,4 +1,4 @@
-"""Panel: status dan konfigurasi otak NPC (metode penalaran, rantai penulis kalimat, validasi NLG),
+"""Panel: status dan konfigurasi otak NPC (metode penalaran dan rantai penulis kalimat),
 serta kode asli untuk flowchart proses AI di menu Simulasi."""
 
 import ast
@@ -40,7 +40,6 @@ PILIHAN = {
 
 class NPCConfig(BaseModel):
     penulis: Literal["otomatis", "templat"]
-    validasi: bool = True
     # None = pertahankan urutan/model yang tersimpan (klien panel lama).
     urutan_penulis: list[Literal["openrouter", "tautan"]] | None = Field(default=None, max_length=2)
     model_openrouter: str | None = Field(default=None, max_length=100)
@@ -60,7 +59,6 @@ def npc_update(body: NPCConfig, token=Depends(require_panel)):
     try:
         status = save_npc_configuration(
             body.penulis,
-            body.validasi,
             body.urutan_penulis,
             body.model_openrouter,
             body.model_tautan,
@@ -310,19 +308,11 @@ KODE_ALUR = {
             ('alasan_tolak = ", ".join', "alasan ditolak dikirim ke percobaan berikutnya"),
             ("# 2) Templat bervariasi.", "LLM gagal: templat"),
         ]),
-        (G + "nlg", "nilai_kalimat", [
-            ("periksa_aturan(", "cek aturan"),
-            ("validasi_nlu(", "IndoBERT membaca ulang kalimat"),
-        ]),
+        (G + "nlg", "nilai_kalimat", [("periksa_aturan(", "cek aturan")]),
         (G + "nlg", "periksa_aturan", [
             ('"menyebut_ai"', "tidak boleh mengaku AI"),
             ('"klaim_tak_direncanakan"', "tidak boleh mengaku role tanpa rencana"),
             ('"target_hilang"', "target rencana harus disebut"),
-        ]),
-        (G + "nlg", "validasi_nlu", [
-            ("anotasi_chat(nlu, chat", "kalimat dibaca seperti chat pemain"),
-            ("cocok_intent = ", "intent harus sama dengan rencana"),
-            ("cocok_target = not perlu_target", "target rencana harus terbaca"),
         ]),
     ],
     "nlg_templat": [

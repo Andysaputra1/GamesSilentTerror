@@ -42,7 +42,7 @@ AKSI_RAHASIA = {"gag", "hostage", "guard", "peek"}
 # Batas waktu keputusan otak dan penulisan kalimat (termasuk rantai LLM) agar bot tidak menggantung.
 BATAS_LANGKAH_DETIK = 25
 BATAS_TULIS_DETIK = 25
-# Cadangan saat penulis LLM melewati batas: kalimat templat (tetap divalidasi IndoBERT) jauh lebih cepat.
+# Cadangan saat penulis LLM melewati batas: kalimat templat tidak memanggil jaringan, jadi jauh lebih cepat.
 BATAS_TEMPLAT_DETIK = 10
 # Pemicu cepat: jarak minimal antar-langkah bot yang dipanggil/dituduh (langkah biasa: NPC_STEP_SECONDS).
 JEDA_SEGERA_DETIK = 1.0
@@ -52,13 +52,13 @@ LANTAI_MAKS = 3
 
 
 # Lama tiap tahap satu langkah bot (ms): NLU + sinkron ingatan, logika metode, penjelasan panel, lalu NLG
-# (total, panggilan LLM, dan sisanya = aturan + validasi IndoBERT + templat).
+# (total, panggilan LLM, dan sisanya = aturan + templat).
 def waktu_jejak(waktu, tulisan):
     hasil = dict(waktu or {})
     if tulisan:
         nlg, llm = tulisan.get("detik") or 0.0, tulisan.get("llm_detik") or 0.0
         hasil.update(nlg_ms=round(nlg * 1000, 1), llm_ms=round(llm * 1000, 1),
-                     validasi_ms=round(max(0.0, nlg - llm) * 1000, 1))  # fmt: skip
+                     aturan_ms=round(max(0.0, nlg - llm) * 1000, 1))  # fmt: skip
     return hasil
 
 
@@ -87,7 +87,6 @@ def isi_jejak(trace, match, otak, npc, rencana, tulisan, penolakan, durasi_ms, d
                 if not tulisan
                 else {
                     "sumber": tulisan["sumber"],
-                    "lolos_nlu": tulisan["lolos_nlu"],
                     "pelanggaran": tulisan["pelanggaran"],
                 }
             ),
@@ -104,10 +103,10 @@ def isi_jejak(trace, match, otak, npc, rencana, tulisan, penolakan, durasi_ms, d
     return trace
 
 
-# NLG dengan batas waktu. Jika penulis LLM terlalu lama, kalimat tetap dikirim dari templat (tetap
-# divalidasi IndoBERT) agar rencana bot tidak hilang. Thread LLM yang tertinggal selesai sendiri;
-# rantai penulis mencatat hasilnya (mis. mengistirahatkan jalur yang lambat) untuk kalimat berikutnya.
-# lapor(tahap): simulasi panel memantau tahap NLG (nlg, llm, validasi).
+# NLG dengan batas waktu. Jika penulis LLM terlalu lama, kalimat tetap dikirim dari templat agar
+# rencana bot tidak hilang. Thread LLM yang tertinggal selesai sendiri; rantai penulis mencatat
+# hasilnya (mis. mengistirahatkan jalur yang lambat) untuk kalimat berikutnya.
+# lapor(tahap): simulasi panel memantau tahap NLG (nlg, llm, aturan).
 async def tulis_kalimat(runtime, otak, payload, konteks, lapor=None):
     loop = asyncio.get_running_loop()
     tulis = runtime.tulis if lapor is None else partial(runtime.tulis, lapor=lapor)

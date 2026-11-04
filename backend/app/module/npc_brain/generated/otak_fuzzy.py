@@ -1,8 +1,8 @@
 """FILE INI DIHASILKAN OTOMATIS oleh scripts/ekspor_otak_npc.py. JANGAN DIEDIT MANUAL.
 
 Sumber : npc_fuzzy.ipynb
-Sidik  : 96968490688e995a
-Dibuat : 2026-11-01 07:55 UTC
+Sidik  : 9dc970d3e55770d7
+Dibuat : 2026-11-04 03:30 UTC
 
 Perubahan logika bot dilakukan di notebook skripsi, dijalankan ulang sampai semua
 skenario/pengujian lulus, lalu diekspor ulang dengan skrip ini.
@@ -346,7 +346,7 @@ def pemain_disebut(teks, daftar_pemain, pengirim, common_words):
 # Keluaran: chat yang sama + intent, conf_intent (0–1), target [{pemain, relasi, prob, sumber}], dan sumber_nlu.
 #           sumber = ["indobert"], ["nama"], atau keduanya. Hanya relasi offend/defend yang menjadi bukti (relasi_chat);
 #           target neutral menandai pemain yang diajak bicara (konteks "ditanya").
-# Dipakai oleh: Ingatan.sinkron_snapshot (setiap chat baru) dan validasi_pesan.
+# Dipakai oleh: Ingatan.sinkron_snapshot (setiap chat baru).
 def anotasi_chat(nlu, chat, riwayat, daftar_pemain):
     intent, confidence = nlu.intent(chat["teks"], daftar_pemain)
     konteks = [{
@@ -1676,7 +1676,7 @@ def rencana_vote(aksi, target=None, alasan=(), skor=None):
 def rencana_aksi(aksi, target=None, alasan=(), skor=None):
     return {"aksi": aksi, "target": target, "alasan": list(alasan), "skor": skor}
 
-# Kalimat cadangan bila LLM tidak tersedia atau keluarannya gagal validasi.
+# Kalimat cadangan bila LLM tidak tersedia atau keluarannya ditolak pemeriksa aturan.
 def templat_pesan(rencana):
     t = rencana["target"]
     bukti = rencana["alasan"][0] if rencana["alasan"] else ""
@@ -1742,7 +1742,7 @@ def batasan_nlg(rencana):
 # Masukan : rencana chat (keluaran keputusan_chat), view (nama bot).
 # Keluaran: {pembicara, aksi, intent, target, klaim, bukti, gaya, batasan, cadangan} (+ penanya untuk jawab), atau None
 #           bila bot tidak chat.
-# Dipakai oleh: putuskan (kunci nlg) → npc_nlg menulis kalimat lalu memvalidasinya ulang dengan IndoBERT.
+# Dipakai oleh: putuskan (kunci nlg) → npc_nlg menulis kalimat lalu memeriksanya dengan aturan.
 def siapkan_nlg(rencana, view):
     if not rencana["kirim"]:
         return None
@@ -1753,21 +1753,6 @@ def siapkan_nlg(rencana, view):
         "batasan": batasan_nlg(rencana), "cadangan": templat_pesan(rencana),
         **({"penanya": rencana["penanya"]} if rencana.get("penanya") else {}),
     }
-
-# Memastikan kalimat hasil NLG tetap sesuai rencana menurut IndoBERT. Target neutral (pemain yang disapa) bukan
-# tuduhan atau pembelaan, jadi tidak dihitung sebagai target rencana.
-def validasi_pesan(nlu, teks, rencana, ingatan, view):
-    daftar = [p["nama"] for p in view["pemain"]]
-    chat = {"id": "validasi", "ronde": view["ronde"], "fase": view["fase"], "waktu": view["waktu"],
-            "pengirim": view["saya"]["nama"], "teks": teks}
-    hasil = anotasi_chat(nlu, chat, ingatan.chat, daftar)
-    target_prediksi = sorted({t["pemain"] for t in hasil["target"]
-                              if t["pemain"] in daftar and t["relasi"] != "neutral"})
-    cocok_intent = hasil["intent"] == rencana["intent"]
-    cocok_target = rencana["intent"] == "neutral" or rencana["target"] in target_prediksi
-    return {"teks": teks, "lolos": cocok_intent and cocok_target, "intent_prediksi": hasil["intent"],
-            "confidence": round(hasil["conf_intent"], 3), "target_prediksi": target_prediksi,
-            "target_lain": [t for t in target_prediksi if t != rencana["target"]]}
 
 R_, S_, T_ = "rendah", "sedang", "tinggi"
 

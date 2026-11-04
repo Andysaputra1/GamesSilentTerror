@@ -6,7 +6,7 @@ Alurnya
 2. Mengecek rantai penulis di latar (segarkan_penulis), supaya permainan tidak menunggu jaringan
 3. Awal pertandingan (siapkan_pertandingan): Buat persona dan ingatan tiap bot
 4. Tiap langkah bot (langkah, thread keputusan): IndoBERT membaca chat baru, fuzzy memutuskan, penjelasan dibuat untuk panel
-5. Bot mau chat (tulis, thread penulis): Rencana jadi kalimat lewat LLM atau templat, lalu divalidasi aturan dan IndoBERT
+5. Bot mau chat (tulis, thread penulis): Rencana jadi kalimat lewat LLM atau templat, lalu diperiksa aturan
 6. Chat atau aksi sudah terjadi (catat_chat, catat_aksi): Masuk ingatan bot
 7. Chat baru masuk (baca_chat): IndoBERT membaca sekali dan hasilnya masuk memo, jadi bot tidak menghitung ulang
 
@@ -139,7 +139,7 @@ class _JamPenulis:
             return self.penulis.tulis(sistem, pesan)
         finally:
             self.detik += time.perf_counter() - mulai
-            self.lapor("validasi")  # aturan + IndoBERT, lalu ulang LLM atau templat bila ditolak
+            self.lapor("aturan")  # kalimat diperiksa aturan, lalu ulang LLM atau templat bila ditolak
 
 
 @dataclass
@@ -161,7 +161,6 @@ class OtakBot:
 @dataclass
 class KonfigurasiNPC:
     penulis: str = "otomatis"
-    validasi: bool = True
     # Prioritas rantai penulis; jalur yang tidak tercantum dinonaktifkan.
     urutan_penulis: list = field(default_factory=lambda: list(JALUR_PENULIS))
     model_openrouter: str = ""  # kosong = model OpenRouter dari Konfigurasi AI/.env (qwen/qwen3-14b)
@@ -205,7 +204,6 @@ class BrainRuntime:
         self.keterangan_penulis = {}  # jalur → alasan tidak masuk rantai (mis. key belum diisi)
         self.konfigurasi = KonfigurasiNPC(
             settings.npc_writer,
-            settings.npc_validate_nlg,
             settings.npc_writer_order.split(",") if settings.npc_writer_order else [],
             settings.npc_openrouter_model,
         )
@@ -264,7 +262,6 @@ class BrainRuntime:
             return {
                 **self.status,
                 "penulis_diminta": self.konfigurasi.penulis,
-                "validasi": self.konfigurasi.validasi,
                 "penulis_aktif": berikut is not None,
                 "penulis": berikut.jalur if berikut else "templat",
                 "model_penulis": berikut.model if berikut else None,
@@ -426,12 +423,11 @@ class BrainRuntime:
     def muat_sekarang(self, nlu=None):
         self._muat(nlu)
 
-    # PANEL: ubah penulis/validasi/rantai saat server berjalan; rantai penulis langsung dipakai kalimat
+    # PANEL: ubah penulis/rantai saat server berjalan; rantai penulis langsung dipakai kalimat
     # berikutnya. Semua nilai divalidasi dulu (atomik).
     def atur(
         self,
         penulis=None,
-        validasi=None,
         urutan_penulis=None,
         model_openrouter=None,
         model_tautan=None,
@@ -456,8 +452,6 @@ class BrainRuntime:
         with self.lock:
             k = self.konfigurasi
             sebelum = (k.penulis, list(k.urutan_penulis), k.model_openrouter, k.model_tautan)
-            if validasi is not None:
-                k.validasi = bool(validasi)
             if penulis is not None:
                 k.penulis = penulis
             if urutan_penulis is not None:
@@ -560,18 +554,17 @@ class BrainRuntime:
         }  # fmt: skip
         return view, keputusan, konteks
 
-    # NLG (thread penulis): rencana → kalimat, dengan pengaman aturan dan validasi IndoBERT.
+    # NLG (thread penulis): rencana → kalimat, dengan pengaman aturan.
     # pakai_llm=False: hanya templat, dipakai sebagai cadangan cepat saat penulis LLM melewati batas waktu.
     def tulis(self, bot: OtakBot, payload, konteks, pakai_llm=True, lapor=_tanpa_lapor):
         with self.lock:
             pakai = pakai_llm and self.konfigurasi.penulis != "templat"
             penulis = self.penulis if pakai else None
-            nlu = self.nlu if self.konfigurasi.validasi else None
         # Hindari kalimat sendiri yang lalu dan chat terbaru di room (bot lain tidak dikembari).
         hindari = tuple(bot.riwayat[-12:]) + tuple(c["teks"] for c in konteks["chat_terbaru"])
         jam = _JamPenulis(penulis, lapor) if penulis is not None else None
-        lapor("nlg" if jam else "validasi")  # tanpa LLM: templat langsung dinilai aturan + IndoBERT
-        tulisan = self.nlg.tulis_pesan(payload, konteks, nlu, jam, bot.persona, hindari=hindari)
+        lapor("nlg" if jam else "aturan")  # tanpa LLM: templat langsung dinilai aturan
+        tulisan = self.nlg.tulis_pesan(payload, konteks, jam, bot.persona, hindari=hindari)
         tulisan["llm_detik"] = round(jam.detik, 3) if jam else 0.0
         return tulisan
 

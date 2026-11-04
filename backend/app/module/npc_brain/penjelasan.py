@@ -514,7 +514,7 @@ def _masukan(masukan):
     }  # fmt: skip
 
 
-# Ringkasan NLG untuk tab panel: kalimat akhir, asal kalimat, penulis LLM, dan hasil validasi IndoBERT;
+# Ringkasan NLG untuk tab panel: kalimat akhir, asal kalimat, penulis LLM, dan hasil pemeriksa aturan;
 # selalu disertai masukan NLG bila otak merencanakan chat.
 def _nlg(tulisan, rencana, ditunda, masukan=None):
     return {**_hasil_nlg(tulisan, rencana, ditunda), "masukan": _masukan(masukan)}
@@ -523,7 +523,6 @@ def _nlg(tulisan, rencana, ditunda, masukan=None):
 def _hasil_nlg(tulisan, rencana, ditunda):
     rencana = rencana or {}
     if tulisan:
-        nlu = tulisan.get("nlu") or {}
         llm = [p for p in tulisan.get("percobaan") or [] if p.get("sumber") == "llm"]
         return {
             "status": "terkirim",
@@ -532,10 +531,7 @@ def _hasil_nlg(tulisan, rencana, ditunda):
             "penulis": tulisan.get("penulis"),  # jalur LLM (None = templat)
             "persona": tulisan.get("persona"),
             "lolos_aturan": _nilai(tulisan.get("lolos_aturan")),
-            "lolos_nlu": _nilai(tulisan.get("lolos_nlu")),
             "pelanggaran": _nilai(tulisan.get("pelanggaran") or []),
-            "nlu": {k: _nilai(nlu.get(k)) for k in ("intent_prediksi", "confidence", "target_prediksi",
-                                                     "cocok_intent", "cocok_target") if k in nlu} or None,
             "percobaan_llm": [_nilai(p.get("status")) for p in llm][:3],
             "percobaan_templat": sum(p.get("sumber") == "templat" for p in tulisan.get("percobaan") or []),
             "detik": _nilai(tulisan.get("detik")),

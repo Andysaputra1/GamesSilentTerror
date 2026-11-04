@@ -54,7 +54,7 @@ async def lifespan(_: FastAPI):
         except PersistenceError as error:
             logger.error("Konfigurasi AI panel gagal dimuat; memakai .env: %s", error)
         try:
-            # Pengaturan Otak NPC dari panel (penulis kalimat, model, validasi) dibaca dari DB ke otak bot.
+            # Pengaturan Otak NPC dari panel (penulis kalimat dan model) dibaca dari DB ke otak bot.
             load_npc_configuration()
         except PersistenceError as error:
             logger.warning("Konfigurasi Otak NPC panel gagal dimuat; memakai .env: %s", error)

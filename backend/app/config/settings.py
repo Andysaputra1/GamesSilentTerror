@@ -76,7 +76,6 @@ class Settings(MySQLSettings):
     npc_writer_order: str = ",".join(JALUR_PENULIS_NPC)
     # Model OpenRouter penulis kalimat; kosong = openrouter_model (qwen/qwen3-14b).
     npc_openrouter_model: str = ""
-    npc_validate_nlg: bool = True
     npc_intent_model_dir: Path | None = None
     npc_target_model_dir: Path | None = None
     npc_nlu_device: Literal["cpu", "cuda"] = "cpu"

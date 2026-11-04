@@ -37,8 +37,8 @@ BAGIAN_NLG = {
     "## Konfigurasi",
     "## Persona Bot",
     "## Templat Bervariasi",
-    "## Pengaman 1: Pemeriksa Aturan",
-    "## Pengaman 2: Validasi Ulang dengan IndoBERT",
+    "## Pengaman: Pemeriksa Aturan",
+    "## NLU IndoBERT",
     "## Penulis Kalimat: Rantai LLM",
     "## Pipeline `tulis_pesan`",
 }

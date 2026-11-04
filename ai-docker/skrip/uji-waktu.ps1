@@ -1,6 +1,6 @@
 # Dipanggil uji-waktu.bat: ukur lama otak NPC di backend lewat simulasi panel (otak, NLU IndoBERT, dan NLG asli,
 # tanpa room/database). Tiga bot Fuzzy (jumlah minimal simulasi); setiap chat memanggil satu bot,
-# lalu semua bot melangkah. Tiap langkah dicatat per tahap: NLU -> logika -> penjelasan -> NLG (LLM + validasi).
+# lalu semua bot melangkah. Tiap langkah dicatat per tahap: NLU -> logika -> penjelasan -> NLG (LLM + aturan).
 # Game hanya memakai Fuzzy; Utility AI dan Behavior Tree diarsipkan di ..\arsip_bt_utility_2026-11-03 (di luar repo).
 # Hasil lama (waktu dan keseimbangan) diukur dengan metode campuran, jadi belum berlaku untuk Fuzzy saja.
 # Hasil: tabel di layar + CSV di communicationfolder\uji-waktu-<tanggal>\.
@@ -58,7 +58,7 @@ for ($i = 0; $i -lt $jumlah; $i++) {
             nlu_pesan_ms = $manusia.nlu.ms; intent_pesan = $manusia.nlu.intent
             bot = $j.sender; metode = ($j.provider -replace '^otak:', '')
             nlu_ms = $w.nlu_ms; logika_ms = $w.logika_ms; penjelasan_ms = $w.penjelasan_ms
-            nlg_ms = $w.nlg_ms; llm_ms = $w.llm_ms; validasi_ms = $w.validasi_ms; total_ms = $j.duration_ms
+            nlg_ms = $w.nlg_ms; llm_ms = $w.llm_ms; aturan_ms = $w.aturan_ms; total_ms = $j.duration_ms
             bicara = $bicara; sumber = $nlg.sumber; penulis = $nlg.penulis
             percobaan_llm = (@($nlg.percobaan_llm) -join ' | '); keputusan = ($j.ringkas.keputusan -join '; ')
             kalimat = $(if ($bicara) { $nlg.teks } else { '' })

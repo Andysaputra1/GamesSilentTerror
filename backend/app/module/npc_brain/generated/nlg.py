@@ -1,8 +1,8 @@
 """FILE INI DIHASILKAN OTOMATIS oleh scripts/ekspor_otak_npc.py. JANGAN DIEDIT MANUAL.
 
 Sumber : npc_nlg.ipynb
-Sidik  : fa8a02b1e22cee6b
-Dibuat : 2026-11-01 06:46 UTC
+Sidik  : c1364e283bb90eac
+Dibuat : 2026-11-04 03:30 UTC
 
 Perubahan logika bot dilakukan di notebook skripsi, dijalankan ulang sampai semua
 skenario/pengujian lulus, lalu diekspor ulang dengan skrip ini.
@@ -586,7 +586,7 @@ def pemain_disebut(teks, daftar_pemain, pengirim, common_words):
 # Keluaran: chat yang sama + intent, conf_intent (0–1), target [{pemain, relasi, prob, sumber}], dan sumber_nlu.
 #           sumber = ["indobert"], ["nama"], atau keduanya. Hanya relasi offend/defend yang menjadi bukti (relasi_chat);
 #           target neutral menandai pemain yang diajak bicara (konteks "ditanya").
-# Dipakai oleh: Ingatan.sinkron_snapshot (setiap chat baru) dan validasi_pesan.
+# Dipakai oleh: Ingatan.sinkron_snapshot (setiap chat baru).
 def anotasi_chat(nlu, chat, riwayat, daftar_pemain):
     intent, confidence = nlu.intent(chat["teks"], daftar_pemain)
     konteks = [{
@@ -604,25 +604,6 @@ def anotasi_chat(nlu, chat, riwayat, daftar_pemain):
             else:
                 sama["sumber"].append("nama")
     return {**chat, "intent": intent, "conf_intent": confidence, "target": target, "sumber_nlu": "indobert"}
-
-# Membaca ulang kalimat dengan IndoBERT; konteks = chat terbaru beserta labelnya.
-def validasi_nlu(nlu, teks, p, konteks):
-    chat = {"id": "validasi", "pengirim": p["pembicara"], "teks": teks}
-    riwayat = [{"pengirim": c["pengirim"], "teks": c["teks"], "intent": c.get("intent") or "neutral",
-                "target": c.get("target") or []} for c in konteks["chat_terbaru"]]
-    hasil = anotasi_chat(nlu, chat, riwayat, konteks["roster"])
-    terbaca = {(t["pemain"], t["relasi"]) for t in hasil["target"] if t["pemain"] in konteks["roster"]}
-    perlu_target = p["intent"] in ("offend", "defend") and p["target"] is not None
-    cocok_intent = hasil["intent"] == p["intent"]
-    if p["aksi"] == "bela_diri":
-        # Model 2 lemah membaca "aku" sebagai diri pembicara; syaratnya: membela dan tidak menuduh siapa pun.
-        cocok_target = not any(relasi == "offend" for _, relasi in terbaca)
-    else:
-        cocok_target = not perlu_target or (p["target"], p["intent"]) in terbaca
-    return {"lolos": cocok_intent and cocok_target, "intent_prediksi": hasil["intent"],
-            "confidence": round(hasil["conf_intent"], 3), "target_prediksi": sorted(terbaca),
-            "cocok_intent": cocok_intent, "cocok_target": cocok_target,
-            "target_lain": sorted(n for n, _ in terbaca if n != p["target"])}
 
 # Membaca berkas .env sederhana (NAMA=nilai); nama tidak peka huruf besar/kecil, nilai tidak pernah dicetak.
 def baca_env(path):
@@ -1120,22 +1101,19 @@ Tulis pesan chat {p['pembicara']} sekarang."""
         pesan += f"\n\nPesan sebelumnya ditolak karena: {alasan_tolak}. Tulis ulang dengan memperbaikinya."
     return sistem, pesan
 
-# Menilai satu kalimat dengan dua pengaman; validasi IndoBERT hanya jika aturan lolos. Pengirim chat pemicu boleh
-# disapa (mis. "Andi, kenapa nuduh aku?") tanpa dianggap menambah nama pemain lain.
-def nilai_kalimat(teks, p, konteks, nlu):
+# Menilai satu kalimat dengan pemeriksa aturan. Pengirim chat pemicu boleh disapa (mis. "Andi, kenapa nuduh aku?")
+# tanpa dianggap menambah nama pemain lain.
+def nilai_kalimat(teks, p, konteks):
     langgar = periksa_aturan(teks, p, konteks["roster"], pemicu(p, konteks)[1])
-    hasil_nlu = validasi_nlu(nlu, teks, p, konteks) if (nlu is not None and not langgar) else None
-    lolos = not langgar and (hasil_nlu is None or hasil_nlu["lolos"])
-    return {"teks": teks, "lolos": lolos, "pelanggaran": langgar, "nlu": hasil_nlu}
+    return {"teks": teks, "lolos": not langgar, "pelanggaran": langgar}
 
 # Rencana chat → kalimat akhir. Selalu mengembalikan kalimat, apa pun yang gagal.
-def tulis_pesan(p, konteks, nlu=None, penulis=None, persona="santai", hindari=()):
+def tulis_pesan(p, konteks, penulis=None, persona="santai", hindari=()):
     mulai, percobaan = perf_counter(), []
 
     def selesai(nilai, sumber, jalur=None):
         return {"teks": nilai["teks"], "sumber": sumber, "penulis": jalur, "lolos_aturan": not nilai["pelanggaran"],
-                "lolos_nlu": None if nilai["nlu"] is None else nilai["nlu"]["lolos"],
-                "pelanggaran": nilai["pelanggaran"], "nlu": nilai["nlu"], "persona": persona,
+                "pelanggaran": nilai["pelanggaran"], "persona": persona,
                 "percobaan": percobaan, "detik": round(perf_counter() - mulai, 3)}
 
     # 1) LLM, bila aktif.
@@ -1153,7 +1131,7 @@ def tulis_pesan(p, konteks, nlu=None, penulis=None, persona="santai", hindari=()
             percobaan.append({"sumber": "llm", "ke": ke, "status": status})
             continue
         jalur = getattr(penulis, "terakhir", None) or penulis.jalur  # rantai: jalur yang benar-benar menulis
-        nilai = nilai_kalimat(bersihkan(mentah, p["pembicara"]), p, konteks, nlu)
+        nilai = nilai_kalimat(bersihkan(mentah, p["pembicara"]), p, konteks)
         # Parafrase tipis dari kalimat yang baru terdengar (milik bot sendiri atau pemain lain) ikut ditolak.
         mirip = kalimat_mirip(nilai["teks"], hindari)
         percobaan.append({"sumber": "llm", "ke": ke, "penulis": jalur, "status": status, "teks": nilai["teks"],
@@ -1162,24 +1140,20 @@ def tulis_pesan(p, konteks, nlu=None, penulis=None, persona="santai", hindari=()
             return selesai(nilai, "llm", jalur)
         if nilai["pelanggaran"]:
             alasan_tolak = ", ".join(nilai["pelanggaran"])
-        elif not nilai["lolos"]:
-            alasan_tolak = "niat atau target kalimat terbaca berbeda dari rencana"
         else:
             alasan_tolak = f'terlalu mirip dengan kalimat yang baru terdengar ("{mirip}"); pakai susunan lain'
 
     # 2) Templat bervariasi.
     dinilai = []
     for teks in kalimat_templat(p, persona, hindari):
-        nilai = nilai_kalimat(teks, p, konteks, nlu)
+        nilai = nilai_kalimat(teks, p, konteks)
         percobaan.append({"sumber": "templat", "teks": teks, "lolos": nilai["lolos"], "pelanggaran": nilai["pelanggaran"]})
         if nilai["lolos"]:
             return selesai(nilai, "templat")
         dinilai.append(nilai)
 
-    # 3) Cadangan: varian yang lolos aturan dan intent-nya cocok, lalu varian pertama yang lolos aturan.
-    aman = [n for n in dinilai if not n["pelanggaran"]] or dinilai
-    terbaik = next((n for n in aman if n["nlu"] and n["nlu"]["cocok_intent"]), aman[0])
-    return selesai(terbaik, "templat_cadangan")
+    # 3) Cadangan: tidak ada varian yang lolos aturan, jadi varian pertama yang dikirim.
+    return selesai(dinilai[0], "templat_cadangan")
 
 # Konteks NLG dari satu baris rencana (di game: dari ingatan bot dan snapshot).
 def konteks_dari(r):

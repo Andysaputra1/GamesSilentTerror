@@ -51,7 +51,7 @@ file saja tidak berarti route tersebut dibuka pada aplikasi utama.
    menyiarkan pesan tanpa menganalisisnya. Pada pertandingan, `NPCService`
    mengambil langkah mandiri dari timer untuk setiap bot: snapshot privat ->
    `backend/app/module/npc_brain` (IndoBERT -> fuzzy hasil ekspor notebook -> NLG
-   tervalidasi) -> aksi/vote engine serta chat. Fase diperiksa ulang
+   yang dicek aturan) -> aksi/vote engine serta chat. Fase diperiksa ulang
    sebelum keputusan diterapkan. Vote/aksi langsung diterapkan; chat bot melewati
    "lantai bicara" (`NPCService._ambil_giliran_bicara`): paling banyak `LANTAI_MAKS` (3) bot
    menyusun/mengetik bersamaan per pertandingan tanpa rencana kembar (intent + target

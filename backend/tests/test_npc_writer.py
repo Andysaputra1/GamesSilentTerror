@@ -8,7 +8,7 @@ import threading
 import time
 import unittest
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -51,6 +51,22 @@ def konfigurasi_ai(link="https://llm-uji.example"):
         ollama_model="qwen3:14b",
         ollama_tunnel_token=SecretStr(RAHASIA["token"]),
     )
+
+
+class PenulisTiruan:
+    """Penulis tanpa jaringan: mengembalikan jawaban yang disiapkan dan mencatat prompt yang diterima."""
+
+    aktif, jalur, model = True, "tiruan", "tiruan"
+
+    def __init__(self, jawaban):
+        self.jawaban, self.pesan = list(jawaban), []
+
+    def tulis(self, sistem, pesan):
+        self.pesan.append(pesan)
+        return (self.jawaban.pop(0), "ok") if self.jawaban else (None, "habis")
+
+    def tutup(self):
+        pass
 
 
 class WriterChainTests(unittest.TestCase):
@@ -160,15 +176,11 @@ class WriterChainTests(unittest.TestCase):
         tautan, openrouter = Jalur("tautan", 401), Jalur("openrouter")
         self.runtime.penulis = nlg.PenulisBerantai([tautan, openrouter])
         self.runtime.penulis.cek()
-        self.runtime.konfigurasi.validasi = False
-        try:
-            bot = OtakBot("NOX", "fuzzy", "santai", "civilian", None)
-            payload = {"pembicara": "NOX", "aksi": "tuduh", "intent": "offend", "target": "ECHO",
-                       "klaim": False, "bukti": []}  # fmt: skip
-            konteks = {"roster": ["NOX", "ECHO", "VEIL"], "chat_terbaru": []}
-            tulisan = self.runtime.tulis(bot, payload, konteks)
-        finally:
-            self.runtime.konfigurasi.validasi = True
+        bot = OtakBot("NOX", "fuzzy", "santai", "civilian", None)
+        payload = {"pembicara": "NOX", "aksi": "tuduh", "intent": "offend", "target": "ECHO",
+                   "klaim": False, "bukti": []}  # fmt: skip
+        konteks = {"roster": ["NOX", "ECHO", "VEIL"], "chat_terbaru": []}
+        tulisan = self.runtime.tulis(bot, payload, konteks)
         self.assertEqual((tulisan["sumber"], tulisan["penulis"]), ("llm", "openrouter"))
         self.assertEqual(tautan.panggilan, 0)
         baris = {b["jalur"]: b for b in self.runtime.ringkasan()["rantai_penulis"]}
@@ -180,6 +192,57 @@ class WriterChainTests(unittest.TestCase):
         status = self.runtime.ringkasan()
         self.assertEqual((status["penulis"], status["penulis_aktif"]), ("templat", False))
         self.assertEqual(status["rantai_penulis"][1]["keadaan"], "istirahat")
+
+
+class WriterSentenceRuleTests(unittest.TestCase):
+    """Kalimat LLM langsung dikirim bila lolos aturan; IndoBERT tidak membaca ulang sebelum kirim."""
+
+    PAYLOAD = {"pembicara": "NOX", "aksi": "tuduh", "intent": "offend", "target": "ECHO",
+               "klaim": False, "bukti": []}  # fmt: skip
+    KONTEKS = {"roster": ["NOX", "ECHO", "VEIL"], "chat_terbaru": []}
+
+    def setUp(self):
+        self.runtime = runtime_siap()
+        self.addCleanup(self.runtime.tutup)
+        self.runtime.konfigurasi.penulis = "otomatis"
+        self.bot = OtakBot("NOX", "fuzzy", "santai", "civilian", None)
+
+    def tulis(self, *jawaban):
+        penulis = PenulisTiruan(jawaban)
+        self.runtime.penulis = penulis
+        return self.runtime.tulis(self.bot, self.PAYLOAD, self.KONTEKS), penulis
+
+    def test_kalimat_lolos_aturan_terkirim_tanpa_dibaca_nlu(self):
+        self.runtime.nlu = Mock()
+        tulisan, penulis = self.tulis("Aku curiga sama ECHO, dia diam terus dari tadi.")
+        self.assertEqual(tulisan["sumber"], "llm")
+        self.assertTrue(tulisan["lolos_aturan"])
+        self.assertEqual(len(penulis.pesan), 1)
+        self.assertEqual(self.runtime.nlu.mock_calls, [])
+        self.assertNotIn("lolos_nlu", tulisan)
+        self.assertNotIn("nlu", tulisan)
+
+    def test_pelanggaran_aturan_ditulis_ulang_dengan_alasannya(self):
+        tulisan, penulis = self.tulis(
+            "Sebagai AI, aku curiga sama ECHO.", "Aku curiga sama ECHO dari tadi."
+        )
+        self.assertEqual(tulisan["sumber"], "llm")
+        self.assertEqual(tulisan["teks"], "Aku curiga sama ECHO dari tadi.")
+        self.assertIn("ditolak karena: menyebut_ai", penulis.pesan[1])
+
+    def test_kedua_percobaan_melanggar_aturan_jatuh_ke_templat(self):
+        tulisan, penulis = self.tulis("Aku bot.", "Aku bot.")
+        self.assertEqual(len(penulis.pesan), 2)
+        self.assertEqual((tulisan["sumber"], tulisan["penulis"]), ("templat", None))
+        self.assertIn("ECHO", tulisan["teks"])
+        self.assertEqual(tulisan["pelanggaran"], [])
+
+    # Nama tahap ini dipakai kotak nlg_cek di flowchart simulasi panel.
+    def test_tahap_yang_dilaporkan_ke_flowchart(self):
+        tahap = []
+        self.runtime.penulis = PenulisTiruan(["Aku curiga sama ECHO, dia diam terus dari tadi."])
+        self.runtime.tulis(self.bot, self.PAYLOAD, self.KONTEKS, lapor=tahap.append)
+        self.assertEqual(tahap, ["nlg", "llm", "aturan"])
 
 
 class WriterCheckTests(unittest.TestCase):
@@ -256,11 +319,11 @@ class NpcConfigStoreTests(unittest.TestCase):
             patch.object(layanan, "brain_runtime") as runtime,
             patch.object(layanan.PersistenceService, "_run") as baca,
         ):
-            # Baris produksi lama masih memuat kunci metode; kuncinya diabaikan.
+            # Baris produksi lama masih memuat kunci metode dan validasi; keduanya diabaikan.
             baca.return_value = {"metode": "fuzzy", "penulis": "otomatis", "validasi": True}
             layanan.load_npc_configuration()
             runtime.atur.assert_called_once_with(
-                penulis="otomatis", validasi=True,
+                penulis="otomatis",
                 urutan_penulis=None, model_openrouter=None, model_tautan=None,
             )  # fmt: skip
             runtime.atur.side_effect = ValueError("jalur tidak dikenal")
@@ -272,7 +335,7 @@ class NpcConfigStoreTests(unittest.TestCase):
         from app.module import npc_config_service as layanan
         from app.module.persistence_service import PersistenceError
 
-        sebelum = {"penulis_diminta": "otomatis", "validasi": True,
+        sebelum = {"penulis_diminta": "otomatis",
                    "urutan_penulis": ["openrouter", "tautan"], "model_openrouter": "",
                    "model_tautan": ""}  # fmt: skip
         with (
@@ -282,9 +345,9 @@ class NpcConfigStoreTests(unittest.TestCase):
             runtime.ringkasan.return_value = sebelum
             runtime.atur.return_value = {**sebelum, "urutan_penulis": ["tautan"]}
             with self.assertRaises(PersistenceError):
-                layanan.save_npc_configuration("otomatis", True, ["tautan"], "")
+                layanan.save_npc_configuration("otomatis", ["tautan"], "")
         runtime.atur.assert_called_with(
-            penulis="otomatis", validasi=True,
+            penulis="otomatis",
             urutan_penulis=["openrouter", "tautan"], model_openrouter="", model_tautan="",
         )  # fmt: skip
 
@@ -315,7 +378,7 @@ class PanelWriterApiTests(unittest.TestCase):
         self.panel = panel
 
     def test_save_sends_order_and_model_to_runtime(self):
-        ringkasan = {"penulis_diminta": "otomatis", "validasi": True,
+        ringkasan = {"penulis_diminta": "otomatis",
                      "urutan_penulis": ["openrouter", "tautan"], "model_openrouter": "",
                      "model_tautan": "qwen3:4b-instruct"}  # fmt: skip
         with (
@@ -323,6 +386,7 @@ class PanelWriterApiTests(unittest.TestCase):
             patch("app.module.npc_config_service.PersistenceService._run") as simpan,
         ):
             runtime.atur.return_value = ringkasan
+            # Klien lama (skrip kirim-link versi lama) masih boleh mengirim kunci validasi; kuncinya diabaikan.
             response = self.client.put(
                 "/api/panel/npc",
                 json={"penulis": "otomatis", "validasi": True,
@@ -331,7 +395,7 @@ class PanelWriterApiTests(unittest.TestCase):
             )  # fmt: skip
         self.assertEqual(response.status_code, 200)
         runtime.atur.assert_called_once_with(
-            penulis="otomatis", validasi=True,
+            penulis="otomatis",
             urutan_penulis=["openrouter", "tautan"], model_openrouter="",
             model_tautan="qwen3:4b-instruct",
         )  # fmt: skip

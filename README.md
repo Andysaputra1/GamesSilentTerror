@@ -32,11 +32,12 @@ Semua AI ada di **otak bot** (NPC yang ikut bermain). Chat manusia hanya diotori
 | Komponen | Dipakai untuk | Kapan berjalan |
 | --- | --- | --- |
 | **IndoBERT** (2 model: intent + target) | NLU otak bot: membaca chat publik menjadi intent (menuduh, membela, dll.) dan siapa yang dituju | Setiap kali bot mengambil langkah, untuk chat terbaru di ruangan (satu model dipakai bersama semua bot, hasilnya di-cache per pesan) |
-| **IndoBERT** (validasi ulang) | Memastikan kalimat yang ditulis bot memang terbaca sesuai rencana (misalnya benar-benar menuduh X) | Setiap kali bot akan mengirim chat, sebelum kalimat dikirim (`NPC_VALIDATE_NLG=true`) |
 | **Fuzzy Mamdani** | Penalaran bot: memilih tuduhan, pembelaan, vote, dan skill malam | Setiap langkah bot, untuk semua bot; metode tiap bot dicatat di tabel `match_bots` |
 | **NLG** (rantai penulis LLM atau templat) | Mengubah rencana bot menjadi kalimat | Saat bot memutuskan bicara. Jalur LLM yang gagal dilewati; tanpa jalur yang hidup, bot memakai templat |
 
 Game hanya memakai otak Fuzzy. Utility AI dan Behavior Tree diarsipkan di luar repo, di `../arsip_bt_utility_2026-11-03/` (isi dan cara menariknya kembali ada di README folder itu). Angka keseimbangan di `GAME_CONCEPT.md` diukur dengan metode campuran, jadi belum berlaku untuk Fuzzy saja.
+
+Kalimat bot diperiksa aturan lalu langsung dikirim; IndoBERT baru membacanya sesudah terkirim. Pembacaan ulang sebelum kirim diarsipkan di luar repo, di `../arsip_validasi_nlg_2026-11-04/` (alasan dan cara mengembalikannya ada di README folder itu).
 
 Tanpa model IndoBERT, otak bot gagal dimuat: bot tidak chat dan hanya memakai aksi cadangan engine. Statusnya terlihat di panel menu **Otak NPC**.
 
@@ -336,7 +337,7 @@ ai-docker/            LLM penulis kalimat bot (Qwen3 4B/14B) di laptop + tunnel 
 docker-compose.yml    Service development dan volume
 ```
 
-Alur chat manusia: **pesan → otorisasi → validasi ulang fase/hak chat → penyimpanan MySQL → broadcast**. Secara terpisah, timer menjalankan bot: **snapshot privat → IndoBERT (baca chat) → fuzzy → NLG → validasi IndoBERT → aksi/vote/chat**. Analisis lama SVM → agresivitas → fuzzy 2 input dan balasan NOX sudah dihapus; model SVM hanya dipakai sebagai NLU cadangan bila IndoBERT tidak ada.
+Alur chat manusia: **pesan → otorisasi → validasi ulang fase/hak chat → penyimpanan MySQL → broadcast**. Secara terpisah, timer menjalankan bot: **snapshot privat → IndoBERT (baca chat) → fuzzy → NLG → cek aturan → aksi/vote/chat**. Analisis lama SVM → agresivitas → fuzzy 2 input dan balasan NOX sudah dihapus; model SVM hanya dipakai sebagai NLU cadangan bila IndoBERT tidak ada.
 
 Dengan container aplikasi sudah berjalan:
 

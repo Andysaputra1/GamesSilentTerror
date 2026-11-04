@@ -100,6 +100,10 @@ function duration(value) {
   if (typeof value !== 'number') return 'Belum tercatat';
   return value >= 1000 ? `${(value / 1000).toFixed(2)} dtk` : `${value.toFixed(1)} ms`;
 }
+// Lama cek aturan satu kalimat; jejak sebelum 4 Nov 2026 menyimpannya sebagai validasi_ms.
+function waktuAturan(t) {
+  return t.aturan_ms ?? t.validasi_ms;
+}
 function renderReport(container, trace) {
   container.replaceChildren();
   container.classList.remove('empty-state');
@@ -311,9 +315,9 @@ const STATUS_ROOM = {
   arsip: ['Arsip', 'status-muted'],
 };
 const SUMBER_NLG = {
-  llm: 'LLM (lolos aturan dan IndoBERT)',
-  templat: 'Templat (lolos aturan dan IndoBERT)',
-  templat_cadangan: 'Templat cadangan (tidak ada varian yang lolos IndoBERT)',
+  llm: 'LLM (lolos pemeriksaan)',
+  templat: 'Templat (lolos pemeriksaan)',
+  templat_cadangan: 'Templat cadangan (tidak ada varian yang lolos)',
 };
 // Arti parameter: dipakai legenda dan keterangan judul kolom tabel.
 const PARAMETER = {
@@ -890,7 +894,7 @@ function prosesTab(trace, p, lama) {
           ['Sumber', SUMBER_NLG[nlg.sumber] || nlg.sumber],
           ['Penulis LLM', nlg.penulis || 'tidak ada (templat)'],
           ['Lama panggilan LLM', duration(t.llm_ms)],
-          ['Aturan + validasi IndoBERT + templat', duration(t.validasi_ms)],
+          ['Aturan + templat', duration(waktuAturan(t))],
           ['Status percobaan LLM', nlg.percobaan_llm],
         ])
       : nlgBelum(nlg);
@@ -1128,9 +1132,20 @@ function nlgTab(p) {
       ['Penulis LLM', n.penulis || 'tidak ada (templat)'],
       ['Persona', n.persona],
       ['Lolos aturan', n.lolos_aturan],
-      ['Lolos validasi IndoBERT', n.lolos_nlu ?? 'tidak divalidasi'],
-      ['Intent terbaca', n.nlu ? `${n.nlu.intent_prediksi} (${teks(n.nlu.confidence)})` : null],
-      ['Target terbaca', n.nlu?.target_prediksi?.map(([nama, relasi]) => `${nama}: ${relasi}`)],
+      // Jejak sebelum 4 Nov 2026 masih memuat hasil pembacaan ulang IndoBERT; jejak baru tidak.
+      ...('lolos_nlu' in n
+        ? [
+            ['Lolos validasi IndoBERT', n.lolos_nlu ?? 'tidak divalidasi'],
+            [
+              'Intent terbaca',
+              n.nlu ? `${n.nlu.intent_prediksi} (${teks(n.nlu.confidence)})` : null,
+            ],
+            [
+              'Target terbaca',
+              n.nlu?.target_prediksi?.map(([nama, relasi]) => `${nama}: ${relasi}`),
+            ],
+          ]
+        : []),
       ['Pelanggaran aturan', n.pelanggaran],
       ['Percobaan LLM', n.percobaan_llm],
       ['Varian templat dicoba', n.percobaan_templat],
@@ -1357,14 +1372,15 @@ const ALUR_AI = {
     alasan: 'Lebih variatif dan manusiawi daripada templat.',
   },
   nlg_cek: {
-    tahap: ['validasi'],
-    judul: 'Cek aturan + validasi IndoBERT',
-    kode: 'bersihkan · periksa_aturan · validasi_nlu · nilai_kalimat',
-    tujuan: 'Memastikan kalimat sesuai rencana.',
+    tahap: ['aturan'],
+    judul: 'Cek aturan',
+    kode: 'bersihkan · periksa_aturan · nilai_kalimat',
+    tujuan: 'Menjaga kalimat tetap aman sebelum dikirim.',
     proses:
-      'Kalimat dibersihkan dan dicek (target disebut, tidak membocorkan role), lalu IndoBERT membaca ulang: intent dan target harus cocok. Gagal → ulang LLM (maks 2 kali) atau templat.',
+      'Kalimat dibersihkan dan dicek (target disebut, tidak membocorkan role, tidak mengaku AI). Gagal atau terlalu mirip → ulang LLM (maks 2 kali) atau templat.',
     keluaran: 'Kalimat yang lolos, atau alasan penolakan.',
-    alasan: 'LLM bisa melenceng; validasi menjaga kalimat sesuai keputusan metode.',
+    alasan:
+      'LLM bisa melenceng; aturan menjaga bot tidak membocorkan peran atau mengikuti injeksi dari chat.',
   },
   nlg_templat: {
     judul: 'Cadangan templat',
@@ -1441,7 +1457,7 @@ function waktuNode(trace) {
     ...(kepala ? { [kepala]: t.logika_ms } : {}),
     penjelasan: t.penjelasan_ms,
     nlg_llm: t.llm_ms,
-    nlg_cek: t.validasi_ms,
+    nlg_cek: waktuAturan(t),
     output: trace.duration_ms,
   };
 }
@@ -1583,7 +1599,7 @@ function dataNode(id, trace) {
           ['Kalimat', nlg.teks],
           ['Sumber', SUMBER_NLG[nlg.sumber] || nlg.sumber],
           ['LLM', duration(t.llm_ms)],
-          ['Cek + validasi', duration(t.validasi_ms)],
+          ['Cek aturan', duration(waktuAturan(t))],
           ['Pelanggaran', nlg.pelanggaran],
         ])
       : nlgBelum(nlg);
@@ -2100,7 +2116,6 @@ function showNpc(data, { form = true } = {}) {
   npcChainStatus = Object.fromEntries(chain.map((row) => [row.jalur, row]));
   if (form || !npcChain.length) {
     fillSelect($('npc-writer'), data.pilihan.penulis, status.penulis_diminta);
-    $('npc-validate').checked = status.validasi;
     npcChain = chain.map((row) => ({
       jalur: row.jalur,
       dipakai: (status.urutan_penulis ?? []).includes(row.jalur),
@@ -2575,7 +2590,6 @@ $('npc-form').onsubmit = handle(async () => {
       '/api/panel/npc',
       {
         penulis: $('npc-writer').value,
-        validasi: $('npc-validate').checked,
         urutan_penulis: npcChain.filter((item) => item.dipakai).map((item) => item.jalur),
         model_openrouter: $('npc-openrouter-model').value.trim(),
         model_tautan: $('npc-link-model').value,
@@ -2592,12 +2606,7 @@ $('npc-form').onsubmit = handle(async () => {
 });
 // Refresh manual memuat ulang form dari server (editan yang belum disimpan dibuang).
 $('refresh-npc').onclick = handle(() => loadNpc());
-for (const id of [
-  'npc-writer',
-  'npc-validate',
-  'npc-openrouter-model',
-  'npc-link-model',
-])
+for (const id of ['npc-writer', 'npc-openrouter-model', 'npc-link-model'])
   for (const type of ['input', 'change'])
     $(id).addEventListener(type, () => {
       npcDirty = true;

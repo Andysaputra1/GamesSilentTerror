@@ -1,4 +1,4 @@
-"""Konfigurasi otak NPC dari panel (penulis kalimat, rantai penulis, validasi); .env tetap nilai awal.
+"""Konfigurasi otak NPC dari panel (penulis kalimat dan rantai penulis); .env tetap nilai awal.
 
 Disimpan di baris panel_configuration id=2 agar tidak bercampur dengan konfigurasi provider LLM
 (id=1) yang ditulis ulang utuh oleh save_panel_configuration.
@@ -40,7 +40,6 @@ def load_npc_configuration():
             # Baris lama tanpa urutan/model penulis → None → nilai .env dipertahankan.
             brain_runtime.atur(
                 penulis=stored.get("penulis"),
-                validasi=stored.get("validasi"),
                 urutan_penulis=stored.get("urutan_penulis"),
                 model_openrouter=stored.get("model_openrouter"),
                 model_tautan=stored.get("model_tautan"),
@@ -50,20 +49,16 @@ def load_npc_configuration():
 
 
 # Validasi lewat runtime terlebih dahulu, simpan nilai efektifnya, lalu kembalikan ringkasan terbaru.
-def save_npc_configuration(
-    penulis, validasi, urutan_penulis=None, model_openrouter=None, model_tautan=None
-):
+def save_npc_configuration(penulis, urutan_penulis=None, model_openrouter=None, model_tautan=None):
     before = brain_runtime.ringkasan()
     summary = brain_runtime.atur(
         penulis=penulis,
-        validasi=validasi,
         urutan_penulis=urutan_penulis,
         model_openrouter=model_openrouter,
         model_tautan=model_tautan,
     )
     config = {
         "penulis": summary["penulis_diminta"],
-        "validasi": summary["validasi"],
         "urutan_penulis": summary["urutan_penulis"],
         "model_openrouter": summary["model_openrouter"],
         "model_tautan": summary["model_tautan"],
@@ -84,7 +79,6 @@ def save_npc_configuration(
         # Gagal simpan: kembalikan runtime ke konfigurasi sebelumnya agar panel dan server konsisten.
         brain_runtime.atur(
             penulis=before["penulis_diminta"],
-            validasi=before["validasi"],
             urutan_penulis=before["urutan_penulis"],
             model_openrouter=before["model_openrouter"],
             model_tautan=before["model_tautan"],
