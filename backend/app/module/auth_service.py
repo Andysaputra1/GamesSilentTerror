@@ -1,4 +1,7 @@
-"""Layanan login dan sesi: token buram yang disimpan di MySQL dan bisa dicabut."""
+"""Layanan login dan sesi: token buram yang disimpan di MySQL dan bisa dicabut.
+
+DB hanya menyimpan hash SHA-256 token, bukan token asli. Waktu memakai UTC tanpa zona, karena kolom DATETIME MySQL tidak menyimpan zona waktu.
+"""
 
 from __future__ import annotations
 
@@ -46,16 +49,6 @@ class LoginResult:
     user: AuthenticatedUser
 
 
-# Hash SHA-256 agar database tidak menyimpan token sesi dalam bentuk asli.
-def _hash_token(token: str) -> str:
-    return hashlib.sha256(token.encode("utf-8")).hexdigest()
-
-
-# Waktu UTC tanpa metadata zona, karena kolom DATETIME MySQL tidak menyimpan zona waktu.
-def _waktu_utc_sekarang() -> datetime:
-    return datetime.now(timezone.utc).replace(tzinfo=None)
-
-
 class AuthService:
     """Memeriksa kredensial serta membuat dan mencabut sesi di database."""
 
@@ -89,11 +82,13 @@ class AuthService:
                 raise AuthenticationError("Username atau password tidak valid.")
 
             token = secrets.token_urlsafe(32)
-            waktu_kedaluwarsa = _waktu_utc_sekarang() + timedelta(hours=settings.auth_session_hours)
+            waktu_kedaluwarsa = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(
+                hours=settings.auth_session_hours
+            )
             auth_queries.create_session(
                 database,
                 user_id=akun["id"],
-                token_hash=_hash_token(token),
+                token_hash=hashlib.sha256(token.encode("utf-8")).hexdigest(),
                 expires_at=waktu_kedaluwarsa,
             )
             return LoginResult(
@@ -116,7 +111,9 @@ class AuthService:
 
         akun = self._jalankan_transaksi(
             lambda database: auth_queries.account_for_token(
-                database, _hash_token(token), _waktu_utc_sekarang()
+                database,
+                hashlib.sha256(token.encode("utf-8")).hexdigest(),
+                datetime.now(timezone.utc).replace(tzinfo=None),
             )
         )
         if akun is None:
@@ -171,7 +168,7 @@ class AuthService:
             return
 
         def hapus_sesi(database: Session) -> None:
-            auth_queries.delete_session(database, _hash_token(token))
+            auth_queries.delete_session(database, hashlib.sha256(token.encode("utf-8")).hexdigest())
 
         self._jalankan_transaksi(hapus_sesi)
 

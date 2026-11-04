@@ -1,7 +1,8 @@
 """Controller HTTP untuk login, pendaftaran akun, dan verifikasi identitas Google."""
 
 from collections import OrderedDict
-from datetime import timedelta, timezone
+from datetime import datetime, timedelta, timezone
+import hashlib
 import secrets
 from threading import RLock
 import time
@@ -32,8 +33,6 @@ from app.module.auth_service import (
     AuthenticationPersistenceError,
     LoginResult,
     auth_service,
-    _hash_token,
-    _waktu_utc_sekarang,
 )
 from app.module.password_service import hash_password
 
@@ -190,9 +189,14 @@ def issue_session(database, akun):
     if not akun["is_active"]:
         raise AuthenticationError("Akun tidak aktif.")
     token = secrets.token_urlsafe(32)
-    waktu_kedaluwarsa = _waktu_utc_sekarang() + timedelta(hours=settings.auth_session_hours)
+    waktu_kedaluwarsa = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(
+        hours=settings.auth_session_hours
+    )
     auth_queries.create_session(
-        database, user_id=akun["id"], token_hash=_hash_token(token), expires_at=waktu_kedaluwarsa
+        database,
+        user_id=akun["id"],
+        token_hash=hashlib.sha256(token.encode("utf-8")).hexdigest(),
+        expires_at=waktu_kedaluwarsa,
     )
     return LoginResult(
         token,
