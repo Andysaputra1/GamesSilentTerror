@@ -95,128 +95,123 @@ class SocketGameController:
         self.sockets.pop(sid, None)
         logger.info("Pemain keluar dari Socket: %s", sid)
 
-    # Validasi sesi dan hak chat, simpan pesan, lalu broadcast. Setelah itu IndoBERT membaca pesan sekali
-    # (tahap 5) untuk checker dan riwayat chat; hasilnya masuk memo NLU sehingga bot memakainya di langkah
-    # NPCService berikutnya tanpa menghitung ulang. Handler ini tidak membalas pesan.
-    async def _send_chat(self, sid: str, data: dict[str, Any], wadah_jejak) -> None:
-        # TAHAP 1: terima event send_chat; validasi isi pesan dan identitas sesi.
-        try:
-            if not isinstance(data, dict) or not isinstance(data.get("message"), str):
-                raise ValueError("Format pesan tidak valid.")
-            pengirim = str(data.get("username", "")).strip()
-            pesan = str(data.get("message", "")).strip()
-            if not pesan or len(pesan) > 1000:
-                raise ValueError("Pesan chat harus berisi 1–1000 karakter.")
-            # Socket sudah masuk kanal ruangan saat connect; pemain dicatat di transaksi pesan (tahap 3).
-            kode_room = self._verifikasi_socket(sid, pengirim)
-        except ValueError as error:
-            await self.sio.emit("system_alert", {"msg": str(error)}, to=sid)
-            return
-
-        room = room_service.get(kode_room, pengirim)
-        # TAHAP 2: engine mengotorisasi pesan sebelum disimpan atau ditampilkan.
-        chat_terkunci = False
-        with room_service.lock:
-            pertandingan = room.match
-            if pertandingan:
-                # tick dulu: jam baru berdetak tiap 0,5 detik, jadi fase bisa belum terbarui.
-                pertandingan.tick()
-                chat_terkunci = not pertandingan.can_chat(pengirim)
-                # Penanda fase ini; dibandingkan lagi di tahap 3 untuk tahu fase sudah berubah atau belum.
-                token_fase = (pertandingan.id, pertandingan.round, pertandingan.phase)
-            else:
-                token_fase = None
-        if chat_terkunci:
-            activity.record(
-                kode_room,
-                "Match.can_chat",
-                {"username": pengirim},
-                status="rejected",
-                result={"allowed": False},
-            )
-            await self.sio.emit(
-                "system_alert", {"msg": "Chat terkunci untukmu pada fase ini."}, to=sid
-            )
-            return
-        # Jejak debugging pesan (tahap dan durasi) untuk checker di panel.
-        jejak = checker_service.begin(kode_room, pengirim, pesan)
-        wadah_jejak["trace"] = jejak
-        jejak["match_id"] = token_fase[0] if token_fase else None
-        activity.record(
-            kode_room,
-            "SocketGameController.send_chat",
-            {"username": pengirim, "message": pesan},
-            status="received",
-            call_id=jejak["id"],
-        )
-
-        konteks = (
-            {"match_id": token_fase[0], "round_number": token_fase[1], "phase": token_fase[2]}
-            if token_fase
-            else {"phase": "lobby"}
-        )
-        pesan_diterima = {"sender": pengirim, "message": pesan}
-        try:
-            # TAHAP 3: simpan pesan. Aksi/skip HTTP bisa berjalan bersamaan, jadi periksa ulang dan
-            # commit di lock yang sama supaya Gag atau fase baru tidak diterobos.
-            with measure(jejak, "persistence_ms"), room_service.lock:
-                room_terkini = room_service.get(kode_room, pengirim)
-                if room_terkini is not room or room_terkini.match is not pertandingan:
-                    raise ValueError("Ruangan sudah berubah. Kirim ulang pada fase yang sesuai.")
-                if pertandingan:
-                    pertandingan.tick()
-                    if token_fase != (
-                        pertandingan.id,
-                        pertandingan.round,
-                        pertandingan.phase,
-                    ) or not pertandingan.can_chat(pengirim):
-                        raise ValueError(
-                            "Chat terkunci atau fase sudah berubah. Pesan tidak dikirim."
-                        )
-                jejak["message_id"] = PersistenceService(kode_room).record_player_message(
-                    username=pengirim,
-                    message=pesan,
-                    status="active",  # Gag/Hostage ditegakkan Match.can_chat, bukan status arsip
-                    context=konteks,
-                )
-                if pertandingan:
-                    pesan_diterima = pertandingan.add_message(pengirim, pesan)
-            activity.record(
-                kode_room,
-                "PersistenceService.record_player_message",
-                {"username": pengirim},
-                result={"message_id": jejak["message_id"]},
-                call_id=jejak["id"],
-            )
-        except ValueError as error:
-            jejak.update(stage="discarded_state_changed", error=str(error))
-            await self.sio.emit("system_alert", {"msg": str(error)}, to=sid)
-            return
-        except PersistenceError as error:
-            jejak.update(stage="persistence_error", error=str(error))
-            await self.sio.emit("system_alert", {"msg": str(error)}, to=sid)
-            return
-        # TAHAP 4: kirim pesan ke semua anggota ruangan.
-        with measure(jejak, "broadcast_ms"):
-            await self.emit_room("receive_chat", pesan_diterima, to=kode_room)
-        jejak["stage"] = "delivered"
-        # TAHAP 5: catat bacaan IndoBERT (intent, target) untuk checker dan riwayat chat panel.
-        if pertandingan:
-            with measure(jejak, "nlu_ms"):
-                jejak["nlu"] = await catat_nlu(
-                    pertandingan, pengirim, pesan, jejak["message_id"], room_code=kode_room
-                )
-
-    # Jalan saat pemain mengirim chat. Kerjanya ada di _send_chat, sedangkan fungsi ini memastikan jejak pesan tersimpan.
+    # Jalan saat pemain mengirim chat, lewat 5 tahap di bawah. Fungsi ini tidak membalas pesan.
     # Jejak = catatan tahap dan durasi satu pesan, yang tampil di panel checker.
+    # IndoBERT membaca pesan sekali di tahap 5; hasilnya masuk memo NLU, jadi langkah bot berikutnya tidak menghitung ulang.
     async def send_chat(self, sid: str, data: dict[str, Any]) -> None:
         waktu_mulai = perf_counter()
-        # Wadah agar jejak tetap terbaca di finally walaupun _send_chat berhenti di tengah jalan.
-        wadah_jejak = {}
+        # Diisi di tahap 2. finally tetap membacanya walau fungsi ini berhenti di tengah jalan.
+        jejak = None
         try:
-            await self._send_chat(sid, data, wadah_jejak)
+            # TAHAP 1: terima event send_chat; validasi isi pesan dan identitas sesi.
+            try:
+                if not isinstance(data, dict) or not isinstance(data.get("message"), str):
+                    raise ValueError("Format pesan tidak valid.")
+                pengirim = str(data.get("username", "")).strip()
+                pesan = str(data.get("message", "")).strip()
+                if not pesan or len(pesan) > 1000:
+                    raise ValueError("Pesan chat harus berisi 1–1000 karakter.")
+                # Socket sudah masuk kanal ruangan saat connect; pemain dicatat di transaksi pesan (tahap 3).
+                kode_room = self._verifikasi_socket(sid, pengirim)
+            except ValueError as error:
+                await self.sio.emit("system_alert", {"msg": str(error)}, to=sid)
+                return
+
+            room = room_service.get(kode_room, pengirim)
+            # TAHAP 2: engine mengotorisasi pesan sebelum disimpan atau ditampilkan.
+            chat_terkunci = False
+            with room_service.lock:
+                pertandingan = room.match
+                if pertandingan:
+                    # tick dulu: jam baru berdetak tiap 0,5 detik, jadi fase bisa belum terbarui.
+                    pertandingan.tick()
+                    chat_terkunci = not pertandingan.can_chat(pengirim)
+                    # Penanda fase ini; dibandingkan lagi di tahap 3 untuk tahu fase sudah berubah atau belum.
+                    token_fase = (pertandingan.id, pertandingan.round, pertandingan.phase)
+                else:
+                    token_fase = None
+            if chat_terkunci:
+                activity.record(
+                    kode_room,
+                    "Match.can_chat",
+                    {"username": pengirim},
+                    status="rejected",
+                    result={"allowed": False},
+                )
+                await self.sio.emit(
+                    "system_alert", {"msg": "Chat terkunci untukmu pada fase ini."}, to=sid
+                )
+                return
+            # Jejak debugging pesan (tahap dan durasi) untuk checker di panel.
+            jejak = checker_service.begin(kode_room, pengirim, pesan)
+            jejak["match_id"] = token_fase[0] if token_fase else None
+            activity.record(
+                kode_room,
+                "SocketGameController.send_chat",
+                {"username": pengirim, "message": pesan},
+                status="received",
+                call_id=jejak["id"],
+            )
+
+            konteks = (
+                {"match_id": token_fase[0], "round_number": token_fase[1], "phase": token_fase[2]}
+                if token_fase
+                else {"phase": "lobby"}
+            )
+            pesan_diterima = {"sender": pengirim, "message": pesan}
+            try:
+                # TAHAP 3: simpan pesan. Aksi/skip HTTP bisa berjalan bersamaan, jadi periksa ulang dan
+                # commit di lock yang sama supaya Gag atau fase baru tidak diterobos.
+                with measure(jejak, "persistence_ms"), room_service.lock:
+                    room_terkini = room_service.get(kode_room, pengirim)
+                    if room_terkini is not room or room_terkini.match is not pertandingan:
+                        raise ValueError(
+                            "Ruangan sudah berubah. Kirim ulang pada fase yang sesuai."
+                        )
+                    if pertandingan:
+                        pertandingan.tick()
+                        if token_fase != (
+                            pertandingan.id,
+                            pertandingan.round,
+                            pertandingan.phase,
+                        ) or not pertandingan.can_chat(pengirim):
+                            raise ValueError(
+                                "Chat terkunci atau fase sudah berubah. Pesan tidak dikirim."
+                            )
+                    jejak["message_id"] = PersistenceService(kode_room).record_player_message(
+                        username=pengirim,
+                        message=pesan,
+                        status="active",  # Gag/Hostage ditegakkan Match.can_chat, bukan status arsip
+                        context=konteks,
+                    )
+                    if pertandingan:
+                        pesan_diterima = pertandingan.add_message(pengirim, pesan)
+                activity.record(
+                    kode_room,
+                    "PersistenceService.record_player_message",
+                    {"username": pengirim},
+                    result={"message_id": jejak["message_id"]},
+                    call_id=jejak["id"],
+                )
+            except ValueError as error:
+                jejak.update(stage="discarded_state_changed", error=str(error))
+                await self.sio.emit("system_alert", {"msg": str(error)}, to=sid)
+                return
+            except PersistenceError as error:
+                jejak.update(stage="persistence_error", error=str(error))
+                await self.sio.emit("system_alert", {"msg": str(error)}, to=sid)
+                return
+            # TAHAP 4: kirim pesan ke semua anggota ruangan.
+            with measure(jejak, "broadcast_ms"):
+                await self.emit_room("receive_chat", pesan_diterima, to=kode_room)
+            jejak["stage"] = "delivered"
+            # TAHAP 5: catat bacaan IndoBERT (intent, target) untuk checker dan riwayat chat panel.
+            if pertandingan:
+                with measure(jejak, "nlu_ms"):
+                    jejak["nlu"] = await catat_nlu(
+                        pertandingan, pengirim, pesan, jejak["message_id"], room_code=kode_room
+                    )
         finally:
-            jejak = wadah_jejak.get("trace")
             if jejak:
                 jejak["duration_ms"] = round((perf_counter() - waktu_mulai) * 1000, 2)
                 try:
