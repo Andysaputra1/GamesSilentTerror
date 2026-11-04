@@ -1,8 +1,8 @@
 """FILE INI DIHASILKAN OTOMATIS oleh scripts/ekspor_otak_npc.py. JANGAN DIEDIT MANUAL.
 
 Sumber : npc_fuzzy.ipynb
-Sidik  : 15003e70228f7690
-Dibuat : 2026-11-04 09:07 UTC
+Sidik  : aeb99a6f18aa6b2f
+Dibuat : 2026-11-04 09:14 UTC
 
 Perubahan logika bot dilakukan di notebook skripsi, dijalankan ulang sampai semua
 skenario/pengujian lulus, lalu diekspor ulang dengan skrip ini.
@@ -72,6 +72,8 @@ HENING_FRAKSI = 0.20
 
 HENING_MIN_DETIK = 15
 
+KALIMAT_SALAH_VOTE = "Kalau salah vote kita bisa kalah."
+
 KALIMAT_HENING = "Kok sepi ya, belum ada yang cerita."
 
 VOTE_TUNGGU_FRAKSI = 0.50
@@ -85,6 +87,16 @@ BATAS_SANDERA_VOTE = 0.70
 BATAS_SANDERA_AKSI = 0.60
 
 BATAS_TERSANGKA_JAGA = 0.60
+
+BATAS_SUARA_TERANCAM = 0.30
+
+BATAS_TEKANAN_TERANCAM = 0.50
+
+BATAS_WARGA_KRITIS = 0.75
+
+RONDE_AWAL = 2
+
+RISIKO_TINGGI = 0.60
 
 URUTAN_FASE = {"day": 0, "tribunal": 1, "night": 2}
 
@@ -1252,6 +1264,53 @@ def urutkan_kandidat(tabel, kolom="kecurigaan"):
     keunggulan = 1.0 if len(skor) < 2 else float(np.clip((skor[0] - skor[1]) / 0.30, 0, 1))
     return kandidat, keunggulan
 
+# Role yang diakui bot saat membuka role: (role, bukti_klaim, relasi_tambahan). Role asli tidak ikut ke rencana. Hitman memakai
+# Civilian palsu, atau Spy palsu saat risikonya tinggi. Tidak ada malam sebelum ronde 1, jadi Guard palsu baru ada sesudahnya.
+def klaim_role_bot(ctx):
+    peran, saya, ronde = ctx["peran"], ctx["view"]["saya"], ctx["view"]["ronde"]
+    if peran == "hitman":
+        if ctx["diri"]["risiko_saya"] < RISIKO_TINGGI:
+            return "civilian", None, []
+        warga = ctx["fitur_hitman"].sort_values(["kecurigaan_publik", "pemain"], kind="stable")["pemain"].tolist()
+        return "spy", (f"semalam jaga {warga[0]}" if warga and ronde > 1 else None), []
+    if peran == "spy":
+        return "spy", (f"semalam jaga {saya['last_guard']}" if saya.get("last_guard") else None), []
+    if peran == "stalker" and ctx["ingatan"].intel:
+        x = ctx["ingatan"].intel[-1]
+        hitman = x["peran"] == "hitman"
+        # Hasil Peek menyebut orang itu langsung, jadi ia ikut menjadi target. Saksi Guard tidak.
+        return ("stalker", f"semalam peek {x['pemain']}, dia {'Hitman' if hitman else 'bukan Hitman'}",
+                [{"pemain": x["pemain"], "relasi": "offend" if hitman else "defend"}])
+    return peran, None, []
+
+# Satu kandidat bela_diri menurut aturan berurutan: buka role saat terdesak, persuade terlalu awal, tunjuk orang lain, persuade
+# bahaya salah vote, lalu sangkalan biasa. Role hanya dibuka sekali per game. Kalimat selain tunjuk orang wajib memuat penolakan vote.
+def calon_bela_diri(ctx, dituduh, tersangka, bukti_tersangka):
+    konteks, ingatan, view, bot = ctx["konteks"], ctx["ingatan"], ctx["view"], ctx["bot"]
+    baris = baris_pemain(ctx["tabel"], bot)
+    hampir_kalah = konteks["warga_terdesak"] >= BATAS_WARGA_KRITIS
+    terdesak = (konteks["porsi_suara"].get(bot, 0.0) >= BATAS_SUARA_TERANCAM or baris["tekanan"] >= BATAS_TEKANAN_TERANCAM
+                or hampir_kalah)
+    dasar = {"aksi": "bela_diri", "target": bot, "pemicu": dituduh}
+    if terdesak and not any(a.get("role_diakui") for a in ingatan.aksi_bot):
+        role, bukti, relasi = klaim_role_bot(ctx)
+        sebutan = f"cuma {role.capitalize()}" if role == "civilian" else role.capitalize()
+        kalimat = f"Jangan vote aku, aku {sebutan}"
+        if bukti:
+            return {**dasar, "jenis": "role_bukti_aksi", "role_diakui": role, "bukti_klaim": bukti, "relasi_tambahan": relasi,
+                    "alasan": [f"{kalimat}, {bukti.replace('semalam ', 'semalam aku ', 1)}."]}
+        return {**dasar, "jenis": "buka_role", "role_diakui": role, "alasan": [f"{kalimat}."]}
+    if view["ronde"] <= RONDE_AWAL and baris["n_penuduh"] <= 1:
+        return {**dasar, "jenis": "terlalu_awal", "alasan": ["Jangan vote aku, masih terlalu awal, buktinya belum ada."]}
+    if tersangka is not None:
+        return {**dasar, "target": tersangka, "jenis": "tunjuk_orang_bahaya" if hampir_kalah else "tunjuk_orang",
+                "relasi_tambahan": [{"pemain": bot, "relasi": "defend"}],
+                "alasan": [f"Aku bukan Hitman, yang lebih mencurigakan justru {tersangka}.", *bukti_tersangka[:1],
+                           *([KALIMAT_SALAH_VOTE] if hampir_kalah else [])]}
+    if hampir_kalah:
+        return {**dasar, "jenis": "bahaya_salah_vote", "alasan": [f"Jangan vote aku, {KALIMAT_SALAH_VOTE[0].lower()}{KALIMAT_SALAH_VOTE[1:]}"]}
+    return {**dasar, "jenis": "tanpa_bukti", "alasan": ["Aku bukan Hitman; tuduhan ke aku belum punya bukti."]}
+
 # Kandidat chat role warga (Civilian, Spy, Stalker).
 def _calon_chat_warga(ctx):
     tabel, konteks, ingatan, view, izin = ctx["tabel"], ctx["konteks"], ctx["ingatan"], ctx["view"], ctx["izin"]
@@ -1263,10 +1322,7 @@ def _calon_chat_warga(ctx):
     calon = []
     dituduh, penanya = pemicu_layak(ingatan, view, konteks)
     if izin["boleh_reaktif"] and dituduh:
-        alasan = ["Aku bukan Hitman; tuduhan ke aku belum punya bukti."]
-        if bukti_teratas:
-            alasan.append(f"Yang lebih mencurigakan justru {teratas['pemain']}: {bukti_teratas[0]}")
-        calon.append({"aksi": "bela_diri", "jenis": "tanpa_bukti", "target": bot, "alasan": alasan, "pemicu": dituduh})
+        calon.append(calon_bela_diri(ctx, dituduh, teratas["pemain"] if curiga_teratas else None, bukti_teratas))
     # Bot disebut chat neutral yang belum dijawab: jawab dengan tersangka teratas bila ada. Saat dituduh,
     # bela diri sekaligus menjawab. Satu jawaban per panggilan: chat bot apa pun menutup panggilan sebelumnya.
     elif izin["boleh_reaktif"] and penanya:
@@ -1338,10 +1394,7 @@ def _calon_chat_hitman(ctx):
     calon = []
     dituduh, penanya = pemicu_layak(ingatan, view, konteks)
     if izin["boleh_reaktif"] and dituduh:
-        alasan = ["Aku bukan Hitman; tuduhan ke aku belum punya bukti."]
-        if alasan_kambing:
-            alasan.append(f"Yang lebih mencurigakan justru {kambing['pemain']}: {alasan_kambing[0]}")
-        calon.append({"aksi": "bela_diri", "jenis": "tanpa_bukti", "target": bot, "alasan": alasan, "pemicu": dituduh})
+        calon.append(calon_bela_diri(ctx, dituduh, kambing["pemain"] if kambing is not None else None, alasan_kambing))
     # Dipanggil: Hitman menjawab seperti warga, dengan kambing hitam bila ada (jawaban menipu dari bukti publik).
     elif izin["boleh_reaktif"] and penanya:
         calon.append({"aksi": "jawab", "intent": "offend" if kambing is not None else "neutral",
@@ -1544,9 +1597,9 @@ def templat_pesan(rencana):
     }
     if rencana.get("jenis") in templat_jenis:
         return templat_jenis[rencana["jenis"]].strip()
+    if rencana["aksi"] == "bela_diri":
+        return " ".join(rencana["alasan"]).strip()
     templat = {
-        "bela_diri": "Aku bukan Hitman. " + (rencana["alasan"][1] if len(rencana["alasan"]) > 1 else
-                                             "Tuduhan ke aku belum ada buktinya, coba cek lagi."),
         # Jawaban netral yang terbaca netral oleh IndoBERT (versi lama dengan "mencurigakan" terbaca menuduh).
         "jawab": (f"Kalau aku sih curiga {t}. {bukti}" if t else "Aku belum yakin siapa-siapa. Kalian curiga siapa?"),
         "bela_orang": f"Aku rasa {t} bukan Hitman, tuduhannya belum ada bukti.",

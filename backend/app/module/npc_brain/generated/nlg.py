@@ -1,8 +1,8 @@
 """FILE INI DIHASILKAN OTOMATIS oleh scripts/ekspor_otak_npc.py. JANGAN DIEDIT MANUAL.
 
 Sumber : npc_nlg.ipynb
-Sidik  : ed528f2934438ddf
-Dibuat : 2026-11-04 09:03 UTC
+Sidik  : d36670cf0d7ba1a4
+Dibuat : 2026-11-04 09:14 UTC
 
 Perubahan logika bot dilakukan di notebook skripsi, dijalankan ulang sampai semua
 skenario/pengujian lulus, lalu diekspor ulang dengan skrip ini.
@@ -109,6 +109,12 @@ VARIASI = {
         "Kok aku sih? Aku warga, bukan Hitman.",
         "Tunggu dulu, aku bukan Hitman. {b2|Coba cek lagi siapa yang dari tadi mengalihkan tuduhan.}",
     ],
+    # Target bela diri jenis tunjuk orang adalah orang lain, jadi kalimatnya wajib menyebut orang itu.
+    "bela_diri_tunjuk": [
+        "Aku bukan Hitman, justru {t} yang lebih mencurigakan.",
+        "Kok aku? Aku bukan Hitman, yang lebih aneh itu {t}.",
+        "Aku bukan Hitman. Coba perhatikan {t} deh. {b2|}",
+    ],
     "jawab_target": [
         "Kalau aku sih paling curiga sama {t}. {b1}",
         "Menurutku {t} yang paling mencurigakan. {b1}",
@@ -173,6 +179,8 @@ def kelompok_varian(p):
         return "klaim_palsu"
     if p["aksi"] == "tanya_info" and p["target"]:
         return "ajak_bicara"
+    if p["aksi"] == "bela_diri" and p["target"] != p["pembicara"]:
+        return "bela_diri_tunjuk"
     if p["aksi"] == "bela_orang" and p["klaim"]:
         return "bela_orang_klaim"
     if p["aksi"] == "tanya_info" and p["bukti"]:
@@ -878,6 +886,7 @@ MAKSUD_AKSI = {
     "ungkap": "Mengaku sebagai Stalker dan menyampaikan hasil Peek bahwa {t} adalah Hitman, lalu mengajak semua vote {t}.",
     "klaim_palsu": "Mengaku sebagai Stalker dan menyampaikan hasil Peek semalam bahwa {t} adalah Hitman.",
     "bela_diri": "Membela diri sendiri dari tuduhan: tegaskan kamu bukan Hitman.",
+    "bela_diri_tunjuk": "Membela diri sendiri: tegaskan kamu bukan Hitman, lalu sampaikan bahwa {t} lebih mencurigakan.",
     "jawab_target": ("Menjawab langsung pertanyaan yang {penanya} tujukan kepadamu (lihat <pemicu>): intinya kamu "
                      "paling curiga pada {t}, sertakan alasannya."),
     "jawab_netral": ("Menjawab langsung pertanyaan yang {penanya} tujukan kepadamu (lihat <pemicu>) tanpa menuduh "
