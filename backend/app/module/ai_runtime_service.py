@@ -1,7 +1,14 @@
 """Override provider satu proses. .env tetap sumber default setelah restart."""
 
+import json
 from threading import RLock
+
+from cryptography.fernet import Fernet, InvalidToken
+from pydantic import SecretStr
+from sqlalchemy import text
+
 from app.config.settings import settings
+from app.module.persistence_service import PersistenceError, PersistenceService
 
 
 class AIRuntimeService:
@@ -30,11 +37,9 @@ class AIRuntimeService:
 ai_runtime = AIRuntimeService()
 
 
-# Bangun cipher dari kunci server; tolak penyimpanan jika kunci belum valid.
+# Buat alat enkripsi dari PANEL_ENCRYPTION_KEY; tolak penyimpanan jika kunci belum valid.
+# Alur: 1 cek kunci server -> 2 buat cipher
 def _cipher():
-    from cryptography.fernet import Fernet
-    from app.module.persistence_service import PersistenceError
-
     try:
         if not settings.panel_encryption_key:
             raise ValueError()
@@ -45,12 +50,9 @@ def _cipher():
         ) from error
 
 
-# Pulihkan konfigurasi tersimpan dan dekripsi kunci hanya untuk sumber kustom.
+# Ubah isi baris DB menjadi nilai yang dipakai program. API key dibuka hanya untuk sumber kustom.
+# Alur: 1 salin isi baris -> 2 ambil key terenkripsi -> 3 dekripsi API key -> 4 dekripsi token tunnel
 def _decode_config(stored):
-    from pydantic import SecretStr
-    from cryptography.fernet import InvalidToken
-    from app.module.persistence_service import PersistenceError
-
     override = dict(stored)
     override.pop("api_backend", None)  # kunci lama; OpenAI langsung sudah dihapus
     token = override.pop("ollama_tunnel_token_encrypted", None)
@@ -79,25 +81,22 @@ def _decode_config(stored):
     return override
 
 
-# Muat konfigurasi panel tersimpan sebagai override saat backend dimulai.
-def load_panel_configuration():
-    import json
-    from sqlalchemy import text
-    from app.module.persistence_service import PersistenceService
-
-    # Baca satu dokumen konfigurasi panel dan normalisasi JSON dari driver database.
-    def read(db):
-        value = db.execute(text("SELECT config FROM panel_configuration WHERE id=1")).scalar()
-        return json.loads(value) if isinstance(value, str) else value
-
-    stored = PersistenceService._run(read)
+# Ambil konfigurasi AI yang disimpan di panel saat server nyala, supaya key dan link tidak hilang
+# saat restart. Baris kosong bukan error: bot memakai nilai .env.
+# Alur: 1 tarik data DB -> 2 cek isi -> 3 dekripsi key -> 4 simpan ke memori
+def muat_konfigurasi_ai():
+    nilai = PersistenceService._run(
+        lambda db: db.execute(text("SELECT config FROM panel_configuration WHERE id=1")).scalar()
+    )
+    stored = json.loads(nilai) if isinstance(nilai, str) else nilai
     if stored:
         override = _decode_config(stored)
         with ai_runtime.lock:
             ai_runtime.override = override
 
 
-# Enkripsi kunci, simpan konfigurasi secara atomik, lalu terapkan override.
+# Simpan konfigurasi AI dari panel ke DB dan memori, supaya langsung berlaku tanpa restart.
+# Alur: 1 baca isi lama (baris dikunci) -> 2 susun isi baru dan enkripsi key -> 3 uji dekripsi -> 4 tulis DB -> 5 simpan ke memori
 def save_panel_configuration(
     provider,
     endpoint,
@@ -107,10 +106,6 @@ def save_panel_configuration(
     clear_tunnel_token=False,
     model=None,
 ):
-    import json
-    from sqlalchemy import text
-    from app.module.persistence_service import PersistenceService
-
     stored = {
         "ai_provider": provider,
         "openrouter_model": "qwen/qwen3-14b",

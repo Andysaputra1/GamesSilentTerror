@@ -7,41 +7,41 @@ has its own event controller.
 
 from __future__ import annotations
 
-from contextlib import asynccontextmanager
-import logging
 import asyncio
-from contextlib import suppress
-from app.module.room_service import room_service
+from contextlib import asynccontextmanager, suppress
+import logging
 
 import socketio
 from fastapi import FastAPI
 
 from app.controller.controller_main import api_router
 from app.controller.middleware.cors import configure_cors
+from app.module.ai_runtime_service import muat_konfigurasi_ai
 from app.module.mysql_connector import engine, database_is_ready
 from app.config.settings import settings
 from app.controller.realtime.socket_handlers import register_socket_handlers
 from app.module.npc_service import NPCService
 from app.module.npc_brain.runtime import brain_runtime
 from app.module.npc_config_service import load_npc_configuration
+from app.module.persistence_service import PersistenceError
+from app.module.room_service import room_service
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("shadow_heist")
 
 
+# Mengatur hidup server: yang dijalankan saat server nyala dan saat server mati.
+# Alur: 1 cek MySQL -> 2 muat konfigurasi panel -> 3 muat otak bot di latar -> 4 nyalakan jam
+# -> 5 layani pemain -> 6 saat mati: hentikan jam, bot, thread otak, lalu koneksi MySQL
 @asynccontextmanager
-# LIFECYCLE ASYNC: cek MySQL saat startup; tutup pool koneksi saat aplikasi berhenti.
 async def lifespan(_: FastAPI):
     """Validate connectivity without changing schema."""
     if database_is_ready():
         logger.info("Koneksi MySQL siap.")
-        from app.module.ai_runtime_service import load_panel_configuration
-        from app.module.persistence_service import PersistenceError
-
         try:
-            load_panel_configuration()
-        except PersistenceError:
-            logger.error("Konfigurasi panel belum tersedia; jalankan migrasi V6.")
+            muat_konfigurasi_ai()
+        except PersistenceError as error:
+            logger.error("Konfigurasi AI panel gagal dimuat; memakai .env: %s", error)
         try:
             load_npc_configuration()
         except PersistenceError:
@@ -52,7 +52,8 @@ async def lifespan(_: FastAPI):
     # Otak NPC (IndoBERT + fuzzy + NLG) dimuat di latar agar server langsung melayani.
     brain_runtime.mulai_memuat()
 
-    # Timer server tidak bergantung pada tab pemain atau kecepatan respons LLM.
+    # Jam permainan: tiap 0,5 detik, tidak bergantung pada tab pemain atau kecepatan respons LLM.
+    # Alur: 1 ganti fase yang waktunya habis -> 2 jalankan bot yang sudah waktunya -> 3 tunggu 0,5 detik
     async def game_clock():
         while True:
             try:

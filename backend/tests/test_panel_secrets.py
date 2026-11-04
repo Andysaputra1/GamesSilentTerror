@@ -9,7 +9,7 @@ from app.config.settings import settings
 from app.module.ai_runtime_service import (
     ai_runtime,
     save_panel_configuration,
-    load_panel_configuration,
+    muat_konfigurasi_ai,
 )
 from app.module.persistence_service import PersistenceError
 from app.controller.api.panel import router, require_panel
@@ -57,14 +57,14 @@ class PanelSecretsTests(unittest.TestCase):
         self.assertNotIn("fixture-private-key", self.stored)
         self.assertIn("openrouter_key_encrypted", json.loads(self.stored))
         ai_runtime.reset()
-        load_panel_configuration()
+        muat_konfigurasi_ai()
         self.assertEqual(
             ai_runtime.current().openrouter_api_key.get_secret_value(), "fixture-private-key"
         )
         self.assertNotIn("fixture-private-key", self.client.get("/api/panel/config").text)
         self.client.put("/api/panel/config", json={"provider": "api", "api_key": "  "})
         ai_runtime.reset()
-        load_panel_configuration()
+        muat_konfigurasi_ai()
         self.assertEqual(
             ai_runtime.current().openrouter_api_key.get_secret_value(), "fixture-private-key"
         )
@@ -90,7 +90,7 @@ class PanelSecretsTests(unittest.TestCase):
                 self.assertEqual(result.json()["token_source"], "panel")
                 self.assertNotIn("panel-token-123", result.text + self.stored)
                 ai_runtime.reset()
-                load_panel_configuration()
+                muat_konfigurasi_ai()
                 token = ai_runtime.current().ollama_tunnel_token.get_secret_value()
                 self.assertEqual(token, "panel-token-123")
                 self.client.put("/api/panel/config", json={**body, "tunnel_token": "  "})
@@ -118,7 +118,7 @@ class PanelSecretsTests(unittest.TestCase):
             self.assertEqual((view["local_model"], view["model"]), ("qwen3:4b-instruct",) * 2)
             self.client.put("/api/panel/config", json=body)  # tanpa model: pilihan lama tetap
             ai_runtime.reset()
-            load_panel_configuration()
+            muat_konfigurasi_ai()
             self.assertEqual(ai_runtime.current().ollama_model, "qwen3:4b-instruct")
             bad = self.client.put("/api/panel/config", json={**body, "model": "qwen3 4b; rm"})
             self.assertEqual(bad.status_code, 400)
@@ -137,7 +137,7 @@ class PanelSecretsTests(unittest.TestCase):
             settings, "panel_encryption_key", SecretStr(Fernet.generate_key().decode())
         ):
             with self.assertRaises(PersistenceError):
-                load_panel_configuration()
+                muat_konfigurasi_ai()
         self.assertIsNone(ai_runtime.override)
 
     def test_invalid_key_validation_does_not_echo_secret(self):
@@ -167,14 +167,14 @@ class PanelSecretsTests(unittest.TestCase):
             self.assertEqual(ai_runtime.current().openrouter_api_key_value, "custom-fixture")
             self.client.put("/api/panel/config", json={"provider": "api", "key_source": "default"})
             ai_runtime.reset()
-            load_panel_configuration()
+            muat_konfigurasi_ai()
             self.assertEqual(
                 ai_runtime.current().openrouter_api_key_value, "server-default-fixture"
             )
             self.assertTrue(self.client.get("/api/panel/config").json()["custom_configured"])
             self.client.put("/api/panel/config", json={"provider": "api", "key_source": "custom"})
             ai_runtime.reset()
-            load_panel_configuration()
+            muat_konfigurasi_ai()
             self.assertEqual(ai_runtime.current().openrouter_api_key_value, "custom-fixture")
             self.assertNotIn("custom-fixture", self.stored)
 
