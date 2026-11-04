@@ -72,12 +72,12 @@ def account_by_username(database, username):
 Pemakaian dari module:
 
 ```python
-from app.module.mysql_connector import SessionLocal
+from app.module.mysql_connector import jalankan_transaksi
 from app.models.auth_queries import account_by_username
 
-with SessionLocal.begin() as database:
-    account = account_by_username(database, "user1")
-    # account berupa mapping: account["username"], atau None jika tidak ditemukan.
+account = jalankan_transaksi(lambda database: account_by_username(database, "user1"))
+# account berupa mapping: account["username"], atau None jika tidak ditemukan.
+# Error SQL di-rollback lalu menjadi PersistenceError.
 ```
 
 SQLAlchemy digunakan sebagai konektor/pool dan pengikat parameter SQL; query
@@ -92,6 +92,7 @@ bukan setiap query. Semua perubahan tabel tetap melalui migrations.
 Environment Docker atau file `.env` di root dibaca oleh `app/config/settings.py`.
 Pengaturan MySQL didefinisikan di `app/config/mysql.py`:
 `MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_DATABASE`, `MYSQL_USER`, `MYSQL_PASSWORD`.
+`MYSQL_PASSWORD` wajib diisi: backend gagal jalan kalau kosong.
 Alias `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` juga diterima;
 jika keduanya diberikan, nama MYSQL_* diprioritaskan. Nilai DB_* harus diteruskan
 ke environment container jika menjalankan backend lewat Docker.

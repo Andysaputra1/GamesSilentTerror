@@ -64,6 +64,7 @@ class PanelTests(unittest.TestCase):
             ("erd", "ERD Silent Terror"),
             ("proses-ai", "Proses AI Silent Terror"),
             ("arsitektur", "Arsitektur Sistem Silent Terror"),
+            ("bedah-alur", "Bedah Alur Silent Terror"),
             ("kode-fuzzy", "Kode Fuzzy Logic"),
             ("diagram-alir-fuzzy", "Diagram Alir Fuzzy Logic"),
             ("kode-nlu-intent", "Kode NLU Intent"),

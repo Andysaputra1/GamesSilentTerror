@@ -898,6 +898,7 @@ test('menu dokumen membuka semua dokumen sistem, AI, dan NLU di tab baru', async
       '/panel/dokumen/arsitektur',
       '/panel/dokumen/erd',
       '/panel/dokumen/proses-ai',
+      '/panel/dokumen/bedah-alur',
       '/panel/dokumen/diagram-alir-nlu',
       '/panel/dokumen/kode-nlu-intent',
       '/panel/dokumen/kode-nlu-target',

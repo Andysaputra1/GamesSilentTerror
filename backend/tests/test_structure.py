@@ -1,7 +1,9 @@
 """Run with: python -m unittest discover -s tests -v (from backend)."""
 
 from datetime import datetime, timedelta
+import os
 import unittest
+from unittest.mock import patch
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session
@@ -19,6 +21,11 @@ class ConfigurationTests(unittest.TestCase):
         self.assertIn("a%40b", config.sqlalchemy_database_url)
         with self.assertRaises(ValueError):
             MySQLSettings(DB_PORT=70000)
+
+    # Password DB tidak punya nilai bawaan di kode.
+    def test_db_password_is_required(self):
+        with patch.dict(os.environ, {}, clear=True), self.assertRaises(ValueError):
+            MySQLSettings()
 
 
 class AccountQueryTests(unittest.TestCase):
@@ -45,6 +52,16 @@ class AccountQueryTests(unittest.TestCase):
             self.assertIsNone(auth_queries.account_by_token(db, "test", now + timedelta(hours=2)))
             self.assertEqual(auth_queries.delete_session(db, "test"), 1)
             self.assertIsNone(auth_queries.account_by_token(db, "test", now))
+            # Membuat sesi baru membersihkan sesi yang sudah kedaluwarsa.
+            auth_queries.create_session(
+                db, user_id=1, token_hash="lama", expires_at=datetime(2000, 1, 1)
+            )
+            auth_queries.create_session(
+                db, user_id=1, token_hash="baru", expires_at=datetime(2999, 1, 1)
+            )
+            self.assertEqual(
+                db.execute(text("SELECT token_hash FROM auth_sessions")).scalars().all(), ["baru"]
+            )
         engine.dispose()
 
 

@@ -20,8 +20,8 @@ class MySQLSettings(BaseSettings):
     mysql_user: str = Field(
         default="shadow_app", validation_alias=AliasChoices("MYSQL_USER", "DB_USER")
     )
+    # Tanpa nilai bawaan: server harus gagal saat password belum diisi, bukan diam-diam memakai password lain.
     mysql_password: str = Field(
-        default="shadow_app_dev_2026",
         repr=False,
         validation_alias=AliasChoices("MYSQL_PASSWORD", "DB_PASSWORD"),
     )
