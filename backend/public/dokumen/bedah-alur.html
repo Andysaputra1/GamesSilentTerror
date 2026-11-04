@@ -116,7 +116,7 @@ td code { white-space: nowrap; overflow-wrap: break-word; }
 <h1>Bedah Alur Silent Terror</h1>
 <p class="pembuka">Alur backend dari <code>main.py</code> sampai ujung tiap fungsi. Tiap bagian berisi gunanya, alurnya, kodenya, dan hal yang tidak terlihat dari kode.</p>
 <p class="ringkas"><span>✅ <b>12</b> sudah dibahas</span><span><b>24</b> belum dibahas</span><span><b>4</b> nanti, menunggu rombak otak bot</span></p>
-<p class="sumber">Kode dibaca langsung dari commit <code>301de55</code>, dibangun 2026-11-04 15:10. Bagian yang belum dibahas boleh dibaca lebih dulu, tapi belum kita periksa bersama.</p>
+<p class="sumber">Kode dibaca langsung dari commit <code>86e2ed7</code>, dibangun 2026-11-04 15:13. Bagian yang belum dibahas boleh dibaca lebih dulu, tapi belum kita periksa bersama.</p>
 </header>
 <div class="kerangka">
 <nav class="samping" aria-label="Daftar bagian"><details id="t-daftar" open><summary>Daftar bagian</summary><ul><li><a href="#t-alur-besar"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav">Alur utama main.<wbr>py</span></a></li><li><a href="#t-setup-logger"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">1</span>[SETUP LOGGER]</span></a></li><li><a href="#t-konek-socket"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">2</span>[KONEK SOCKET]</span></a><ul><li><a href="#t-allowed-origins"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">2.1</span>settings.<wbr>allowed_origins</span></a></li><li><a href="#t-socket-game-controller"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">2.2</span>SocketGameController</span></a></li><li><a href="#t-connect"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">2.3</span>connect</span></a><ul><li><a href="#t-cek-token"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">2.3.1</span>auth_service.<wbr>check_user_by_token</span></a><ul><li><a href="#t-session-local"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">2.3.1.1</span>SessionLocal</span></a><ul><li><a href="#t-database-url"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">2.3.1.1.1</span>settings.<wbr>sqlalchemy_database_url</span></a></li></ul></li><li><a href="#t-query-token"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">2.3.1.2</span>auth_queries.<wbr>account_by_token</span></a></li></ul></li><li><a href="#t-room-get"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">2.3.2</span>room_service.<wbr>get</span></a></li></ul></li><li><a href="#t-disconnect"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">2.4</span>disconnect</span></a></li><li><a href="#t-send-chat"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">2.5</span>send_chat</span></a><ul><li><a href="#t-verifikasi-socket"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">2.5.1</span>_verifikasi_socket</span></a></li><li><a href="#t-match-tick"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">2.5.2</span>Match.<wbr>tick</span></a></li><li><a href="#t-match-can-chat"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">2.5.3</span>Match.<wbr>can_chat</span></a></li><li><a href="#t-activity-record"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">2.5.4</span>activity.<wbr>record</span></a></li><li><a href="#t-checker-begin"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">2.5.5</span>checker_service.<wbr>begin</span></a></li><li><a href="#t-measure"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">2.5.6</span>measure</span></a></li><li><a href="#t-record-player-message"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">2.5.7</span>PersistenceService.<wbr>record_player_message</span></a><ul><li><a href="#t-transaksi-game"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">2.5.7.1</span>mysql_connector.<wbr>jalankan_transaksi</span></a></li><li><a href="#t-game-queries"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">2.5.7.2</span>game_queries</span></a></li></ul></li><li><a href="#t-add-message"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">2.5.8</span>Match.<wbr>add_message</span></a></li><li><a href="#t-emit-room"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">2.5.9</span>emit_room</span></a></li><li><a href="#t-catat-nlu"><span class="m m-nanti" title="nanti"></span><span class="label-nav"><span class="no">2.5.10</span>catat_nlu<span class="tag-nanti">nanti</span></span></a></li><li><a href="#t-record-trace"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">2.5.11</span>PersistenceService.<wbr>record_trace</span></a></li></ul></li></ul></li><li><a href="#t-siapkan-bot"><span class="m m-nanti" title="nanti"></span><span class="label-nav"><span class="no">3</span>[SIAPKAN BOT NPC]<span class="tag-nanti">nanti</span></span></a></li><li><a href="#t-konek-api"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">4</span>[KONEK API]</span></a></li><li><a href="#t-cors"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">5</span>[CORS]</span></a></li><li><a href="#t-routes"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">6</span>[ROUTES CONTROLLER]</span></a></li><li><a href="#t-gabung"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">7</span>[GABUNG API + SOCKET]</span></a></li><li><a href="#t-server-nyala"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">8</span>[SERVER NYALA]</span></a><ul><li><a href="#t-database-is-ready"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">8.1</span>database_is_ready</span></a></li><li><a href="#t-muat-ai"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">8.2</span>muat_konfigurasi_ai</span></a></li><li><a href="#t-load-npc"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">8.3</span>load_npc_configuration</span></a></li><li><a href="#t-mulai-memuat"><span class="m m-nanti" title="nanti"></span><span class="label-nav"><span class="no">8.4</span>brain_runtime.<wbr>mulai_memuat<span class="tag-nanti">nanti</span></span></a></li><li><a href="#t-game-clock"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">8.5</span>game_clock</span></a><ul><li><a href="#t-perbarui-fase"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">8.5.1</span>room_service.<wbr>perbarui_fase_semua_room</span></a></li><li><a href="#t-jalankan-bot"><span class="m m-nanti" title="nanti"></span><span class="label-nav"><span class="no">8.5.2</span>npc_service.<wbr>jalankan_bot_yang_sudah_waktunya<span class="tag-nanti">nanti</span></span></a></li></ul></li></ul></li><li><a href="#t-server-mati"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">9</span>[SERVER MATI]</span></a></li></ul></details></nav>
@@ -461,16 +461,10 @@ Saat SessionLocal() dipanggil (tiap kali butuh):
 <section class="bagian k1" id="t-send-chat">
 <p class="jalur"><span>main.py</span> <span class="sep">/</span> <a href="#t-konek-socket">[KONEK SOCKET]</a> <span class="sep">/</span> <span>send_chat</span></p>
 <h3 class="judul"><span class="no">2.5</span><span class="nama">send_chat</span><span class="status s-belum">belum dibahas</span></h3>
-<p class="guna">Jalan saat pemain mengirim chat. <code>send_chat</code> hanya pembungkus yang memastikan jejak tersimpan, isi kerjanya ada di <code>_send_chat</code>.</p>
+<p class="guna">Jalan saat pemain mengirim chat, lewat 5 tahap. Di akhir, jejak pesan selalu dicatat, walau chat berhenti di tengah.</p>
 <p class="label">Alur</p>
-<pre class="alur" tabindex="0">send_chat:
-  Mulai hitung waktu
-    <span class="panah">-&gt;</span> _send_chat mengerjakan semua tahap di bawah
-    <span class="panah">-&gt;</span> selesai atau berhenti di tengah, jejak yang sudah ada tetap dicatat:
-         durasi <span class="panah">-&gt;</span> <a class="ref" href="#t-record-trace">[[PersistenceService.record_trace]]</a>
-              <span class="cabang">\&gt;</span> gagal: catat di log saja
+<pre class="alur" tabindex="0">Mulai hitung waktu
 
-_send_chat:
   TAHAP 1, cek isi dan identitas
     data berupa dict dan message berupa teks?
     <span class="panah">-&gt;</span> rapikan pengirim dan pesan, panjang pesan harus 1-1000 karakter
@@ -497,141 +491,140 @@ _send_chat:
     <a class="ref" href="#t-emit-room">[[emit_room]]</a>  siarkan receive_chat ke kanal room
 
   TAHAP 5, baca
-    Ada pertandingan: <a class="ref" href="#t-catat-nlu">[[catat_nlu]]</a>  IndoBERT membaca pesan</pre>
+    Ada pertandingan: <a class="ref" href="#t-catat-nlu">[[catat_nlu]]</a>  IndoBERT membaca pesan
+
+  Selesai atau berhenti di tengah, kalau jejak sudah ada:
+    durasi <span class="panah">-&gt;</span> <a class="ref" href="#t-record-trace">[[PersistenceService.record_trace]]</a>
+         <span class="cabang">\&gt;</span> gagal: catat di log saja</pre>
 <p class="label">Kode</p>
-<figure class="blok-kode"><figcaption><code>backend/app/controller/realtime/socket_handlers.py:210-227</code></figcaption><pre class="kode" tabindex="0"><span class="ln">210</span><span class="c"># Jalan saat pemain mengirim chat. Kerjanya ada di _send_chat, sedangkan fungsi ini memastikan jejak pesan tersimpan.</span>
-<span class="ln">211</span><span class="c"># Jejak = catatan tahap dan durasi satu pesan, yang tampil di panel checker.</span>
-<span class="ln">212</span><span class="k">async</span> <span class="k">def</span> <span class="f">send_chat</span>(self, sid: str, data: dict[str, Any]) -&gt; <span class="k">None</span>:
-<span class="ln">213</span>    waktu_mulai = perf_counter()
-<span class="ln">214</span>    <span class="c"># Wadah agar jejak tetap terbaca di finally walaupun _send_chat berhenti di tengah jalan.</span>
-<span class="ln">215</span>    wadah_jejak = {}
-<span class="ln">216</span>    <span class="k">try</span>:
-<span class="ln">217</span>        <span class="k">await</span> self._send_chat(sid, data, wadah_jejak)
-<span class="ln">218</span>    <span class="k">finally</span>:
-<span class="ln">219</span>        jejak = wadah_jejak.get(<span class="s">"trace"</span>)
-<span class="ln">220</span>        <span class="k">if</span> jejak:
-<span class="ln">221</span>            jejak[<span class="s">"duration_ms"</span>] = round((perf_counter() - waktu_mulai) * <span class="n">1000</span>, <span class="n">2</span>)
-<span class="ln">222</span>            <span class="k">try</span>:
-<span class="ln">223</span>                PersistenceService(jejak[<span class="s">"room_code"</span>]).record_trace(jejak)
-<span class="ln">224</span>            <span class="k">except</span> PersistenceError:
-<span class="ln">225</span>                logger.error(
-<span class="ln">226</span>                    <span class="s">"Checker archive could not be saved for room %s"</span>, jejak[<span class="s">"room_code"</span>]
-<span class="ln">227</span>                )</pre></figure>
-<figure class="blok-kode"><figcaption><code>backend/app/controller/realtime/socket_handlers.py:98-208</code></figcaption><pre class="kode" tabindex="0"><span class="ln">98</span><span class="c"># Validasi sesi dan hak chat, simpan pesan, lalu broadcast. Setelah itu IndoBERT membaca pesan sekali</span>
-<span class="ln">99</span><span class="c"># (tahap 5) untuk checker dan riwayat chat; hasilnya masuk memo NLU sehingga bot memakainya di langkah</span>
-<span class="ln">100</span><span class="c"># NPCService berikutnya tanpa menghitung ulang. Handler ini tidak membalas pesan.</span>
-<span class="ln">101</span><span class="k">async</span> <span class="k">def</span> <span class="f">_send_chat</span>(self, sid: str, data: dict[str, Any], wadah_jejak) -&gt; <span class="k">None</span>:
-<span class="ln">102</span>    <span class="c"># TAHAP 1: terima event send_chat; validasi isi pesan dan identitas sesi.</span>
-<span class="ln">103</span>    <span class="k">try</span>:
-<span class="ln">104</span>        <span class="k">if</span> <span class="k">not</span> isinstance(data, dict) <span class="k">or</span> <span class="k">not</span> isinstance(data.get(<span class="s">"message"</span>), str):
-<span class="ln">105</span>            <span class="k">raise</span> ValueError(<span class="s">"Format pesan tidak valid."</span>)
-<span class="ln">106</span>        pengirim = str(data.get(<span class="s">"username"</span>, <span class="s">""</span>)).strip()
-<span class="ln">107</span>        pesan = str(data.get(<span class="s">"message"</span>, <span class="s">""</span>)).strip()
-<span class="ln">108</span>        <span class="k">if</span> <span class="k">not</span> pesan <span class="k">or</span> len(pesan) &gt; <span class="n">1000</span>:
-<span class="ln">109</span>            <span class="k">raise</span> ValueError(<span class="s">"Pesan chat harus berisi 1–1000 karakter."</span>)
-<span class="ln">110</span>        <span class="c"># Socket sudah masuk kanal ruangan saat connect; pemain dicatat di transaksi pesan (tahap 3).</span>
-<span class="ln">111</span>        kode_room = self._verifikasi_socket(sid, pengirim)
-<span class="ln">112</span>    <span class="k">except</span> ValueError <span class="k">as</span> error:
-<span class="ln">113</span>        <span class="k">await</span> self.sio.emit(<span class="s">"system_alert"</span>, {<span class="s">"msg"</span>: str(error)}, to=sid)
-<span class="ln">114</span>        <span class="k">return</span>
-<span class="ln">115</span>
-<span class="ln">116</span>    room = room_service.get(kode_room, pengirim)
-<span class="ln">117</span>    <span class="c"># TAHAP 2: engine mengotorisasi pesan sebelum disimpan atau ditampilkan.</span>
-<span class="ln">118</span>    chat_terkunci = <span class="k">False</span>
-<span class="ln">119</span>    <span class="k">with</span> room_service.lock:
-<span class="ln">120</span>        pertandingan = room.match
-<span class="ln">121</span>        <span class="k">if</span> pertandingan:
-<span class="ln">122</span>            <span class="c"># tick dulu: jam baru berdetak tiap 0,5 detik, jadi fase bisa belum terbarui.</span>
-<span class="ln">123</span>            pertandingan.tick()
-<span class="ln">124</span>            chat_terkunci = <span class="k">not</span> pertandingan.can_chat(pengirim)
-<span class="ln">125</span>            <span class="c"># Penanda fase ini; dibandingkan lagi di tahap 3 untuk tahu fase sudah berubah atau belum.</span>
-<span class="ln">126</span>            token_fase = (pertandingan.id, pertandingan.round, pertandingan.phase)
-<span class="ln">127</span>        <span class="k">else</span>:
-<span class="ln">128</span>            token_fase = <span class="k">None</span>
-<span class="ln">129</span>    <span class="k">if</span> chat_terkunci:
-<span class="ln">130</span>        activity.record(
-<span class="ln">131</span>            kode_room,
-<span class="ln">132</span>            <span class="s">"Match.can_chat"</span>,
-<span class="ln">133</span>            {<span class="s">"username"</span>: pengirim},
-<span class="ln">134</span>            status=<span class="s">"rejected"</span>,
-<span class="ln">135</span>            result={<span class="s">"allowed"</span>: <span class="k">False</span>},
-<span class="ln">136</span>        )
-<span class="ln">137</span>        <span class="k">await</span> self.sio.emit(
-<span class="ln">138</span>            <span class="s">"system_alert"</span>, {<span class="s">"msg"</span>: <span class="s">"Chat terkunci untukmu pada fase ini."</span>}, to=sid
-<span class="ln">139</span>        )
-<span class="ln">140</span>        <span class="k">return</span>
-<span class="ln">141</span>    <span class="c"># Jejak debugging pesan (tahap dan durasi) untuk checker di panel.</span>
-<span class="ln">142</span>    jejak = checker_service.begin(kode_room, pengirim, pesan)
-<span class="ln">143</span>    wadah_jejak[<span class="s">"trace"</span>] = jejak
-<span class="ln">144</span>    jejak[<span class="s">"match_id"</span>] = token_fase[<span class="n">0</span>] <span class="k">if</span> token_fase <span class="k">else</span> <span class="k">None</span>
-<span class="ln">145</span>    activity.record(
-<span class="ln">146</span>        kode_room,
-<span class="ln">147</span>        <span class="s">"SocketGameController.send_chat"</span>,
-<span class="ln">148</span>        {<span class="s">"username"</span>: pengirim, <span class="s">"message"</span>: pesan},
-<span class="ln">149</span>        status=<span class="s">"received"</span>,
-<span class="ln">150</span>        call_id=jejak[<span class="s">"id"</span>],
-<span class="ln">151</span>    )
-<span class="ln">152</span>
-<span class="ln">153</span>    konteks = (
-<span class="ln">154</span>        {<span class="s">"match_id"</span>: token_fase[<span class="n">0</span>], <span class="s">"round_number"</span>: token_fase[<span class="n">1</span>], <span class="s">"phase"</span>: token_fase[<span class="n">2</span>]}
-<span class="ln">155</span>        <span class="k">if</span> token_fase
-<span class="ln">156</span>        <span class="k">else</span> {<span class="s">"phase"</span>: <span class="s">"lobby"</span>}
-<span class="ln">157</span>    )
-<span class="ln">158</span>    pesan_diterima = {<span class="s">"sender"</span>: pengirim, <span class="s">"message"</span>: pesan}
-<span class="ln">159</span>    <span class="k">try</span>:
-<span class="ln">160</span>        <span class="c"># TAHAP 3: simpan pesan. Aksi/skip HTTP bisa berjalan bersamaan, jadi periksa ulang dan</span>
-<span class="ln">161</span>        <span class="c"># commit di lock yang sama supaya Gag atau fase baru tidak diterobos.</span>
-<span class="ln">162</span>        <span class="k">with</span> measure(jejak, <span class="s">"persistence_ms"</span>), room_service.lock:
-<span class="ln">163</span>            room_terkini = room_service.get(kode_room, pengirim)
-<span class="ln">164</span>            <span class="k">if</span> room_terkini <span class="k">is</span> <span class="k">not</span> room <span class="k">or</span> room_terkini.match <span class="k">is</span> <span class="k">not</span> pertandingan:
-<span class="ln">165</span>                <span class="k">raise</span> ValueError(<span class="s">"Ruangan sudah berubah. Kirim ulang pada fase yang sesuai."</span>)
-<span class="ln">166</span>            <span class="k">if</span> pertandingan:
-<span class="ln">167</span>                pertandingan.tick()
-<span class="ln">168</span>                <span class="k">if</span> token_fase != (
-<span class="ln">169</span>                    pertandingan.id,
-<span class="ln">170</span>                    pertandingan.round,
-<span class="ln">171</span>                    pertandingan.phase,
-<span class="ln">172</span>                ) <span class="k">or</span> <span class="k">not</span> pertandingan.can_chat(pengirim):
-<span class="ln">173</span>                    <span class="k">raise</span> ValueError(
-<span class="ln">174</span>                        <span class="s">"Chat terkunci atau fase sudah berubah. Pesan tidak dikirim."</span>
-<span class="ln">175</span>                    )
-<span class="ln">176</span>            jejak[<span class="s">"message_id"</span>] = PersistenceService(kode_room).record_player_message(
-<span class="ln">177</span>                username=pengirim,
-<span class="ln">178</span>                message=pesan,
-<span class="ln">179</span>                status=<span class="s">"active"</span>,  <span class="c"># Gag/Hostage ditegakkan Match.can_chat, bukan status arsip</span>
-<span class="ln">180</span>                context=konteks,
-<span class="ln">181</span>            )
-<span class="ln">182</span>            <span class="k">if</span> pertandingan:
-<span class="ln">183</span>                pesan_diterima = pertandingan.add_message(pengirim, pesan)
-<span class="ln">184</span>        activity.record(
-<span class="ln">185</span>            kode_room,
-<span class="ln">186</span>            <span class="s">"PersistenceService.record_player_message"</span>,
-<span class="ln">187</span>            {<span class="s">"username"</span>: pengirim},
-<span class="ln">188</span>            result={<span class="s">"message_id"</span>: jejak[<span class="s">"message_id"</span>]},
-<span class="ln">189</span>            call_id=jejak[<span class="s">"id"</span>],
-<span class="ln">190</span>        )
-<span class="ln">191</span>    <span class="k">except</span> ValueError <span class="k">as</span> error:
-<span class="ln">192</span>        jejak.update(stage=<span class="s">"discarded_state_changed"</span>, error=str(error))
-<span class="ln">193</span>        <span class="k">await</span> self.sio.emit(<span class="s">"system_alert"</span>, {<span class="s">"msg"</span>: str(error)}, to=sid)
-<span class="ln">194</span>        <span class="k">return</span>
-<span class="ln">195</span>    <span class="k">except</span> PersistenceError <span class="k">as</span> error:
-<span class="ln">196</span>        jejak.update(stage=<span class="s">"persistence_error"</span>, error=str(error))
-<span class="ln">197</span>        <span class="k">await</span> self.sio.emit(<span class="s">"system_alert"</span>, {<span class="s">"msg"</span>: str(error)}, to=sid)
-<span class="ln">198</span>        <span class="k">return</span>
-<span class="ln">199</span>    <span class="c"># TAHAP 4: kirim pesan ke semua anggota ruangan.</span>
-<span class="ln">200</span>    <span class="k">with</span> measure(jejak, <span class="s">"broadcast_ms"</span>):
-<span class="ln">201</span>        <span class="k">await</span> self.emit_room(<span class="s">"receive_chat"</span>, pesan_diterima, to=kode_room)
-<span class="ln">202</span>    jejak[<span class="s">"stage"</span>] = <span class="s">"delivered"</span>
-<span class="ln">203</span>    <span class="c"># TAHAP 5: catat bacaan IndoBERT (intent, target) untuk checker dan riwayat chat panel.</span>
-<span class="ln">204</span>    <span class="k">if</span> pertandingan:
-<span class="ln">205</span>        <span class="k">with</span> measure(jejak, <span class="s">"nlu_ms"</span>):
-<span class="ln">206</span>            jejak[<span class="s">"nlu"</span>] = <span class="k">await</span> catat_nlu(
-<span class="ln">207</span>                pertandingan, pengirim, pesan, jejak[<span class="s">"message_id"</span>], room_code=kode_room
-<span class="ln">208</span>            )</pre></figure>
+<figure class="blok-kode"><figcaption><code>backend/app/controller/realtime/socket_handlers.py:98-222</code></figcaption><pre class="kode" tabindex="0"><span class="ln">98</span><span class="c"># Jalan saat pemain mengirim chat, lewat 5 tahap di bawah. Fungsi ini tidak membalas pesan.</span>
+<span class="ln">99</span><span class="c"># Jejak = catatan tahap dan durasi satu pesan, yang tampil di panel checker.</span>
+<span class="ln">100</span><span class="c"># IndoBERT membaca pesan sekali di tahap 5; hasilnya masuk memo NLU, jadi langkah bot berikutnya tidak menghitung ulang.</span>
+<span class="ln">101</span><span class="k">async</span> <span class="k">def</span> <span class="f">send_chat</span>(self, sid: str, data: dict[str, Any]) -&gt; <span class="k">None</span>:
+<span class="ln">102</span>    waktu_mulai = perf_counter()
+<span class="ln">103</span>    <span class="c"># Diisi di tahap 2. finally tetap membacanya walau fungsi ini berhenti di tengah jalan.</span>
+<span class="ln">104</span>    jejak = <span class="k">None</span>
+<span class="ln">105</span>    <span class="k">try</span>:
+<span class="ln">106</span>        <span class="c"># TAHAP 1: terima event send_chat; validasi isi pesan dan identitas sesi.</span>
+<span class="ln">107</span>        <span class="k">try</span>:
+<span class="ln">108</span>            <span class="k">if</span> <span class="k">not</span> isinstance(data, dict) <span class="k">or</span> <span class="k">not</span> isinstance(data.get(<span class="s">"message"</span>), str):
+<span class="ln">109</span>                <span class="k">raise</span> ValueError(<span class="s">"Format pesan tidak valid."</span>)
+<span class="ln">110</span>            pengirim = str(data.get(<span class="s">"username"</span>, <span class="s">""</span>)).strip()
+<span class="ln">111</span>            pesan = str(data.get(<span class="s">"message"</span>, <span class="s">""</span>)).strip()
+<span class="ln">112</span>            <span class="k">if</span> <span class="k">not</span> pesan <span class="k">or</span> len(pesan) &gt; <span class="n">1000</span>:
+<span class="ln">113</span>                <span class="k">raise</span> ValueError(<span class="s">"Pesan chat harus berisi 1–1000 karakter."</span>)
+<span class="ln">114</span>            <span class="c"># Socket sudah masuk kanal ruangan saat connect; pemain dicatat di transaksi pesan (tahap 3).</span>
+<span class="ln">115</span>            kode_room = self._verifikasi_socket(sid, pengirim)
+<span class="ln">116</span>        <span class="k">except</span> ValueError <span class="k">as</span> error:
+<span class="ln">117</span>            <span class="k">await</span> self.sio.emit(<span class="s">"system_alert"</span>, {<span class="s">"msg"</span>: str(error)}, to=sid)
+<span class="ln">118</span>            <span class="k">return</span>
+<span class="ln">119</span>
+<span class="ln">120</span>        room = room_service.get(kode_room, pengirim)
+<span class="ln">121</span>        <span class="c"># TAHAP 2: engine mengotorisasi pesan sebelum disimpan atau ditampilkan.</span>
+<span class="ln">122</span>        chat_terkunci = <span class="k">False</span>
+<span class="ln">123</span>        <span class="k">with</span> room_service.lock:
+<span class="ln">124</span>            pertandingan = room.match
+<span class="ln">125</span>            <span class="k">if</span> pertandingan:
+<span class="ln">126</span>                <span class="c"># tick dulu: jam baru berdetak tiap 0,5 detik, jadi fase bisa belum terbarui.</span>
+<span class="ln">127</span>                pertandingan.tick()
+<span class="ln">128</span>                chat_terkunci = <span class="k">not</span> pertandingan.can_chat(pengirim)
+<span class="ln">129</span>                <span class="c"># Penanda fase ini; dibandingkan lagi di tahap 3 untuk tahu fase sudah berubah atau belum.</span>
+<span class="ln">130</span>                token_fase = (pertandingan.id, pertandingan.round, pertandingan.phase)
+<span class="ln">131</span>            <span class="k">else</span>:
+<span class="ln">132</span>                token_fase = <span class="k">None</span>
+<span class="ln">133</span>        <span class="k">if</span> chat_terkunci:
+<span class="ln">134</span>            activity.record(
+<span class="ln">135</span>                kode_room,
+<span class="ln">136</span>                <span class="s">"Match.can_chat"</span>,
+<span class="ln">137</span>                {<span class="s">"username"</span>: pengirim},
+<span class="ln">138</span>                status=<span class="s">"rejected"</span>,
+<span class="ln">139</span>                result={<span class="s">"allowed"</span>: <span class="k">False</span>},
+<span class="ln">140</span>            )
+<span class="ln">141</span>            <span class="k">await</span> self.sio.emit(
+<span class="ln">142</span>                <span class="s">"system_alert"</span>, {<span class="s">"msg"</span>: <span class="s">"Chat terkunci untukmu pada fase ini."</span>}, to=sid
+<span class="ln">143</span>            )
+<span class="ln">144</span>            <span class="k">return</span>
+<span class="ln">145</span>        <span class="c"># Jejak debugging pesan (tahap dan durasi) untuk checker di panel.</span>
+<span class="ln">146</span>        jejak = checker_service.begin(kode_room, pengirim, pesan)
+<span class="ln">147</span>        jejak[<span class="s">"match_id"</span>] = token_fase[<span class="n">0</span>] <span class="k">if</span> token_fase <span class="k">else</span> <span class="k">None</span>
+<span class="ln">148</span>        activity.record(
+<span class="ln">149</span>            kode_room,
+<span class="ln">150</span>            <span class="s">"SocketGameController.send_chat"</span>,
+<span class="ln">151</span>            {<span class="s">"username"</span>: pengirim, <span class="s">"message"</span>: pesan},
+<span class="ln">152</span>            status=<span class="s">"received"</span>,
+<span class="ln">153</span>            call_id=jejak[<span class="s">"id"</span>],
+<span class="ln">154</span>        )
+<span class="ln">155</span>
+<span class="ln">156</span>        konteks = (
+<span class="ln">157</span>            {<span class="s">"match_id"</span>: token_fase[<span class="n">0</span>], <span class="s">"round_number"</span>: token_fase[<span class="n">1</span>], <span class="s">"phase"</span>: token_fase[<span class="n">2</span>]}
+<span class="ln">158</span>            <span class="k">if</span> token_fase
+<span class="ln">159</span>            <span class="k">else</span> {<span class="s">"phase"</span>: <span class="s">"lobby"</span>}
+<span class="ln">160</span>        )
+<span class="ln">161</span>        pesan_diterima = {<span class="s">"sender"</span>: pengirim, <span class="s">"message"</span>: pesan}
+<span class="ln">162</span>        <span class="k">try</span>:
+<span class="ln">163</span>            <span class="c"># TAHAP 3: simpan pesan. Aksi/skip HTTP bisa berjalan bersamaan, jadi periksa ulang dan</span>
+<span class="ln">164</span>            <span class="c"># commit di lock yang sama supaya Gag atau fase baru tidak diterobos.</span>
+<span class="ln">165</span>            <span class="k">with</span> measure(jejak, <span class="s">"persistence_ms"</span>), room_service.lock:
+<span class="ln">166</span>                room_terkini = room_service.get(kode_room, pengirim)
+<span class="ln">167</span>                <span class="k">if</span> room_terkini <span class="k">is</span> <span class="k">not</span> room <span class="k">or</span> room_terkini.match <span class="k">is</span> <span class="k">not</span> pertandingan:
+<span class="ln">168</span>                    <span class="k">raise</span> ValueError(
+<span class="ln">169</span>                        <span class="s">"Ruangan sudah berubah. Kirim ulang pada fase yang sesuai."</span>
+<span class="ln">170</span>                    )
+<span class="ln">171</span>                <span class="k">if</span> pertandingan:
+<span class="ln">172</span>                    pertandingan.tick()
+<span class="ln">173</span>                    <span class="k">if</span> token_fase != (
+<span class="ln">174</span>                        pertandingan.id,
+<span class="ln">175</span>                        pertandingan.round,
+<span class="ln">176</span>                        pertandingan.phase,
+<span class="ln">177</span>                    ) <span class="k">or</span> <span class="k">not</span> pertandingan.can_chat(pengirim):
+<span class="ln">178</span>                        <span class="k">raise</span> ValueError(
+<span class="ln">179</span>                            <span class="s">"Chat terkunci atau fase sudah berubah. Pesan tidak dikirim."</span>
+<span class="ln">180</span>                        )
+<span class="ln">181</span>                jejak[<span class="s">"message_id"</span>] = PersistenceService(kode_room).record_player_message(
+<span class="ln">182</span>                    username=pengirim,
+<span class="ln">183</span>                    message=pesan,
+<span class="ln">184</span>                    status=<span class="s">"active"</span>,  <span class="c"># Gag/Hostage ditegakkan Match.can_chat, bukan status arsip</span>
+<span class="ln">185</span>                    context=konteks,
+<span class="ln">186</span>                )
+<span class="ln">187</span>                <span class="k">if</span> pertandingan:
+<span class="ln">188</span>                    pesan_diterima = pertandingan.add_message(pengirim, pesan)
+<span class="ln">189</span>            activity.record(
+<span class="ln">190</span>                kode_room,
+<span class="ln">191</span>                <span class="s">"PersistenceService.record_player_message"</span>,
+<span class="ln">192</span>                {<span class="s">"username"</span>: pengirim},
+<span class="ln">193</span>                result={<span class="s">"message_id"</span>: jejak[<span class="s">"message_id"</span>]},
+<span class="ln">194</span>                call_id=jejak[<span class="s">"id"</span>],
+<span class="ln">195</span>            )
+<span class="ln">196</span>        <span class="k">except</span> ValueError <span class="k">as</span> error:
+<span class="ln">197</span>            jejak.update(stage=<span class="s">"discarded_state_changed"</span>, error=str(error))
+<span class="ln">198</span>            <span class="k">await</span> self.sio.emit(<span class="s">"system_alert"</span>, {<span class="s">"msg"</span>: str(error)}, to=sid)
+<span class="ln">199</span>            <span class="k">return</span>
+<span class="ln">200</span>        <span class="k">except</span> PersistenceError <span class="k">as</span> error:
+<span class="ln">201</span>            jejak.update(stage=<span class="s">"persistence_error"</span>, error=str(error))
+<span class="ln">202</span>            <span class="k">await</span> self.sio.emit(<span class="s">"system_alert"</span>, {<span class="s">"msg"</span>: str(error)}, to=sid)
+<span class="ln">203</span>            <span class="k">return</span>
+<span class="ln">204</span>        <span class="c"># TAHAP 4: kirim pesan ke semua anggota ruangan.</span>
+<span class="ln">205</span>        <span class="k">with</span> measure(jejak, <span class="s">"broadcast_ms"</span>):
+<span class="ln">206</span>            <span class="k">await</span> self.emit_room(<span class="s">"receive_chat"</span>, pesan_diterima, to=kode_room)
+<span class="ln">207</span>        jejak[<span class="s">"stage"</span>] = <span class="s">"delivered"</span>
+<span class="ln">208</span>        <span class="c"># TAHAP 5: catat bacaan IndoBERT (intent, target) untuk checker dan riwayat chat panel.</span>
+<span class="ln">209</span>        <span class="k">if</span> pertandingan:
+<span class="ln">210</span>            <span class="k">with</span> measure(jejak, <span class="s">"nlu_ms"</span>):
+<span class="ln">211</span>                jejak[<span class="s">"nlu"</span>] = <span class="k">await</span> catat_nlu(
+<span class="ln">212</span>                    pertandingan, pengirim, pesan, jejak[<span class="s">"message_id"</span>], room_code=kode_room
+<span class="ln">213</span>                )
+<span class="ln">214</span>    <span class="k">finally</span>:
+<span class="ln">215</span>        <span class="k">if</span> jejak:
+<span class="ln">216</span>            jejak[<span class="s">"duration_ms"</span>] = round((perf_counter() - waktu_mulai) * <span class="n">1000</span>, <span class="n">2</span>)
+<span class="ln">217</span>            <span class="k">try</span>:
+<span class="ln">218</span>                PersistenceService(jejak[<span class="s">"room_code"</span>]).record_trace(jejak)
+<span class="ln">219</span>            <span class="k">except</span> PersistenceError:
+<span class="ln">220</span>                logger.error(
+<span class="ln">221</span>                    <span class="s">"Checker archive could not be saved for room %s"</span>, jejak[<span class="s">"room_code"</span>]
+<span class="ln">222</span>                )</pre></figure>
 <p class="label">Yang tidak terlihat dari kode</p>
-<ul class="catatan"><li>Tahap 3 mengecek ulang karena aksi lewat HTTP bisa berjalan bersamaan. Di antara tahap 2 dan 3, pemain bisa saja kena Gag atau fase bisa berganti.</li><li><code>Match.tick</code> dipanggil dulu karena jam baru berdetak tiap 0,5 detik, jadi fase bisa belum terbarui.</li><li>Di lobby tidak ada pertandingan. Chat tetap disimpan dan disiarkan, tanpa pengecekan engine dan tanpa IndoBERT.</li><li><code>wadah_jejak</code> ada supaya blok <code>finally</code> di <code>send_chat</code> tetap bisa membaca jejak walau <code>_send_chat</code> berhenti di tengah.</li></ul>
+<ul class="catatan"><li>Tahap 3 mengecek ulang karena aksi lewat HTTP bisa berjalan bersamaan. Di antara tahap 2 dan 3, pemain bisa saja kena Gag atau fase bisa berganti.</li><li><code>Match.tick</code> dipanggil dulu karena jam baru berdetak tiap 0,5 detik, jadi fase bisa belum terbarui.</li><li>Di lobby tidak ada pertandingan. Chat tetap disimpan dan disiarkan, tanpa pengecekan engine dan tanpa IndoBERT.</li></ul>
 <aside class="temuan"><span class="label-temuan">Temuan</span> Tahap 3 menulis ke MySQL sambil memegang <code>room_service.lock</code>, dan lock itu satu untuk semua room. Ini disengaja supaya Gag atau fase baru tidak diterobos, tapi operasi room lain menunggu selama itu. Durasinya belum diukur.</aside>
-<aside class="temuan"><span class="label-temuan">Menunggu keputusan</span> <code>_send_chat</code> digabung ke <code>send_chat</code> atau tidak. Saranku tetap terpisah, karena <code>try/finally</code> jadi lebih mudah dibaca.</aside>
 </section>
 <section class="bagian k2" id="t-verifikasi-socket">
 <p class="jalur"><span>main.py</span> <span class="sep">/</span> <a href="#t-konek-socket">[KONEK SOCKET]</a> <span class="sep">/</span> <a href="#t-send-chat">send_chat</a> <span class="sep">/</span> <span>_verifikasi_socket</span></p>
