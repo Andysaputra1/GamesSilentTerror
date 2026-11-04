@@ -19,7 +19,7 @@ from app.module.room_service import BOT_NAMES
 KODE = "SIMULASI"
 PEMAIN = "sim_pemain"  # username admin di engine; tampil dengan nama pilihan admin
 MAKS_SIMULASI = 5  # simulasi terlama dibuang
-MULAI_FASE = 2.0  # detik setelah fase mulai sebelum bot melangkah (sama dengan NPCService._due)
+MULAI_FASE = 2.0  # detik setelah fase mulai sebelum bot melangkah (sama dengan NPCService._sudah_waktunya_melangkah)
 
 
 class Simulasi:
@@ -123,7 +123,7 @@ class Simulasi:
 
     async def _putaran(self, detik):
         m = self.match
-        # Bot tidak melangkah di detik terakhir fase (NPCService._due); waktu tidak melewati deadline.
+        # Bot tidak melangkah di detik terakhir fase (NPCService._sudah_waktunya_melangkah); waktu tidak melewati deadline.
         self.jam = min(self.jam + detik, m.deadline - 1.0)
         jejak = []
         for nama in sorted(self.otak):

@@ -275,38 +275,46 @@ class NPCService:
         task.add_done_callback(self.tasks.discard)
         return task
 
-    # Dipanggil timer server; NPC mengambil giliran tanpa menunggu manusia mengirim chat.
+    # Dipanggil jam permainan tiap 0,5 detik: menyuruh bot yang sudah waktunya melangkah, tanpa menunggu
+    # manusia mengirim chat.
     def schedule(self):
-        now = time.time()
+        waktu_sekarang = time.time()
         with room_service.lock:
-            active = {
+            # INPUT: pertandingan yang masih berjalan
+            id_pertandingan_aktif = {
                 r.match.id for r in room_service.rooms.values() if r.match and not r.match.winner
             }
-            self.issued = {key for key in self.issued if key[0] in active}
-            self.preparing &= active
-            self.lantai = {m: bot for m, bot in self.lantai.items() if m in active}
-            for match_id in [m for m in riwayat_nlu if m not in active]:
+
+            # PROSES: buang data pertandingan yang sudah selesai, supaya memori server tidak penuh
+            self.issued = {key for key in self.issued if key[0] in id_pertandingan_aktif}
+            self.preparing &= id_pertandingan_aktif
+            self.lantai = {m: bot for m, bot in self.lantai.items() if m in id_pertandingan_aktif}
+            for match_id in [m for m in riwayat_nlu if m not in id_pertandingan_aktif]:
                 del riwayat_nlu[match_id]
-            self.runtime.lupakan_kecuali(active)
+            self.runtime.lupakan_kecuali(id_pertandingan_aktif)
+
+            # OUTPUT: tiap room menyiapkan otak bot, atau menjalankan bot yang sudah waktunya
             for room in list(room_service.rooms.values()):
                 match = room.match
                 if not match or match.winner or not match.ai_controlled:
-                    continue
+                    continue  # belum ada game, sudah selesai, atau bukan game ber-AI
                 if match.phase == "preparing":
                     # Layar persiapan: muat otak dan siapkan ingatan bot sekali per pertandingan.
                     if match.id not in self.preparing:
                         self.preparing.add(match.id)
                         self._spawn(self.prepare(room.code, match))
                     continue
-                elapsed = match.phase_length() - (match.deadline - now)
-                bots = sorted(p.name for p in match.players.values() if p.bot and p.alive)
-                for index, name in enumerate(bots):
-                    otak = self.runtime.otak_bot(match.id, name)
+                lama_fase_berjalan = match.phase_length() - (match.deadline - waktu_sekarang)
+                nama_bot_hidup = sorted(p.name for p in match.players.values() if p.bot and p.alive)
+                for urutan, nama in enumerate(nama_bot_hidup):
+                    otak = self.runtime.otak_bot(match.id, nama)
                     if otak is None:
                         continue  # otak gagal dimuat: engine mengisi aksi cadangan di deadline
                     if otak.metode == "llm":
-                        self._schedule_llm(room.code, match, name, elapsed)
-                    elif not otak.sibuk and self._due(otak, match, elapsed, now, index):
+                        self._schedule_llm(room.code, match, nama, lama_fase_berjalan)
+                    elif not otak.sibuk and self._sudah_waktunya_melangkah(
+                        otak, match, lama_fase_berjalan, waktu_sekarang, urutan
+                    ):
                         otak.sibuk = True
                         self._spawn(self.brain_turn(room.code, match, otak))
 
@@ -325,12 +333,12 @@ class NPCService:
 
     # Otak mengambil langkah berkala; bot digeser beberapa detik agar tidak berbicara serentak. Bot yang baru
     # dipanggil atau dituduh (otak.segera) melangkah lebih cepat, minimal JEDA_SEGERA_DETIK sesudah langkah terakhir.
-    def _due(self, otak, match, elapsed, now, index):
-        start = min(2.0, match.durations[match.phase] / 6) + (index % 4) * 0.7
-        if elapsed < start or match.deadline - now < 1.0:
+    def _sudah_waktunya_melangkah(self, otak, match, lama_fase_berjalan, waktu_sekarang, urutan):
+        waktu_mulai = min(2.0, match.durations[match.phase] / 6) + (urutan % 4) * 0.7
+        if lama_fase_berjalan < waktu_mulai or match.deadline - waktu_sekarang < 1.0:
             return False
         jeda = JEDA_SEGERA_DETIK if otak.segera else settings.npc_step_seconds
-        return now - otak.langkah_terakhir >= jeda
+        return waktu_sekarang - otak.langkah_terakhir >= jeda
 
     # PERSIAPAN: tunggu otak siap, bagi metode/persona per bot, lalu buka ronde 1.
     async def prepare(self, code, match):
@@ -370,11 +378,12 @@ class NPCService:
             with room_service.lock:
                 match.mark_ai_ready(detail="Persiapan AI gagal; bot memakai aksi cadangan engine.")
 
-    # LANGKAH OTAK: snapshot privat → putuskan() → vote/aksi langsung → kalimat lewat lantai bicara.
+    # LANGKAH OTAK: baca keadaan game → bot berpikir → vote/aksi langsung → kalimat lewat lantai bicara.
     async def brain_turn(self, code, match, otak):
-        started = perf_counter()
-        bicara = gagal = False
+        waktu_mulai = perf_counter()
+        sedang_bicara = gagal = False
         try:
+            # INPUT: apa yang dilihat bot sekarang
             with room_service.lock:
                 room = room_service.rooms.get(code)
                 if (
@@ -385,74 +394,132 @@ class NPCService:
                     or not match.players[otak.nama].alive
                 ):
                     return
-                key = (match.id, match.round, match.phase)
+                fase = (match.id, match.round, match.phase)
                 otak.segera = False  # snapshot ini sudah memuat chat pemicunya
                 snapshot = snapshot_berlabel(match.snapshot(otak.nama), match.labels)
-                terlihat = match.messages[-1]["id"] if match.messages else None
+                id_chat_terakhir_dilihat = match.messages[-1]["id"] if match.messages else None
                 match.bot_tahap[otak.nama] = "I"
-            now = time.time()
+            waktu_sekarang = time.time()
             otak.langkah += 1
             loop = asyncio.get_running_loop()
 
+            # PROSES: bot berpikir di jalur keputusan, dengan batas waktu.
             # Tahap L baru saat thread keputusan benar-benar mulai (bisa antre di belakang bot lain).
-            def langkah():
+            def pikirkan_langkah():
                 with room_service.lock:
                     match.bot_tahap[otak.nama] = "L"
-                return self.runtime.langkah(otak, snapshot, now)
+                return self.runtime.langkah(otak, snapshot, waktu_sekarang)
 
-            view, hasil, konteks = await asyncio.wait_for(
-                loop.run_in_executor(self.runtime.eksekutor_keputusan, langkah),
+            pandangan, keputusan, konteks = await asyncio.wait_for(
+                loop.run_in_executor(self.runtime.eksekutor_keputusan, pikirkan_langkah),
                 timeout=BATAS_LANGKAH_DETIK,
             )
-            npc, rencana = hasil["npc_decision"], hasil["rencana_chat"]
-            # Vote dan aksi rahasia tidak menunggu kalimat selesai diketik.
-            berlaku, penolakan = self._terapkan_aksi(code, match, key, otak, npc)
-            if not berlaku:
-                return  # fase berganti selama bot berpikir: keputusan basi dibuang
-            tulisan = reply = None
-            ditunda = hasil["nlg"] is not None and not self._ambil_lantai(
-                match, otak, terlihat, rencana
+            keputusan_aksi, rencana_chat = keputusan["npc_decision"], keputusan["rencana_chat"]
+
+            # OUTPUT 1: vote dan aksi rahasia langsung ke game, tidak menunggu kalimat selesai diketik
+            masih_berlaku, penolakan = self._kirim_vote_atau_aksi(
+                code, match, fase, otak, keputusan_aksi
             )
-            if hasil["nlg"] is not None and not ditunda:
-                bicara = True
-                tulisan = await tulis_kalimat(self.runtime, otak, hasil["nlg"], konteks)
+            if not masih_berlaku:
+                return  # fase berganti selama bot berpikir: keputusan basi dibuang
+
+            # OUTPUT 2: minta giliran bicara, tulis kalimat, jeda mengetik, lalu kirim chat
+            kalimat = pesan_terkirim = id_pesan = None
+            chat_ditunda = keputusan["nlg"] is not None and not self._ambil_giliran_bicara(
+                match, otak, id_chat_terakhir_dilihat, rencana_chat
+            )
+            if keputusan["nlg"] is not None and not chat_ditunda:
+                sedang_bicara = True
+                kalimat = await tulis_kalimat(self.runtime, otak, keputusan["nlg"], konteks)
                 # Jeda mengetik: balasan instan terasa seperti mesin.
-                typing = min(4.0, max(1.0, len(tulisan["teks"]) / 30))
-                if match.deadline - time.time() > typing + 1:
-                    await asyncio.sleep(typing)
-                reply, message_id = self._kirim_chat(
-                    code, match, key, otak, view, rencana, tulisan
-                ) or (None, None)
-            trace = None
-            if reply or npc["action"] != "wait" or penolakan or ditunda:
+                lama_mengetik = min(4.0, max(1.0, len(kalimat["teks"]) / 30))
+                if match.deadline - time.time() > lama_mengetik + 1:
+                    await asyncio.sleep(lama_mengetik)
+                # Chat dikirim hanya jika fase masih sama dan bot masih boleh bicara; ingatan dicatat
+                # setelah terkirim.
+                with room_service.lock:
+                    if (
+                        kalimat["teks"]
+                        and self._berlaku(code, match, fase)
+                        and match.can_chat(otak.nama)
+                    ):
+                        try:
+                            id_pesan = PersistenceService(code).record_bot_message(
+                                username=otak.nama,
+                                message=kalimat["teks"],
+                                context={"match_id": match.id, "round_number": match.round,
+                                         "phase": match.phase},
+                                reply_to_id=None,
+                            )  # fmt: skip
+                        except PersistenceError:
+                            logger.warning(
+                                "Chat bot %s tidak tersimpan; tidak disiarkan.", otak.nama
+                            )
+                        else:
+                            pesan_terkirim = match.add_message(otak.nama, kalimat["teks"])
+                            # Kalimat sudah tampil; awan berpikir hilang bersama pesan.
+                            match.bot_berpikir.discard(otak.nama)
+                            self.runtime.catat_chat(otak, pandangan, rencana_chat, kalimat["teks"])
+
+            # OUTPUT 3: jejak untuk panel checker (tanpa role pemain lain), siaran chat, bacaan IndoBERT
+            jejak = None
+            if pesan_terkirim or keputusan_aksi["action"] != "wait" or penolakan or chat_ditunda:
                 # Masukan NLG ikut dicatat, juga saat ditunda: panel tetap melihat apa yang akan ditulis.
-                masukan = (
-                    None if hasil["nlg"] is None
-                    else {"rencana": hasil["nlg"],
-                          "prompt": self.runtime.prompt_nlg(otak, hasil["nlg"], konteks)}
+                masukan_nlg = (
+                    None if keputusan["nlg"] is None
+                    else {"rencana": keputusan["nlg"],
+                          "prompt": self.runtime.prompt_nlg(otak, keputusan["nlg"], konteks)}
                 )  # fmt: skip
-                trace = self._trace(code, match, otak, npc, rencana, tulisan if reply else None,
-                                    penolakan, started, ditunda=ditunda,
-                                    penjelasan=hasil.get("penjelasan"), waktu=hasil.get("waktu"),
-                                    masukan_nlg=masukan)  # fmt: skip
-            if reply:
-                await self.broadcast("receive_chat", reply, to=code)
-            if trace is not None:
-                await self._simpan_trace(code, trace)
-            if reply:  # di latar: lantai bicara tidak ditahan selama NLU membaca kalimat ini
+                kalimat_terkirim = kalimat if pesan_terkirim else None
+                jejak = isi_jejak(
+                    checker_service.begin(
+                        code,
+                        otak.nama,
+                        kalimat_terkirim["teks"] if kalimat_terkirim else keputusan_aksi["action"],
+                    ),
+                    match,
+                    otak,
+                    keputusan_aksi,
+                    rencana_chat,
+                    kalimat_terkirim,
+                    penolakan,
+                    round((perf_counter() - waktu_mulai) * 1000, 2),
+                    chat_ditunda,
+                    keputusan.get("penjelasan"),  # hanya dibaca panel admin
+                    waktu_jejak(keputusan.get("waktu"), kalimat_terkirim),
+                    getattr(self.runtime.nlu, "sumber", None),
+                    masukan_nlg,
+                )
+            if pesan_terkirim:
+                await self.broadcast("receive_chat", pesan_terkirim, to=code)
+            if jejak is not None:
+                # Disimpan di thread latar: tulisan DB (hingga ±12 KB penjelasan per jejak) tidak menahan
+                # event loop game. Jejak di memori (checker) sudah tersedia sejak checker_service.begin.
+                try:
+                    await asyncio.to_thread(PersistenceService(code).record_trace, jejak)
+                except PersistenceError:
+                    pass
+            if (
+                pesan_terkirim
+            ):  # di latar: lantai bicara tidak ditahan selama NLU membaca kalimat ini
                 self._spawn(
-                    catat_nlu(match, otak.nama, reply["message"], message_id, self.runtime, code)
+                    catat_nlu(
+                        match, otak.nama, pesan_terkirim["message"], id_pesan, self.runtime, code
+                    )
                 )
         except asyncio.CancelledError:
             raise
         except Exception as error:
             gagal = True
             logger.exception("Langkah otak %s gagal.", otak.nama)
-            trace = checker_service.begin(code, otak.nama, "NPC brain")
-            trace.update(match_id=match.id, stage="npc_brain_error", error=type(error).__name__)
+            jejak_gagal = checker_service.begin(code, otak.nama, "NPC brain")
+            jejak_gagal.update(
+                match_id=match.id, stage="npc_brain_error", error=type(error).__name__
+            )
         finally:
+            # Selesai, juga saat error: lepas giliran bicara dan tandai bot tidak sibuk.
             penyusun = self.lantai.get(match.id, {})
-            if bicara and penyusun.pop(otak.nama, None) is not None and not penyusun:
+            if sedang_bicara and penyusun.pop(otak.nama, None) is not None and not penyusun:
                 del self.lantai[match.id]
             with room_service.lock:
                 match.bot_berpikir.discard(otak.nama)
@@ -474,20 +541,26 @@ class NPCService:
         )
 
     # Vote/aksi rahasia diterapkan segera. Hasil: (masih berlaku, pesan penolakan engine atau None).
-    def _terapkan_aksi(self, code, match, key, otak, npc):
+    def _kirim_vote_atau_aksi(self, code, match, fase, otak, keputusan_aksi):
         with room_service.lock:
-            if not self._berlaku(code, match, key):
+            if not self._berlaku(code, match, fase):
                 return False, None
             # Otak sudah memutuskan fase ini: tunggu/abstain miliknya dihormati, bukan diganti aksi acak
             # engine. Ditandai setelah keputusan ada, sehingga langkah yang error/timeout sebelum pernah
             # memutuskan apa pun tetap mendapat aksi cadangan engine di akhir fase.
-            match.npc_decisions.add((key[1], key[2], otak.nama))
+            match.npc_decisions.add((fase[1], fase[2], otak.nama))
             try:
-                if npc["action"] == "vote":
-                    match.vote(otak.nama, match.username(npc["target"]))
-                elif npc["action"] in AKSI_RAHASIA:
-                    match.act(otak.nama, npc["action"], match.username(npc["target"]))
-                    self.runtime.catat_aksi(otak, match.round, npc["action"], npc["target"])
+                if keputusan_aksi["action"] == "vote":
+                    match.vote(otak.nama, match.username(keputusan_aksi["target"]))
+                elif keputusan_aksi["action"] in AKSI_RAHASIA:
+                    match.act(
+                        otak.nama,
+                        keputusan_aksi["action"],
+                        match.username(keputusan_aksi["target"]),
+                    )
+                    self.runtime.catat_aksi(
+                        otak, match.round, keputusan_aksi["action"], keputusan_aksi["target"]
+                    )
             except ValueError as error:
                 return True, str(error)
             return True, None
@@ -496,68 +569,26 @@ class NPCService:
     # menulis paralel). Ditolak bila lantai penuh, bila bot lain sedang menulis rencana kembar (intent dan
     # target sama: tidak ada tuduhan atau pertanyaan serentak yang sama), atau bila rencana dibuat sebelum
     # chat bot lain masuk. Bot yang ditolak memutuskan ulang di langkah berikutnya dengan chat terbaru.
-    def _ambil_lantai(self, match, otak, terlihat, rencana):
+    def _ambil_giliran_bicara(self, match, otak, id_chat_terakhir_dilihat, rencana_chat):
         penyusun = self.lantai.get(match.id, {})
-        niat = (rencana.get("intent"), rencana.get("target"))
+        niat = (rencana_chat.get("intent"), rencana_chat.get("target"))
         if len(penyusun) >= LANTAI_MAKS or niat in penyusun.values():
             return False
         with room_service.lock:
             pesan = list(match.messages)
-        ids = [m["id"] for m in pesan]
-        baru = pesan[ids.index(terlihat) + 1 :] if terlihat in ids else pesan
-        bots = {p.name for p in match.players.values() if p.bot}
-        if any(m["sender"] in bots and m["sender"] != otak.nama for m in baru):
+        semua_id = [m["id"] for m in pesan]
+        pesan_baru = (
+            pesan[semua_id.index(id_chat_terakhir_dilihat) + 1 :]
+            if id_chat_terakhir_dilihat in semua_id
+            else pesan
+        )
+        nama_bot = {p.name for p in match.players.values() if p.bot}
+        if any(m["sender"] in nama_bot and m["sender"] != otak.nama for m in pesan_baru):
             return False
         self.lantai.setdefault(match.id, {})[otak.nama] = niat
         with room_service.lock:
             match.bot_berpikir.add(otak.nama)  # pemain melihat awan berpikir selama kalimat disusun
         return True
-
-    # Chat dikirim hanya jika fase masih sama dan bot masih boleh bicara; ingatan dicatat setelah terkirim.
-    # Hasil: (pesan engine, ID pesan di database) atau None.
-    def _kirim_chat(self, code, match, key, otak, view, rencana, tulisan):
-        with room_service.lock:
-            if (
-                not tulisan["teks"]
-                or not self._berlaku(code, match, key)
-                or not match.can_chat(otak.nama)
-            ):
-                return None
-            try:
-                message_id = PersistenceService(code).record_bot_message(
-                    username=otak.nama,
-                    message=tulisan["teks"],
-                    context={"match_id": match.id, "round_number": match.round,
-                             "phase": match.phase},
-                    reply_to_id=None,
-                )  # fmt: skip
-            except PersistenceError:
-                logger.warning("Chat bot %s tidak tersimpan; tidak disiarkan.", otak.nama)
-                return None
-            reply = match.add_message(otak.nama, tulisan["teks"])
-            match.bot_berpikir.discard(otak.nama)  # kalimat sudah tampil; awan hilang bersama pesan
-            self.runtime.catat_chat(otak, view, rencana, tulisan["teks"])
-            return reply, message_id
-
-    # Jejak untuk panel checker: metode, persona, keputusan, dan asal kalimat (tanpa role pemain lain).
-    # `penjelasan` (identitas, parameter, penalaran metode, keputusan, NLG) hanya dibaca panel admin.
-    def _trace(self, code, match, otak, npc, rencana, tulisan, penolakan, started, ditunda=False,
-               penjelasan=None, waktu=None, masukan_nlg=None):  # fmt: skip
-        trace = checker_service.begin(
-            code, otak.nama, tulisan["teks"] if tulisan else npc["action"]
-        )
-        return isi_jejak(trace, match, otak, npc, rencana, tulisan, penolakan,
-                         round((perf_counter() - started) * 1000, 2), ditunda, penjelasan,
-                         waktu_jejak(waktu, tulisan), getattr(self.runtime.nlu, "sumber", None),
-                         masukan_nlg)  # fmt: skip
-
-    # Simpan jejak otak ke database di thread latar: tulisan DB (hingga ±12 KB penjelasan per jejak)
-    # tidak menahan event loop game. Jejak di memori (checker) sudah tersedia sejak _trace.
-    async def _simpan_trace(self, code, trace):
-        try:
-            await asyncio.to_thread(PersistenceService(code).record_trace, trace)
-        except PersistenceError:
-            pass
 
     # Validasi ulang fase dan izin setelah LLM selesai; balasan basi tidak boleh masuk fase baru.
     async def turn(self, code, match, key, context):

@@ -303,7 +303,7 @@ class NPCServiceBrainTests(unittest.IsolatedAsyncioTestCase):
         npc = {"action": "vote", "target": "human", "message": ""}
         self.match.phase = "tribunal"
         stale_key = (self.match.id, self.match.round, "day")
-        berlaku, penolakan = self.service._terapkan_aksi(
+        berlaku, penolakan = self.service._kirim_vote_atau_aksi(
             self.room.code, self.match, stale_key, otak, npc
         )
         self.assertEqual((berlaku, penolakan), (False, None))
@@ -317,15 +317,15 @@ class NPCServiceBrainTests(unittest.IsolatedAsyncioTestCase):
         # Lantai penuh (LANTAI_MAKS bot sedang menulis) dan rencana kembar ditolak.
         penuh = {f"B{i}": ("neutral", f"P{i}") for i in range(LANTAI_MAKS)}
         self.service.lantai[self.match.id] = penuh
-        self.assertFalse(self.service._ambil_lantai(self.match, nox, None, tuduh_ash))
+        self.assertFalse(self.service._ambil_giliran_bicara(self.match, nox, None, tuduh_ash))
         self.service.lantai[self.match.id] = {"ECHO": ("offend", "ASH")}
-        self.assertFalse(self.service._ambil_lantai(self.match, nox, None, tuduh_ash))
+        self.assertFalse(self.service._ambil_giliran_bicara(self.match, nox, None, tuduh_ash))
         # Rencana berbeda boleh ditulis bersamaan; chat manusia sesudah snapshot tidak membatalkannya.
         with self.rooms.lock:
             terlihat = self.match.add_message("human", "Halo semua.")["id"]
             self.match.add_message("human", "Ada yang curiga?")
         bela_ash = {"intent": "defend", "target": "ASH"}
-        self.assertTrue(self.service._ambil_lantai(self.match, nox, terlihat, bela_ash))
+        self.assertTrue(self.service._ambil_giliran_bicara(self.match, nox, terlihat, bela_ash))
         self.assertEqual(
             self.service.lantai[self.match.id],
             {"ECHO": ("offend", "ASH"), "NOX": ("defend", "ASH")},
@@ -338,7 +338,7 @@ class NPCServiceBrainTests(unittest.IsolatedAsyncioTestCase):
         self.match.bot_berpikir.clear()
         with self.rooms.lock:
             self.match.add_message("ECHO", "Aku belum yakin.")
-        self.assertFalse(self.service._ambil_lantai(self.match, nox, terlihat, bela_ash))
+        self.assertFalse(self.service._ambil_giliran_bicara(self.match, nox, terlihat, bela_ash))
 
     async def test_accused_bots_defend_themselves_in_parallel(self):
         await self.service.prepare(self.room.code, self.match)
@@ -391,11 +391,17 @@ class NPCServiceBrainTests(unittest.IsolatedAsyncioTestCase):
             {n: o.segera for n, o in otak.items()}, {"NOX": True, "ECHO": True, "VEIL": False}
         )
         elapsed = self.match.durations["day"] - (self.match.deadline - sekarang)
-        self.assertTrue(self.service._due(otak["NOX"], self.match, elapsed, sekarang, 0))
-        self.assertFalse(self.service._due(otak["VEIL"], self.match, elapsed, sekarang, 0))
+        self.assertTrue(
+            self.service._sudah_waktunya_melangkah(otak["NOX"], self.match, elapsed, sekarang, 0)
+        )
+        self.assertFalse(
+            self.service._sudah_waktunya_melangkah(otak["VEIL"], self.match, elapsed, sekarang, 0)
+        )
         # Batas laju tetap ada: langkah segera minimal JEDA_SEGERA_DETIK sesudah langkah terakhir.
         otak["NOX"].langkah_terakhir = sekarang - 0.5
-        self.assertFalse(self.service._due(otak["NOX"], self.match, elapsed, sekarang, 0))
+        self.assertFalse(
+            self.service._sudah_waktunya_melangkah(otak["NOX"], self.match, elapsed, sekarang, 0)
+        )
         with patch("app.module.npc_service.asyncio.sleep", AsyncMock()):
             otak["NOX"].sibuk = True
             await self.service.brain_turn(self.room.code, self.match, otak["NOX"])
