@@ -51,6 +51,17 @@ class BrainRuntimeTests(unittest.TestCase):
         self.runtime.lupakan_kecuali(set())
         self.assertIsNone(self.runtime.otak_bot(match.id, "NOX"))
 
+    def test_removed_systems_and_action_stay_out_of_the_generated_modules(self):
+        from app.module.npc_brain.generated import nlg, otak_fuzzy
+
+        self.assertEqual(len(otak_fuzzy.SEMUA_SISTEM), 21)
+        dihapus = "bela_diri h_bela_diri jawab h_jawab info_sandera sandera lindung".split()
+        self.assertFalse(set(dihapus) & set(otak_fuzzy.SEMUA_SISTEM))
+        self.assertNotIn("info_sandera", otak_fuzzy.URUTAN_AKSI)
+        self.assertNotIn("info_sandera", otak_fuzzy.INTENT_AKSI)
+        self.assertNotIn("info_sandera", nlg.VARIASI)
+        self.assertNotIn("info_sandera", nlg.MAKSUD_AKSI)
+
     def test_bots_do_not_echo_each_others_sentences(self):
         match = Match(["human"], ["NOX", "ECHO", "VEIL"], now=0.0)
         self.runtime.siapkan_pertandingan(match, "ROOM02")

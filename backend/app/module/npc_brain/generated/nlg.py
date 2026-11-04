@@ -1,8 +1,8 @@
 """FILE INI DIHASILKAN OTOMATIS oleh scripts/ekspor_otak_npc.py. JANGAN DIEDIT MANUAL.
 
 Sumber : npc_nlg.ipynb
-Sidik  : 452c8237a12c8604
-Dibuat : 2026-11-04 04:59 UTC
+Sidik  : 58a1edeb62a58756
+Dibuat : 2026-11-04 07:48 UTC
 
 Perubahan logika bot dilakukan di notebook skripsi, dijalankan ulang sampai semua
 skenario/pengujian lulus, lalu diekspor ulang dengan skrip ini.
@@ -143,13 +143,6 @@ VARIASI = {
         "Coba perhatikan {t}. {b1}",
         "Aku curiga sama {t}.",
         "Menurutku {t} patut dicurigai.",
-    ],
-    # Kata "sandera" condong terbaca menuduh; pembelaan harus datang lebih dulu. Korban Hostage diumumkan server, jadi
-    # statusnya disebut pasti.
-    "info_sandera": [
-        "Jangan salah vote, {t} bukan Hitman. Dia sudah disandera.",
-        "{t} bukan Hitman, dia kan sudah disandera. Jangan vote {t}.",
-        "Aku yakin {t} bukan Hitman, dia sudah disandera.",
     ],
     # "X kok diam?" terbaca menuduh; ajakan bicara ditulis sebagai pertanyaan pendapat.
     "ajak_bicara": [
@@ -886,8 +879,6 @@ MAKSUD_AKSI = {
     "bela_orang": "Membela {t}: minta pemain lain jangan buru-buru vote {t}.",
     "bela_orang_klaim": "Mengaku sebagai Stalker yang sudah Peek {t} dan hasilnya bukan Hitman, jadi jangan vote {t}.",
     "tuduh": "Menyampaikan kecurigaan pada {t} beserta alasannya, sebagai dugaan (bukan kepastian).",
-    "info_sandera": ("Mengingatkan bahwa {t} sudah disandera (diumumkan ke semua pemain), jadi {t} pasti bukan Hitman; "
-                     "minta pemain lain jangan vote {t}."),
     "ajak_bicara": "Mengajak {t} yang dari tadi diam untuk ikut bicara dan memberi pendapat.",
     "tanya_info": "Bertanya kepada semua pemain siapa yang mereka curigai dan kenapa.",
     "tanya_info_bukti": "Menyampaikan alasan berikut lalu bertanya pendapat pemain lain.",
@@ -896,11 +887,11 @@ MAKSUD_AKSI = {
 NIAT = {"offend": "menuduh", "defend": "membela", "neutral": "netral (tidak menuduh dan tidak membela siapa pun)"}
 
 # Chat yang memicu rencana, supaya kalimat menanggapi kejadian nyata, bukan kalimat umum: bela diri → tuduhan dan suara
-# Tribunal ke pembicara; bela orang/info sandera → tuduhan dan suara ke target; jawab → pertanyaan penanya.
+# Tribunal ke pembicara; bela orang → tuduhan dan suara ke target; jawab → pertanyaan penanya.
 # Keluaran: (baris pemicu untuk prompt, nama pengirimnya yang boleh disapa walau bukan target).
 def pemicu(p, konteks):
     chat = konteks["chat_terbaru"][-JUMLAH_CHAT_KONTEKS:]
-    sasaran = {"bela_diri": p["pembicara"], "bela_orang": p["target"], "info_sandera": p["target"]}.get(p["aksi"])
+    sasaran = {"bela_diri": p["pembicara"], "bela_orang": p["target"]}.get(p["aksi"])
     if p["aksi"] == "jawab":
         dipilih = [c for c in chat if c["pengirim"] == p.get("penanya")][-1:]
     elif sasaran:

@@ -346,16 +346,17 @@ const PARAMETER = {
   keunggulan: 'Selisih kecurigaan tersangka teratas dari tersangka kedua (0–1).',
   keyakinan: 'Fuzzy vote: keyakinan pada kandidat teratas (0–1).',
   kesiapan: 'Fuzzy vote: kesiapan mengunci vote (0–100) dari keyakinan dan warga terdesak.',
-  prioritas: 'Keluaran fuzzy 0–100 untuk tindakan chat atau aksi rahasia.',
+  prioritas:
+    'Nilai tiap kandidat: keluaran fuzzy 0–100 untuk chat, Gag, dan Peek; nilai 0–1 tanpa fuzzy untuk Hostage dan Guard. Bela diri dan jawab tanpa nilai.',
   utilitas: 'Skor Utility AI 0–1. Nilai pertimbangan sudah melalui kurva.',
   poin: 'Behavior Tree: jumlah poin bendera merah yang aktif; kecurigaan = poin / 5.',
   bendera: 'Behavior Tree: bendera merah aktif bila nilai bukti ≥ ambangnya.',
   ancaman: 'Hitman: seberapa berbahaya pemain (menuduh, berpengaruh, mengaku role penting).',
   kambing_hitam: 'Hitman: seberapa mudah pemain dijadikan tersangka oleh warga.',
   jejak_tuduhan:
-    'Hitman: seberapa jelas pemain ini menuduh Syndicate, makin sedikit orang yang dituduhnya makin tinggi; jejak bila ia dibungkam.',
-  terancam: 'Spy: seberapa mungkin pemain diincar Hitman malam ini.',
-  kepercayaan: 'Input bela orang dan Guard: seberapa bisa dipercaya (1 = pasti bersih).',
+    'Hitman: seberapa jelas pemain ini menuduh Syndicate, makin sedikit orang yang dituduhnya makin tinggi. Nilai Hostage = ancaman × (1 − 0,5 × jejak_tuduhan).',
+  terancam: 'Spy: seberapa mungkin pemain diincar Hitman malam ini; menjadi nilai Guard.',
+  kepercayaan: 'Input bela orang: seberapa bisa dipercaya (1 = pasti bersih).',
 };
 // Nama lama tetap dikenali karena jejak lama di checker_traces masih memakainya.
 for (const [lama, baru] of Object.entries({
@@ -1300,8 +1301,8 @@ const ALUR_AI = {
     kode: 'otak_fuzzy.putuskan',
     tujuan: 'Menalar dengan aturan bahasa manusia (rendah/sedang/tinggi).',
     proses:
-      'Bukti → sistem fuzzy bertingkat → kecurigaan; tiap pilihan chat/vote/aksi diberi prioritas 0–100.',
-    keluaran: 'Kecurigaan per pemain dan prioritas tiap pilihan.',
+      'Bukti → sistem fuzzy bertingkat → kecurigaan. Chat yang dinilai, vote, Gag, dan Peek diberi prioritas 0–100. Bela diri dan jawab dikirim tanpa nilai; Hostage dan Guard memakai nilai 0–1 tanpa fuzzy.',
+    keluaran: 'Kecurigaan per pemain dan nilai tiap pilihan.',
     alasan: 'Bukti sosial tidak pasti; fuzzy menangani "agak curiga" dengan halus.',
   },
   fl_1: {
@@ -1339,7 +1340,7 @@ const ALUR_AI = {
     kode: 'keputusan_chat · keputusan_vote · keputusan_aksi',
     tujuan: 'Memutuskan bertindak atau menunggu.',
     proses:
-      'Prioritas terbaik dibandingkan AMBANG_CHAT, VOTE_LANGSUNG/AMBANG_VOTE, dan AMBANG_GAG.',
+      'Prioritas terbaik dibandingkan AMBANG_CHAT, VOTE_LANGSUNG/AMBANG_VOTE, dan AMBANG_GAG. Bela diri dan jawab tidak melewati ambang; Hostage, Guard, dan Peek selalu memakai target terbaik.',
     keluaran: 'Rencana chat, vote, dan aksi rahasia.',
     alasan: 'Bot tidak menuduh tanpa bukti yang cukup.',
   },

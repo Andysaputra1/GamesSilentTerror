@@ -18,7 +18,15 @@ from fastapi.testclient import TestClient
 
 from app.module.checker_service import CheckerService, checker_service
 from app.module.match_engine import Match
-from app.module.npc_brain.penjelasan import BATAS_BYTE, batasi, jelaskan, lengkapi, ringkas, ukuran
+from app.module.npc_brain.penjelasan import (
+    BATAS_BYTE,
+    _sistem_fuzzy,
+    batasi,
+    jelaskan,
+    lengkapi,
+    ringkas,
+    ukuran,
+)
 from app.module.npc_service import NPCService
 from app.module.room_service import RoomService
 from tests.test_npc_brain import AKSI_RAHASIA, runtime_siap
@@ -125,8 +133,32 @@ class PenjelasanMetodeTests(unittest.TestCase):
         self.assertIn(f"vote → {npc['target']}", r["keputusan"])
         self.assertIsNone(ringkas(None))
 
+    # Hostage dan Guard tidak punya sistem fuzzy, tetapi tetap tampil di daftar jejak dan membawa nilainya.
+    def test_hostage_and_guard_show_a_plain_value_without_fuzzy_system(self):
+        for aksi in ("hostage", "guard"):
+            with self.subTest(aksi=aksi):
+                semua = [x for langkah in self.langkah.values() for x in langkah]
+                _, npc, _, p = next(x for x in semua if x[1]["action"] == aksi)
+                blok = p["penalaran"]["aksi"]
+                self.assertEqual(blok["sistem"], [])
+                self.assertIn(f"{aksi} → {npc['target']} (nilai ", blok["hasil"])
+                self.assertIn("Tanpa sistem fuzzy", blok["catatan"])
+                self.assertIn("prioritas", blok["kandidat"]["kolom"])
+                self.assertIn(f"{aksi} → {npc['target']}", ringkas(p)["keputusan"])
+
 
 class PenjelasanToleransiTests(unittest.TestCase):
+    def test_only_gag_peek_and_chat_actions_map_to_a_fuzzy_system(self):
+        semua = dict.fromkeys(("gag", "intip", "tuduh", "h_tuduh", "bela_orang"))
+        modul = SimpleNamespace(SEMUA_SISTEM=semua)
+        for aksi, peran, sistem in (("gag", "hitman", "gag"), ("peek", "stalker", "intip"),
+                                    ("tuduh", "hitman", "h_tuduh"), ("tuduh", "spy", "tuduh"),
+                                    ("bela_orang", "hitman", "bela_orang"), ("hostage", "hitman", None),
+                                    ("guard", "spy", None), ("bela_diri", "hitman", None),
+                                    ("jawab", "civilian", None)):  # fmt: skip
+            with self.subTest(aksi=aksi, peran=peran):
+                self.assertEqual(_sistem_fuzzy(modul, aksi, peran), sistem)
+
     def test_missing_columns_and_empty_traces_do_not_raise(self):
         bot = SimpleNamespace(
             nama="NOX", metode="fuzzy", persona="santai", peran="civilian", langkah=1
@@ -275,6 +307,10 @@ class NPCServicePenjelasanTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(p["nlg"]["status"], "terkirim")
         self.assertEqual(p["nlg"]["teks"], self.match.messages[-1]["message"])
         self.assertEqual(p["keputusan"]["chat"]["aksi"], "bela_diri")
+        self.assertIsNone(p["keputusan"]["chat"]["skor"])
+        self.assertEqual(p["penalaran"]["chat"]["hasil"], "bela_diri → NOX")
+        self.assertIn("Tanpa nilai", p["penalaran"]["chat"]["catatan"])
+        self.assertNotIn("ambang", p["penalaran"]["chat"])
         self.assertIn("chat bela_diri → NOX", trace["ringkas"]["keputusan"])
         stored = self.persistence.record_trace.call_args.args[0]
         self.assertLessEqual(len(json.dumps(stored["penjelasan"]).encode()), BATAS_BYTE)

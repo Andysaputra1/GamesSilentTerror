@@ -50,8 +50,16 @@ KOLOM_LINDUNG = [
     "pengaruh",
 ]
 
+AKSI_RAHASIA = {"hostage", "guard", "peek", "gag"}
 # Nama sistem fuzzy untuk aksi rahasia (aksi engine → nama di notebook).
-SISTEM_AKSI = {"hostage": "sandera", "guard": "lindung", "peek": "intip", "gag": "gag"}
+SISTEM_AKSI = {"peek": "intip", "gag": "gag"}
+# Keputusan tanpa sistem fuzzy dan cara nilainya ditentukan.
+TANPA_SISTEM = {
+    "bela_diri": "Tanpa nilai: tuduhan selalu dibalas lebih dulu.",
+    "jawab": "Tanpa nilai: panggilan selalu dibalas lebih dulu.",
+    "hostage": "Tanpa sistem fuzzy: nilai = ancaman × (1 − 0,5 × jejak_tuduhan).",
+    "guard": "Tanpa sistem fuzzy: nilai = terancam.",
+}
 
 # Ambang tiap keputusan: (nama konstanta di modul notebook, arti). Nilainya dibaca dari modul.
 AMBANG_CHAT = {
@@ -236,8 +244,9 @@ def _keputusan(hasil):
 # ---------------------------------------------------------------- penalaran per metode
 def _sistem_fuzzy(modul, aksi, peran):
     semua = getattr(modul, "SEMUA_SISTEM", {})
-    calon = ([f"h_{aksi}"] if peran == "hitman" else []) + [SISTEM_AKSI.get(aksi, aksi), aksi]
-    return next((s for s in calon if s in semua), None)
+    # h_tuduh satu-satunya sistem chat yang namanya berbeda dari aksi.
+    sistem = "h_tuduh" if peran == "hitman" and aksi == "tuduh" else SISTEM_AKSI.get(aksi, aksi)
+    return sistem if sistem in semua else None
 
 
 # Satu sistem Mamdani: derajat keanggotaan input, aturan yang menyala, dan keluaran defuzzifikasi.
@@ -306,7 +315,8 @@ def _blok_kandidat(modul, metode, jejak, rencana, peran, judul, ambang):
         return fakta
     rows = _baris(jejak)
     blok = {"judul": judul, "jenis": metode, "hasil": _narasi_rencana(rencana)}
-    if rows and ambang:
+    # bela_diri dan jawab tidak dinilai, jadi ambang chat tidak berlaku untuk keduanya.
+    if ambang and any(r.get("prioritas") is not None for r in rows):
         blok["ambang"] = _ambang(modul, ambang)
     if not rows:
         return blok
@@ -329,6 +339,9 @@ def _blok_kandidat(modul, metode, jejak, rencana, peran, judul, ambang):
         blok["hasil"] += f" (kandidat terbaik {terpilih.get('aksi')} = {_fmt(skor)})"
     elif skor is not None:
         blok["hasil"] += f" (nilai {_fmt(skor)})"
+    catatan = TANPA_SISTEM.get(terpilih.get("aksi"))
+    if catatan:
+        blok["catatan"] = catatan
     return blok
 
 
@@ -588,7 +601,7 @@ def ringkas(penjelasan):
         baris.append(f"chat {chat.get('aksi')}{target}")
     if vote.get("aksi") == "vote":
         baris.append(f"vote → {vote.get('target')}")
-    if aksi.get("aksi") in SISTEM_AKSI:
+    if aksi.get("aksi") in AKSI_RAHASIA:
         baris.append(f"{aksi.get('aksi')} → {aksi.get('target')}")
     return {
         "bot": {
