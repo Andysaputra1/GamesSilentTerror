@@ -1,9 +1,4 @@
-"""Application composition root for the Shadow Heist Python backend.
-
-FastAPI routes are HTTP controllers; services own use cases and transactions.
-Models contain parameterized SQL, modules own infrastructure, and Socket.IO
-has its own event controller.
-"""
+"""Titik masuk backend: menyusun server HTTP, Socket.IO, bot, dan jam permainan."""
 
 from __future__ import annotations
 
@@ -14,28 +9,33 @@ import logging
 import socketio
 from fastapi import FastAPI
 
+from app.config.settings import settings
 from app.controller.controller_main import api_router
 from app.controller.middleware.cors import configure_cors
+from app.controller.realtime.socket_handlers import register_socket_handlers
 from app.module.ai_runtime_service import muat_konfigurasi_ai
 from app.module.mysql_connector import engine, database_is_ready
-from app.config.settings import settings
-from app.controller.realtime.socket_handlers import register_socket_handlers
-from app.module.npc_service import NPCService
 from app.module.npc_brain.runtime import brain_runtime
 from app.module.npc_config_service import load_npc_configuration
+from app.module.npc_service import NPCService
 from app.module.persistence_service import PersistenceError
 from app.module.room_service import room_service
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("shadow_heist")
 
+# Server chat realtime dan pengatur bot; dipakai jam permainan di lifespan.
+sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins=settings.allowed_origins)
+socket_controller = register_socket_handlers(sio)
+npc_service = NPCService(sio, broadcast=socket_controller.emit_room)
+
 
 # Mengatur hidup server: yang dijalankan saat server nyala dan saat server mati.
-# Alur 1 (server nyala): 1 cek MySQL -> 2 muat konfigurasi panel -> 3 muat otak bot di latar -> 4 nyalakan jam
+# Alur 1 (server nyala): 1 cek MySQL -> 2.1.1 muat konfigurasi panel -> 3 muat otak bot di latar -> 4 nyalakan jam -> 5 layani pemain
+#                                    \> 2.2.1 MySQL atau konfigurasi gagal -> 2.2.2 catat error, pakai .env -> lanjut ke 3
 # Alur 2 (server mati): 1 hentikan jam -> 2 batalkan giliran bot -> 3 tutup thread otak -> 4 tutup koneksi MySQL
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    """Validate connectivity without changing schema."""
     if database_is_ready():
         logger.info("Koneksi MySQL siap.")
         try:
@@ -44,8 +44,8 @@ async def lifespan(_: FastAPI):
             logger.error("Konfigurasi AI panel gagal dimuat; memakai .env: %s", error)
         try:
             load_npc_configuration()
-        except PersistenceError:
-            logger.warning("Konfigurasi NPC panel belum tersimpan; memakai nilai .env.")
+        except PersistenceError as error:
+            logger.warning("Konfigurasi Otak NPC panel gagal dimuat; memakai .env: %s", error)
     else:
         logger.error("Koneksi awal MySQL gagal.")
 
@@ -53,7 +53,8 @@ async def lifespan(_: FastAPI):
     brain_runtime.mulai_memuat()
 
     # Jam permainan: tiap 0,5 detik, tidak bergantung pada tab pemain atau kecepatan respons LLM.
-    # Alur: 1 ganti fase yang waktunya habis -> 2 jalankan bot yang sudah waktunya -> 3 tunggu 0,5 detik
+    # Alur: 1 ganti fase yang waktunya habis -> 2.1.1 jalankan bot yang sudah waktunya -> 3 tunggu 0,5 detik -> kembali ke 1
+    #                                        \> 2.2.1 ada error -> 2.2.2 catat ke log -> lanjut ke 3
     async def game_clock():
         while True:
             try:
@@ -80,10 +81,5 @@ app = FastAPI(title=settings.app_name, lifespan=lifespan)
 configure_cors(app)
 app.include_router(api_router)
 
-# The former Node real-time server is hosted alongside FastAPI on port 8000.
-sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins=settings.allowed_origins)
-socket_controller = register_socket_handlers(sio)
-npc_service = NPCService(sio, broadcast=socket_controller.emit_room)
-
-# Uvicorn targets this object so FastAPI and Socket.IO share one backend port.
+# Uvicorn menjalankan objek ini, supaya FastAPI dan Socket.IO berbagi satu port.
 asgi_app = socketio.ASGIApp(sio, other_asgi_app=app)
