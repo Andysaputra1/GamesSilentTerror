@@ -115,11 +115,11 @@ td code { white-space: nowrap; overflow-wrap: break-word; }
 <header class="kepala-halaman">
 <h1>Bedah Alur Silent Terror</h1>
 <p class="pembuka">Alur backend dari <code>main.py</code> sampai ujung tiap fungsi. Tiap bagian berisi gunanya, alurnya, kodenya, dan hal yang tidak terlihat dari kode.</p>
-<p class="ringkas"><span>✅ <b>11</b> sudah dibahas</span><span><b>25</b> belum dibahas</span><span><b>4</b> nanti, menunggu rombak otak bot</span></p>
-<p class="sumber">Kode dibaca langsung dari commit <code>6815cf4</code>, dibangun 2026-11-04 14:58. Bagian yang belum dibahas boleh dibaca lebih dulu, tapi belum kita periksa bersama.</p>
+<p class="ringkas"><span>✅ <b>12</b> sudah dibahas</span><span><b>24</b> belum dibahas</span><span><b>4</b> nanti, menunggu rombak otak bot</span></p>
+<p class="sumber">Kode dibaca langsung dari commit <code>301de55</code>, dibangun 2026-11-04 15:10. Bagian yang belum dibahas boleh dibaca lebih dulu, tapi belum kita periksa bersama.</p>
 </header>
 <div class="kerangka">
-<nav class="samping" aria-label="Daftar bagian"><details id="t-daftar" open><summary>Daftar bagian</summary><ul><li><a href="#t-alur-besar"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav">Alur utama main.<wbr>py</span></a></li><li><a href="#t-setup-logger"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">1</span>[SETUP LOGGER]</span></a></li><li><a href="#t-konek-socket"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">2</span>[KONEK SOCKET]</span></a><ul><li><a href="#t-allowed-origins"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">2.1</span>settings.<wbr>allowed_origins</span></a></li><li><a href="#t-socket-game-controller"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">2.2</span>SocketGameController</span></a></li><li><a href="#t-connect"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">2.3</span>connect</span></a><ul><li><a href="#t-cek-token"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">2.3.1</span>auth_service.<wbr>check_user_by_token</span></a><ul><li><a href="#t-session-local"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">2.3.1.1</span>SessionLocal</span></a><ul><li><a href="#t-database-url"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">2.3.1.1.1</span>settings.<wbr>sqlalchemy_database_url</span></a></li></ul></li><li><a href="#t-query-token"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">2.3.1.2</span>auth_queries.<wbr>account_by_token</span></a></li></ul></li><li><a href="#t-room-get"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">2.3.2</span>room_service.<wbr>get</span></a></li></ul></li><li><a href="#t-disconnect"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">2.4</span>disconnect</span></a></li><li><a href="#t-send-chat"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">2.5</span>send_chat</span></a><ul><li><a href="#t-verifikasi-socket"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">2.5.1</span>_verifikasi_socket</span></a></li><li><a href="#t-match-tick"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">2.5.2</span>Match.<wbr>tick</span></a></li><li><a href="#t-match-can-chat"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">2.5.3</span>Match.<wbr>can_chat</span></a></li><li><a href="#t-activity-record"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">2.5.4</span>activity.<wbr>record</span></a></li><li><a href="#t-checker-begin"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">2.5.5</span>checker_service.<wbr>begin</span></a></li><li><a href="#t-measure"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">2.5.6</span>measure</span></a></li><li><a href="#t-record-player-message"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">2.5.7</span>PersistenceService.<wbr>record_player_message</span></a><ul><li><a href="#t-transaksi-game"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">2.5.7.1</span>mysql_connector.<wbr>jalankan_transaksi</span></a></li><li><a href="#t-game-queries"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">2.5.7.2</span>game_queries</span></a></li></ul></li><li><a href="#t-add-message"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">2.5.8</span>Match.<wbr>add_message</span></a></li><li><a href="#t-emit-room"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">2.5.9</span>emit_room</span></a></li><li><a href="#t-catat-nlu"><span class="m m-nanti" title="nanti"></span><span class="label-nav"><span class="no">2.5.10</span>catat_nlu<span class="tag-nanti">nanti</span></span></a></li><li><a href="#t-record-trace"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">2.5.11</span>PersistenceService.<wbr>record_trace</span></a></li></ul></li></ul></li><li><a href="#t-siapkan-bot"><span class="m m-nanti" title="nanti"></span><span class="label-nav"><span class="no">3</span>[SIAPKAN BOT NPC]<span class="tag-nanti">nanti</span></span></a></li><li><a href="#t-konek-api"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">4</span>[KONEK API]</span></a></li><li><a href="#t-cors"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">5</span>[CORS]</span></a></li><li><a href="#t-routes"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">6</span>[ROUTES CONTROLLER]</span></a></li><li><a href="#t-gabung"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">7</span>[GABUNG API + SOCKET]</span></a></li><li><a href="#t-server-nyala"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">8</span>[SERVER NYALA]</span></a><ul><li><a href="#t-database-is-ready"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">8.1</span>database_is_ready</span></a></li><li><a href="#t-muat-ai"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">8.2</span>muat_konfigurasi_ai</span></a></li><li><a href="#t-load-npc"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">8.3</span>load_npc_configuration</span></a></li><li><a href="#t-mulai-memuat"><span class="m m-nanti" title="nanti"></span><span class="label-nav"><span class="no">8.4</span>brain_runtime.<wbr>mulai_memuat<span class="tag-nanti">nanti</span></span></a></li><li><a href="#t-game-clock"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">8.5</span>game_clock</span></a><ul><li><a href="#t-perbarui-fase"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">8.5.1</span>room_service.<wbr>perbarui_fase_semua_room</span></a></li><li><a href="#t-jalankan-bot"><span class="m m-nanti" title="nanti"></span><span class="label-nav"><span class="no">8.5.2</span>npc_service.<wbr>jalankan_bot_yang_sudah_waktunya<span class="tag-nanti">nanti</span></span></a></li></ul></li></ul></li><li><a href="#t-server-mati"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">9</span>[SERVER MATI]</span></a></li></ul></details></nav>
+<nav class="samping" aria-label="Daftar bagian"><details id="t-daftar" open><summary>Daftar bagian</summary><ul><li><a href="#t-alur-besar"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav">Alur utama main.<wbr>py</span></a></li><li><a href="#t-setup-logger"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">1</span>[SETUP LOGGER]</span></a></li><li><a href="#t-konek-socket"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">2</span>[KONEK SOCKET]</span></a><ul><li><a href="#t-allowed-origins"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">2.1</span>settings.<wbr>allowed_origins</span></a></li><li><a href="#t-socket-game-controller"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">2.2</span>SocketGameController</span></a></li><li><a href="#t-connect"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">2.3</span>connect</span></a><ul><li><a href="#t-cek-token"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">2.3.1</span>auth_service.<wbr>check_user_by_token</span></a><ul><li><a href="#t-session-local"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">2.3.1.1</span>SessionLocal</span></a><ul><li><a href="#t-database-url"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">2.3.1.1.1</span>settings.<wbr>sqlalchemy_database_url</span></a></li></ul></li><li><a href="#t-query-token"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">2.3.1.2</span>auth_queries.<wbr>account_by_token</span></a></li></ul></li><li><a href="#t-room-get"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">2.3.2</span>room_service.<wbr>get</span></a></li></ul></li><li><a href="#t-disconnect"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">2.4</span>disconnect</span></a></li><li><a href="#t-send-chat"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">2.5</span>send_chat</span></a><ul><li><a href="#t-verifikasi-socket"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">2.5.1</span>_verifikasi_socket</span></a></li><li><a href="#t-match-tick"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">2.5.2</span>Match.<wbr>tick</span></a></li><li><a href="#t-match-can-chat"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">2.5.3</span>Match.<wbr>can_chat</span></a></li><li><a href="#t-activity-record"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">2.5.4</span>activity.<wbr>record</span></a></li><li><a href="#t-checker-begin"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">2.5.5</span>checker_service.<wbr>begin</span></a></li><li><a href="#t-measure"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">2.5.6</span>measure</span></a></li><li><a href="#t-record-player-message"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">2.5.7</span>PersistenceService.<wbr>record_player_message</span></a><ul><li><a href="#t-transaksi-game"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">2.5.7.1</span>mysql_connector.<wbr>jalankan_transaksi</span></a></li><li><a href="#t-game-queries"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">2.5.7.2</span>game_queries</span></a></li></ul></li><li><a href="#t-add-message"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">2.5.8</span>Match.<wbr>add_message</span></a></li><li><a href="#t-emit-room"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">2.5.9</span>emit_room</span></a></li><li><a href="#t-catat-nlu"><span class="m m-nanti" title="nanti"></span><span class="label-nav"><span class="no">2.5.10</span>catat_nlu<span class="tag-nanti">nanti</span></span></a></li><li><a href="#t-record-trace"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">2.5.11</span>PersistenceService.<wbr>record_trace</span></a></li></ul></li></ul></li><li><a href="#t-siapkan-bot"><span class="m m-nanti" title="nanti"></span><span class="label-nav"><span class="no">3</span>[SIAPKAN BOT NPC]<span class="tag-nanti">nanti</span></span></a></li><li><a href="#t-konek-api"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">4</span>[KONEK API]</span></a></li><li><a href="#t-cors"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">5</span>[CORS]</span></a></li><li><a href="#t-routes"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">6</span>[ROUTES CONTROLLER]</span></a></li><li><a href="#t-gabung"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">7</span>[GABUNG API + SOCKET]</span></a></li><li><a href="#t-server-nyala"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">8</span>[SERVER NYALA]</span></a><ul><li><a href="#t-database-is-ready"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">8.1</span>database_is_ready</span></a></li><li><a href="#t-muat-ai"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">8.2</span>muat_konfigurasi_ai</span></a></li><li><a href="#t-load-npc"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">8.3</span>load_npc_configuration</span></a></li><li><a href="#t-mulai-memuat"><span class="m m-nanti" title="nanti"></span><span class="label-nav"><span class="no">8.4</span>brain_runtime.<wbr>mulai_memuat<span class="tag-nanti">nanti</span></span></a></li><li><a href="#t-game-clock"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">8.5</span>game_clock</span></a><ul><li><a href="#t-perbarui-fase"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">8.5.1</span>room_service.<wbr>perbarui_fase_semua_room</span></a></li><li><a href="#t-jalankan-bot"><span class="m m-nanti" title="nanti"></span><span class="label-nav"><span class="no">8.5.2</span>npc_service.<wbr>jalankan_bot_yang_sudah_waktunya<span class="tag-nanti">nanti</span></span></a></li></ul></li></ul></li><li><a href="#t-server-mati"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">9</span>[SERVER MATI]</span></a></li></ul></details></nav>
 <main>
 <section class="bagian k0" id="t-alur-besar">
 <p class="jalur"><span>Alur utama main.py</span></p>
@@ -140,7 +140,7 @@ td code { white-space: nowrap; overflow-wrap: break-word; }
 <pre class="alur" tabindex="0">Atur level log ke INFO, jadi pesan INFO, WARNING, dan ERROR tampil
   <span class="panah">-&gt;</span> ambil pencatat bernama "shadow_heist"</pre>
 <p class="label">Kode</p>
-<figure class="blok-kode"><figcaption><code>backend/app/main.py:82-84</code></figcaption><pre class="kode" tabindex="0"><span class="ln">82</span><span class="c"># Setup Logger</span>
+<figure class="blok-kode"><figcaption><code>backend/app/main.py:82-84</code></figcaption><pre class="kode" tabindex="0"><span class="ln">82</span><span class="c"># Menyiapkan pencatat log. File lain memakai anak dari nama ini (mis. shadow_heist.auth), jadi pesannya ikut aturan yang sama.</span>
 <span class="ln">83</span>logging.basicConfig(level=logging.INFO)
 <span class="ln">84</span>logger = logging.getLogger(<span class="s">"shadow_heist"</span>)</pre></figure>
 <p class="label">Yang tidak terlihat dari kode</p>
@@ -162,12 +162,13 @@ Waktu 2, saat pemain main (berulang):
   Pemain kirim chat   <span class="panah">-&gt;</span> <a class="ref" href="#t-send-chat">[[send_chat]]</a>   cek pesan, simpan, kirim ke semua orang di room
   Browser terputus    <span class="panah">-&gt;</span> <a class="ref" href="#t-disconnect">[[disconnect]]</a>  hapus catatan socket</pre>
 <p class="label">Kode</p>
-<figure class="blok-kode"><figcaption><code>backend/app/main.py:86-91</code></figcaption><pre class="kode" tabindex="0"><span class="ln">86</span><span class="c"># Koneksi WebSocket lewat Socket.IO: jalur realtime server dengan browser pemain, bot NPC ikut memakainya.</span>
-<span class="ln">87</span>sio = socketio.AsyncServer(async_mode=<span class="s">"asgi"</span>, cors_allowed_origins=settings.allowed_origins)
-<span class="ln">88</span>socket_controller = SocketGameController(sio)
-<span class="ln">89</span>sio.on(<span class="s">"connect"</span>, socket_controller.connect)
-<span class="ln">90</span>sio.on(<span class="s">"disconnect"</span>, socket_controller.disconnect)
-<span class="ln">91</span>sio.on(<span class="s">"send_chat"</span>, socket_controller.send_chat)</pre></figure>
+<figure class="blok-kode"><figcaption><code>backend/app/main.py:86-92</code></figcaption><pre class="kode" tabindex="0"><span class="ln">86</span><span class="c"># Socket.IO: jalur yang tetap terbuka antara server dan browser, jadi server bisa mengirim chat kapan saja.</span>
+<span class="ln">87</span><span class="c"># Di sini hanya persiapan: connect, disconnect, dan send_chat baru jalan saat ada pemain.</span>
+<span class="ln">88</span>sio = socketio.AsyncServer(async_mode=<span class="s">"asgi"</span>, cors_allowed_origins=settings.allowed_origins)
+<span class="ln">89</span>socket_controller = SocketGameController(sio)
+<span class="ln">90</span>sio.on(<span class="s">"connect"</span>, socket_controller.connect)
+<span class="ln">91</span>sio.on(<span class="s">"disconnect"</span>, socket_controller.disconnect)
+<span class="ln">92</span>sio.on(<span class="s">"send_chat"</span>, socket_controller.send_chat)</pre></figure>
 <div class="tabel" tabindex="0"><table><caption>Yang dipakai dari <code>sio</code> (server Socket.IO)</caption><thead><tr><th scope="col">Pemanggilan</th><th scope="col">Gunanya</th></tr></thead><tbody><tr><td><code>sio.on("connect", fungsi)</code></td><td>Mendaftarkan fungsi untuk sebuah event</td></tr><tr><td><code>sio.enter_room(sid, "ABC")</code></td><td>Memasukkan satu sambungan ke kanal room</td></tr><tr><td><code>sio.leave_room(sid, "ABC")</code></td><td>Mengeluarkan sambungan dari kanal room</td></tr><tr><td><code>sio.emit("receive_chat", data, to="ABC")</code></td><td>Mengirim pesan ke semua sambungan di room itu</td></tr><tr><td><code>sio.emit("system_alert", data, to=sid)</code></td><td>Mengirim pesan ke satu sambungan saja</td></tr></tbody></table></div>
 <div class="tabel" tabindex="0"><table><caption>Contoh: pemain bernama Budi</caption><thead><tr><th scope="col">Kejadian</th><th scope="col">Yang terjadi di server</th></tr></thead><tbody><tr><td>Budi membuka game</td><td><a class="ref" href="#t-connect">[[connect]]</a> mengecek token dan room ABC, mencatat sambungan <code>s1</code> = Budi, lalu memasukkan <code>s1</code> ke kanal ABC</td></tr><tr><td>Budi mengirim "halo"</td><td><a class="ref" href="#t-send-chat">[[send_chat]]</a> melihat catatan <code>s1</code>, menyimpan pesan, lalu mengirimnya ke semua orang di kanal ABC</td></tr><tr><td>Budi menutup tab</td><td><a class="ref" href="#t-disconnect">[[disconnect]]</a> menghapus catatan <code>s1</code>. Budi tetap anggota room ABC dan bisa menyambung lagi</td></tr></tbody></table></div>
 <p class="label">Yang tidak terlihat dari kode</p>
@@ -185,12 +186,13 @@ Waktu 2, saat pemain main (berulang):
   <span class="panah">-&gt;</span> buang spasi di tiap alamat, buang yang kosong
   <span class="panah">-&gt;</span> kembalikan daftar alamat</pre>
 <p class="label">Kode</p>
-<figure class="blok-kode"><figcaption><code>backend/app/config/settings.py:119-122</code></figcaption><pre class="kode" tabindex="0"><span class="ln">119</span>@<span class="d">property</span>
-<span class="ln">120</span><span class="c"># PROPERTY: pecah konfigurasi CORS menjadi daftar origin browser yang diizinkan.</span>
-<span class="ln">121</span><span class="k">def</span> <span class="f">allowed_origins</span>(self) -&gt; list[str]:
-<span class="ln">122</span>    <span class="k">return</span> [origin.strip() <span class="k">for</span> origin <span class="k">in</span> self.cors_origins.split(<span class="s">","</span>) <span class="k">if</span> origin.strip()]</pre></figure>
+<figure class="blok-kode"><figcaption><code>backend/app/config/settings.py:119-123</code></figcaption><pre class="kode" tabindex="0"><span class="ln">119</span>@<span class="d">property</span>
+<span class="ln">120</span><span class="c"># Mengubah pengaturan CORS dari satu teks menjadi daftar alamat web.</span>
+<span class="ln">121</span><span class="c"># Dipakai di 3 tempat (Socket.IO, middleware CORS, login Google), jadi rumusnya cukup ditulis sekali.</span>
+<span class="ln">122</span><span class="k">def</span> <span class="f">allowed_origins</span>(self) -&gt; list[str]:
+<span class="ln">123</span>    <span class="k">return</span> [origin.strip() <span class="k">for</span> origin <span class="k">in</span> self.cors_origins.split(<span class="s">","</span>) <span class="k">if</span> origin.strip()]</pre></figure>
 <figure class="blok-kode"><figcaption><code>backend/app/config/settings.py:47</code></figcaption><pre class="kode" tabindex="0"><span class="ln">47</span>cors_origins: str = <span class="s">"http://localhost:4200,http://127.0.0.1:4200"</span></pre></figure>
-<div class="tabel" tabindex="0"><table><caption>Kenapa dibuat fungsi: dipakai di 3 tempat, jadi rumusnya cukup ditulis sekali</caption><thead><tr><th scope="col">Pemakai</th><th scope="col">Gunanya</th></tr></thead><tbody><tr><td><code>backend/app/main.py:87</code></td><td>Socket.IO menolak browser dari alamat lain</td></tr><tr><td><code>backend/app/controller/middleware/cors.py:13</code></td><td>API menolak browser dari alamat lain</td></tr><tr><td><code>backend/app/controller/api/auth.py:169</code></td><td>Mengecek asal permintaan login Google</td></tr></tbody></table></div>
+<div class="tabel" tabindex="0"><table><caption>Kenapa dibuat fungsi: dipakai di 3 tempat, jadi rumusnya cukup ditulis sekali</caption><thead><tr><th scope="col">Pemakai</th><th scope="col">Gunanya</th></tr></thead><tbody><tr><td><code>backend/app/main.py:88</code></td><td>Socket.IO menolak browser dari alamat lain</td></tr><tr><td><code>backend/app/controller/middleware/cors.py:13</code></td><td>API menolak browser dari alamat lain</td></tr><tr><td><code>backend/app/controller/api/auth.py:169</code></td><td>Mengecek asal permintaan login Google</td></tr></tbody></table></div>
 </section>
 <section class="bagian k1" id="t-socket-game-controller">
 <p class="jalur"><span>main.py</span> <span class="sep">/</span> <a href="#t-konek-socket">[KONEK SOCKET]</a> <span class="sep">/</span> <span>SocketGameController</span></p>
@@ -202,9 +204,9 @@ Waktu 2, saat pemain main (berulang):
   <span class="panah">-&gt;</span> siapkan catatan sockets yang masih kosong</pre>
 <p class="label">Kode</p>
 <figure class="blok-kode"><figcaption><code>backend/app/controller/realtime/socket_handlers.py:32-38</code></figcaption><pre class="kode" tabindex="0"><span class="ln">32</span><span class="k">class</span> <span class="f">SocketGameController</span>:
-<span class="ln">33</span>    <span class="s">"""Chat per ruangan; engine di memori, pesan dicatat ke MySQL. `sid` = ID koneksi Socket.IO."""</span>
+<span class="ln">33</span>    <span class="s">"""Menampung semua fungsi yang melayani socket. `sid` = nomor sambungan, dibuat Socket.IO."""</span>
 <span class="ln">34</span>
-<span class="ln">35</span>    <span class="c"># CONSTRUCTOR: simpan dependensi dan catatan tiap socket: akun, ruangan, dan token login.</span>
+<span class="ln">35</span>    <span class="c"># sockets: catatan tiap sambungan aktif, {sid: {username, token, room}}. Hanya di memori, jadi hilang saat server restart.</span>
 <span class="ln">36</span>    <span class="k">def</span> <span class="f">__init__</span>(self, sio: socketio.AsyncServer) -&gt; <span class="k">None</span>:
 <span class="ln">37</span>        self.sio = sio
 <span class="ln">38</span>        self.sockets: dict[str, dict[str, str]] = {}</pre></figure>
@@ -235,24 +237,26 @@ Waktu 2, saat pemain main (berulang):
      <span class="panah">-&gt;</span> masukkan sambungan ke kanal room, supaya menerima chat room itu
      <span class="panah">-&gt;</span> catat di log: pemain terkoneksi</pre>
 <p class="label">Kode</p>
-<figure class="blok-kode"><figcaption><code>backend/app/controller/realtime/socket_handlers.py:71-88</code></figcaption><pre class="kode" tabindex="0"><span class="ln">71</span><span class="c"># EVENT CONNECT: periksa token login dan akses ruangan sebelum mencatat identitas socket.</span>
-<span class="ln">72</span><span class="k">async</span> <span class="k">def</span> <span class="f">connect</span>(self, sid: str, environ: dict[str, Any], auth: Any = <span class="k">None</span>) -&gt; <span class="k">None</span>:
-<span class="ln">73</span>    token = str(auth.get(<span class="s">"token"</span>, <span class="s">""</span>)) <span class="k">if</span> isinstance(auth, dict) <span class="k">else</span> <span class="s">""</span>
-<span class="ln">74</span>    <span class="k">try</span>:
-<span class="ln">75</span>        akun = auth_service.check_user_by_token(token)
-<span class="ln">76</span>    <span class="k">except</span> (SessionValidationError, PersistenceError) <span class="k">as</span> error:
-<span class="ln">77</span>        <span class="k">raise</span> socketio.exceptions.ConnectionRefusedError(<span class="s">"Login diperlukan."</span>) <span class="k">from</span> error
-<span class="ln">78</span>    <span class="k">try</span>:
-<span class="ln">79</span>        kode_room = str(auth.get(<span class="s">"room_code"</span>, <span class="s">""</span>))
-<span class="ln">80</span>        room_service.get(kode_room, akun.username)
-<span class="ln">81</span>    <span class="k">except</span> ValueError <span class="k">as</span> error:
-<span class="ln">82</span>        logger.info(<span class="s">"Koneksi Socket ditolak untuk %s: %s"</span>, sid, error)
-<span class="ln">83</span>        <span class="k">raise</span> socketio.exceptions.ConnectionRefusedError(<span class="s">"Ruangan tidak valid."</span>) <span class="k">from</span> error
-<span class="ln">84</span>
-<span class="ln">85</span>    kode_room = kode_room.strip().upper()
-<span class="ln">86</span>    self.sockets[sid] = {<span class="s">"username"</span>: akun.username, <span class="s">"token"</span>: token, <span class="s">"room"</span>: kode_room}
-<span class="ln">87</span>    <span class="k">await</span> self.sio.enter_room(sid, kode_room)
-<span class="ln">88</span>    logger.info(<span class="s">"Pemain terkoneksi ke Socket: %s"</span>, sid)</pre></figure>
+<figure class="blok-kode"><figcaption><code>backend/app/controller/realtime/socket_handlers.py:71-90</code></figcaption><pre class="kode" tabindex="0"><span class="ln">71</span><span class="c"># Jalan saat browser menyambung: mengecek siapa yang masuk dan ke room mana, sebelum sambungan boleh menerima chat.</span>
+<span class="ln">72</span><span class="c"># auth = data dari browser (token, room_code). environ tidak dipakai, tapi wajib ada karena Socket.IO mengirimnya.</span>
+<span class="ln">73</span><span class="k">async</span> <span class="k">def</span> <span class="f">connect</span>(self, sid: str, environ: dict[str, Any], auth: Any = <span class="k">None</span>) -&gt; <span class="k">None</span>:
+<span class="ln">74</span>    token = str(auth.get(<span class="s">"token"</span>, <span class="s">""</span>)) <span class="k">if</span> isinstance(auth, dict) <span class="k">else</span> <span class="s">""</span>
+<span class="ln">75</span>    <span class="k">try</span>:
+<span class="ln">76</span>        akun = auth_service.check_user_by_token(token)
+<span class="ln">77</span>    <span class="k">except</span> (SessionValidationError, PersistenceError) <span class="k">as</span> error:
+<span class="ln">78</span>        <span class="k">raise</span> socketio.exceptions.ConnectionRefusedError(<span class="s">"Login diperlukan."</span>) <span class="k">from</span> error
+<span class="ln">79</span>    <span class="k">try</span>:
+<span class="ln">80</span>        kode_room = str(auth.get(<span class="s">"room_code"</span>, <span class="s">""</span>))
+<span class="ln">81</span>        room_service.get(kode_room, akun.username)
+<span class="ln">82</span>    <span class="k">except</span> ValueError <span class="k">as</span> error:
+<span class="ln">83</span>        logger.info(<span class="s">"Koneksi Socket ditolak untuk %s: %s"</span>, sid, error)
+<span class="ln">84</span>        <span class="k">raise</span> socketio.exceptions.ConnectionRefusedError(<span class="s">"Ruangan tidak valid."</span>) <span class="k">from</span> error
+<span class="ln">85</span>
+<span class="ln">86</span>    kode_room = kode_room.strip().upper()
+<span class="ln">87</span>    <span class="c"># Token ikut dicatat karena dicek ulang tiap chat, jadi pemain yang sudah logout tidak bisa terus chat lewat sambungan lama.</span>
+<span class="ln">88</span>    self.sockets[sid] = {<span class="s">"username"</span>: akun.username, <span class="s">"token"</span>: token, <span class="s">"room"</span>: kode_room}
+<span class="ln">89</span>    <span class="k">await</span> self.sio.enter_room(sid, kode_room)
+<span class="ln">90</span>    logger.info(<span class="s">"Pemain terkoneksi ke Socket: %s"</span>, sid)</pre></figure>
 <div class="tabel" tabindex="0"><table><caption>Parameternya</caption><thead><tr><th scope="col">Nama</th><th scope="col">Isi</th></tr></thead><tbody><tr><td><code>sid</code></td><td>Nomor sambungan, dibuat Socket.IO</td></tr><tr><td><code>environ</code></td><td>Data permintaan awal. Tidak dipakai, tapi wajib ada karena Socket.IO mengirimnya</td></tr><tr><td><code>auth</code></td><td>Data yang dikirim browser saat tersambung: token dan kode room</td></tr></tbody></table></div>
 <p class="label">Yang tidak terlihat dari kode</p>
 <ul class="catatan"><li>Kalau <code>auth</code> bukan dict, token jadi kosong, dan <a class="ref" href="#t-cek-token">[[auth_service.check_user_by_token]]</a> menolaknya. Jadi <code>auth.get</code> di bagian 2 selalu aman.</li><li>Token ikut dicatat karena dicek ulang setiap kali chat dikirim. Pemain yang sudah logout tidak bisa terus chat lewat sambungan lama.</li></ul>
@@ -275,38 +279,39 @@ Waktu 2, saat pemain main (berulang):
        <span class="cabang">\&gt;</span> ya: tolak ("Sesi login sudah tidak valid.")
   <span class="panah">-&gt;</span> kembalikan data akun: id, username, display_name, skin_id</pre>
 <p class="label">Kode</p>
-<figure class="blok-kode"><figcaption><code>backend/app/module/auth_service.py:88-103</code></figcaption><pre class="kode" tabindex="0"><span class="ln">88</span><span class="c"># Cari akun aktif untuk token yang belum kedaluwarsa; sesi tidak valid ditolak.</span>
-<span class="ln">89</span><span class="k">def</span> <span class="f">check_user_by_token</span>(self, token: str) -&gt; AuthenticatedUser:
-<span class="ln">90</span>    <span class="k">if</span> <span class="k">not</span> token.strip():
-<span class="ln">91</span>        <span class="k">raise</span> SessionValidationError(<span class="s">"Sesi login tidak ditemukan."</span>)
-<span class="ln">92</span>
-<span class="ln">93</span>    akun = jalankan_transaksi(
-<span class="ln">94</span>        <span class="k">lambda</span> database: auth_queries.account_by_token(
-<span class="ln">95</span>            database,
-<span class="ln">96</span>            hashlib.sha256(token.encode(<span class="s">"utf-8"</span>)).hexdigest(),
-<span class="ln">97</span>            datetime.now(timezone.utc).replace(tzinfo=<span class="k">None</span>),
-<span class="ln">98</span>        ),
-<span class="ln">99</span>        PESAN_LOGIN,
-<span class="ln">100</span>    )
-<span class="ln">101</span>    <span class="k">if</span> akun <span class="k">is</span> <span class="k">None</span>:
-<span class="ln">102</span>        <span class="k">raise</span> SessionValidationError(<span class="s">"Sesi login sudah tidak valid."</span>)
-<span class="ln">103</span>    <span class="k">return</span> AuthenticatedUser(**akun)</pre></figure>
-<figure class="blok-kode"><figcaption><code>backend/app/module/mysql_connector.py:46-61</code></figcaption><pre class="kode" tabindex="0"><span class="ln">46</span><span class="c"># Jalankan operasi(database) dalam satu transaksi; hanya error SQL menjadi PersistenceError(pesan).</span>
-<span class="ln">47</span><span class="c"># Sesi dibuka manual, bukan lewat SessionLocal.begin(): operasi di controller auth memanggil</span>
-<span class="ln">48</span><span class="c"># database.rollback() sendiri, dan di dalam blok begin() itu bisa memicu InvalidRequestError.</span>
-<span class="ln">49</span><span class="k">def</span> <span class="f">jalankan_transaksi</span>(operasi, pesan=<span class="s">"Database sedang tidak tersedia."</span>):
-<span class="ln">50</span>    database = SessionLocal()
-<span class="ln">51</span>    <span class="k">try</span>:
-<span class="ln">52</span>        hasil = operasi(database)
-<span class="ln">53</span>        database.commit()
-<span class="ln">54</span>        <span class="k">return</span> hasil
-<span class="ln">55</span>    <span class="k">except</span> SQLAlchemyError <span class="k">as</span> error:
-<span class="ln">56</span>        database.rollback()
-<span class="ln">57</span>        <span class="c"># Parameter SQL tidak dicatat karena bisa memuat isi chat privat.</span>
-<span class="ln">58</span>        logger.error(<span class="s">"Transaksi database gagal (%s)."</span>, type(error).__name__)
-<span class="ln">59</span>        <span class="k">raise</span> PersistenceError(pesan) <span class="k">from</span> error
-<span class="ln">60</span>    <span class="k">finally</span>:
-<span class="ln">61</span>        database.close()</pre></figure>
+<figure class="blok-kode"><figcaption><code>backend/app/module/auth_service.py:88-104</code></figcaption><pre class="kode" tabindex="0"><span class="ln">88</span><span class="c"># Mengubah token dari browser menjadi data akun, dan menolak kalau tidak sah.</span>
+<span class="ln">89</span><span class="c"># DB hanya menyimpan hash, jadi token asli tidak terbaca walau DB bocor.</span>
+<span class="ln">90</span><span class="k">def</span> <span class="f">check_user_by_token</span>(self, token: str) -&gt; AuthenticatedUser:
+<span class="ln">91</span>    <span class="k">if</span> <span class="k">not</span> token.strip():
+<span class="ln">92</span>        <span class="k">raise</span> SessionValidationError(<span class="s">"Sesi login tidak ditemukan."</span>)
+<span class="ln">93</span>
+<span class="ln">94</span>    akun = jalankan_transaksi(
+<span class="ln">95</span>        <span class="k">lambda</span> database: auth_queries.account_by_token(
+<span class="ln">96</span>            database,
+<span class="ln">97</span>            hashlib.sha256(token.encode(<span class="s">"utf-8"</span>)).hexdigest(),
+<span class="ln">98</span>            datetime.now(timezone.utc).replace(tzinfo=<span class="k">None</span>),
+<span class="ln">99</span>        ),
+<span class="ln">100</span>        PESAN_LOGIN,
+<span class="ln">101</span>    )
+<span class="ln">102</span>    <span class="k">if</span> akun <span class="k">is</span> <span class="k">None</span>:
+<span class="ln">103</span>        <span class="k">raise</span> SessionValidationError(<span class="s">"Sesi login sudah tidak valid."</span>)
+<span class="ln">104</span>    <span class="k">return</span> AuthenticatedUser(**akun)</pre></figure>
+<figure class="blok-kode"><figcaption><code>backend/app/module/mysql_connector.py:47-62</code></figcaption><pre class="kode" tabindex="0"><span class="ln">47</span><span class="c"># Jalankan operasi(database) dalam satu transaksi; hanya error SQL menjadi PersistenceError(pesan).</span>
+<span class="ln">48</span><span class="c"># Sesi dibuka manual, bukan lewat SessionLocal.begin(): operasi di controller auth memanggil</span>
+<span class="ln">49</span><span class="c"># database.rollback() sendiri, dan di dalam blok begin() itu bisa memicu InvalidRequestError.</span>
+<span class="ln">50</span><span class="k">def</span> <span class="f">jalankan_transaksi</span>(operasi, pesan=<span class="s">"Database sedang tidak tersedia."</span>):
+<span class="ln">51</span>    database = SessionLocal()
+<span class="ln">52</span>    <span class="k">try</span>:
+<span class="ln">53</span>        hasil = operasi(database)
+<span class="ln">54</span>        database.commit()
+<span class="ln">55</span>        <span class="k">return</span> hasil
+<span class="ln">56</span>    <span class="k">except</span> SQLAlchemyError <span class="k">as</span> error:
+<span class="ln">57</span>        database.rollback()
+<span class="ln">58</span>        <span class="c"># Parameter SQL tidak dicatat karena bisa memuat isi chat privat.</span>
+<span class="ln">59</span>        logger.error(<span class="s">"Transaksi database gagal (%s)."</span>, type(error).__name__)
+<span class="ln">60</span>        <span class="k">raise</span> PersistenceError(pesan) <span class="k">from</span> error
+<span class="ln">61</span>    <span class="k">finally</span>:
+<span class="ln">62</span>        database.close()</pre></figure>
 <p class="label">Yang tidak terlihat dari kode</p>
 <ul class="catatan"><li>DB hanya menyimpan hash token, jadi token asli tidak terbaca walau DB bocor.</li><li><code>AuthenticatedUser(**akun)</code> mengisi field sesuai nama kolom hasil query.</li><li>Pesan tolak berhenti di <a class="ref" href="#t-connect">[[connect]]</a>. Browser hanya menerima "Login diperlukan."</li></ul>
 <aside class="temuan"><span class="label-temuan">Risiko</span> Rumus hash ditulis langsung di 4 tempat atas permintaan user: <code>login</code>, fungsi ini, dan <code>logout</code> di <code>auth_service.py</code>, serta <code>issue_session</code> di <code>controller/api/auth.py</code>. Kalau satu diubah sendiri, token yang sah tidak ketemu di DB dan pemain tertolak.</aside>
@@ -329,7 +334,7 @@ Saat SessionLocal() dipanggil (tiap kali butuh):
   <span class="panah">-&gt;</span> koneksi baru diambil dari pool saat query pertama jalan
   <span class="panah">-&gt;</span> database.close() mengembalikan koneksi ke pool, tidak memutusnya</pre>
 <p class="label">Kode</p>
-<figure class="blok-kode"><figcaption><code>backend/app/module/mysql_connector.py:21-39</code></figcaption><pre class="kode" tabindex="0"><span class="ln">21</span><span class="c"># pool_pre_ping dan pool_recycle: koneksi yang sudah diputus MySQL diganti, tidak menggagalkan request.</span>
+<figure class="blok-kode"><figcaption><code>backend/app/module/mysql_connector.py:21-40</code></figcaption><pre class="kode" tabindex="0"><span class="ln">21</span><span class="c"># Kumpulan koneksi (pool) yang dipakai bersama. Koneksi yang diputus MySQL atau berumur lebih dari 1 jam diganti otomatis.</span>
 <span class="ln">22</span>engine = create_engine(
 <span class="ln">23</span>    settings.sqlalchemy_database_url,
 <span class="ln">24</span>    echo=settings.sql_echo,
@@ -347,7 +352,8 @@ Saat SessionLocal() dipanggil (tiap kali butuh):
 <span class="ln">36</span>            cursor.execute(<span class="s">"SET time_zone = '+00:00'"</span>)
 <span class="ln">37</span>
 <span class="ln">38</span>
-<span class="ln">39</span>SessionLocal = sessionmaker(bind=engine, autoflush=<span class="k">False</span>, autocommit=<span class="k">False</span>, expire_on_commit=<span class="k">False</span>)</pre></figure>
+<span class="ln">39</span><span class="c"># Pembuat sesi DB. Sesi wajib ditutup: close() mengembalikan koneksi ke pool, dan tanpa itu koneksi lama-lama habis.</span>
+<span class="ln">40</span>SessionLocal = sessionmaker(bind=engine, autoflush=<span class="k">False</span>, autocommit=<span class="k">False</span>, expire_on_commit=<span class="k">False</span>)</pre></figure>
 <div class="tabel" tabindex="0"><table><thead><tr><th scope="col">Pengaturan</th><th scope="col">Artinya</th></tr></thead><tbody><tr><td><code>pool_size</code> (5)</td><td>Jumlah koneksi yang disimpan untuk dipakai ulang</td></tr><tr><td><code>max_overflow</code> (10)</td><td>Tambahan koneksi sementara saat ramai</td></tr><tr><td><code>pool_pre_ping</code></td><td>Koneksi dicek hidup atau tidak sebelum dipakai</td></tr><tr><td><code>pool_recycle</code> (3600)</td><td>Koneksi yang berumur 1 jam diganti baru</td></tr><tr><td><code>autoflush=False</code></td><td>Perubahan baru dikirim ke DB saat di-commit</td></tr><tr><td><code>expire_on_commit=False</code></td><td>Data tetap terbaca sesudah commit</td></tr></tbody></table></div>
 <p class="label">Yang tidak terlihat dari kode</p>
 <ul class="catatan"><li>Setiap sesi harus ditutup. Kalau tidak, koneksi tidak kembali ke pool dan lama-lama habis.</li></ul>
@@ -363,18 +369,19 @@ Saat SessionLocal() dipanggil (tiap kali butuh):
   <span class="panah">-&gt;</span> encode user, password, dan nama DB, supaya karakter seperti @ tidak merusak alamat
   <span class="panah">-&gt;</span> susun mysql+pymysql://user:password@host:port/db?charset=utf8mb4</pre>
 <p class="label">Kode</p>
-<figure class="blok-kode"><figcaption><code>backend/app/config/mysql.py:33-44</code></figcaption><pre class="kode" tabindex="0"><span class="ln">33</span>@<span class="d">property</span>
-<span class="ln">34</span><span class="c"># PROPERTY: susun URL koneksi MySQL dengan kredensial yang di-encode, atau gunakan database_url khusus.</span>
-<span class="ln">35</span><span class="k">def</span> <span class="f">sqlalchemy_database_url</span>(self) -&gt; str:
-<span class="ln">36</span>    <span class="k">if</span> self.database_url:
-<span class="ln">37</span>        <span class="k">return</span> self.database_url
-<span class="ln">38</span>    user = quote_plus(self.mysql_user)
-<span class="ln">39</span>    password = quote_plus(self.mysql_password)
-<span class="ln">40</span>    database = quote_plus(self.mysql_database)
-<span class="ln">41</span>    <span class="k">return</span> (
-<span class="ln">42</span>        <span class="s">f"mysql+pymysql://{user}:{password}@{self.mysql_host}:"</span>
-<span class="ln">43</span>        <span class="s">f"{self.mysql_port}/{database}?charset=utf8mb4"</span>
-<span class="ln">44</span>    )</pre></figure>
+<figure class="blok-kode"><figcaption><code>backend/app/config/mysql.py:33-45</code></figcaption><pre class="kode" tabindex="0"><span class="ln">33</span>@<span class="d">property</span>
+<span class="ln">34</span><span class="c"># Menyusun alamat DB yang dipakai engine, atau memakai DATABASE_URL apa adanya kalau diisi.</span>
+<span class="ln">35</span><span class="c"># User, password, dan nama DB di-encode, supaya karakter seperti @ tidak merusak alamat.</span>
+<span class="ln">36</span><span class="k">def</span> <span class="f">sqlalchemy_database_url</span>(self) -&gt; str:
+<span class="ln">37</span>    <span class="k">if</span> self.database_url:
+<span class="ln">38</span>        <span class="k">return</span> self.database_url
+<span class="ln">39</span>    user = quote_plus(self.mysql_user)
+<span class="ln">40</span>    password = quote_plus(self.mysql_password)
+<span class="ln">41</span>    database = quote_plus(self.mysql_database)
+<span class="ln">42</span>    <span class="k">return</span> (
+<span class="ln">43</span>        <span class="s">f"mysql+pymysql://{user}:{password}@{self.mysql_host}:"</span>
+<span class="ln">44</span>        <span class="s">f"{self.mysql_port}/{database}?charset=utf8mb4"</span>
+<span class="ln">45</span>    )</pre></figure>
 <p class="label">Yang tidak terlihat dari kode</p>
 <ul class="catatan"><li>Pengaturan ini ada di class <code>MySQLSettings</code>, induk dari <code>Settings</code>. Tiap nilai bisa diisi lewat nama <code>MYSQL_*</code> atau <code>DB_*</code>.</li><li><code>MySQLSettings</code> tetap di file sendiri karena <code>tests/test_structure.py</code> memanggilnya langsung.</li><li><code>.env</code> dan <code>.env.example</code> di repo tidak mengisi <code>DATABASE_URL</code>, jadi jalur alamat bentukan yang dipakai.</li></ul>
 <aside class="temuan"><span class="label-temuan">Sudah dihapus</span> Password DB bawaan sudah keluar dari kode. <code>MYSQL_PASSWORD</code> atau <code>DB_PASSWORD</code> wajib diisi, dan server gagal jalan kalau kosong.</aside>
@@ -389,18 +396,19 @@ Saat SessionLocal() dipanggil (tiap kali butuh):
        syarat: hash cocok, sesi belum kedaluwarsa, akun aktif
   <span class="panah">-&gt;</span> kembalikan satu baris, atau None kalau tidak ada</pre>
 <p class="label">Kode</p>
-<figure class="blok-kode"><figcaption><code>backend/app/models/auth_queries.py:75-86</code></figcaption><pre class="kode" tabindex="0"><span class="ln">75</span><span class="c"># Cari akun aktif dengan sesi yang cocok dan belum kedaluwarsa.</span>
-<span class="ln">76</span><span class="k">def</span> <span class="f">account_by_token</span>(database: Session, token_hash: str, waktu_sekarang: datetime):
-<span class="ln">77</span>    sql = text(<span class="s">"""</span>
-<span class="ln">78</span><span class="s">        SELECT u.id, u.username, u.display_name, u.skin_id</span>
-<span class="ln">79</span><span class="s">        FROM user_accounts u JOIN auth_sessions s ON s.user_id = u.id</span>
-<span class="ln">80</span><span class="s">        WHERE s.token_hash = :token_hash AND s.expires_at &gt; :now AND u.is_active = 1</span>
-<span class="ln">81</span><span class="s">    """</span>)
-<span class="ln">82</span>    <span class="k">return</span> (
-<span class="ln">83</span>        database.execute(sql, {<span class="s">"token_hash"</span>: token_hash, <span class="s">"now"</span>: waktu_sekarang})
-<span class="ln">84</span>        .mappings()
-<span class="ln">85</span>        .one_or_none()
-<span class="ln">86</span>    )</pre></figure>
+<figure class="blok-kode"><figcaption><code>backend/app/models/auth_queries.py:75-87</code></figcaption><pre class="kode" tabindex="0"><span class="ln">75</span><span class="c"># Mencari akun pemilik token: hash cocok, sesi belum kedaluwarsa, dan akun masih aktif.</span>
+<span class="ln">76</span><span class="c"># Hasilnya satu baris atau None, karena token_hash unik.</span>
+<span class="ln">77</span><span class="k">def</span> <span class="f">account_by_token</span>(database: Session, token_hash: str, waktu_sekarang: datetime):
+<span class="ln">78</span>    sql = text(<span class="s">"""</span>
+<span class="ln">79</span><span class="s">        SELECT u.id, u.username, u.display_name, u.skin_id</span>
+<span class="ln">80</span><span class="s">        FROM user_accounts u JOIN auth_sessions s ON s.user_id = u.id</span>
+<span class="ln">81</span><span class="s">        WHERE s.token_hash = :token_hash AND s.expires_at &gt; :now AND u.is_active = 1</span>
+<span class="ln">82</span><span class="s">    """</span>)
+<span class="ln">83</span>    <span class="k">return</span> (
+<span class="ln">84</span>        database.execute(sql, {<span class="s">"token_hash"</span>: token_hash, <span class="s">"now"</span>: waktu_sekarang})
+<span class="ln">85</span>        .mappings()
+<span class="ln">86</span>        .one_or_none()
+<span class="ln">87</span>    )</pre></figure>
 <p class="label">Yang tidak terlihat dari kode</p>
 <ul class="catatan"><li><code>token_hash</code> unik (<code>backend/migrations/V02__add_authentication.sql:25</code>), jadi hasilnya paling banyak satu baris.</li><li><code>.mappings()</code> membuat kolom bisa dibaca dengan nama, dan itu yang membuat <code>AuthenticatedUser(**akun)</code> jalan.</li><li>Fungsi ini tidak commit. Di <code>models/</code>, commit dan rollback diatur pemanggil.</li><li>Query ini hanya mengabaikan sesi kedaluwarsa. Penghapusannya terjadi saat sesi baru dibuat, di <code>auth_queries.create_session</code>.</li></ul>
 </section>
@@ -418,33 +426,35 @@ Saat SessionLocal() dipanggil (tiap kali butuh):
        <span class="cabang">\&gt;</span> tidak, masih lobby: ValueError ("Gabung ke ruangan ini terlebih dahulu.")
   <span class="panah">-&gt;</span> kembalikan room</pre>
 <p class="label">Kode</p>
-<figure class="blok-kode"><figcaption><code>backend/app/module/room_service.py:81-91</code></figcaption><pre class="kode" tabindex="0"><span class="ln">81</span><span class="c"># SERVICE AKSES: ambil ruangan berdasarkan kode serta pastikan pengguna merupakan anggotanya.</span>
-<span class="ln">82</span><span class="k">def</span> <span class="f">get</span>(self, code: str, username: str) -&gt; Room:
-<span class="ln">83</span>    <span class="k">with</span> self.lock:
-<span class="ln">84</span>        room = self.rooms.get(code.strip().upper())
-<span class="ln">85</span>        <span class="k">if</span> room <span class="k">is</span> <span class="k">None</span>:
-<span class="ln">86</span>            <span class="k">raise</span> ValueError(<span class="s">"Ruangan tidak ditemukan atau server sudah dimulai ulang."</span>)
-<span class="ln">87</span>        <span class="k">if</span> username <span class="k">not</span> <span class="k">in</span> room.members:
-<span class="ln">88</span>            <span class="k">if</span> room.match <span class="k">is</span> <span class="k">not</span> <span class="k">None</span>:
-<span class="ln">89</span>                <span class="k">raise</span> ValueError(<span class="s">"Pertandingan sudah dimulai; tunggu ruangan baru."</span>)
-<span class="ln">90</span>            <span class="k">raise</span> ValueError(<span class="s">"Gabung ke ruangan ini terlebih dahulu."</span>)
-<span class="ln">91</span>        <span class="k">return</span> room</pre></figure>
+<figure class="blok-kode"><figcaption><code>backend/app/module/room_service.py:81-92</code></figcaption><pre class="kode" tabindex="0"><span class="ln">81</span><span class="c"># Mengambil room dari kodenya, sekaligus memastikan pemain itu anggotanya.</span>
+<span class="ln">82</span><span class="c"># Room hanya ada di memori: tidak ada query DB di sini, dan semua room hilang saat server restart.</span>
+<span class="ln">83</span><span class="k">def</span> <span class="f">get</span>(self, code: str, username: str) -&gt; Room:
+<span class="ln">84</span>    <span class="k">with</span> self.lock:
+<span class="ln">85</span>        room = self.rooms.get(code.strip().upper())
+<span class="ln">86</span>        <span class="k">if</span> room <span class="k">is</span> <span class="k">None</span>:
+<span class="ln">87</span>            <span class="k">raise</span> ValueError(<span class="s">"Ruangan tidak ditemukan atau server sudah dimulai ulang."</span>)
+<span class="ln">88</span>        <span class="k">if</span> username <span class="k">not</span> <span class="k">in</span> room.members:
+<span class="ln">89</span>            <span class="k">if</span> room.match <span class="k">is</span> <span class="k">not</span> <span class="k">None</span>:
+<span class="ln">90</span>                <span class="k">raise</span> ValueError(<span class="s">"Pertandingan sudah dimulai; tunggu ruangan baru."</span>)
+<span class="ln">91</span>            <span class="k">raise</span> ValueError(<span class="s">"Gabung ke ruangan ini terlebih dahulu."</span>)
+<span class="ln">92</span>        <span class="k">return</span> room</pre></figure>
 <p class="label">Yang tidak terlihat dari kode</p>
 <ul class="catatan"><li>Room hanya ada di memori, tidak ada query DB di sini. Restart server menghapus semua room aktif, karena itu pesannya menyebut server dimulai ulang.</li><li><code>lock</code> adalah <code>RLock</code> yang sama untuk semua room. <code>RLock</code> boleh dikunci ulang oleh thread yang sama, jadi fungsi ini aman dipanggil dari dalam blok yang sudah memegang lock, seperti di <a class="ref" href="#t-send-chat">[[send_chat]]</a>.</li></ul>
 </section>
 <section class="bagian k1" id="t-disconnect">
 <p class="jalur"><span>main.py</span> <span class="sep">/</span> <a href="#t-konek-socket">[KONEK SOCKET]</a> <span class="sep">/</span> <span>disconnect</span></p>
-<h3 class="judul"><span class="no">2.4</span><span class="nama">disconnect</span><span class="status s-belum">belum dibahas</span></h3>
+<h3 class="judul"><span class="no">2.4</span><span class="nama">disconnect</span><span class="status s-dibahas">✅ sudah dibahas</span></h3>
 <p class="guna">Jalan saat browser terputus. Hanya menghapus catatan sambungan.</p>
 <p class="label">Alur</p>
 <pre class="alur" tabindex="0">Browser terputus
   <span class="panah">-&gt;</span> hapus catatan socket
   <span class="panah">-&gt;</span> catat di log: pemain keluar</pre>
 <p class="label">Kode</p>
-<figure class="blok-kode"><figcaption><code>backend/app/controller/realtime/socket_handlers.py:90-93</code></figcaption><pre class="kode" tabindex="0"><span class="ln">90</span><span class="c"># EVENT DISCONNECT: hapus pemetaan socket yang keluar; tidak menghapus keanggotaan lobby atau data MySQL.</span>
-<span class="ln">91</span><span class="k">async</span> <span class="k">def</span> <span class="f">disconnect</span>(self, sid: str) -&gt; <span class="k">None</span>:
-<span class="ln">92</span>    self.sockets.pop(sid, <span class="k">None</span>)
-<span class="ln">93</span>    logger.info(<span class="s">"Pemain keluar dari Socket: %s"</span>, sid)</pre></figure>
+<figure class="blok-kode"><figcaption><code>backend/app/controller/realtime/socket_handlers.py:92-96</code></figcaption><pre class="kode" tabindex="0"><span class="ln">92</span><span class="c"># Jalan saat browser terputus: hanya menghapus catatan sambungan.</span>
+<span class="ln">93</span><span class="c"># Keanggotaan room tetap, jadi pemain yang memuat ulang halaman bisa kembali ke room yang sama.</span>
+<span class="ln">94</span><span class="k">async</span> <span class="k">def</span> <span class="f">disconnect</span>(self, sid: str) -&gt; <span class="k">None</span>:
+<span class="ln">95</span>    self.sockets.pop(sid, <span class="k">None</span>)
+<span class="ln">96</span>    logger.info(<span class="s">"Pemain keluar dari Socket: %s"</span>, sid)</pre></figure>
 <p class="label">Yang tidak terlihat dari kode</p>
 <ul class="catatan"><li>Keanggotaan room dan data MySQL tidak berubah, jadi pemain bisa memuat ulang halaman lalu menyambung lagi lewat <a class="ref" href="#t-connect">[[connect]]</a>.</li></ul>
 </section>
@@ -489,134 +499,135 @@ _send_chat:
   TAHAP 5, baca
     Ada pertandingan: <a class="ref" href="#t-catat-nlu">[[catat_nlu]]</a>  IndoBERT membaca pesan</pre>
 <p class="label">Kode</p>
-<figure class="blok-kode"><figcaption><code>backend/app/controller/realtime/socket_handlers.py:207-223</code></figcaption><pre class="kode" tabindex="0"><span class="ln">207</span><span class="c"># EVENT CHAT ASYNC: validasi pesan, catat checker dan MySQL, lalu kirim hanya ke ruangan terkait.</span>
-<span class="ln">208</span><span class="k">async</span> <span class="k">def</span> <span class="f">send_chat</span>(self, sid: str, data: dict[str, Any]) -&gt; <span class="k">None</span>:
-<span class="ln">209</span>    waktu_mulai = perf_counter()
-<span class="ln">210</span>    <span class="c"># Wadah agar jejak tetap terbaca di finally walaupun _send_chat berhenti di tengah jalan.</span>
-<span class="ln">211</span>    wadah_jejak = {}
-<span class="ln">212</span>    <span class="k">try</span>:
-<span class="ln">213</span>        <span class="k">await</span> self._send_chat(sid, data, wadah_jejak)
-<span class="ln">214</span>    <span class="k">finally</span>:
-<span class="ln">215</span>        jejak = wadah_jejak.get(<span class="s">"trace"</span>)
-<span class="ln">216</span>        <span class="k">if</span> jejak:
-<span class="ln">217</span>            jejak[<span class="s">"duration_ms"</span>] = round((perf_counter() - waktu_mulai) * <span class="n">1000</span>, <span class="n">2</span>)
-<span class="ln">218</span>            <span class="k">try</span>:
-<span class="ln">219</span>                PersistenceService(jejak[<span class="s">"room_code"</span>]).record_trace(jejak)
-<span class="ln">220</span>            <span class="k">except</span> PersistenceError:
-<span class="ln">221</span>                logger.error(
-<span class="ln">222</span>                    <span class="s">"Checker archive could not be saved for room %s"</span>, jejak[<span class="s">"room_code"</span>]
-<span class="ln">223</span>                )</pre></figure>
-<figure class="blok-kode"><figcaption><code>backend/app/controller/realtime/socket_handlers.py:95-205</code></figcaption><pre class="kode" tabindex="0"><span class="ln">95</span><span class="c"># Validasi sesi dan hak chat, simpan pesan, lalu broadcast. Setelah itu IndoBERT membaca pesan sekali</span>
-<span class="ln">96</span><span class="c"># (tahap 5) untuk checker dan riwayat chat; hasilnya masuk memo NLU sehingga bot memakainya di langkah</span>
-<span class="ln">97</span><span class="c"># NPCService berikutnya tanpa menghitung ulang. Handler ini tidak membalas pesan.</span>
-<span class="ln">98</span><span class="k">async</span> <span class="k">def</span> <span class="f">_send_chat</span>(self, sid: str, data: dict[str, Any], wadah_jejak) -&gt; <span class="k">None</span>:
-<span class="ln">99</span>    <span class="c"># TAHAP 1: terima event send_chat; validasi isi pesan dan identitas sesi.</span>
-<span class="ln">100</span>    <span class="k">try</span>:
-<span class="ln">101</span>        <span class="k">if</span> <span class="k">not</span> isinstance(data, dict) <span class="k">or</span> <span class="k">not</span> isinstance(data.get(<span class="s">"message"</span>), str):
-<span class="ln">102</span>            <span class="k">raise</span> ValueError(<span class="s">"Format pesan tidak valid."</span>)
-<span class="ln">103</span>        pengirim = str(data.get(<span class="s">"username"</span>, <span class="s">""</span>)).strip()
-<span class="ln">104</span>        pesan = str(data.get(<span class="s">"message"</span>, <span class="s">""</span>)).strip()
-<span class="ln">105</span>        <span class="k">if</span> <span class="k">not</span> pesan <span class="k">or</span> len(pesan) &gt; <span class="n">1000</span>:
-<span class="ln">106</span>            <span class="k">raise</span> ValueError(<span class="s">"Pesan chat harus berisi 1–1000 karakter."</span>)
-<span class="ln">107</span>        <span class="c"># Socket sudah masuk kanal ruangan saat connect; pemain dicatat di transaksi pesan (tahap 3).</span>
-<span class="ln">108</span>        kode_room = self._verifikasi_socket(sid, pengirim)
-<span class="ln">109</span>    <span class="k">except</span> ValueError <span class="k">as</span> error:
-<span class="ln">110</span>        <span class="k">await</span> self.sio.emit(<span class="s">"system_alert"</span>, {<span class="s">"msg"</span>: str(error)}, to=sid)
-<span class="ln">111</span>        <span class="k">return</span>
-<span class="ln">112</span>
-<span class="ln">113</span>    room = room_service.get(kode_room, pengirim)
-<span class="ln">114</span>    <span class="c"># TAHAP 2: engine mengotorisasi pesan sebelum disimpan atau ditampilkan.</span>
-<span class="ln">115</span>    chat_terkunci = <span class="k">False</span>
-<span class="ln">116</span>    <span class="k">with</span> room_service.lock:
-<span class="ln">117</span>        pertandingan = room.match
-<span class="ln">118</span>        <span class="k">if</span> pertandingan:
-<span class="ln">119</span>            <span class="c"># tick dulu: jam baru berdetak tiap 0,5 detik, jadi fase bisa belum terbarui.</span>
-<span class="ln">120</span>            pertandingan.tick()
-<span class="ln">121</span>            chat_terkunci = <span class="k">not</span> pertandingan.can_chat(pengirim)
-<span class="ln">122</span>            <span class="c"># Penanda fase ini; dibandingkan lagi di tahap 3 untuk tahu fase sudah berubah atau belum.</span>
-<span class="ln">123</span>            token_fase = (pertandingan.id, pertandingan.round, pertandingan.phase)
-<span class="ln">124</span>        <span class="k">else</span>:
-<span class="ln">125</span>            token_fase = <span class="k">None</span>
-<span class="ln">126</span>    <span class="k">if</span> chat_terkunci:
-<span class="ln">127</span>        activity.record(
-<span class="ln">128</span>            kode_room,
-<span class="ln">129</span>            <span class="s">"Match.can_chat"</span>,
-<span class="ln">130</span>            {<span class="s">"username"</span>: pengirim},
-<span class="ln">131</span>            status=<span class="s">"rejected"</span>,
-<span class="ln">132</span>            result={<span class="s">"allowed"</span>: <span class="k">False</span>},
-<span class="ln">133</span>        )
-<span class="ln">134</span>        <span class="k">await</span> self.sio.emit(
-<span class="ln">135</span>            <span class="s">"system_alert"</span>, {<span class="s">"msg"</span>: <span class="s">"Chat terkunci untukmu pada fase ini."</span>}, to=sid
+<figure class="blok-kode"><figcaption><code>backend/app/controller/realtime/socket_handlers.py:210-227</code></figcaption><pre class="kode" tabindex="0"><span class="ln">210</span><span class="c"># Jalan saat pemain mengirim chat. Kerjanya ada di _send_chat, sedangkan fungsi ini memastikan jejak pesan tersimpan.</span>
+<span class="ln">211</span><span class="c"># Jejak = catatan tahap dan durasi satu pesan, yang tampil di panel checker.</span>
+<span class="ln">212</span><span class="k">async</span> <span class="k">def</span> <span class="f">send_chat</span>(self, sid: str, data: dict[str, Any]) -&gt; <span class="k">None</span>:
+<span class="ln">213</span>    waktu_mulai = perf_counter()
+<span class="ln">214</span>    <span class="c"># Wadah agar jejak tetap terbaca di finally walaupun _send_chat berhenti di tengah jalan.</span>
+<span class="ln">215</span>    wadah_jejak = {}
+<span class="ln">216</span>    <span class="k">try</span>:
+<span class="ln">217</span>        <span class="k">await</span> self._send_chat(sid, data, wadah_jejak)
+<span class="ln">218</span>    <span class="k">finally</span>:
+<span class="ln">219</span>        jejak = wadah_jejak.get(<span class="s">"trace"</span>)
+<span class="ln">220</span>        <span class="k">if</span> jejak:
+<span class="ln">221</span>            jejak[<span class="s">"duration_ms"</span>] = round((perf_counter() - waktu_mulai) * <span class="n">1000</span>, <span class="n">2</span>)
+<span class="ln">222</span>            <span class="k">try</span>:
+<span class="ln">223</span>                PersistenceService(jejak[<span class="s">"room_code"</span>]).record_trace(jejak)
+<span class="ln">224</span>            <span class="k">except</span> PersistenceError:
+<span class="ln">225</span>                logger.error(
+<span class="ln">226</span>                    <span class="s">"Checker archive could not be saved for room %s"</span>, jejak[<span class="s">"room_code"</span>]
+<span class="ln">227</span>                )</pre></figure>
+<figure class="blok-kode"><figcaption><code>backend/app/controller/realtime/socket_handlers.py:98-208</code></figcaption><pre class="kode" tabindex="0"><span class="ln">98</span><span class="c"># Validasi sesi dan hak chat, simpan pesan, lalu broadcast. Setelah itu IndoBERT membaca pesan sekali</span>
+<span class="ln">99</span><span class="c"># (tahap 5) untuk checker dan riwayat chat; hasilnya masuk memo NLU sehingga bot memakainya di langkah</span>
+<span class="ln">100</span><span class="c"># NPCService berikutnya tanpa menghitung ulang. Handler ini tidak membalas pesan.</span>
+<span class="ln">101</span><span class="k">async</span> <span class="k">def</span> <span class="f">_send_chat</span>(self, sid: str, data: dict[str, Any], wadah_jejak) -&gt; <span class="k">None</span>:
+<span class="ln">102</span>    <span class="c"># TAHAP 1: terima event send_chat; validasi isi pesan dan identitas sesi.</span>
+<span class="ln">103</span>    <span class="k">try</span>:
+<span class="ln">104</span>        <span class="k">if</span> <span class="k">not</span> isinstance(data, dict) <span class="k">or</span> <span class="k">not</span> isinstance(data.get(<span class="s">"message"</span>), str):
+<span class="ln">105</span>            <span class="k">raise</span> ValueError(<span class="s">"Format pesan tidak valid."</span>)
+<span class="ln">106</span>        pengirim = str(data.get(<span class="s">"username"</span>, <span class="s">""</span>)).strip()
+<span class="ln">107</span>        pesan = str(data.get(<span class="s">"message"</span>, <span class="s">""</span>)).strip()
+<span class="ln">108</span>        <span class="k">if</span> <span class="k">not</span> pesan <span class="k">or</span> len(pesan) &gt; <span class="n">1000</span>:
+<span class="ln">109</span>            <span class="k">raise</span> ValueError(<span class="s">"Pesan chat harus berisi 1–1000 karakter."</span>)
+<span class="ln">110</span>        <span class="c"># Socket sudah masuk kanal ruangan saat connect; pemain dicatat di transaksi pesan (tahap 3).</span>
+<span class="ln">111</span>        kode_room = self._verifikasi_socket(sid, pengirim)
+<span class="ln">112</span>    <span class="k">except</span> ValueError <span class="k">as</span> error:
+<span class="ln">113</span>        <span class="k">await</span> self.sio.emit(<span class="s">"system_alert"</span>, {<span class="s">"msg"</span>: str(error)}, to=sid)
+<span class="ln">114</span>        <span class="k">return</span>
+<span class="ln">115</span>
+<span class="ln">116</span>    room = room_service.get(kode_room, pengirim)
+<span class="ln">117</span>    <span class="c"># TAHAP 2: engine mengotorisasi pesan sebelum disimpan atau ditampilkan.</span>
+<span class="ln">118</span>    chat_terkunci = <span class="k">False</span>
+<span class="ln">119</span>    <span class="k">with</span> room_service.lock:
+<span class="ln">120</span>        pertandingan = room.match
+<span class="ln">121</span>        <span class="k">if</span> pertandingan:
+<span class="ln">122</span>            <span class="c"># tick dulu: jam baru berdetak tiap 0,5 detik, jadi fase bisa belum terbarui.</span>
+<span class="ln">123</span>            pertandingan.tick()
+<span class="ln">124</span>            chat_terkunci = <span class="k">not</span> pertandingan.can_chat(pengirim)
+<span class="ln">125</span>            <span class="c"># Penanda fase ini; dibandingkan lagi di tahap 3 untuk tahu fase sudah berubah atau belum.</span>
+<span class="ln">126</span>            token_fase = (pertandingan.id, pertandingan.round, pertandingan.phase)
+<span class="ln">127</span>        <span class="k">else</span>:
+<span class="ln">128</span>            token_fase = <span class="k">None</span>
+<span class="ln">129</span>    <span class="k">if</span> chat_terkunci:
+<span class="ln">130</span>        activity.record(
+<span class="ln">131</span>            kode_room,
+<span class="ln">132</span>            <span class="s">"Match.can_chat"</span>,
+<span class="ln">133</span>            {<span class="s">"username"</span>: pengirim},
+<span class="ln">134</span>            status=<span class="s">"rejected"</span>,
+<span class="ln">135</span>            result={<span class="s">"allowed"</span>: <span class="k">False</span>},
 <span class="ln">136</span>        )
-<span class="ln">137</span>        <span class="k">return</span>
-<span class="ln">138</span>    <span class="c"># Jejak debugging pesan (tahap dan durasi) untuk checker di panel.</span>
-<span class="ln">139</span>    jejak = checker_service.begin(kode_room, pengirim, pesan)
-<span class="ln">140</span>    wadah_jejak[<span class="s">"trace"</span>] = jejak
-<span class="ln">141</span>    jejak[<span class="s">"match_id"</span>] = token_fase[<span class="n">0</span>] <span class="k">if</span> token_fase <span class="k">else</span> <span class="k">None</span>
-<span class="ln">142</span>    activity.record(
-<span class="ln">143</span>        kode_room,
-<span class="ln">144</span>        <span class="s">"SocketGameController.send_chat"</span>,
-<span class="ln">145</span>        {<span class="s">"username"</span>: pengirim, <span class="s">"message"</span>: pesan},
-<span class="ln">146</span>        status=<span class="s">"received"</span>,
-<span class="ln">147</span>        call_id=jejak[<span class="s">"id"</span>],
-<span class="ln">148</span>    )
-<span class="ln">149</span>
-<span class="ln">150</span>    konteks = (
-<span class="ln">151</span>        {<span class="s">"match_id"</span>: token_fase[<span class="n">0</span>], <span class="s">"round_number"</span>: token_fase[<span class="n">1</span>], <span class="s">"phase"</span>: token_fase[<span class="n">2</span>]}
-<span class="ln">152</span>        <span class="k">if</span> token_fase
-<span class="ln">153</span>        <span class="k">else</span> {<span class="s">"phase"</span>: <span class="s">"lobby"</span>}
-<span class="ln">154</span>    )
-<span class="ln">155</span>    pesan_diterima = {<span class="s">"sender"</span>: pengirim, <span class="s">"message"</span>: pesan}
-<span class="ln">156</span>    <span class="k">try</span>:
-<span class="ln">157</span>        <span class="c"># TAHAP 3: simpan pesan. Aksi/skip HTTP bisa berjalan bersamaan, jadi periksa ulang dan</span>
-<span class="ln">158</span>        <span class="c"># commit di lock yang sama supaya Gag atau fase baru tidak diterobos.</span>
-<span class="ln">159</span>        <span class="k">with</span> measure(jejak, <span class="s">"persistence_ms"</span>), room_service.lock:
-<span class="ln">160</span>            room_terkini = room_service.get(kode_room, pengirim)
-<span class="ln">161</span>            <span class="k">if</span> room_terkini <span class="k">is</span> <span class="k">not</span> room <span class="k">or</span> room_terkini.match <span class="k">is</span> <span class="k">not</span> pertandingan:
-<span class="ln">162</span>                <span class="k">raise</span> ValueError(<span class="s">"Ruangan sudah berubah. Kirim ulang pada fase yang sesuai."</span>)
-<span class="ln">163</span>            <span class="k">if</span> pertandingan:
-<span class="ln">164</span>                pertandingan.tick()
-<span class="ln">165</span>                <span class="k">if</span> token_fase != (
-<span class="ln">166</span>                    pertandingan.id,
-<span class="ln">167</span>                    pertandingan.round,
-<span class="ln">168</span>                    pertandingan.phase,
-<span class="ln">169</span>                ) <span class="k">or</span> <span class="k">not</span> pertandingan.can_chat(pengirim):
-<span class="ln">170</span>                    <span class="k">raise</span> ValueError(
-<span class="ln">171</span>                        <span class="s">"Chat terkunci atau fase sudah berubah. Pesan tidak dikirim."</span>
-<span class="ln">172</span>                    )
-<span class="ln">173</span>            jejak[<span class="s">"message_id"</span>] = PersistenceService(kode_room).record_player_message(
-<span class="ln">174</span>                username=pengirim,
-<span class="ln">175</span>                message=pesan,
-<span class="ln">176</span>                status=<span class="s">"active"</span>,  <span class="c"># Gag/Hostage ditegakkan Match.can_chat, bukan status arsip</span>
-<span class="ln">177</span>                context=konteks,
-<span class="ln">178</span>            )
-<span class="ln">179</span>            <span class="k">if</span> pertandingan:
-<span class="ln">180</span>                pesan_diterima = pertandingan.add_message(pengirim, pesan)
-<span class="ln">181</span>        activity.record(
-<span class="ln">182</span>            kode_room,
-<span class="ln">183</span>            <span class="s">"PersistenceService.record_player_message"</span>,
-<span class="ln">184</span>            {<span class="s">"username"</span>: pengirim},
-<span class="ln">185</span>            result={<span class="s">"message_id"</span>: jejak[<span class="s">"message_id"</span>]},
-<span class="ln">186</span>            call_id=jejak[<span class="s">"id"</span>],
-<span class="ln">187</span>        )
-<span class="ln">188</span>    <span class="k">except</span> ValueError <span class="k">as</span> error:
-<span class="ln">189</span>        jejak.update(stage=<span class="s">"discarded_state_changed"</span>, error=str(error))
-<span class="ln">190</span>        <span class="k">await</span> self.sio.emit(<span class="s">"system_alert"</span>, {<span class="s">"msg"</span>: str(error)}, to=sid)
-<span class="ln">191</span>        <span class="k">return</span>
-<span class="ln">192</span>    <span class="k">except</span> PersistenceError <span class="k">as</span> error:
-<span class="ln">193</span>        jejak.update(stage=<span class="s">"persistence_error"</span>, error=str(error))
-<span class="ln">194</span>        <span class="k">await</span> self.sio.emit(<span class="s">"system_alert"</span>, {<span class="s">"msg"</span>: str(error)}, to=sid)
-<span class="ln">195</span>        <span class="k">return</span>
-<span class="ln">196</span>    <span class="c"># TAHAP 4: kirim pesan ke semua anggota ruangan.</span>
-<span class="ln">197</span>    <span class="k">with</span> measure(jejak, <span class="s">"broadcast_ms"</span>):
-<span class="ln">198</span>        <span class="k">await</span> self.emit_room(<span class="s">"receive_chat"</span>, pesan_diterima, to=kode_room)
-<span class="ln">199</span>    jejak[<span class="s">"stage"</span>] = <span class="s">"delivered"</span>
-<span class="ln">200</span>    <span class="c"># TAHAP 5: catat bacaan IndoBERT (intent, target) untuk checker dan riwayat chat panel.</span>
-<span class="ln">201</span>    <span class="k">if</span> pertandingan:
-<span class="ln">202</span>        <span class="k">with</span> measure(jejak, <span class="s">"nlu_ms"</span>):
-<span class="ln">203</span>            jejak[<span class="s">"nlu"</span>] = <span class="k">await</span> catat_nlu(
-<span class="ln">204</span>                pertandingan, pengirim, pesan, jejak[<span class="s">"message_id"</span>], room_code=kode_room
-<span class="ln">205</span>            )</pre></figure>
+<span class="ln">137</span>        <span class="k">await</span> self.sio.emit(
+<span class="ln">138</span>            <span class="s">"system_alert"</span>, {<span class="s">"msg"</span>: <span class="s">"Chat terkunci untukmu pada fase ini."</span>}, to=sid
+<span class="ln">139</span>        )
+<span class="ln">140</span>        <span class="k">return</span>
+<span class="ln">141</span>    <span class="c"># Jejak debugging pesan (tahap dan durasi) untuk checker di panel.</span>
+<span class="ln">142</span>    jejak = checker_service.begin(kode_room, pengirim, pesan)
+<span class="ln">143</span>    wadah_jejak[<span class="s">"trace"</span>] = jejak
+<span class="ln">144</span>    jejak[<span class="s">"match_id"</span>] = token_fase[<span class="n">0</span>] <span class="k">if</span> token_fase <span class="k">else</span> <span class="k">None</span>
+<span class="ln">145</span>    activity.record(
+<span class="ln">146</span>        kode_room,
+<span class="ln">147</span>        <span class="s">"SocketGameController.send_chat"</span>,
+<span class="ln">148</span>        {<span class="s">"username"</span>: pengirim, <span class="s">"message"</span>: pesan},
+<span class="ln">149</span>        status=<span class="s">"received"</span>,
+<span class="ln">150</span>        call_id=jejak[<span class="s">"id"</span>],
+<span class="ln">151</span>    )
+<span class="ln">152</span>
+<span class="ln">153</span>    konteks = (
+<span class="ln">154</span>        {<span class="s">"match_id"</span>: token_fase[<span class="n">0</span>], <span class="s">"round_number"</span>: token_fase[<span class="n">1</span>], <span class="s">"phase"</span>: token_fase[<span class="n">2</span>]}
+<span class="ln">155</span>        <span class="k">if</span> token_fase
+<span class="ln">156</span>        <span class="k">else</span> {<span class="s">"phase"</span>: <span class="s">"lobby"</span>}
+<span class="ln">157</span>    )
+<span class="ln">158</span>    pesan_diterima = {<span class="s">"sender"</span>: pengirim, <span class="s">"message"</span>: pesan}
+<span class="ln">159</span>    <span class="k">try</span>:
+<span class="ln">160</span>        <span class="c"># TAHAP 3: simpan pesan. Aksi/skip HTTP bisa berjalan bersamaan, jadi periksa ulang dan</span>
+<span class="ln">161</span>        <span class="c"># commit di lock yang sama supaya Gag atau fase baru tidak diterobos.</span>
+<span class="ln">162</span>        <span class="k">with</span> measure(jejak, <span class="s">"persistence_ms"</span>), room_service.lock:
+<span class="ln">163</span>            room_terkini = room_service.get(kode_room, pengirim)
+<span class="ln">164</span>            <span class="k">if</span> room_terkini <span class="k">is</span> <span class="k">not</span> room <span class="k">or</span> room_terkini.match <span class="k">is</span> <span class="k">not</span> pertandingan:
+<span class="ln">165</span>                <span class="k">raise</span> ValueError(<span class="s">"Ruangan sudah berubah. Kirim ulang pada fase yang sesuai."</span>)
+<span class="ln">166</span>            <span class="k">if</span> pertandingan:
+<span class="ln">167</span>                pertandingan.tick()
+<span class="ln">168</span>                <span class="k">if</span> token_fase != (
+<span class="ln">169</span>                    pertandingan.id,
+<span class="ln">170</span>                    pertandingan.round,
+<span class="ln">171</span>                    pertandingan.phase,
+<span class="ln">172</span>                ) <span class="k">or</span> <span class="k">not</span> pertandingan.can_chat(pengirim):
+<span class="ln">173</span>                    <span class="k">raise</span> ValueError(
+<span class="ln">174</span>                        <span class="s">"Chat terkunci atau fase sudah berubah. Pesan tidak dikirim."</span>
+<span class="ln">175</span>                    )
+<span class="ln">176</span>            jejak[<span class="s">"message_id"</span>] = PersistenceService(kode_room).record_player_message(
+<span class="ln">177</span>                username=pengirim,
+<span class="ln">178</span>                message=pesan,
+<span class="ln">179</span>                status=<span class="s">"active"</span>,  <span class="c"># Gag/Hostage ditegakkan Match.can_chat, bukan status arsip</span>
+<span class="ln">180</span>                context=konteks,
+<span class="ln">181</span>            )
+<span class="ln">182</span>            <span class="k">if</span> pertandingan:
+<span class="ln">183</span>                pesan_diterima = pertandingan.add_message(pengirim, pesan)
+<span class="ln">184</span>        activity.record(
+<span class="ln">185</span>            kode_room,
+<span class="ln">186</span>            <span class="s">"PersistenceService.record_player_message"</span>,
+<span class="ln">187</span>            {<span class="s">"username"</span>: pengirim},
+<span class="ln">188</span>            result={<span class="s">"message_id"</span>: jejak[<span class="s">"message_id"</span>]},
+<span class="ln">189</span>            call_id=jejak[<span class="s">"id"</span>],
+<span class="ln">190</span>        )
+<span class="ln">191</span>    <span class="k">except</span> ValueError <span class="k">as</span> error:
+<span class="ln">192</span>        jejak.update(stage=<span class="s">"discarded_state_changed"</span>, error=str(error))
+<span class="ln">193</span>        <span class="k">await</span> self.sio.emit(<span class="s">"system_alert"</span>, {<span class="s">"msg"</span>: str(error)}, to=sid)
+<span class="ln">194</span>        <span class="k">return</span>
+<span class="ln">195</span>    <span class="k">except</span> PersistenceError <span class="k">as</span> error:
+<span class="ln">196</span>        jejak.update(stage=<span class="s">"persistence_error"</span>, error=str(error))
+<span class="ln">197</span>        <span class="k">await</span> self.sio.emit(<span class="s">"system_alert"</span>, {<span class="s">"msg"</span>: str(error)}, to=sid)
+<span class="ln">198</span>        <span class="k">return</span>
+<span class="ln">199</span>    <span class="c"># TAHAP 4: kirim pesan ke semua anggota ruangan.</span>
+<span class="ln">200</span>    <span class="k">with</span> measure(jejak, <span class="s">"broadcast_ms"</span>):
+<span class="ln">201</span>        <span class="k">await</span> self.emit_room(<span class="s">"receive_chat"</span>, pesan_diterima, to=kode_room)
+<span class="ln">202</span>    jejak[<span class="s">"stage"</span>] = <span class="s">"delivered"</span>
+<span class="ln">203</span>    <span class="c"># TAHAP 5: catat bacaan IndoBERT (intent, target) untuk checker dan riwayat chat panel.</span>
+<span class="ln">204</span>    <span class="k">if</span> pertandingan:
+<span class="ln">205</span>        <span class="k">with</span> measure(jejak, <span class="s">"nlu_ms"</span>):
+<span class="ln">206</span>            jejak[<span class="s">"nlu"</span>] = <span class="k">await</span> catat_nlu(
+<span class="ln">207</span>                pertandingan, pengirim, pesan, jejak[<span class="s">"message_id"</span>], room_code=kode_room
+<span class="ln">208</span>            )</pre></figure>
 <p class="label">Yang tidak terlihat dari kode</p>
 <ul class="catatan"><li>Tahap 3 mengecek ulang karena aksi lewat HTTP bisa berjalan bersamaan. Di antara tahap 2 dan 3, pemain bisa saja kena Gag atau fase bisa berganti.</li><li><code>Match.tick</code> dipanggil dulu karena jam baru berdetak tiap 0,5 detik, jadi fase bisa belum terbarui.</li><li>Di lobby tidak ada pertandingan. Chat tetap disimpan dan disiarkan, tanpa pengecekan engine dan tanpa IndoBERT.</li><li><code>wadah_jejak</code> ada supaya blok <code>finally</code> di <code>send_chat</code> tetap bisa membaca jejak walau <code>_send_chat</code> berhenti di tengah.</li></ul>
 <aside class="temuan"><span class="label-temuan">Temuan</span> Tahap 3 menulis ke MySQL sambil memegang <code>room_service.lock</code>, dan lock itu satu untuk semua room. Ini disengaja supaya Gag atau fase baru tidak diterobos, tapi operasi room lain menunggu selama itu. Durasinya belum diukur.</aside>
@@ -931,22 +942,22 @@ _send_chat:
        <span class="cabang">\&gt;</span> error SQL: rollback, catat jenis error di log, PersistenceError(pesan)
   <span class="panah">-&gt;</span> tutup sesi, baik berhasil maupun gagal</pre>
 <p class="label">Kode</p>
-<figure class="blok-kode"><figcaption><code>backend/app/module/mysql_connector.py:46-61</code></figcaption><pre class="kode" tabindex="0"><span class="ln">46</span><span class="c"># Jalankan operasi(database) dalam satu transaksi; hanya error SQL menjadi PersistenceError(pesan).</span>
-<span class="ln">47</span><span class="c"># Sesi dibuka manual, bukan lewat SessionLocal.begin(): operasi di controller auth memanggil</span>
-<span class="ln">48</span><span class="c"># database.rollback() sendiri, dan di dalam blok begin() itu bisa memicu InvalidRequestError.</span>
-<span class="ln">49</span><span class="k">def</span> <span class="f">jalankan_transaksi</span>(operasi, pesan=<span class="s">"Database sedang tidak tersedia."</span>):
-<span class="ln">50</span>    database = SessionLocal()
-<span class="ln">51</span>    <span class="k">try</span>:
-<span class="ln">52</span>        hasil = operasi(database)
-<span class="ln">53</span>        database.commit()
-<span class="ln">54</span>        <span class="k">return</span> hasil
-<span class="ln">55</span>    <span class="k">except</span> SQLAlchemyError <span class="k">as</span> error:
-<span class="ln">56</span>        database.rollback()
-<span class="ln">57</span>        <span class="c"># Parameter SQL tidak dicatat karena bisa memuat isi chat privat.</span>
-<span class="ln">58</span>        logger.error(<span class="s">"Transaksi database gagal (%s)."</span>, type(error).__name__)
-<span class="ln">59</span>        <span class="k">raise</span> PersistenceError(pesan) <span class="k">from</span> error
-<span class="ln">60</span>    <span class="k">finally</span>:
-<span class="ln">61</span>        database.close()</pre></figure>
+<figure class="blok-kode"><figcaption><code>backend/app/module/mysql_connector.py:47-62</code></figcaption><pre class="kode" tabindex="0"><span class="ln">47</span><span class="c"># Jalankan operasi(database) dalam satu transaksi; hanya error SQL menjadi PersistenceError(pesan).</span>
+<span class="ln">48</span><span class="c"># Sesi dibuka manual, bukan lewat SessionLocal.begin(): operasi di controller auth memanggil</span>
+<span class="ln">49</span><span class="c"># database.rollback() sendiri, dan di dalam blok begin() itu bisa memicu InvalidRequestError.</span>
+<span class="ln">50</span><span class="k">def</span> <span class="f">jalankan_transaksi</span>(operasi, pesan=<span class="s">"Database sedang tidak tersedia."</span>):
+<span class="ln">51</span>    database = SessionLocal()
+<span class="ln">52</span>    <span class="k">try</span>:
+<span class="ln">53</span>        hasil = operasi(database)
+<span class="ln">54</span>        database.commit()
+<span class="ln">55</span>        <span class="k">return</span> hasil
+<span class="ln">56</span>    <span class="k">except</span> SQLAlchemyError <span class="k">as</span> error:
+<span class="ln">57</span>        database.rollback()
+<span class="ln">58</span>        <span class="c"># Parameter SQL tidak dicatat karena bisa memuat isi chat privat.</span>
+<span class="ln">59</span>        logger.error(<span class="s">"Transaksi database gagal (%s)."</span>, type(error).__name__)
+<span class="ln">60</span>        <span class="k">raise</span> PersistenceError(pesan) <span class="k">from</span> error
+<span class="ln">61</span>    <span class="k">finally</span>:
+<span class="ln">62</span>        database.close()</pre></figure>
 <p class="label">Yang tidak terlihat dari kode</p>
 <ul class="catatan"><li>Yang dicatat di log hanya jenis errornya, karena parameter SQL bisa memuat isi chat privat.</li><li><code>models/</code> tetap hanya berisi SQL, karena satu transaksi bisa memuat beberapa query dan aturan.</li><li>Sesi dibuka manual, bukan lewat <code>SessionLocal.begin()</code>, karena login Google dan pendaftaran memanggil <code>database.rollback()</code> di tengah operasi.</li></ul>
 </section>
@@ -1130,7 +1141,7 @@ set_message_context   lengkapi pesan dengan id pertandingan, ronde, dan fase</pr
 <h2 class="judul"><span class="no">3</span><span class="nama">[SIAPKAN BOT NPC]</span><span class="status s-nanti">nanti</span></h2>
 <p class="guna">Membuat pengatur bot dan memberinya <a class="ref" href="#t-emit-room">[[emit_room]]</a>, supaya chat bot sampai ke room. Dibedah nanti, karena rombak otak bot masih berjalan.</p>
 <p class="label">Kode</p>
-<figure class="blok-kode"><figcaption><code>backend/app/main.py:92</code></figcaption><pre class="kode" tabindex="0"><span class="ln">92</span>npc_service = NPCService(sio, broadcast=socket_controller.emit_room)</pre></figure>
+<figure class="blok-kode"><figcaption><code>backend/app/main.py:93</code></figcaption><pre class="kode" tabindex="0"><span class="ln">93</span>npc_service = NPCService(sio, broadcast=socket_controller.emit_room)</pre></figure>
 </section>
 <section class="bagian k0" id="t-konek-api">
 <p class="jalur"><span>main.py</span> <span class="sep">/</span> <span>[KONEK API]</span></p>
@@ -1140,9 +1151,9 @@ set_message_context   lengkapi pesan dengan id pertandingan, ronde, dan fase</pr
 <pre class="alur" tabindex="0">Buat aplikasi FastAPI dengan nama dari settings
   <span class="panah">-&gt;</span> pasang lifespan, tapi belum dijalankan</pre>
 <p class="label">Kode</p>
-<figure class="blok-kode"><figcaption><code>backend/app/main.py:94-96</code></figcaption><pre class="kode" tabindex="0"><span class="ln">94</span><span class="c"># Bangun FastAPI dan daftarkan lifespan(Koneksi ke DB, Konfigurasi AI, Konfigurasi NPC, Memuat Otak AI, Menyalakan Jam (cek terus setiap 0.5 Detik)).</span>
-<span class="ln">95</span><span class="c"># Lifespan baru jalan saat Uvicorn menyalakan server.</span>
-<span class="ln">96</span>app = FastAPI(title=settings.app_name, lifespan=lifespan)</pre></figure>
+<figure class="blok-kode"><figcaption><code>backend/app/main.py:95-97</code></figcaption><pre class="kode" tabindex="0"><span class="ln">95</span><span class="c"># Bangun FastAPI dan daftarkan lifespan(Koneksi ke DB, Konfigurasi AI, Konfigurasi NPC, Memuat Otak AI, Menyalakan Jam (cek terus setiap 0.5 Detik)).</span>
+<span class="ln">96</span><span class="c"># Lifespan baru jalan saat Uvicorn menyalakan server.</span>
+<span class="ln">97</span>app = FastAPI(title=settings.app_name, lifespan=lifespan)</pre></figure>
 <p class="label">Yang tidak terlihat dari kode</p>
 <ul class="catatan"><li><code>lifespan</code> baru jalan saat Uvicorn menyalakan server. Isinya ada di <a class="ref tahap" href="#t-server-nyala">[SERVER NYALA]</a> dan <a class="ref tahap" href="#t-server-mati">[SERVER MATI]</a>.</li></ul>
 </section>
@@ -1155,7 +1166,7 @@ set_message_context   lengkapi pesan dengan id pertandingan, ronde, dan fase</pr
   <span class="panah">-&gt;</span> <a class="ref" href="#t-allowed-origins">[[settings.allowed_origins]]</a>  alamat web yang diizinkan
   <span class="panah">-&gt;</span> izinkan kredensial, method GET POST PUT DELETE OPTIONS, dan semua header</pre>
 <p class="label">Kode</p>
-<figure class="blok-kode"><figcaption><code>backend/app/main.py:98</code></figcaption><pre class="kode" tabindex="0"><span class="ln">98</span>configure_cors(app)</pre></figure>
+<figure class="blok-kode"><figcaption><code>backend/app/main.py:99</code></figcaption><pre class="kode" tabindex="0"><span class="ln">99</span>configure_cors(app)</pre></figure>
 <figure class="blok-kode"><figcaption><code>backend/app/controller/middleware/cors.py:9-18</code></figcaption><pre class="kode" tabindex="0"><span class="ln">9</span><span class="c"># Pasang kebijakan origin, method, dan header untuk request lintas origin dari browser.</span>
 <span class="ln">10</span><span class="k">def</span> <span class="f">configure_cors</span>(app: FastAPI) -&gt; <span class="k">None</span>:
 <span class="ln">11</span>    app.add_middleware(
@@ -1179,7 +1190,7 @@ set_message_context   lengkapi pesan dengan id pertandingan, ronde, dan fase</pr
   <span class="panah">-&gt;</span> controller_main.py sudah menggabungkan 7 router jadi satu api_router
   <span class="panah">-&gt;</span> tiap router punya file sendiri di controller/api/</pre>
 <p class="label">Kode</p>
-<figure class="blok-kode"><figcaption><code>backend/app/main.py:99</code></figcaption><pre class="kode" tabindex="0"><span class="ln">99</span>app.include_router(api_router)</pre></figure>
+<figure class="blok-kode"><figcaption><code>backend/app/main.py:100</code></figcaption><pre class="kode" tabindex="0"><span class="ln">100</span>app.include_router(api_router)</pre></figure>
 <figure class="blok-kode"><figcaption><code>backend/app/controller/controller_main.py:13-21</code></figcaption><pre class="kode" tabindex="0"><span class="ln">13</span>api_router = APIRouter()
 <span class="ln">14</span>api_router.include_router(health_router)
 <span class="ln">15</span>api_router.include_router(auth_router)
@@ -1200,7 +1211,7 @@ set_message_context   lengkapi pesan dengan id pertandingan, ronde, dan fase</pr
   <span class="panah">-&gt;</span> permintaan ke /socket.io/: ditangani Socket.IO
   <span class="panah">-&gt;</span> selain itu: diteruskan ke FastAPI</pre>
 <p class="label">Kode</p>
-<figure class="blok-kode"><figcaption><code>backend/app/main.py:101</code></figcaption><pre class="kode" tabindex="0"><span class="ln">101</span>asgi_app = socketio.ASGIApp(sio, other_asgi_app=app)</pre></figure>
+<figure class="blok-kode"><figcaption><code>backend/app/main.py:102</code></figcaption><pre class="kode" tabindex="0"><span class="ln">102</span>asgi_app = socketio.ASGIApp(sio, other_asgi_app=app)</pre></figure>
 <p class="label">Yang tidak terlihat dari kode</p>
 <ul class="catatan"><li><code>backend/Dockerfile:17</code> menjalankan <code>app.main:asgi_app</code>. Jadi yang dijalankan variabel ini, bukan <code>app</code>.</li></ul>
 </section>
@@ -1257,14 +1268,14 @@ set_message_context   lengkapi pesan dengan id pertandingan, ronde, dan fase</pr
   <span class="panah">-&gt;</span> berhasil: True
        <span class="cabang">\&gt;</span> error SQL: False</pre>
 <p class="label">Kode</p>
-<figure class="blok-kode"><figcaption><code>backend/app/module/mysql_connector.py:64-71</code></figcaption><pre class="kode" tabindex="0"><span class="ln">64</span><span class="c"># HEALTH CHECK: jalankan SELECT 1 tanpa mengubah data; dipakai startup dan controller health.</span>
-<span class="ln">65</span><span class="k">def</span> <span class="f">database_is_ready</span>() -&gt; bool:
-<span class="ln">66</span>    <span class="k">try</span>:
-<span class="ln">67</span>        <span class="k">with</span> engine.connect() <span class="k">as</span> koneksi:
-<span class="ln">68</span>            koneksi.execute(text(<span class="s">"SELECT 1"</span>))
-<span class="ln">69</span>        <span class="k">return</span> <span class="k">True</span>
-<span class="ln">70</span>    <span class="k">except</span> SQLAlchemyError:
-<span class="ln">71</span>        <span class="k">return</span> <span class="k">False</span></pre></figure>
+<figure class="blok-kode"><figcaption><code>backend/app/module/mysql_connector.py:65-72</code></figcaption><pre class="kode" tabindex="0"><span class="ln">65</span><span class="c"># HEALTH CHECK: jalankan SELECT 1 tanpa mengubah data; dipakai startup dan controller health.</span>
+<span class="ln">66</span><span class="k">def</span> <span class="f">database_is_ready</span>() -&gt; bool:
+<span class="ln">67</span>    <span class="k">try</span>:
+<span class="ln">68</span>        <span class="k">with</span> engine.connect() <span class="k">as</span> koneksi:
+<span class="ln">69</span>            koneksi.execute(text(<span class="s">"SELECT 1"</span>))
+<span class="ln">70</span>        <span class="k">return</span> <span class="k">True</span>
+<span class="ln">71</span>    <span class="k">except</span> SQLAlchemyError:
+<span class="ln">72</span>        <span class="k">return</span> <span class="k">False</span></pre></figure>
 <p class="label">Yang tidak terlihat dari kode</p>
 <ul class="catatan"><li>Dipakai <code>main.py</code> saat server nyala, dan <code>controller/api/health.py</code>.</li></ul>
 </section>
@@ -1414,46 +1425,46 @@ set_message_context   lengkapi pesan dengan id pertandingan, ronde, dan fase</pr
             <span class="cabang">\&gt;</span> error: catat di log, lanjut ke room berikutnya
        <span class="panah">-&gt;</span> fase atau ronde berubah: <a class="ref" href="#t-activity-record">[[activity.record]]</a></pre>
 <p class="label">Kode</p>
-<figure class="blok-kode"><figcaption><code>backend/app/module/room_service.py:403-429</code></figcaption><pre class="kode" tabindex="0"><span class="ln">403</span><span class="c"># JAM: dipanggil tiap 0,5 detik oleh game_clock, bukan oleh request browser. Untuk tiap room,</span>
-<span class="ln">404</span><span class="c"># panggil Match.tick(): kalau waktu fase habis, fase berganti. Pergantian fase dicatat untuk panel.</span>
-<span class="ln">405</span><span class="k">def</span> <span class="f">perbarui_fase_semua_room</span>(self):
-<span class="ln">406</span>    <span class="k">with</span> self.lock:
-<span class="ln">407</span>        <span class="k">for</span> room <span class="k">in</span> self.rooms.values():
-<span class="ln">408</span>            pertandingan = room.match
-<span class="ln">409</span>            <span class="k">if</span> <span class="k">not</span> pertandingan:
-<span class="ln">410</span>                <span class="k">continue</span>
-<span class="ln">411</span>            fase_sebelum, ronde_sebelum = pertandingan.phase, pertandingan.round
-<span class="ln">412</span>            <span class="k">try</span>:
-<span class="ln">413</span>                pertandingan.tick()
-<span class="ln">414</span>                self._catat_peserta_pertandingan_selesai(room)
-<span class="ln">415</span>            <span class="k">except</span> Exception:
-<span class="ln">416</span>                <span class="c"># Satu pertandingan rusak tidak boleh menghentikan timer room lain.</span>
-<span class="ln">417</span>                logger.exception(<span class="s">"Timer room %s gagal."</span>, room.code)
-<span class="ln">418</span>                <span class="k">continue</span>
-<span class="ln">419</span>            <span class="k">if</span> (fase_sebelum, ronde_sebelum) != (pertandingan.phase, pertandingan.round):
-<span class="ln">420</span>                activity.record(
-<span class="ln">421</span>                    room.code,
-<span class="ln">422</span>                    <span class="s">"Match.tick"</span>,
-<span class="ln">423</span>                    {<span class="s">"phase_before"</span>: fase_sebelum, <span class="s">"round_before"</span>: ronde_sebelum},
-<span class="ln">424</span>                    result={
-<span class="ln">425</span>                        <span class="s">"phase"</span>: pertandingan.phase,
-<span class="ln">426</span>                        <span class="s">"round"</span>: pertandingan.round,
-<span class="ln">427</span>                        <span class="s">"winner"</span>: pertandingan.winner,
-<span class="ln">428</span>                    },
-<span class="ln">429</span>                )</pre></figure>
-<figure class="blok-kode"><figcaption><code>backend/app/module/room_service.py:108-120</code></figcaption><pre class="kode" tabindex="0"><span class="ln">108</span><span class="c"># Pertandingan yang baru selesai (lewat timer atau pemain keluar): peserta manusianya dicatat sekali ke</span>
-<span class="ln">109</span><span class="c"># arsip survei di thread latar, jadi jam permainan tidak menunggu database.</span>
-<span class="ln">110</span><span class="k">def</span> <span class="f">_catat_peserta_pertandingan_selesai</span>(self, room):
-<span class="ln">111</span>    <span class="k">if</span> room.peserta_tercatat <span class="k">or</span> <span class="k">not</span> room.match <span class="k">or</span> <span class="k">not</span> room.match.winner:
-<span class="ln">112</span>        <span class="k">return</span>
-<span class="ln">113</span>    room.peserta_tercatat = <span class="k">True</span>
-<span class="ln">114</span>    <span class="c"># Impor lambat: survey_service mengimpor modul ini.</span>
-<span class="ln">115</span>    <span class="k">from</span> app.module.survey_service <span class="k">import</span> survey_service
-<span class="ln">116</span>
-<span class="ln">117</span>    baris_peserta = survey_service.baris_peserta(room)
-<span class="ln">118</span>    threading.Thread(
-<span class="ln">119</span>        target=survey_service.catat_peserta, args=(baris_peserta,), daemon=<span class="k">True</span>
-<span class="ln">120</span>    ).start()</pre></figure>
+<figure class="blok-kode"><figcaption><code>backend/app/module/room_service.py:404-430</code></figcaption><pre class="kode" tabindex="0"><span class="ln">404</span><span class="c"># JAM: dipanggil tiap 0,5 detik oleh game_clock, bukan oleh request browser. Untuk tiap room,</span>
+<span class="ln">405</span><span class="c"># panggil Match.tick(): kalau waktu fase habis, fase berganti. Pergantian fase dicatat untuk panel.</span>
+<span class="ln">406</span><span class="k">def</span> <span class="f">perbarui_fase_semua_room</span>(self):
+<span class="ln">407</span>    <span class="k">with</span> self.lock:
+<span class="ln">408</span>        <span class="k">for</span> room <span class="k">in</span> self.rooms.values():
+<span class="ln">409</span>            pertandingan = room.match
+<span class="ln">410</span>            <span class="k">if</span> <span class="k">not</span> pertandingan:
+<span class="ln">411</span>                <span class="k">continue</span>
+<span class="ln">412</span>            fase_sebelum, ronde_sebelum = pertandingan.phase, pertandingan.round
+<span class="ln">413</span>            <span class="k">try</span>:
+<span class="ln">414</span>                pertandingan.tick()
+<span class="ln">415</span>                self._catat_peserta_pertandingan_selesai(room)
+<span class="ln">416</span>            <span class="k">except</span> Exception:
+<span class="ln">417</span>                <span class="c"># Satu pertandingan rusak tidak boleh menghentikan timer room lain.</span>
+<span class="ln">418</span>                logger.exception(<span class="s">"Timer room %s gagal."</span>, room.code)
+<span class="ln">419</span>                <span class="k">continue</span>
+<span class="ln">420</span>            <span class="k">if</span> (fase_sebelum, ronde_sebelum) != (pertandingan.phase, pertandingan.round):
+<span class="ln">421</span>                activity.record(
+<span class="ln">422</span>                    room.code,
+<span class="ln">423</span>                    <span class="s">"Match.tick"</span>,
+<span class="ln">424</span>                    {<span class="s">"phase_before"</span>: fase_sebelum, <span class="s">"round_before"</span>: ronde_sebelum},
+<span class="ln">425</span>                    result={
+<span class="ln">426</span>                        <span class="s">"phase"</span>: pertandingan.phase,
+<span class="ln">427</span>                        <span class="s">"round"</span>: pertandingan.round,
+<span class="ln">428</span>                        <span class="s">"winner"</span>: pertandingan.winner,
+<span class="ln">429</span>                    },
+<span class="ln">430</span>                )</pre></figure>
+<figure class="blok-kode"><figcaption><code>backend/app/module/room_service.py:109-121</code></figcaption><pre class="kode" tabindex="0"><span class="ln">109</span><span class="c"># Pertandingan yang baru selesai (lewat timer atau pemain keluar): peserta manusianya dicatat sekali ke</span>
+<span class="ln">110</span><span class="c"># arsip survei di thread latar, jadi jam permainan tidak menunggu database.</span>
+<span class="ln">111</span><span class="k">def</span> <span class="f">_catat_peserta_pertandingan_selesai</span>(self, room):
+<span class="ln">112</span>    <span class="k">if</span> room.peserta_tercatat <span class="k">or</span> <span class="k">not</span> room.match <span class="k">or</span> <span class="k">not</span> room.match.winner:
+<span class="ln">113</span>        <span class="k">return</span>
+<span class="ln">114</span>    room.peserta_tercatat = <span class="k">True</span>
+<span class="ln">115</span>    <span class="c"># Impor lambat: survey_service mengimpor modul ini.</span>
+<span class="ln">116</span>    <span class="k">from</span> app.module.survey_service <span class="k">import</span> survey_service
+<span class="ln">117</span>
+<span class="ln">118</span>    baris_peserta = survey_service.baris_peserta(room)
+<span class="ln">119</span>    threading.Thread(
+<span class="ln">120</span>        target=survey_service.catat_peserta, args=(baris_peserta,), daemon=<span class="k">True</span>
+<span class="ln">121</span>    ).start()</pre></figure>
 <p class="label">Yang tidak terlihat dari kode</p>
 <ul class="catatan"><li>Satu pertandingan yang rusak tidak boleh menghentikan timer room lain, karena itu <code>except Exception</code> ada di dalam perulangan.</li><li>Peserta dicatat di thread latar, supaya jam permainan tidak menunggu database.</li></ul>
 </section>
