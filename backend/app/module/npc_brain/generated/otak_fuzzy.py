@@ -2,7 +2,7 @@
 
 Sumber : npc_fuzzy.ipynb
 Sidik  : ae637faf0b30886d
-Dibuat : 2026-11-04 09:19 UTC
+Dibuat : 2026-11-04 09:21 UTC
 
 Perubahan logika bot dilakukan di notebook skripsi, dijalankan ulang sampai semua
 skenario/pengujian lulus, lalu diekspor ulang dengan skrip ini.
@@ -14,8 +14,8 @@ Alurnya
    2.2 pengetahuan_peran: fakta pasti menurut role
    2.3 Warga: nilai_kecurigaan lalu terapkan_pengetahuan; Spy juga fitur_lindung
    2.4 Hitman: hitung_bukti publik, nilai_kecurigaan, fitur_hitman, lalu nilai_ancaman
-   2.5 Chat: chat_pasti bila ada hasil Peek yang harus diungkap, selain itu keputusan_chat
-   2.6 Vote: vote_pasti, selain itu keputusan_vote_hitman (Hitman) atau keputusan_vote (warga), lalu pertahanan_suara
+   2.5 Vote: vote_pasti, selain itu keputusan_vote_hitman (Hitman) atau keputusan_vote (warga), lalu pertahanan_suara
+   2.6 Chat: chat_pasti bila ada hasil Peek yang harus diungkap, selain itu keputusan_chat
    2.7 Aksi rahasia: keputusan_aksi
    2.8 Keluaran: format_npc untuk engine dan siapkan_nlg untuk penulis kalimat
 """
