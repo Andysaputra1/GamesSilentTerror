@@ -1,7 +1,9 @@
 """Run with: python -m unittest discover -s tests -v (from backend)."""
 
+import ast
 from datetime import datetime, timedelta
 import os
+from pathlib import Path
 import unittest
 from unittest.mock import patch
 
@@ -10,6 +12,30 @@ from sqlalchemy.orm import Session
 
 from app.config.mysql import MySQLSettings
 from app.models import auth_queries
+
+
+# Nama yang diimpor sebuah berkas dari satu modul, di mana pun letak impornya di dalam berkas itu.
+def _impor_dari(berkas, modul):
+    pohon = ast.parse(berkas.read_text(encoding="utf-8"))
+    return {
+        alias.name
+        for simpul in ast.walk(pohon)
+        if isinstance(simpul, ast.ImportFrom) and simpul.module == modul
+        for alias in simpul.names
+    }
+
+
+class LayerRuleTests(unittest.TestCase):
+    APP = Path(__file__).resolve().parents[1] / "app"
+
+    # SQL hanya di models; satu-satunya pengecualian SELECT 1 pemeriksa koneksi di config/database.py.
+    def test_sql_text_only_in_models(self):
+        for berkas in self.APP.rglob("*.py"):
+            relatif = berkas.relative_to(self.APP).as_posix()
+            if relatif.startswith("models/") or relatif == "config/database.py":
+                continue
+            with self.subTest(berkas=relatif):
+                self.assertNotIn("text", _impor_dari(berkas, "sqlalchemy"))
 
 
 class ConfigurationTests(unittest.TestCase):

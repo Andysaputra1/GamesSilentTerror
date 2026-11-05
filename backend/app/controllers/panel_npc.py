@@ -332,10 +332,10 @@ KODE_ALUR = {
     ],
     "simpan": [
         ("app.module.persistence_service", "PersistenceService.record_trace", [
-            ("INSERT INTO checker_traces", "jejak untuk checker"),
+            ("save_checker_trace", "jejak untuk checker"),
         ]),
         ("app.module.persistence_service", "PersistenceService.record_nlu", [
-            ("UPDATE chat_messages SET nlu", "bacaan NLU untuk riwayat chat"),
+            ("set_message_nlu", "bacaan NLU untuk riwayat chat"),
         ]),
         (G + "otak_fuzzy", "Ingatan.catat_aksi_bot", []),
     ],

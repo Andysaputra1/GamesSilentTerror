@@ -18,10 +18,10 @@ Alurnya tiap detak jam (perbarui_fase_semua_room, dipanggil main.py tiap 0,5 det
 
 import logging
 from dataclasses import dataclass, field
-from sqlalchemy import text
 import secrets
 import threading
 from app.config.database import SessionLocal
+from app.models import auth_queries
 from app.module.match_engine import Match, label_unik, phase_durations
 from app.services.activity_service import activity, traced
 
@@ -56,15 +56,9 @@ class RoomService:
             return {}
         database = SessionLocal()
         try:
-            penanda_sql = ", ".join([f":u{urutan}" for urutan in range(len(daftar_username))])
-            nilai_sql = {f"u{urutan}": username for urutan, username in enumerate(daftar_username)}
-            perintah_sql = text(f"""
-                SELECT username, skin_id, display_name FROM user_accounts
-                WHERE username IN ({penanda_sql})
-            """)
             profil_tersimpan = {
                 baris.username: (baris.skin_id, baris.display_name)
-                for baris in database.execute(perintah_sql, nilai_sql)
+                for baris in auth_queries.account_profiles(database, daftar_username)
             }
             return {
                 username: profil_tersimpan.get(username, ("dexter", username))

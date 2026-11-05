@@ -17,9 +17,8 @@ Alurnya saat panel menyimpan (save_npc_configuration)
 import json
 import logging
 
-from sqlalchemy import text
-
 from app.config.database import jalankan_transaksi
+from app.models import panel_queries
 from app.module.npc_brain.runtime import brain_runtime
 
 BARIS_NPC = 2
@@ -29,9 +28,7 @@ logger = logging.getLogger("shadow_heist.npc_config")
 # Baca konfigurasi tersimpan lalu terapkan ke runtime saat backend dimulai.
 def muat_konfigurasi_npc():
     def read(database):
-        value = database.execute(
-            text("SELECT config FROM panel_configuration WHERE id=:id"), {"id": BARIS_NPC}
-        ).scalar()
+        value = panel_queries.panel_configuration(database, BARIS_NPC)
         return json.loads(value) if isinstance(value, str) else value
 
     stored = jalankan_transaksi(read)
@@ -64,17 +61,12 @@ def save_npc_configuration(penulis, urutan_penulis=None, model_openrouter=None, 
         "model_tautan": summary["model_tautan"],
     }
 
-    def write(database):
-        database.execute(
-            text("""
-            INSERT INTO panel_configuration(id, config) VALUES(:id, :config)
-            ON DUPLICATE KEY UPDATE config=:config
-        """),
-            {"id": BARIS_NPC, "config": json.dumps(config)},
-        )
-
     try:
-        jalankan_transaksi(write)
+        jalankan_transaksi(
+            lambda database: panel_queries.write_panel_configuration(
+                database, BARIS_NPC, json.dumps(config)
+            )
+        )
     except Exception:
         # Gagal simpan: kembalikan runtime ke konfigurasi sebelumnya agar panel dan server konsisten.
         brain_runtime.atur(

@@ -32,8 +32,10 @@ backend/
     services/                   # Logika login, password, room, survei, dan konfigurasi AI
       ollama_client.py          # Cek model di link Ollama
     models/
-      auth_queries.py           # SELECT/INSERT/DELETE akun dan sesi
-      game_queries.py           # SELECT/INSERT pemain dan chat
+      auth_queries.py           # SELECT/INSERT/UPDATE/DELETE akun dan sesi
+      game_queries.py           # SELECT/INSERT/UPDATE pemain, chat, dan jejak checker
+      panel_queries.py          # Sesi panel, konfigurasi, arsip room, jejak, riwayat, kesiapan skema
+      survey_queries.py         # Survei akhir pertandingan dan catatan metode bot
     module/                     # Engine pertandingan, bot, simulasi, dan penyimpanan chat
     schemas/                    # Validasi request/response API
   artifacts/

@@ -19,8 +19,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field, SecretStr
-from sqlalchemy import text
 from app.config.settings import settings
+from app.models import panel_queries
 from app.services.password_service import verify_password
 from app.config.database import PersistenceError, jalankan_transaksi
 from app.services.ai_config_service import ai_runtime, simpan_konfigurasi_ai
@@ -72,13 +72,9 @@ def require_panel(
     if not credentials or not settings.panel_password_hash:
         raise HTTPException(401, "Login administrator diperlukan.")
     sesi_berlaku = transaction(
-        lambda database: database.execute(
-            text("""
-        SELECT token_hash FROM panel_sessions WHERE token_hash=:token
-        AND expires_at > UTC_TIMESTAMP() AND credential_version=:version
-    """),
-            {"token": digest(credentials.credentials), "version": credential_version()},
-        ).scalar()
+        lambda database: panel_queries.valid_panel_session(
+            database, digest(credentials.credentials), credential_version()
+        )
     )
     if not sesi_berlaku:
         raise HTTPException(401, "Sesi panel berakhir. Silakan login lagi.")
@@ -111,33 +107,18 @@ def login(body: Login, response: Response):
         raise HTTPException(401, "Username atau password salah.")
     token_sesi = secrets.token_urlsafe(32)
     waktu_kedaluwarsa = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=8)
-
-    # Bersihkan sesi kedaluwarsa dan simpan hash sesi baru dalam satu transaksi.
-    def simpan_sesi(database):
-        database.execute(text("DELETE FROM panel_sessions WHERE expires_at <= UTC_TIMESTAMP()"))
-        database.execute(
-            text(
-                "INSERT INTO panel_sessions(token_hash,expires_at,credential_version) VALUES(:token,:expires,:version)"
-            ),
-            {
-                "token": digest(token_sesi),
-                "expires": waktu_kedaluwarsa,
-                "version": credential_version(),
-            },
+    transaction(
+        lambda database: panel_queries.create_panel_session(
+            database, digest(token_sesi), waktu_kedaluwarsa, credential_version()
         )
-
-    transaction(simpan_sesi)
+    )
     return {"access_token": token_sesi}
 
 
 # Hapus sesi panel terautentikasi dari database.
 @router.post("/api/panel/logout", status_code=204)
 def logout(token=Depends(require_panel)):
-    transaction(
-        lambda database: database.execute(
-            text("DELETE FROM panel_sessions WHERE token_hash=:token"), {"token": digest(token)}
-        )
-    )
+    transaction(lambda database: panel_queries.delete_panel_session(database, digest(token)))
 
 
 # Sajikan halaman panel dengan kebijakan sumber konten dan tanpa cache.
@@ -289,20 +270,7 @@ def set_config(body: Configuration, token=Depends(require_panel)):
 # Daftar room yang pernah tercatat (cursor ID), jumlah pesan, dan tanda room yang masih hidup di memori.
 @router.get("/api/panel/rooms")
 def rooms(after_id: int = Query(0, ge=0), token=Depends(require_panel)):
-    # LIMIT 201 = satu baris lebih dari isi halaman, untuk tahu masih ada halaman berikutnya.
-    daftar_baris = transaction(
-        lambda database: [
-            dict(baris)
-            for baris in database.execute(
-                text("""
-        SELECT s.id,s.room_code,s.created_at,COUNT(m.id) AS message_count
-        FROM game_sessions s LEFT JOIN chat_messages m ON m.game_session_id=s.id
-        WHERE s.id > :after GROUP BY s.id,s.room_code,s.created_at ORDER BY s.id LIMIT 201
-    """),
-                {"after": after_id},
-            ).mappings()
-        ]
-    )
+    daftar_baris = transaction(lambda database: panel_queries.archived_rooms(database, after_id))
     with room_service.lock:
         kode_room_hidup = {room.code for room in room_service.rooms.values()}
     for baris in daftar_baris:
@@ -316,28 +284,14 @@ def rooms(after_id: int = Query(0, ge=0), token=Depends(require_panel)):
 
 
 # Gabungkan jejak tersimpan dan jejak aktif; cursor menjaga urutan halaman.
-# Daftar tanpa `penjelasan` (bisa ~10 KB per jejak); detail diambil lewat endpoint jejak tunggal.
 @router.get("/api/panel/checker/{code}")
 def checker(
     code: str, before: str | None = Query(None, max_length=100), token=Depends(require_panel)
 ):
     if len(code) > 36:
         raise HTTPException(422, "Kode room terlalu panjang.")
-    # Cursor waktu+ID membuat halaman stabil walau ada waktu yang sama. LIMIT 101 = satu baris lebih
-    # dari isi halaman, untuk tahu masih ada halaman berikutnya.
     daftar_baris = transaction(
-        lambda database: database.execute(
-            text("""
-        SELECT JSON_REMOVE(trace,'$.penjelasan') AS trace,
-        CONCAT(DATE_FORMAT(created_at,'%Y-%m-%d %H:%i:%s'), '|', id) AS trace_cursor
-        FROM checker_traces WHERE room_code=:code
-        AND CONCAT(DATE_FORMAT(created_at,'%Y-%m-%d %H:%i:%s'), '|', id) < :before
-        ORDER BY created_at DESC,id DESC LIMIT 101
-    """),
-            {"code": code, "before": before or "9999"},
-        )
-        .mappings()
-        .all()
+        lambda database: panel_queries.checker_trace_page(database, code, before)
     )
     isi_halaman = daftar_baris[:100]
     # Jejak di memori menimpa arsip ber-ID sama; halaman lanjutan hanya berisi arsip.
@@ -373,40 +327,25 @@ def checker_trace(code: str, trace_id: str, token=Depends(require_panel)):
     if jejak_aktif is not None:
         return jejak_aktif
     jejak_arsip = transaction(
-        lambda database: database.execute(
-            text("SELECT trace FROM checker_traces WHERE id=:id AND room_code=:code"),
-            {"id": trace_id, "code": code},
-        ).scalar()
+        lambda database: panel_queries.checker_trace(database, trace_id, code)
     )
     if jejak_arsip is None:
         raise HTTPException(404, "Jejak tidak ditemukan.")
     return _baca_kolom_json(jejak_arsip)
 
 
-# Bangun kondisi SQL berparameter; rentang tanggal WIB dikonversi ke UTC.
+# Periksa rentang tanggal WIB, konversi ke UTC, lalu bangun kondisi SQL berparameter.
 def history_filter(room_code, date_from, date_to, sender_kind="all"):
     if date_from == date.min:
         raise HTTPException(422, "Tanggal awal terlalu kecil.")
     if date_from and date_to and date_from > date_to:
         raise HTTPException(422, "Tanggal awal harus sebelum atau sama dengan tanggal akhir.")
+    if date_to == date.max:
+        raise HTTPException(422, "Tanggal akhir terlalu besar.")
     selisih_wib = timedelta(hours=7)
-    daftar_syarat = ["1=1"]
-    parameter_sql = {}
-    if sender_kind != "all":
-        daftar_syarat.append("m.sender_kind=:sender_kind")
-        parameter_sql["sender_kind"] = sender_kind
-    if room_code:
-        daftar_syarat.append("s.room_code=:room")
-        parameter_sql["room"] = room_code
-    if date_from:
-        daftar_syarat.append("m.created_at >= :start")
-        parameter_sql["start"] = datetime.combine(date_from, time()) - selisih_wib
-    if date_to:
-        if date_to == date.max:
-            raise HTTPException(422, "Tanggal akhir terlalu besar.")
-        daftar_syarat.append("m.created_at < :end")
-        parameter_sql["end"] = datetime.combine(date_to + timedelta(days=1), time()) - selisih_wib
-    return " AND ".join(daftar_syarat), parameter_sql
+    awal = datetime.combine(date_from, time()) - selisih_wib if date_from else None
+    akhir = datetime.combine(date_to + timedelta(days=1), time()) - selisih_wib if date_to else None
+    return panel_queries.history_conditions(room_code, awal, akhir, sender_kind)
 
 
 # Ambil halaman pesan sesuai filter tanpa memuat seluruh arsip.
@@ -422,28 +361,15 @@ def history(
     token=Depends(require_panel),
 ):
     syarat_sql, parameter_sql = history_filter(room_code, date_from, date_to, sender_kind)
-    # Halaman berikutnya: "lama" melanjutkan sesudah after_id, "baru" (terbaru dulu) sebelum before_id.
-    if urut == "baru":
-        arah = "DESC"
-        if before_id:
-            syarat_sql += " AND m.id<:before"
-            parameter_sql["before"] = before_id
-    else:
-        arah = "ASC"
-        syarat_sql += " AND m.id>:after"
-        parameter_sql["after"] = after_id
-    # LIMIT 201 = satu baris lebih dari isi halaman, untuk tahu masih ada halaman berikutnya.
     daftar_baris = transaction(
-        lambda database: [
-            dict(baris)
-            for baris in database.execute(
-                text("""
-        SELECT m.id,m.sender_name,m.sender_kind,m.message,m.nlu,m.created_at,m.round_number,m.phase,s.room_code
-        FROM chat_messages m LEFT JOIN game_sessions s ON s.id=m.game_session_id
-        WHERE """ + syarat_sql + f" ORDER BY m.id {arah} LIMIT 201"),
-                parameter_sql,
-            ).mappings()
-        ]
+        lambda database: panel_queries.history_page(
+            database,
+            syarat_sql,
+            parameter_sql,
+            terbaru_dulu=urut == "baru",
+            after_id=after_id,
+            before_id=before_id,
+        )
     )
     for baris in daftar_baris:  # bacaan IndoBERT saat game berjalan (JSON; kosong untuk pesan lama)
         baris["nlu"] = _baca_kolom_json(baris["nlu"])
@@ -502,30 +428,20 @@ def download(
     try:
         berkas_csv.write(b"\xef\xbb\xbf")
         tulis_baris_csv(KOLOM_CSV)
-        id_maksimum = transaction(
-            lambda database: database.execute(
-                text("SELECT COALESCE(MAX(id),0) FROM chat_messages")
-            ).scalar()
-        )
+        id_maksimum = transaction(panel_queries.max_message_id)
         # Snapshot sampai id maksimum saat ekspor dimulai; halaman berjalan naik ("lama") atau turun ("baru").
         urut_baru = urut == "baru"
         batas = id_maksimum + 1 if urut_baru else 0
-        syarat_halaman = " AND m.id<:batas" if urut_baru else " AND m.id>:batas AND m.id<=:maximum"
         while True:
-            parameter_halaman = {**parameter_sql, "batas": batas, "maximum": id_maksimum}
             daftar_baris = transaction(
-                lambda database: database.execute(
-                    text(
-                        """
-                SELECT m.id,m.sender_name,m.sender_kind,m.message,m.nlu,m.match_id,s.room_code,m.created_at
-                FROM chat_messages m LEFT JOIN game_sessions s ON s.id=m.game_session_id
-                WHERE """
-                        + syarat_sql
-                        + syarat_halaman
-                        + f" ORDER BY m.id {'DESC' if urut_baru else 'ASC'} LIMIT 1000"
-                    ),
-                    parameter_halaman,
-                ).all()
+                lambda database: panel_queries.history_export_page(
+                    database,
+                    syarat_sql,
+                    parameter_sql,
+                    terbaru_dulu=urut_baru,
+                    batas=batas,
+                    maximum=id_maksimum,
+                )
             )
             if not daftar_baris:
                 break

@@ -4,10 +4,10 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
-from sqlalchemy import text
 
 from app.config.database import PersistenceError, database_is_ready, jalankan_transaksi
 from app.config.settings import settings
+from app.models import panel_queries
 from app.services.ollama_client import model_available
 from app.services.ai_config_service import ai_runtime
 
@@ -45,16 +45,7 @@ def ready():
     """Cheap deployment readiness; never calls a paid or local AI provider."""
     skema_siap = False
     try:
-        skema_siap = (
-            jalankan_transaksi(
-                lambda database: database.execute(
-                    text(
-                        "SELECT COUNT(*) FROM schema_migrations WHERE version IN ('V5__chat_history','V6__admin_panel')"
-                    )
-                ).scalar()
-            )
-            == 2
-        )
+        skema_siap = jalankan_transaksi(panel_queries.count_required_migrations) == 2
     except PersistenceError:
         pass
     return JSONResponse(

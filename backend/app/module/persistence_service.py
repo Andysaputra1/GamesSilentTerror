@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 import json
-from sqlalchemy import text
 
 # PersistenceError ikut diimpor agar file lain tetap bisa mengimpornya dari modul ini.
 from app.config.database import PersistenceError, jalankan_transaksi  # noqa: F401
@@ -52,10 +51,7 @@ class PersistenceService:
     def archive_new_room(self, username):
         # Simpan ruangan dan pemiliknya dalam satu transaksi agar arsip tidak setengah jadi.
         def simpan_room_baru(database):
-            jumlah_baris_baru = database.execute(
-                text("INSERT IGNORE INTO game_sessions(room_code,phase) VALUES(:code,'lobby')"),
-                {"code": self.room_code},
-            ).rowcount
+            jumlah_baris_baru = queries.insert_lobby_room(database, self.room_code)
             if not jumlah_baris_baru:
                 return False
             self._pastikan_room_dan_pemain(database, username)
@@ -66,12 +62,8 @@ class PersistenceService:
     # Simpan jejak checker sebagai arsip analisis ruangan.
     def record_trace(self, trace):
         jalankan_transaksi(
-            lambda database: database.execute(
-                text("""
-            INSERT INTO checker_traces(id,room_code,trace) VALUES(:id,:room,:trace)
-            ON DUPLICATE KEY UPDATE trace=:trace
-        """),
-                {"id": trace["id"], "room": self.room_code, "trace": json.dumps(trace)},
+            lambda database: queries.save_checker_trace(
+                database, trace["id"], self.room_code, json.dumps(trace)
             ),
             PESAN_GAME,
         )
@@ -79,9 +71,8 @@ class PersistenceService:
     # Bacaan NLU (intent, target) satu pesan untuk riwayat chat panel (kolom migrasi V9).
     def record_nlu(self, message_id, nlu):
         jalankan_transaksi(
-            lambda database: database.execute(
-                text("UPDATE chat_messages SET nlu=:nlu WHERE id=:id"),
-                {"id": message_id, "nlu": json.dumps(nlu, ensure_ascii=False)},
+            lambda database: queries.set_message_nlu(
+                database, message_id, json.dumps(nlu, ensure_ascii=False)
             ),
             PESAN_GAME,
         )
@@ -102,4 +93,3 @@ class PersistenceService:
             return id_pesan
 
         return jalankan_transaksi(simpan_pesan_bot, PESAN_GAME)
-

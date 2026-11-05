@@ -40,6 +40,17 @@ def create_account(database: Session, *, username: str, display_name: str, passw
     ).lastrowid
 
 
+# Skin dan nama tampilan beberapa akun sekaligus; akun yang tidak ditemukan tidak ikut terbaca.
+def account_profiles(database: Session, daftar_username: list[str]):
+    penanda_sql = ", ".join([f":u{urutan}" for urutan in range(len(daftar_username))])
+    nilai_sql = {f"u{urutan}": username for urutan, username in enumerate(daftar_username)}
+    perintah_sql = text(f"""
+                SELECT username, skin_id, display_name FROM user_accounts
+                WHERE username IN ({penanda_sql})
+            """)
+    return database.execute(perintah_sql, nilai_sql)
+
+
 # Cari satu akun berdasarkan username; hasil bisa kosong.
 def account_by_username(database: Session, username: str):
     sql = text("""
@@ -91,6 +102,66 @@ def account_by_token(database: Session, token_hash: str, waktu_sekarang: datetim
 def delete_session(database: Session, token_hash: str):
     sql = text("DELETE FROM auth_sessions WHERE token_hash = :token_hash")
     return database.execute(sql, {"token_hash": token_hash}).rowcount
+
+
+# Cabut semua sesi satu akun.
+def delete_user_sessions(database: Session, user_id: int):
+    database.execute(text("DELETE FROM auth_sessions WHERE user_id = :id"), {"id": user_id})
+
+
+# Satu akun untuk panel; kolom password hanya dipakai menentukan metode login.
+def account_for_management(database: Session, user_id: int):
+    return (
+        database.execute(
+            text("""
+            SELECT u.id, u.username, u.display_name,
+                   CASE WHEN i.google_subject IS NOT NULL OR u.password_hash = 'google_only'
+                        THEN 'google' ELSE 'password' END AS login_method
+            FROM user_accounts u LEFT JOIN account_identities i ON i.user_id = u.id
+            WHERE u.id = :user_id
+        """),
+            {"user_id": user_id},
+        )
+        .mappings()
+        .one_or_none()
+    )
+
+
+# Satu halaman akun untuk panel. LIMIT 51 = satu baris lebih dari isi halaman, untuk tahu masih ada halaman berikutnya.
+def accounts_for_management(database: Session, after_id: int, search: str):
+    return (
+        database.execute(
+            text("""
+                SELECT u.id, u.username, u.display_name,
+                       CASE WHEN i.google_subject IS NOT NULL OR u.password_hash = 'google_only'
+                            THEN 'google' ELSE 'password' END AS login_method
+                FROM user_accounts u LEFT JOIN account_identities i ON i.user_id = u.id
+                WHERE u.id > :after_id AND (u.username LIKE :search OR u.display_name LIKE :search)
+                ORDER BY u.id LIMIT 51
+            """),
+            {"after_id": after_id, "search": "%" + search + "%"},
+        )
+        .mappings()
+        .all()
+    )
+
+
+# Ganti hash password satu akun.
+def update_password_hash(database: Session, user_id: int, password_hash: str):
+    database.execute(
+        text("UPDATE user_accounts SET password_hash = :password WHERE id = :id"),
+        {"id": user_id, "password": password_hash},
+    )
+
+
+# Hapus identitas login satu akun; arsip permainan tidak ikut terhapus.
+def delete_identity(database: Session, user_id: int):
+    database.execute(text("DELETE FROM account_identities WHERE user_id = :id"), {"id": user_id})
+
+
+# Hapus baris akun.
+def delete_account(database: Session, user_id: int):
+    database.execute(text("DELETE FROM user_accounts WHERE id = :id"), {"id": user_id})
 
 
 # Identitas tambahan dipisahkan supaya akun demo lama tetap kompatibel.
