@@ -62,8 +62,9 @@ class BrainRuntimeTests(unittest.TestCase):
         )
         self.assertEqual(set(otak_fuzzy.INTENT_AKSI), set(otak_fuzzy.URUTAN_AKSI))
         self.assertLessEqual({"ajak_bicara", "klaim_palsu"}, set(otak_fuzzy.SEMUA_SISTEM))
-        self.assertNotIn("info_sandera", nlg.VARIASI)
-        self.assertNotIn("info_sandera", nlg.MAKSUD_AKSI)
+        lama = {"ungkap", "klaim_palsu", "info_sandera", "ajak_bicara"}
+        self.assertFalse(lama & set(nlg.VARIASI))
+        self.assertFalse(lama & set(nlg.MAKSUD_AKSI))
 
     def test_bots_do_not_echo_each_others_sentences(self):
         match = Match(["human"], ["NOX", "ECHO", "VEIL"], now=0.0)
@@ -71,7 +72,7 @@ class BrainRuntimeTests(unittest.TestCase):
         nox = self.runtime.otak_bot(match.id, "NOX")
         echo = self.runtime.otak_bot(match.id, "ECHO")
         rencana = {"pembicara": "NOX", "aksi": "tanya_info", "intent": "neutral", "target": None,
-                   "klaim": False, "bukti": []}  # fmt: skip
+                   "bukti": []}  # fmt: skip
         konteks = {"roster": ["human", "NOX", "ECHO", "VEIL"], "chat_terbaru": []}
         pertama = self.runtime.tulis(nox, rencana, konteks)["teks"]
         konteks["chat_terbaru"].append(
@@ -139,7 +140,7 @@ class BrainRuntimeTests(unittest.TestCase):
         self.assertEqual(len(konteks["chat_terbaru"]), 12)
         self.assertEqual(konteks["suara_tribunal"], {"human": "NOX"})
         bela = {"pembicara": "NOX", "aksi": "bela_diri", "intent": "defend", "target": "NOX",
-                "klaim": False, "bukti": ["Aku bukan Hitman; tuduhan ke aku belum punya bukti."]}  # fmt: skip
+                "bukti": ["Aku bukan Hitman; tuduhan ke aku belum punya bukti."]}  # fmt: skip
         _, pesan = self.runtime.nlg.buat_prompt(bela, konteks, "santai")
         self.assertIn("<pemicu>\nhuman: Aku curiga NOX, vote NOX.", pesan)
         self.assertIn("Suara Tribunal ke NOX saat ini: human", pesan)

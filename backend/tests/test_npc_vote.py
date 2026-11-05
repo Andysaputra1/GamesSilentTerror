@@ -32,7 +32,7 @@ class AjakVoteTests(unittest.TestCase):
         for jenis in ("ajak_pindah", "ajak_menyatukan", "jelaskan_vote"):
             with self.subTest(jenis=jenis):
                 rencana = {"pembicara": "NOX", "aksi": "tuduh", "jenis": jenis, "intent": "offend",
-                           "target": "ECHO", "klaim": False, "bukti": ["ECHO aneh dari tadi."]}  # fmt: skip
+                           "target": "ECHO", "bukti": ["ECHO aneh dari tadi."]}  # fmt: skip
                 konteks = {"roster": ["NOX", "ECHO", "VEIL"], "chat_terbaru": []}
                 hasil = nlg.tulis_pesan(rencana, konteks, None, "santai")
                 self.assertEqual(hasil["pelanggaran"], [])

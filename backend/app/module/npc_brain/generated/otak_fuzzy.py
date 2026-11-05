@@ -1,8 +1,8 @@
 """FILE INI DIHASILKAN OTOMATIS oleh scripts/ekspor_otak_npc.py. JANGAN DIEDIT MANUAL.
 
 Sumber : npc_fuzzy.ipynb
-Sidik  : 564c8fe501d26ec3
-Dibuat : 2026-11-05 07:47 UTC
+Sidik  : 270dd8821eff9356
+Dibuat : 2026-11-05 08:57 UTC
 
 Perubahan logika bot dilakukan di notebook skripsi, dijalankan ulang sampai semua
 skenario/pengujian lulus, lalu diekspor ulang dengan skrip ini.
@@ -1259,7 +1259,7 @@ def alasan_bela_orang(jenis, baris):
         "peek_bersih": f"Aku Stalker, aku sudah peek {p}: dia bukan Hitman.",
         "yakin_bersih": f"Aku yakin {p} bukan Hitman.",
         "diklaim_bersih": f"{baris['rincian']['pengaku_bersih']} yang ngaku Stalker bilang {p} bersih.",
-        "terlalu_awal": f"Masih terlalu awal buat nuduh {p}.",
+        "terlalu_awal": f"Jangan vote {p} dulu, masih terlalu awal.",
         "ada_pembela": f"Tuduhan ke {p} masih pendapat, ada yang membela juga.",
         "belum_ada_bukti": f"Belum ada bukti kuat kalau {p} Hitman.",
     }
@@ -1332,11 +1332,15 @@ def calon_bela_diri(ctx, dituduh, tersangka, bukti_tersangka):
     if terdesak and not role_dibuka(ingatan):
         role, bukti, relasi = klaim_role_bot(ctx)
         sebutan = f"cuma {role.capitalize()}" if role == "civilian" else role.capitalize()
-        kalimat = f"Jangan vote aku, aku {sebutan}"
         if bukti:
+            # Hasil Peek menyebut orang itu langsung, jadi kalimatnya ikut membela atau menuduhnya.
+            bersih = [r["pemain"] for r in relasi if r["relasi"] == "defend"]
+            hitman = [r["pemain"] for r in relasi if r["relasi"] == "offend"]
+            kepala = (f"Aku bukan Hitman, justru {hitman[0]} yang Hitman. Aku {sebutan}" if hitman
+                      else f"Jangan vote aku dan {bersih[0]}, aku {sebutan}" if bersih else f"Jangan vote aku, aku {sebutan}")
             return {**dasar, "jenis": "role_bukti_aksi", "role_diakui": role, "bukti_klaim": bukti, "relasi_tambahan": relasi,
-                    "alasan": [f"{kalimat}, {bukti.replace(' ', ' aku ', 1)}."]}
-        return {**dasar, "jenis": "buka_role", "role_diakui": role, "alasan": [f"{kalimat}."]}
+                    "alasan": [f"{kepala}, aku {bukti}."]}
+        return {**dasar, "jenis": "buka_role", "role_diakui": role, "alasan": [f"Jangan vote aku, aku {sebutan}."]}
     if view["ronde"] <= RONDE_AWAL and baris["n_penuduh"] <= 1:
         return {**dasar, "jenis": "terlalu_awal", "alasan": ["Jangan vote aku, masih terlalu awal, buktinya belum ada."]}
     if tersangka is not None:
@@ -1623,16 +1627,16 @@ def calon_chat(ctx):
 
 # Bentuk rencana keluaran penalaran. Vote dan aksi rahasia memakai bentuk yang sama {aksi, target, alasan, skor}.
 def rencana_chat_tunggu(alasan):
-    return {"kirim": False, "aksi": "tunggu", "jenis": None, "intent": None, "target": None, "klaim": False,
+    return {"kirim": False, "aksi": "tunggu", "jenis": None, "intent": None, "target": None,
             "alasan": [alasan], "skor": None}
 
-# Rencana jawab juga membawa penanya (pemain yang memanggil bot) untuk penulis kalimat. klaim masih berarti mengaku
-# Stalker dan dihapus pada Fase 8; role asli tidak pernah ikut, hanya role yang diakui.
+# Rencana jawab juga membawa penanya (pemain yang memanggil bot) untuk penulis kalimat. Role asli tidak pernah ikut, hanya role
+# yang diakui.
 def rencana_chat(calon):
     jenis, role = calon.get("jenis"), calon.get("role_diakui")
     intent = calon.get("intent") or (INTENT_JENIS[jenis] if jenis else INTENT_AKSI[calon["aksi"]])
     return {"kirim": True, "aksi": calon["aksi"], "jenis": jenis, "intent": intent, "target": calon["target"],
-            "klaim": role == "stalker", "role_diakui": role, "bukti_klaim": calon.get("bukti_klaim"),
+            "role_diakui": role, "bukti_klaim": calon.get("bukti_klaim"),
             "relasi_tambahan": calon.get("relasi_tambahan", []), "pemicu": calon.get("pemicu"), "paket": calon.get("paket"),
             "alasan": calon["alasan"], "skor": calon.get("skor"),
             **({"penanya": calon["penanya"]} if calon.get("penanya") else {})}
@@ -1657,7 +1661,7 @@ def chat_pasti(ctx):
         return None
     rencana = rencana_chat({"aksi": "tuduh", "jenis": "hasil_peek", "target": ph, "role_diakui": "stalker",
                             "bukti_klaim": f"semalam peek {ph}, dia Hitman",
-                            "alasan": [f"Aku Stalker. Semalam aku peek {ph}: dia Hitman."]})
+                            "alasan": [f"Aku Stalker, semalam aku peek {ph}: dia Hitman."]})
     return rencana, pd.DataFrame([{"aksi": "tuduh", "jenis": "hasil_peek", "target": ph, "sumber": "fakta hasil Peek"}])
 
 # Hasil Peek Hitman berarti vote langsung, tanpa menunggu.
@@ -1827,16 +1831,16 @@ def templat_pesan(rencana):
     t = rencana["target"]
     bukti = rencana["alasan"][0] if rencana["alasan"] else ""
     templat_jenis = {
-        "hasil_peek": f"Aku Stalker. Semalam aku peek {t}, dia Hitman. Ayo vote {t}!",
-        "klaim_peek": f"Aku Stalker, semalam aku peek {t}, dia Hitman.",
+        "hasil_peek": f"Aku Stalker, aku semalam peek {t}, dia Hitman. Ayo vote {t}!",
+        "klaim_peek": f"Aku Stalker, aku semalam peek {t}, dia Hitman.",
         "serang_korban_gag": f"{t} dari tadi diam aja, curiga.",
-        "balik_tuduh": f"{t} nuduh aku tanpa bukti, justru dia yang aneh.",
+        "balik_tuduh": f"Aku bukan Hitman, justru {t} yang aneh, dia nuduh aku tanpa bukti.",
         "ajak_pindah": f"Seri nih, pindah ke {t} aja.",
-        "ajak_menyatukan": f"Suara kita jangan pecah, ke {t} aja.",
-        "jelaskan_vote": f"Aku vote {t}. {bukti}",
+        "ajak_menyatukan": f"Vote {t} aja, suara kita jangan pecah.",
+        "jelaskan_vote": f"Aku pilih vote {t}. {bukti}",
         "peek_bersih": f"{bukti} Jangan vote {t}.",
         "pemain_diam": f"{t}, pendapatmu gimana? Dari tadi belum kedengaran.",
-        "gali_tersangka": f"{t}, gimana penjelasanmu? {bukti}",
+        "gali_tersangka": f"{t}, gimana penjelasanmu?",
         "klaim_bentrok": f"{bukti} Gimana nih?",
         "ruangan_hening": f"{bukti} Ada yang punya info lain?",
         "pertanyaan_umum": "Ada yang punya info atau curiga sama seseorang? Ceritain alasannya ya.",
@@ -1844,10 +1848,10 @@ def templat_pesan(rencana):
     if rencana.get("jenis") in templat_jenis:
         return templat_jenis[rencana["jenis"]].strip()
     if rencana["aksi"] in ("bela_diri", "bela_orang"):
-        return " ".join(rencana["alasan"]).strip()
+        return " ".join(rencana["alasan"][:2]).strip()
     templat = {
         # Jawaban netral yang terbaca netral oleh IndoBERT (versi lama dengan "mencurigakan" terbaca menuduh).
-        "jawab": (f"Kalau aku sih curiga {t}. {bukti}" if t else "Aku belum yakin siapa-siapa. Kalian curiga siapa?"),
+        "jawab": (f"Kalau aku sih paling curiga sama {t}. {bukti}" if t else "Aku belum yakin siapa-siapa. Kalian curiga siapa?"),
         "tuduh": f"Aku makin curiga sama {t}. {bukti}",
     }
     return templat[rencana["aksi"]].strip()
@@ -1879,8 +1883,8 @@ BATASAN_NLG = [
 # Aturan penulisan dari rencana saja. Role asli bot tidak pernah ikut, jadi penulis tidak bisa membocorkannya.
 def batasan_nlg(rencana):
     batasan = list(BATASAN_NLG)
-    if rencana.get("klaim"):
-        batasan.append("Rencana ini memang mengaku Stalker: sebutkan klaim itu singkat, jangan menambah klaim atau hasil lain.")
+    if rencana.get("role_diakui"):
+        batasan.append(f"Rencana ini memang mengaku {rencana['role_diakui'].capitalize()}: sebutkan klaim itu singkat, jangan menambah klaim atau hasil lain.")
     else:
         batasan.append("Jangan mengaku role apa pun dan jangan mengarang hasil Peek/Guard.")
     batasan.append("Jangan menyebut aksi malam (Hostage, Gag, Guard, Peek) sebagai perbuatanmu kecuali rencana memintanya.")
@@ -1888,18 +1892,20 @@ def batasan_nlg(rencana):
 
 # Payload NLG untuk LLM penulis kalimat. Role asli bot sengaja tidak dimasukkan.
 # Masukan : rencana chat (keluaran keputusan_chat), view (nama bot).
-# Keluaran: {pembicara, aksi, jenis, intent, target, klaim, bukti, gaya, batasan, cadangan} (+ penanya untuk jawab), atau None
-#           bila bot tidak chat.
+# Keluaran: {pembicara, aksi, jenis, intent, target, role_diakui, bukti_klaim, relasi_tambahan, bukti, gaya, batasan, cadangan}
+#           (+ penanya dan paket untuk jawab), atau None bila bot tidak chat.
 # Dipakai oleh: putuskan (kunci nlg) → npc_nlg menulis kalimat lalu memeriksanya dengan aturan.
 def siapkan_nlg(rencana, view):
     if not rencana["kirim"]:
         return None
     return {
         "pembicara": view["saya"]["nama"], "aksi": rencana["aksi"], "jenis": rencana.get("jenis"), "intent": rencana["intent"],
-        "target": rencana["target"], "klaim": rencana.get("klaim", False), "bukti": rencana["alasan"][:2],
+        "target": rencana["target"], "role_diakui": rencana.get("role_diakui"), "bukti_klaim": rencana.get("bukti_klaim"),
+        "relasi_tambahan": rencana.get("relasi_tambahan") or [], "bukti": rencana["alasan"][:2],
         "gaya": "1–2 kalimat chat santai bahasa Indonesia, seperti pemain manusia.",
         "batasan": batasan_nlg(rencana), "cadangan": templat_pesan(rencana),
         **({"penanya": rencana["penanya"]} if rencana.get("penanya") else {}),
+        **({"paket": rencana["paket"]} if rencana.get("paket") else {}),
     }
 
 # Paket chat tim untuk penulis kalimat, atau None bila tidak ada yang perlu dikabarkan ke rekan manusia. Target tetap dari logika dan

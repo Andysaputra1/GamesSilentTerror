@@ -229,7 +229,7 @@ class PenjelasanToleransiTests(unittest.TestCase):
         rencana = {"kirim": True, "aksi": "tuduh", "intent": "offend", "target": "ASH",
                    "alasan": ["ASH vote aneh."]}  # fmt: skip
         payload = {"pembicara": "NOX", "aksi": "tuduh", "intent": "offend", "target": "ASH",
-                   "klaim": False, "bukti": ["ASH vote aneh."], "gaya": "santai", "batasan": [],
+                   "bukti": ["ASH vote aneh."], "gaya": "santai", "batasan": [],
                    "cadangan": "Aku makin curiga sama ASH."}  # fmt: skip
         p = lengkapi({"bot": {"nama": "NOX"}, "catatan": []}, {"action": "wait", "target": None},
                      rencana, None, None, ditunda=True,

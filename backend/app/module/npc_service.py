@@ -81,7 +81,7 @@ def isi_jejak(trace, match, otak, npc, rencana, tulisan, penolakan, durasi_ms, d
                 "aksi": rencana["aksi"],
                 "jenis": rencana.get("jenis"),
                 "target": rencana["target"],
-                "klaim": rencana.get("klaim", False),
+                "role_diakui": rencana.get("role_diakui"),
                 "alasan": rencana["alasan"][:2],
                 "ditunda": ditunda,  # lantai bicara penuh/kembar: diputuskan ulang nanti
             },

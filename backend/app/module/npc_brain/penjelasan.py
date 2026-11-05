@@ -237,8 +237,7 @@ def _rencana(rencana, *kunci):
 def _keputusan(hasil):
     return {
         "chat": _rencana(
-            hasil.get("rencana_chat"), "kirim", "aksi", "jenis", "intent", "target", "klaim",
-            "role_diakui", "skor",
+            hasil.get("rencana_chat"), "kirim", "aksi", "jenis", "intent", "target", "role_diakui", "skor",
         ),
         "vote": _rencana(hasil.get("rencana_vote"), "aksi", "target", "skor", "paksa", "pindah"),
         "aksi": _rencana(hasil.get("rencana_aksi"), "aksi", "target", "skor", "pindah"),
@@ -536,8 +535,8 @@ def _masukan(masukan):
     r = masukan["rencana"]
     prompt = masukan.get("prompt")
     return {
-        **{k: _nilai(r.get(k)) for k in ("aksi", "jenis", "intent", "target", "klaim", "bukti", "penanya",
-                                          "cadangan") if r.get(k) is not None},
+        **{k: _nilai(r.get(k)) for k in ("aksi", "jenis", "intent", "target", "role_diakui", "bukti_klaim", "bukti",
+                                          "penanya", "cadangan") if r.get(k) is not None},
         "prompt": prompt[:MAKS_PROMPT] if isinstance(prompt, str) else None,
     }  # fmt: skip
 

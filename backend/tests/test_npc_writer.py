@@ -4,6 +4,7 @@ Tidak ada panggilan jaringan: cek jalur diganti mock dan jalur rantai memakai ke
 """
 
 import json
+import random
 import threading
 import time
 import unittest
@@ -16,6 +17,8 @@ from pydantic import SecretStr
 
 from app.config.settings import Settings
 from app.controllers.panel import require_panel
+from app.module.match_engine import Match
+from app.module.npc_brain.generated import nlg, otak_fuzzy
 from app.module.npc_brain.runtime import (
     JALUR_PENULIS, BrainRuntime, NLUBersama, OtakBot,
 )  # fmt: skip
@@ -178,7 +181,7 @@ class WriterChainTests(unittest.TestCase):
         self.runtime.penulis.cek()
         bot = OtakBot("NOX", "fuzzy", "santai", "civilian", None)
         payload = {"pembicara": "NOX", "aksi": "tuduh", "intent": "offend", "target": "ECHO",
-                   "klaim": False, "bukti": []}  # fmt: skip
+                   "bukti": []}  # fmt: skip
         konteks = {"roster": ["NOX", "ECHO", "VEIL"], "chat_terbaru": []}
         tulisan = self.runtime.tulis(bot, payload, konteks)
         self.assertEqual((tulisan["sumber"], tulisan["penulis"]), ("llm", "openrouter"))
@@ -194,11 +197,144 @@ class WriterChainTests(unittest.TestCase):
         self.assertEqual(status["rantai_penulis"][1]["keadaan"], "istirahat")
 
 
+ENAM = {"NOX": "hitman", "ECHO": "spy", "VEIL": "stalker", "RAVEN": "civilian", "ASH": "civilian", "DUSK": "civilian"}
+
+
+# Tribunal ronde 3 dengan role tetap. Dua pemain sudah vote `bot`, jadi bot terdesak dan membela diri dengan membuka role.
+def bot_terdesak(bot):
+    game = Match([], list(ENAM), rng=random.Random(1), now=0.0)
+    for nama, pemain in game.players.items():
+        pemain.role = ENAM[nama]
+    game.round, game.phase = 3, "tribunal"
+    game.deadline = float(game.durations["tribunal"])
+    ingatan = otak_fuzzy.Ingatan(bot)
+    for nama in [n for n in ENAM if n != bot][:2]:
+        game.vote(nama, bot)
+        game.add_message(nama, f"{bot} aneh dari tadi.", now=1.0)
+    view = ingatan.sinkron_snapshot(game.snapshot(bot), 20.0)
+    for chat in ingatan.chat:
+        chat.update(intent="offend", conf_intent=0.95, target=[{"pemain": bot, "relasi": "offend"}])
+    return ingatan, view
+
+
+class PublicPromptRoleTests(unittest.TestCase):
+    """Prompt chat publik tidak pernah memuat role asli. Role hanya tampil lewat role_diakui, yang adalah isi rencana."""
+
+    KONTEKS = {"roster": list(ENAM), "chat_terbaru": []}
+
+    # Rencana yang sama memberi payload dan prompt yang sama untuk keempat role.
+    def test_prompt_is_identical_for_every_true_role(self):
+        rencana = otak_fuzzy.rencana_chat({"aksi": "tuduh", "jenis": "alasan_curiga", "target": "DUSK",
+                                           "alasan": ["Ucapan dan vote DUSK tidak konsisten."]})  # fmt: skip
+        hasil = set()
+        for bot in ("NOX", "ECHO", "VEIL", "RAVEN"):
+            _, view = bot_terdesak(bot)
+            payload = {**otak_fuzzy.siapkan_nlg(rencana, view), "pembicara": "RAVEN"}
+            hasil.add(nlg.buat_prompt(payload, self.KONTEKS, "santai"))
+        self.assertEqual(len(hasil), 1)
+
+    # Rencana nyata tiap role: payload tanpa kunci role, dan Hitman tidak pernah mengaku Hitman.
+    def test_real_plans_never_carry_the_true_role(self):
+        for bot in ("NOX", "ECHO", "VEIL", "RAVEN"):
+            with self.subTest(bot=bot):
+                ingatan, view = bot_terdesak(bot)
+                payload = otak_fuzzy.putuskan(ingatan, view)["nlg"]
+                self.assertIsNotNone(payload)
+                self.assertFalse({"peran", "role", "tim", "klaim"} & set(payload))
+                self.assertNotEqual(payload["role_diakui"], "hitman")
+                sistem, pesan = nlg.buat_prompt(payload, self.KONTEKS, "santai")
+                self.assertNotIn("mengaku Hitman", sistem + pesan)
+                self.assertEqual("Rencana ini memang mengaku" in sistem, bool(payload["role_diakui"]))
+
+
+class OpenedRoleTests(unittest.TestCase):
+    """Rencana membuka role: kalimat game memakai role yang sama dengan templat simulasi, dan pemeriksa mengikuti role_diakui."""
+
+    def setUp(self):
+        self.runtime = runtime_siap()
+        self.addCleanup(self.runtime.tutup)
+        self.runtime.konfigurasi.penulis = "otomatis"
+
+    def tulis(self, payload, *jawaban):
+        self.runtime.penulis = PenulisTiruan(jawaban)
+        bot = OtakBot(payload["pembicara"], "fuzzy", "santai", "civilian", None)
+        return self.runtime.tulis(bot, payload, {"roster": list(ENAM), "chat_terbaru": []})
+
+    def rencana_spy(self):
+        ingatan, view = bot_terdesak("ECHO")
+        view["saya"]["last_guard"] = "ASH"
+        return otak_fuzzy.putuskan(ingatan, view)["nlg"]
+
+    # Rencana D29 di uji model: dulu klaim Spy selalu ditolak pemeriksa, jadi semua model jatuh ke templat.
+    def test_spy_opening_role_with_guard_evidence_passes_end_to_end(self):
+        payload = self.rencana_spy()
+        self.assertEqual(payload["jenis"], "role_bukti_aksi")
+        self.assertEqual((payload["role_diakui"], payload["bukti_klaim"]), ("spy", "semalam jaga ASH"))
+        kalimat = "Jangan vote aku, aku Spy, semalam aku jaga ASH."
+        tulisan = self.tulis(payload, kalimat)
+        self.assertEqual((tulisan["sumber"], tulisan["teks"]), ("llm", kalimat))
+        # Tanpa LLM, templat tetap membuka role dan aksi yang sama.
+        tulisan = self.tulis(payload)
+        self.assertEqual(tulisan["sumber"], "templat")
+        self.assertRegex(tulisan["teks"], f"(?i){otak_fuzzy.POLA_KLAIM['spy']}")
+        self.assertIn("ASH", tulisan["teks"])
+
+    def test_writer_rejects_claims_outside_the_plan(self):
+        payload = self.rencana_spy()
+        for kalimat, aturan in (
+            ("Jangan vote aku, aku Stalker.", "klaim_salah"),
+            ("Jangan vote aku, aku Spy, semalam aku sandera ASH.", "aksi_sendiri"),
+            ("Jangan vote aku, aku Spy, semalam aku jaga DUSK.", "nama_lain"),
+        ):
+            with self.subTest(kalimat=kalimat):
+                self.assertIn(aturan, nlg.periksa_aturan(kalimat, payload, list(ENAM)))
+
+    # Bot lain membaca role lewat POLA_KLAIM, jadi semua templat buka role harus terbaca sebagai role itu di ketiga persona.
+    def test_templates_are_read_as_the_claimed_role(self):
+        dasar = {"pembicara": "RAVEN", "aksi": "bela_diri", "intent": "defend", "target": "RAVEN", "bukti": []}
+        rencana = [
+            {**dasar, "jenis": "buka_role", "role_diakui": "spy"},
+            {**dasar, "jenis": "buka_role", "role_diakui": "stalker"},
+            {**dasar, "jenis": "buka_role", "role_diakui": "civilian"},
+            {**dasar, "jenis": "role_bukti_aksi", "role_diakui": "spy", "bukti_klaim": "semalam jaga ASH"},
+            {**dasar, "jenis": "role_bukti_aksi", "role_diakui": "stalker", "bukti_klaim": "kemarin peek ASH, dia bukan Hitman",
+             "relasi_tambahan": [{"pemain": "ASH", "relasi": "defend"}]},
+            {**dasar, "jenis": "role_bukti_aksi", "role_diakui": "stalker", "bukti_klaim": "semalam peek ASH, dia Hitman",
+             "relasi_tambahan": [{"pemain": "ASH", "relasi": "offend"}]},
+        ]  # fmt: skip
+        for p in rencana:
+            for persona in nlg.PERSONA:
+                for teks in nlg.kalimat_templat(p, persona):
+                    with self.subTest(teks=teks):
+                        self.assertRegex(teks, f"(?i){otak_fuzzy.POLA_KLAIM[p['role_diakui']]}")
+                        self.assertEqual(nlg.periksa_aturan(teks, p, list(ENAM)), [])
+                        self.assertEqual(nlg.klaim_diri(teks.casefold()), {p["role_diakui"]})
+
+
+class TemplateCoverageTests(unittest.TestCase):
+    # Semua jenis di otak punya templat dan maksud. pelintir_bukti memakai kalimat alasan_curiga.
+    def test_every_plan_kind_has_templates_and_intent(self):
+        self.assertEqual(set(nlg.MAKSUD_AKSI), set(nlg.VARIASI))
+        jenis = {k.split("/")[1] for k in nlg.VARIASI}
+        self.assertEqual(set(otak_fuzzy.INTENT_JENIS) - jenis, {"pelintir_bukti"})
+        self.assertTrue(all(len(v) >= 3 for v in nlg.VARIASI.values()))
+        self.assertTrue(all(len(v) >= 5 for isi in nlg.TEMPLAT_TIM.values() for v in isi.values()))
+
+    # Varian yang baru terdengar tetap dicoba bila semua varian baru gugur aturan.
+    def test_heard_variant_is_tried_when_new_variants_fail(self):
+        p = {"pembicara": "NOX", "aksi": "tuduh", "jenis": "alasan_curiga", "intent": "offend", "target": "ECHO",
+             "bukti": ["ECHO " + "aneh sekali dari tadi " * 12]}  # fmt: skip
+        sudah = ["Aku curiga sama ECHO.", "Menurutku ECHO patut dicurigai."]
+        tulisan = nlg.tulis_pesan(p, {"roster": ["NOX", "ECHO"], "chat_terbaru": []}, None, "santai", hindari=sudah)
+        self.assertEqual(tulisan["sumber"], "templat")
+        self.assertIn(tulisan["teks"], sudah)
+
+
 class WriterSentenceRuleTests(unittest.TestCase):
     """Kalimat LLM langsung dikirim bila lolos aturan; IndoBERT tidak membaca ulang sebelum kirim."""
 
     PAYLOAD = {"pembicara": "NOX", "aksi": "tuduh", "intent": "offend", "target": "ECHO",
-               "klaim": False, "bukti": []}  # fmt: skip
+               "bukti": []}  # fmt: skip
     KONTEKS = {"roster": ["NOX", "ECHO", "VEIL"], "chat_terbaru": []}
 
     def setUp(self):
