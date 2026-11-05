@@ -1,8 +1,8 @@
 """FILE INI DIHASILKAN OTOMATIS oleh scripts/ekspor_otak_npc.py. JANGAN DIEDIT MANUAL.
 
 Sumber : npc_fuzzy.ipynb
-Sidik  : 07e1c102eefd8229
-Dibuat : 2026-11-05 03:45 UTC
+Sidik  : c48d713c86b2c395
+Dibuat : 2026-11-05 04:31 UTC
 
 Perubahan logika bot dilakukan di notebook skripsi, dijalankan ulang sampai semua
 skenario/pengujian lulus, lalu diekspor ulang dengan skrip ini.
@@ -1105,7 +1105,7 @@ INTENT_JENIS = {
     "tunjuk_orang": "offend", "tunjuk_orang_bahaya": "offend",
     "peek_bersih": "defend", "yakin_bersih": "defend", "diklaim_bersih": "defend", "terlalu_awal": "defend",
     "ada_pembela": "defend", "ada_pembela_bahaya": "defend", "belum_ada_bukti": "defend", "belum_ada_bukti_bahaya": "defend",
-    "hasil_peek": "offend", "alasan_curiga": "offend", "serang_korban_gag": "offend", "balik_tuduh": "offend",
+    "hasil_peek": "offend", "ajak_pindah": "offend", "ajak_menyatukan": "offend", "jelaskan_vote": "offend", "alasan_curiga": "offend", "serang_korban_gag": "offend", "balik_tuduh": "offend",
     "pelintir_bukti": "offend", "klaim_peek": "offend",
     "pemain_diam": "neutral", "gali_tersangka": "neutral", "klaim_bentrok": "neutral", "ruangan_hening": "neutral",
     "pertanyaan_umum": "neutral",
@@ -1553,13 +1553,45 @@ def _calon_chat_hitman(ctx):
     tanya = calon_tanya_semua(ctx)
     return calon + [tanya] if tanya else calon
 
+# Kandidat ajak vote saat Tribunal, sekali per Tribunal: menyampaikan target vote bot kepada pemain lain. Vote paksa tidak mengajak,
+# karena bot sendiri belum yakin. Target harus cukup dicurigai: warga memakai kecurigaan, Hitman memakai kambing hitam.
+def calon_ajak_vote(ctx):
+    ingatan, view, konteks, bot = ctx["ingatan"], ctx["view"], ctx["konteks"], ctx["bot"]
+    if view["fase"] != "tribunal" or any(a.get("jenis") in ("ajak_pindah", "ajak_menyatukan", "jelaskan_vote")
+                                         for a in _aksi_fase(ingatan, view)):
+        return None
+    rencana = ctx.get("rencana_vote") or {}
+    akan_vote = rencana.get("aksi") == "vote"
+    target = rencana["target"] if akan_vote else view["suara_tribunal"].get(bot)
+    catatan = next((v for v in ingatan.vote_bot if v["ronde"] == view["ronde"]), {})
+    if not target or (rencana if akan_vote else catatan).get("paksa") or not boleh_tuduh(ingatan, view, konteks, target):
+        return None
+    if ctx["peran"] == "hitman":
+        kambing = ctx["fitur_hitman"][ctx["fitur_hitman"]["pemain"] == target]
+        if kambing.empty or kambing.iloc[0]["kambing_hitam"] < MIN_KAMBING_HITAM:
+            return None
+        alasan = alasan_curiga(baris_pemain(ctx["publik"], target), None)
+        nilai = {"sistem": "h_tuduh", "input": {"kambing_hitam": float(kambing.iloc[0]["kambing_hitam"]), "risiko_saya": ctx["diri"]["risiko_saya"]}}
+    else:
+        baris = baris_pemain(ctx["tabel"], target)
+        if baris["kecurigaan"] < MIN_KECURIGAAN_TUDUH:
+            return None
+        kandidat, _ = urutkan_kandidat(ctx["tabel"])
+        pesaing = kandidat.loc[kandidat["pemain"] != target, "kecurigaan"].tolist()[:1]
+        alasan = alasan_terbuka(ctx, alasan_curiga(baris, bot))
+        nilai = {"sistem": "tuduh", "input": {"kecurigaan": baris["kecurigaan"], "keunggulan": keunggulan_skor([baris["kecurigaan"], *pesaing])}}
+    jenis = "ajak_pindah" if view["tribunal_tambahan"] else "ajak_menyatukan" if len(konteks["porsi_suara"]) >= 2 else "jelaskan_vote"
+    return {"aksi": "tuduh", "jenis": jenis, "target": target, "alasan": alasan[:2], **nilai}
+
 # Kandidat chat sesuai role bot; sama untuk ketiga metode, metode hanya menilai dan memilih.
 # Masukan : ctx dari putuskan (tabel, konteks, pengetahuan, izin; untuk Hitman juga fitur_hitman, diri, publik).
 # Keluaran: daftar kandidat {aksi, target, alasan, input, ...}; input = nilai yang dinilai metode, dan bela_diri serta jawab
 #           tidak membawanya karena tidak dinilai.
 # Dipakai oleh: keputusan_chat metode.
 def calon_chat(ctx):
-    return _calon_chat_hitman(ctx) if ctx["peran"] == "hitman" else _calon_chat_warga(ctx)
+    calon = _calon_chat_hitman(ctx) if ctx["peran"] == "hitman" else _calon_chat_warga(ctx)
+    ajak = calon_ajak_vote(ctx) if ctx["izin"]["boleh_inisiatif"] else None
+    return calon + [ajak] if ajak else calon
 
 # Bentuk rencana keluaran penalaran. Vote dan aksi rahasia memakai bentuk yang sama {aksi, target, alasan, skor}.
 def rencana_chat_tunggu(alasan):
@@ -1717,6 +1749,9 @@ def templat_pesan(rencana):
         "klaim_peek": f"Aku Stalker, semalam aku peek {t}, dia Hitman.",
         "serang_korban_gag": f"{t} dari tadi diam aja, curiga.",
         "balik_tuduh": f"{t} nuduh aku tanpa bukti, justru dia yang aneh.",
+        "ajak_pindah": f"Seri nih, pindah ke {t} aja.",
+        "ajak_menyatukan": f"Suara kita jangan pecah, ke {t} aja.",
+        "jelaskan_vote": f"Aku vote {t}. {bukti}",
         "peek_bersih": f"{bukti} Jangan vote {t}.",
         "pemain_diam": f"{t}, pendapatmu gimana? Dari tadi belum kedengaran.",
         "gali_tersangka": f"{t}, gimana penjelasanmu? {bukti}",
