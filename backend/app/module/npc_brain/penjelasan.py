@@ -240,7 +240,7 @@ def _keputusan(hasil):
             hasil.get("rencana_chat"), "kirim", "aksi", "jenis", "intent", "target", "klaim",
             "role_diakui", "skor",
         ),
-        "vote": _rencana(hasil.get("rencana_vote"), "aksi", "target", "skor"),
+        "vote": _rencana(hasil.get("rencana_vote"), "aksi", "target", "skor", "paksa", "pindah"),
         "aksi": _rencana(hasil.get("rencana_aksi"), "aksi", "target", "skor"),
     }
 
@@ -398,10 +398,9 @@ def _blok_vote(modul, metode, jejak, rencana, peran):
         blok["ambang"] = _ambang(
             modul, AMBANG_VOTE_HITMAN if hitman else AMBANG_VOTE.get(metode, [])
         )
-    alasan = " ".join((rencana or {}).get("alasan") or [])
-    if alasan.startswith("Abstain membiarkan"):
+    if (rencana or {}).get("paksa"):
         blok["catatan"] = (
-            "Metode memilih abstain, lalu diganti vote ke tersangka teratas (PAKSA_VOTE_BUKTI_LEMAH)."
+            "Warga kritis: abstain diganti vote ke tersangka layak teratas (PAKSA_VOTE_KRITIS)."
         )
     return blok
 

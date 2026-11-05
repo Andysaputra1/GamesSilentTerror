@@ -1,4 +1,4 @@
-"""Uji A/B kebijakan vote saat bukti lemah (PAKSA_VOTE_BUKTI_LEMAH) dengan aturan engine terbaru.
+"""Uji A/B kebijakan paksa vote saat warga kritis (PAKSA_VOTE_KRITIS) dengan aturan engine terbaru.
 
 Semua kursi bot memakai otak Fuzzy hasil ekspor notebook, komposisi engine, label NLU sempurna, LANGKAH keputusan
 per fase, seed sama untuk kedua kebijakan. Keluaran: win rate warga ± CI95 dan akurasi vote warga (porsi suara warga
@@ -46,7 +46,7 @@ def label_rencana(rencana):
 def satu_game(argumen):
     metode, paksa, jumlah, seed, langkah = argumen
     modul = MODUL[metode]
-    modul.PAKSA_VOTE_BUKTI_LEMAH = paksa
+    modul.PAKSA_VOTE_KRITIS = paksa
     rng = random.Random(seed)
     nama = NAMA[:jumlah]
     match = match_engine.Match([], nama, rng=random.Random(rng.random()), now=0.0)

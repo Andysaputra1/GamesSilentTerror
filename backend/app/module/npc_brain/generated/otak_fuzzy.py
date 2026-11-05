@@ -1,8 +1,8 @@
 """FILE INI DIHASILKAN OTOMATIS oleh scripts/ekspor_otak_npc.py. JANGAN DIEDIT MANUAL.
 
 Sumber : npc_fuzzy.ipynb
-Sidik  : c48d713c86b2c395
-Dibuat : 2026-11-05 04:31 UTC
+Sidik  : dafd0d43c5c74ae9
+Dibuat : 2026-11-05 04:37 UTC
 
 Perubahan logika bot dilakukan di notebook skripsi, dijalankan ulang sampai semua
 skenario/pengujian lulus, lalu diekspor ulang dengan skrip ini.
@@ -21,6 +21,8 @@ Alurnya
 """
 # ruff: noqa
 # fmt: off
+
+import hashlib
 
 import math
 
@@ -284,11 +286,12 @@ class Ingatan:
     # Dipanggil game setelah vote bot diterima engine. Satu catatan per ronde: suara yang pindah mengganti catatan lama.
     def catat_vote_bot(self, view, rencana):
         catatan = {"ronde": view["ronde"], "target": rencana["target"], "alasan": list(rencana["alasan"]),
-                   "dinilai_ulang": False}
+                   "dinilai_ulang": False, **({"paksa": True} if rencana.get("paksa") else {})}
         lama = next((v for v in self.vote_bot if v["ronde"] == view["ronde"]), None)
         if lama is None:
             self.vote_bot.append(catatan)
         else:
+            lama.pop("paksa", None)
             lama.update(catatan, dinilai_ulang=True)
 
     # Ingatan: mengubah snapshot backend menjadi view keputusan sambil mencatat pengamatan baru.
@@ -1609,8 +1612,8 @@ def rencana_chat(calon):
             "alasan": calon["alasan"], "skor": calon.get("skor"),
             **({"penanya": calon["penanya"]} if calon.get("penanya") else {})}
 
-def rencana_vote(aksi, target=None, alasan=(), skor=None):
-    return {"aksi": aksi, "target": target, "alasan": list(alasan), "skor": skor}
+def rencana_vote(aksi, target=None, alasan=(), skor=None, **tanda):
+    return {"aksi": aksi, "target": target, "alasan": list(alasan), "skor": skor, **tanda}
 
 def rencana_aksi(aksi, target=None, alasan=(), skor=None):
     return {"aksi": aksi, "target": target, "alasan": list(alasan), "skor": skor}
@@ -1896,7 +1899,7 @@ BATAS_ANCAMAN_GAG = 0.70
 
 GAG_WAJIB_FRAKSI = 0.60
 
-PAKSA_VOTE_BUKTI_LEMAH = False
+PAKSA_VOTE_KRITIS = True
 
 _SEMESTA = np.linspace(0, 1, 201)
 
@@ -2146,19 +2149,24 @@ def keputusan_aksi(ctx):
         return rencana_aksi("tunggu", alasan=["Belum ada ancaman yang harus dibungkam sekarang; Gag menunggu."]), jejak
     return rencana_aksi(c["aksi"], c["target"], c["alasan"], c["skor"]), jejak
 
-# Mekanik engine: satu suara pun cukup untuk eksekusi. Untuk metode dengan PAKSA_VOTE_BUKTI_LEMAH, abstain di
-# paruh akhir Tribunal diganti vote ke tersangka teratas yang layak (kebijakan per metode, hasil uji A/B).
+# Warga yang kritis tidak abstain, karena satu suara lain (bisa Hitman) cukup untuk eksekusi. Suara diberikan ke tersangka layak teratas.
+# Bila semua nilainya sama, pilihan diacak stabil per bot, supaya suara warga tidak menumpuk ke nama pertama menurut abjad.
 def pertahanan_suara(ctx, rencana, urutan):
-    if ctx["peran"] == "hitman" or rencana["aksi"] != "abstain" or not PAKSA_VOTE_BUKTI_LEMAH:
+    if (ctx["peran"] == "hitman" or rencana["aksi"] != "abstain" or not PAKSA_VOTE_KRITIS
+            or ctx["konteks"]["warga_terdesak"] < BATAS_WARGA_KRITIS):
         return rencana
     tabel, pasti_orang_baik = ctx["tabel"], ctx["pengetahuan"]["pasti_orang_baik"]
     layak = [p for p in urutan if p not in pasti_orang_baik and baris_pemain(tabel, p)["p_sandera"] < BATAS_SANDERA_VOTE
              and baris_pemain(tabel, p)["bersih_klaim"] < 0.5]  # yang dibersihkan pengaku Stalker tidak dipaksa
     if not layak:
         return rencana
+    target = layak[0]
+    nilai = {(round(baris_pemain(tabel, p)["kecurigaan"], 6), round(baris_pemain(tabel, p)["bukti_total"], 6)) for p in layak}
+    if len(nilai) == 1:
+        kunci = f"{ctx['bot']}|{ctx['view']['ronde']}".encode("utf-8")
+        target = sorted(layak)[int(hashlib.sha256(kunci).hexdigest(), 16) % len(layak)]
     alasan = ["Abstain membiarkan satu suara menentukan eksekusi, jadi aku memilih tersangka teratas."]
-    return rencana_vote("vote", layak[0], alasan + alasan_curiga(baris_pemain(tabel, layak[0]), ctx["bot"]),
-                        rencana["skor"])
+    return rencana_vote("vote", target, alasan + alasan_curiga(baris_pemain(tabel, target), ctx["bot"]), rencana["skor"], paksa=True)
 
 # Satu siklus keputusan untuk role apa pun; satu-satunya fungsi keputusan yang dipanggil game dan simulasi.
 # Masukan : ingatan (Ingatan bot), view (keluaran Ingatan.sinkron_snapshot).

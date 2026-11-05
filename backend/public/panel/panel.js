@@ -848,7 +848,8 @@ function planText(r, chat = false) {
   const intent = chat && r.intent ? ` (${r.intent}${klaim})` : '';
   const skor = typeof r.skor === 'number' ? ` · skor ${teks(r.skor)}` : '';
   const jenis = chat && r.jenis ? ` · ${r.jenis.replaceAll('_', ' ')}` : '';
-  return `${r.aksi}${jenis}${r.target ? ` → ${r.target}` : ''}${intent}${skor}`;
+  const tanda = r.pindah ? ' · pindah suara' : r.paksa ? ' · vote paksa' : '';
+  return `${r.aksi}${jenis}${r.target ? ` → ${r.target}` : ''}${intent}${tanda}${skor}`;
 }
 function engineText(e) {
   if (!e) return '—';
