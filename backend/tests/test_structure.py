@@ -47,6 +47,9 @@ class LayerRuleTests(unittest.TestCase):
                     & {"jalankan_transaksi", "SessionLocal", "engine"},
                     set(),
                 )
+                self.assertNotIn(
+                    "PersistenceService", _impor_dari(berkas, "app.services.persistence_service")
+                )
 
     # Service dipakai controller maupun bot, jadi error-nya diterjemahkan ke HTTP di controller.
     def test_services_do_not_know_http(self):

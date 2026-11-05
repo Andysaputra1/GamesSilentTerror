@@ -24,11 +24,16 @@ from app.config.database import SessionLocal
 from app.models import auth_queries
 from app.module.match_engine import Match, label_unik, phase_durations
 from app.services.activity_service import activity, traced
+from app.services.persistence_service import PersistenceError, PersistenceService
 
 logger = logging.getLogger("shadow_heist.rooms")
 
 # Nama NPC; juga dicadangkan agar tidak bisa dipakai sebagai username akun.
 BOT_NAMES = ("NOX", "ECHO", "VEIL", "RAVEN", "ASH", "DUSK", "IRIS", "SAGE", "ONYX", "LARK")
+
+
+class RoomBelumTersimpan(RuntimeError):
+    """Ruangan baru gagal dicatat di arsip, jadi tidak jadi dibuat."""
 
 
 @dataclass
@@ -173,6 +178,21 @@ class RoomService:
             self.rooms[kode_room] = room
             return room
 
+    # Buat ruangan yang sudah tercatat di arsip. Gagal mencatat berarti ruangannya tidak jadi dibuat.
+    def buat_room_terarsip(self, username, capacity=6):
+        with self.lock:
+            # Kode acak bisa sudah terpakai di arsip lama: buang room itu lalu coba kode lain.
+            for _ in range(10):
+                room = self.create(username, capacity=capacity)
+                try:
+                    if PersistenceService(room.code).archive_new_room(username):
+                        return room
+                except PersistenceError as error:
+                    self.rooms.pop(room.code, None)
+                    raise RoomBelumTersimpan("Ruangan gagal disimpan. Coba lagi.") from error
+                self.rooms.pop(room.code, None)
+            raise RoomBelumTersimpan("Kode ruangan belum tersedia. Coba lagi.")
+
     # SERVICE LOBBY: tambahkan anggota tanpa duplikasi; tolak ruangan hilang atau kapasitas pilihan host penuh.
     @traced
     def join(self, code: str, username: str) -> Room:
@@ -250,6 +270,12 @@ class RoomService:
                     "quick": phase_durations(jumlah_peserta, True),
                 },
             }
+
+    # Snapshot ruangan milik pengguna, termasuk lobby dan pertandingan selesai; None bila tidak ada.
+    def snapshot_room_saat_ini(self, username):
+        with self.lock:
+            room = self.current(username)
+            return self.snapshot(room) if room else None
 
     # START: hanya host; role tidak pernah dikembalikan lewat snapshot lobby.
     @traced

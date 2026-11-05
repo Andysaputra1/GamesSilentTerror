@@ -518,7 +518,7 @@ class TeamChatEndpointTests(unittest.TestCase):
     # Privasi: pesan tim tidak masuk jejak aktivitas panel, checker, riwayat NLU, atau database.
     def test_team_message_stays_out_of_activity_checker_nlu_and_database(self):
         with (
-            patch("app.controllers.rooms.PersistenceService") as arsip,
+            patch("app.services.room_service.PersistenceService") as arsip,
             patch("app.module.npc_service.PersistenceService") as arsip_npc,
         ):
             self.assertEqual(self.post("hitman").status_code, 200)

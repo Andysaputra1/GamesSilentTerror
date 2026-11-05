@@ -689,7 +689,7 @@ class RoomGameTests(unittest.TestCase):
         )
         with (
             patch("app.controllers.rooms.room_service", self.rooms),
-            patch("app.controllers.rooms.PersistenceService"),
+            patch("app.services.room_service.PersistenceService"),
             TestClient(app) as client,
         ):
             for body in [{"capacity": 3}, {"capacity": 11}]:

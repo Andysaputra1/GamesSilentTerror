@@ -148,7 +148,7 @@ class PanelTests(unittest.TestCase):
         rooms = RoomService()
         with (
             patch("app.controllers.rooms.room_service", rooms),
-            patch("app.controllers.rooms.PersistenceService") as factory,
+            patch("app.services.room_service.PersistenceService") as factory,
         ):
             factory.return_value.archive_new_room.return_value = True
             response = self.client.post("/api/rooms")
@@ -160,7 +160,22 @@ class PanelTests(unittest.TestCase):
                 username="bob"
             )
             factory.return_value.archive_new_room.side_effect = PersistenceError("fail")
-            self.assertEqual(self.client.post("/api/rooms").status_code, 503)
+            gagal = self.client.post("/api/rooms")
+            self.assertEqual(
+                (gagal.status_code, gagal.json()["detail"]),
+                (503, "Ruangan gagal disimpan. Coba lagi."),
+            )
+            self.assertEqual(set(rooms.rooms), before)
+            # Semua kode acak sudah terpakai di arsip: berhenti sesudah 10 percobaan, tanpa room tertinggal.
+            factory.return_value.archive_new_room.side_effect = None
+            factory.return_value.archive_new_room.return_value = False
+            factory.return_value.archive_new_room.reset_mock()
+            bentrok = self.client.post("/api/rooms")
+            self.assertEqual(
+                (bentrok.status_code, bentrok.json()["detail"]),
+                (503, "Kode ruangan belum tersedia. Coba lagi."),
+            )
+            self.assertEqual(factory.return_value.archive_new_room.call_count, 10)
             self.assertEqual(set(rooms.rooms), before)
 
 
