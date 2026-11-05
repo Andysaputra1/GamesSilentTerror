@@ -26,6 +26,7 @@ from app.schemas.auth import (
 )
 from app.config.settings import settings
 from app.controller.middleware.auth_limits import limit_auth
+from app.controller.middleware.safe_validation import SafeValidationRoute
 from app.models import auth_queries
 from app.module.auth_service import (
     AuthenticatedUser,
@@ -37,7 +38,7 @@ from app.module.auth_service import (
 from app.module.mysql_connector import PersistenceError, jalankan_transaksi
 from app.module.password_service import hash_password
 
-router = APIRouter(prefix="/api/auth", tags=["auth"])
+router = APIRouter(prefix="/api/auth", tags=["auth"], route_class=SafeValidationRoute)
 _skema_bearer = HTTPBearer(auto_error=False)
 
 
