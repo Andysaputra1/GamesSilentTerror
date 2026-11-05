@@ -251,7 +251,8 @@ KODE_ALUR = {
             ('c["aksi"] in AKSI_REAKTIF', "bela diri dan jawab dibalas tanpa nilai"),
             ('c["skor"] = fuzzy(sistem', "prioritas tiap kandidat chat"),
             ("calon.sort(", "prioritas tertinggi di depan"),
-            ("< AMBANG_CHAT", "di bawah ambang: diam"),
+            (">= AMBANG_CHAT", "mencapai ambang: dikirim"),
+            ("calon_gali(ctx)", "di bawah ambang: gali tersangka sebagai cadangan"),
         ]),
         (G + "otak_fuzzy", "AMBANG_CHAT", []),
         (G + "otak_fuzzy", "keputusan_aksi", [

@@ -159,6 +159,31 @@ class PenjelasanToleransiTests(unittest.TestCase):
             with self.subTest(aksi=aksi, peran=peran):
                 self.assertEqual(_sistem_fuzzy(modul, aksi, peran), sistem)
 
+    # Gali tersangka tanpa nilai, walau kandidat lain dengan target sama dinilai sistem: panel menjelaskannya sebagai cadangan.
+    def test_gali_tersangka_is_explained_as_a_fallback_without_a_system(self):
+        bot = SimpleNamespace(
+            nama="NOX", metode="fuzzy", persona="santai", peran="civilian", langkah=1
+        )
+        view = {"ronde": 2, "fase": "day", "saya": {"nama": "NOX", "role": "civilian"}}
+        hasil = {
+            "jejak_chat": pd.DataFrame([
+                {"aksi": "tanya_info", "jenis": "pemain_diam", "sistem": "ajak_bicara", "target": "ASH",
+                 "prioritas": 15.0, "input": {"diam": 1.0, "kecurigaan": 0.15}},
+                {"aksi": "tanya_info", "jenis": "gali_tersangka", "sistem": None, "target": "ASH",
+                 "prioritas": None, "input": {}},
+            ]),  # fmt: skip
+            "rencana_chat": {"kirim": True, "aksi": "tanya_info", "jenis": "gali_tersangka",
+                             "target": "ASH", "skor": None, "alasan": ["ASH aneh."]},  # fmt: skip
+        }
+        modul = SimpleNamespace(SEMUA_SISTEM={"ajak_bicara": {"input": ("diam", "kecurigaan")}})
+        p = jelaskan(bot, modul, view, hasil)
+        blok = p["penalaran"]["chat"]
+        self.assertEqual(p["keputusan"]["chat"]["jenis"], "gali_tersangka")
+        self.assertEqual(blok["sistem"], [])
+        self.assertEqual(blok["hasil"], "tanya_info → ASH")
+        self.assertIn("Tanpa nilai", blok["catatan"])
+        self.assertIn("jenis", blok["kandidat"]["kolom"])
+
     def test_missing_columns_and_empty_traces_do_not_raise(self):
         bot = SimpleNamespace(
             nama="NOX", metode="fuzzy", persona="santai", peran="civilian", langkah=1

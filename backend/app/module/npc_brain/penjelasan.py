@@ -59,6 +59,7 @@ TANPA_SISTEM = {
     "jawab": "Tanpa nilai: panggilan selalu dibalas lebih dulu.",
     "hostage": "Tanpa sistem fuzzy: nilai = ancaman × (1 − 0,5 × jejak_tuduhan).",
     "guard": "Tanpa sistem fuzzy: nilai = terancam.",
+    "gali_tersangka": "Tanpa nilai: cadangan saat semua calon chat di bawah ambang.",
 }
 
 # Ambang tiap keputusan: (nama konstanta di modul notebook, arti). Nilainya dibaca dari modul.
@@ -282,7 +283,8 @@ def _ambang(modul, daftar):
 
 
 def _cocok(r, rencana):
-    return r.get("aksi") == rencana.get("aksi") and r.get("target") == rencana.get("target")
+    # Satu target bisa muncul di dua jenis tanya_info, jadi jenis ikut dibandingkan.
+    return all(r.get(k) == rencana.get(k) for k in ("aksi", "jenis", "target"))
 
 
 # Keputusan dari fakta pasti (hasil Peek) tidak dinalar metode.
@@ -326,21 +328,23 @@ def _blok_kandidat(modul, metode, jejak, rencana, peran, judul, ambang):
         terpilih = max(rows, key=lambda r: _angka(r.get("prioritas")) or 0.0)
     else:
         terpilih = next((r for r in rows if _cocok(r, rencana or {})), None) or rows[0]
-    blok["kandidat"] = _tabel(rows, ["aksi", "target", "prioritas", "input"])
+    blok["kandidat"] = _tabel(rows, ["aksi", "jenis", "target", "prioritas", "input"])
+    tanpa_nilai = terpilih.get("jenis") in TANPA_SISTEM
     # Kandidat chat mencatat sistemnya sendiri, karena satu aksi bisa dinilai sistem berbeda per jenis.
-    sistem = terpilih.get("sistem") or _sistem_fuzzy(modul, terpilih.get("aksi"), peran)
+    sistem = None if tanpa_nilai else terpilih.get("sistem") or _sistem_fuzzy(modul, terpilih.get("aksi"), peran)
     detail = (
         _detail_fuzzy(modul, sistem, terpilih.get("input") or {}, terpilih.get("prioritas"))
         if sistem
         else None
     )
     blok["sistem"] = [detail] if detail else []
-    skor = terpilih.get("prioritas")
+    # Jenis tanpa nilai bercampur dengan kandidat bernilai, jadi prioritasnya terbaca NaN di tabel.
+    skor = _angka(terpilih.get("prioritas"))
     if diam and skor is not None:
         blok["hasil"] += f" (kandidat terbaik {terpilih.get('aksi')} = {_fmt(skor)})"
     elif skor is not None:
         blok["hasil"] += f" (nilai {_fmt(skor)})"
-    catatan = TANPA_SISTEM.get(terpilih.get("aksi"))
+    catatan = TANPA_SISTEM.get(terpilih.get("jenis")) or TANPA_SISTEM.get(terpilih.get("aksi"))
     if catatan:
         blok["catatan"] = catatan
     return blok
