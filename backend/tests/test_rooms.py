@@ -65,22 +65,43 @@ class SocketRoomTests(unittest.IsolatedAsyncioTestCase):
         sio = Mock(emit=AsyncMock(), leave_room=AsyncMock())
         controller = SocketGameController(sio)
         controller.sockets.update({
-            "alice-sid": {"username": "alice", "room": room.code},
-            "bob-sid": {"username": "bob", "room": room.code},
+            "alice-sid": {"username": "alice", "token": "alice", "room": room.code},
+            "bob-sid": {"username": "bob", "token": "bob", "room": room.code},
         })
         rooms.leave(room.code, "bob")
-        with patch("app.controller.realtime.socket_handlers.room_service", rooms):
+
+        # Token palsu berisi username; hanya sesi yang dicabut yang ditolak.
+        def cek_token(token):
+            if token == "revoked-session":
+                raise SessionValidationError("revoked")
+            return Mock(username=token)
+
+        with (
+            patch("app.controller.realtime.socket_handlers.room_service", rooms),
+            patch(
+                "app.controller.realtime.socket_handlers.auth_service.check_user_by_token",
+                side_effect=cek_token,
+            ),
+        ):
             await controller.emit_room("receive_chat", {"message": "private room"}, to=room.code)
             sio.leave_room.assert_awaited_once_with("bob-sid", room.code)
             sio.leave_room.reset_mock()
             rooms.join(room.code, "bob")
             controller.sockets["bob-sid"]["token"] = "revoked-session"
-            with patch(
-                "app.controller.realtime.socket_handlers.auth_service.check_user_by_token",
-                side_effect=SessionValidationError("revoked"),
-            ):
-                await controller.emit_room("receive_chat", {"message": "next"}, to=room.code)
+            await controller.emit_room("receive_chat", {"message": "next"}, to=room.code)
             sio.leave_room.assert_awaited_once_with("bob-sid", room.code)
+
+    # connect selalu mengisi token, jadi catatan tanpa token tidak boleh lolos tanpa dicek.
+    async def test_socket_record_without_token_is_not_trusted(self):
+        rooms = RoomService()
+        room = rooms.create("alice")
+        controller = SocketGameController(Mock())
+        controller.sockets["sid"] = {"username": "alice", "room": room.code}
+        with (
+            patch("app.controller.realtime.socket_handlers.room_service", rooms),
+            self.assertRaises(KeyError),
+        ):
+            controller._verifikasi_socket("sid", "alice")
 
     # Database sempat gagal bukan berarti sesinya berakhir: pemain tetap di kanal dan tetap menerima chat.
     async def test_database_failure_keeps_socket_in_room_channel(self):
@@ -133,9 +154,13 @@ class SocketRoomTests(unittest.IsolatedAsyncioTestCase):
                     return real_begin(*args)
 
                 controller = SocketGameController(sio)
-                controller.sockets["sid"] = {"username": "alice", "room": room.code}
+                controller.sockets["sid"] = {"username": "alice", "token": "token-palsu", "room": room.code}
                 with (
                     patch("app.controller.realtime.socket_handlers.room_service", rooms),
+                    patch(
+                        "app.controller.realtime.socket_handlers.auth_service.check_user_by_token",
+                        return_value=Mock(username="alice"),
+                    ),
                     patch("app.controller.realtime.socket_handlers.PersistenceService") as persistence,
                     patch("app.controller.realtime.socket_handlers.checker_service.begin", side_effect=begin),
                 ):
@@ -152,9 +177,13 @@ class SocketRoomTests(unittest.IsolatedAsyncioTestCase):
         rooms.set_bot(room.code, "alice", True)
         sio = Mock(emit=AsyncMock(), enter_room=AsyncMock())
         controller = SocketGameController(sio)
-        controller.sockets["sid"] = {"username": "alice", "room": room.code}
+        controller.sockets["sid"] = {"username": "alice", "token": "token-palsu", "room": room.code}
         with (
             patch("app.controller.realtime.socket_handlers.room_service", rooms),
+            patch(
+                "app.controller.realtime.socket_handlers.auth_service.check_user_by_token",
+                return_value=Mock(username="alice"),
+            ),
             patch("app.controller.realtime.socket_handlers.PersistenceService") as persistence,
         ):
             await controller.send_chat("sid", {"username": "alice", "message": "Halo"})

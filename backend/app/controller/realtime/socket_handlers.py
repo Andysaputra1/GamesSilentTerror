@@ -47,13 +47,12 @@ class SocketGameController:
 
         # Token handshake diperiksa lagi supaya logout/expiry mencabut akses chat.
         # PersistenceError sengaja diteruskan: database gagal bukan berarti sesi pemain berakhir.
-        if "token" in socket:
-            try:
-                akun = auth_service.check_user_by_token(socket["token"])
-                if akun.username != socket["username"]:
-                    raise ValueError("Sesi login berubah. Silakan sambungkan ulang.")
-            except SessionValidationError as error:
-                raise ValueError("Sesi login berakhir. Silakan login ulang.") from error
+        try:
+            akun = auth_service.check_user_by_token(socket["token"])
+            if akun.username != socket["username"]:
+                raise ValueError("Sesi login berubah. Silakan sambungkan ulang.")
+        except SessionValidationError as error:
+            raise ValueError("Sesi login berakhir. Silakan login ulang.") from error
 
         return room_service.get(socket["room"], socket["username"])
 

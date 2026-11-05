@@ -801,9 +801,13 @@ class SocketGameTests(unittest.IsolatedAsyncioTestCase):
         rooms.start(room.code, "alice")
         sio = Mock(emit=AsyncMock(), enter_room=AsyncMock())
         controller = SocketGameController(sio)
-        controller.sockets["sid"] = {"username": "alice", "room": room.code}
+        controller.sockets["sid"] = {"username": "alice", "token": "token-palsu", "room": room.code}
         with (
             patch("app.controller.realtime.socket_handlers.room_service", rooms),
+            patch(
+                "app.controller.realtime.socket_handlers.auth_service.check_user_by_token",
+                return_value=Mock(username="alice"),
+            ),
             patch("app.controller.realtime.socket_handlers.PersistenceService"),
         ):
             for data in [
