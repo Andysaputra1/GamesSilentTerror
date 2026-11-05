@@ -37,6 +37,12 @@ class LayerRuleTests(unittest.TestCase):
             with self.subTest(berkas=relatif):
                 self.assertNotIn("text", _impor_dari(berkas, "sqlalchemy"))
 
+    # Service dipakai controller maupun bot, jadi error-nya diterjemahkan ke HTTP di controller.
+    def test_services_do_not_know_http(self):
+        for berkas in (self.APP / "services").glob("*.py"):
+            with self.subTest(berkas=berkas.name):
+                self.assertEqual(_impor_dari(berkas, "fastapi"), set())
+
 
 class ConfigurationTests(unittest.TestCase):
     # TES CONFIG: periksa alias DB_*, encoding password URL, dan penolakan port di luar rentang.

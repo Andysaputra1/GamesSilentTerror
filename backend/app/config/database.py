@@ -45,7 +45,7 @@ class PersistenceError(RuntimeError):
 
 
 # Jalankan operasi(database) dalam satu transaksi; hanya error SQL menjadi PersistenceError(pesan).
-# Sesi dibuka manual, bukan lewat SessionLocal.begin(): operasi di controller auth memanggil
+# Sesi dibuka manual, bukan lewat SessionLocal.begin(): operasi di service auth memanggil
 # database.rollback() sendiri, dan di dalam blok begin() itu bisa memicu InvalidRequestError.
 def jalankan_transaksi(operasi, pesan="Database sedang tidak tersedia."):
     database = SessionLocal()

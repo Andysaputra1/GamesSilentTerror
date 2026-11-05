@@ -11,7 +11,7 @@ from sqlalchemy.pool import StaticPool
 from app.controllers.auth import router
 from app.middleware.auth_limits import _riwayat_percobaan
 from app.config.settings import settings
-from app.controllers.auth import nonces
+from app.services.auth_service import nonces
 
 # Diimpor sebelum setUp mem-patch SessionLocal: room_service menyalin nama itu saat pertama diimpor,
 # jadi impor pertama di tengah patch mengikatnya selamanya ke engine tes yang sudah ditutup.
@@ -205,7 +205,7 @@ class AccountTests(unittest.TestCase):
         with (
             patch.object(settings, "google_client_id", "test-client"),
             patch(
-                "app.controllers.auth.id_token.verify_oauth2_token", return_value=claims
+                "app.services.auth_service.id_token.verify_oauth2_token", return_value=claims
             ) as verify,
         ):
             response = self.client.post(
@@ -322,7 +322,7 @@ class AccountTests(unittest.TestCase):
             ]:
                 with (
                     self.subTest(status=status),
-                    patch("app.controllers.auth.id_token.verify_token", **hasil_cek),
+                    patch("app.services.auth_service.id_token.verify_token", **hasil_cek),
                 ):
                     response = self.client.post(
                         "/api/auth/google",
@@ -338,7 +338,7 @@ class AccountTests(unittest.TestCase):
         with (
             patch.object(settings, "google_client_id", "test-client"),
             patch(
-                "app.controllers.auth.id_token.verify_oauth2_token",
+                "app.services.auth_service.id_token.verify_oauth2_token",
                 side_effect=ValueError("bad token"),
             ),
         ):
