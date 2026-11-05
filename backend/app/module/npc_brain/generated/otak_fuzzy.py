@@ -1,8 +1,8 @@
 """FILE INI DIHASILKAN OTOMATIS oleh scripts/ekspor_otak_npc.py. JANGAN DIEDIT MANUAL.
 
 Sumber : npc_fuzzy.ipynb
-Sidik  : acb4df124d3d7c92
-Dibuat : 2026-11-05 02:51 UTC
+Sidik  : 07e1c102eefd8229
+Dibuat : 2026-11-05 03:45 UTC
 
 Perubahan logika bot dilakukan di notebook skripsi, dijalankan ulang sampai semua
 skenario/pengujian lulus, lalu diekspor ulang dengan skrip ini.
@@ -1530,9 +1530,9 @@ def _calon_chat_hitman(ctx):
     tuduh = calon_tuduh_hitman(ctx, layak, kambing, alasan_kambing)
     if tuduh:
         calon.append(tuduh)
-    # Klaim palsu hanya saat Hitman sudah dicurigai. Hitman yang sudah mengaku role lain tidak bisa lagi mengaku Stalker.
+    # Klaim palsu hanya sekali per game dan hanya saat Hitman sudah dicurigai.
     penuduh = fitur[fitur["menuduh_tim"] > 0].sort_values(["menuduh_tim", "pemain"], ascending=[False, True])
-    if diri["risiko_saya"] >= RISIKO_SEDANG and len(penuduh) and not role_dibuka(ingatan):
+    if diri["risiko_saya"] >= RISIKO_SEDANG and len(penuduh) and not any(a.get("jenis") == "klaim_peek" for a in ingatan.aksi_bot):
         t = penuduh.iloc[0]["pemain"]
         calon.append({"aksi": "tuduh", "jenis": "klaim_peek", "sistem": "klaim_palsu", "target": t, "role_diakui": "stalker",
                       "bukti_klaim": f"semalam peek {t}, dia Hitman",
