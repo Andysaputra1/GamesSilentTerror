@@ -1,8 +1,8 @@
 """FILE INI DIHASILKAN OTOMATIS oleh scripts/ekspor_otak_npc.py. JANGAN DIEDIT MANUAL.
 
 Sumber : npc_fuzzy.ipynb
-Sidik  : 52ceaee85c803d52
-Dibuat : 2026-11-05 05:31 UTC
+Sidik  : 564c8fe501d26ec3
+Dibuat : 2026-11-05 07:47 UTC
 
 Perubahan logika bot dilakukan di notebook skripsi, dijalankan ulang sampai semua
 skenario/pengujian lulus, lalu diekspor ulang dengan skrip ini.
@@ -970,10 +970,10 @@ def _konteks_permainan(ingatan, view, publik, chats, relasi, klaim, p_sandera):
 # Pengetahuan pasti: fakta yang hanya diketahui bot dari role-nya sendiri (hasil Peek, rekan, hasil Hostage Syndicate).
 # Hasilnya dibaca terapkan_pengetahuan, fitur Hitman, kandidat tindakan, serta chat_pasti/vote_pasti lewat ctx.
 # Masukan : ingatan (intel, eksekusi, keluar), view (role, rekan, rekan_spy, hasil_sandera, komposisi, fase).
-# Keluaran: dict {hitman_diketahui, pasti_orang_baik, rekan, gagal_beruntun}.
+# Keluaran: dict {hitman_diketahui, pasti_orang_baik, rekan, gagal_sandera}.
 # Dipakai oleh: putuskan.
 def pengetahuan_peran(ingatan, view):
-    peran, bot, R = view["saya"]["role"], view["saya"]["nama"], view["ronde"]
+    peran, bot = view["saya"]["role"], view["saya"]["nama"]
     roster = [p["nama"] for p in view["pemain"]]
     jumlah = komposisi(view)
     pasti_orang_baik = set() if peran == "hitman" else {bot, *view["saya"].get("rekan_spy", [])}
@@ -996,17 +996,11 @@ def pengetahuan_peran(ingatan, view):
         pasti_orang_baik |= set(roster) - set(hitman_diketahui)  # semua Hitman sudah diketahui
     rekan = set(view["saya"].get("rekan", [])) if peran == "hitman" else set()
 
-    # Hasil pasti dari server (me.syndicate_hostages, hanya Hitman): berhasil, atau gagal karena target dijaga Guard.
-    hasil_malam = {h["ronde"]: (h["pemain"], h["berhasil"]) for h in view["saya"].get("hasil_sandera", [])}
-    # Hostage ke target yang sama gagal beruntun sampai semalam, karena target itu terus dijaga: {target: jumlah malam}.
-    gagal_beruntun = {}
-    if R - 1 in hasil_malam and not hasil_malam[R - 1][1]:
-        x, n = hasil_malam[R - 1][0], R - 1
-        while n in hasil_malam and hasil_malam[n] == (x, False):
-            n -= 1
-        gagal_beruntun = {x: R - 1 - n}
+    # Hostage gagal per target sepanjang pertandingan, dari hasil pasti server (me.syndicate_hostages, hanya Hitman). Tidak harus
+    # berturut-turut, supaya Hitman tidak berputar di antara dua target yang terus dijaga: {target: jumlah malam}.
+    gagal_sandera = dict(Counter(h["pemain"] for h in view["saya"].get("hasil_sandera", []) if not h["berhasil"]))
     return {"hitman_diketahui": hitman_diketahui, "pasti_orang_baik": pasti_orang_baik, "rekan": rekan,
-            "gagal_beruntun": gagal_beruntun}
+            "gagal_sandera": gagal_sandera}
 
 # Fakta pasti menimpa hasil penalaran untuk role warga. Klaim bersih dari pengaku Stalker hampir pasti benar bila
 # Hitman hanya satu: klaim bersih palsu dari Hitman tetap menunjuk warga, dan warga tidak diuntungkan berbohong.
@@ -1737,8 +1731,8 @@ def pilihan_malam_rekan(view):
 def nilai_hostage(r):
     return float(r["ancaman"]) * (1 - 0.5 * float(r["jejak_tuduhan"]))
 
-# Urutan Hostage: pilihan Hitman manusia saat terkunci, pilihan rekan bot, lalu nilai tertinggi. Target yang gagal dua malam
-# berturut-turut kemungkinan dijaga bergantian oleh dua Spy, jadi dilewati selama ada target lain; pilihan manusia tetap diikuti.
+# Urutan Hostage: pilihan Hitman manusia saat terkunci, pilihan rekan bot, lalu nilai tertinggi. Target yang sudah gagal dua kali
+# sepanjang pertandingan kemungkinan terus dijaga, jadi dilewati selama ada target lain; pilihan manusia tetap diikuti.
 def calon_hostage(ctx):
     saya = ctx["view"]["saya"]
     calon = [{"aksi": "hostage", "target": r["pemain"], "alasan": alasan_ancaman(r), "skor": nilai_hostage(r),
@@ -1755,7 +1749,7 @@ def calon_hostage(ctx):
     ikut = ikuti(pilihan_terbanyak(manusia), "Mengikuti pilihan Hostage rekan") if saya.get("terkunci") else []
     if ikut:
         return ikut
-    dijaga_terus = {x for x, k in ctx["pengetahuan"].get("gagal_beruntun", {}).items() if k >= 2}
+    dijaga_terus = {x for x, k in ctx["pengetahuan"].get("gagal_sandera", {}).items() if k >= 2}
     calon = [c for c in calon if c["target"] not in dijaga_terus] or calon
     # Korban malam hanya satu (pilihan terbanyak), jadi memilih target lain hanya memecah suara Syndicate.
     return ikuti(pilihan_terbanyak(rekan_bot), "Mengikuti target Hostage rekan Syndicate") or calon

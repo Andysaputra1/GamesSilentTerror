@@ -479,23 +479,23 @@ class HostageResultTests(unittest.TestCase):
         game.round, game.phase = 2, "day"
         M = importlib.import_module("app.module.npc_brain.generated.otak_fuzzy")
 
-        def gagal_beruntun(snapshot):
+        def gagal_sandera(snapshot):
             ingatan = M.Ingatan("hitman")
             view = ingatan.sinkron_snapshot(snapshot, time.time())
-            return M.pengetahuan_peran(ingatan, view)["gagal_beruntun"]
+            return M.pengetahuan_peran(ingatan, view)["gagal_sandera"]
 
-        self.assertEqual(gagal_beruntun(game.snapshot("hitman")), {"civilian": 1})
+        self.assertEqual(gagal_sandera(game.snapshot("hitman")), {"civilian": 1})
         # Tanpa catatan server tidak ada kesimpulan dari pengumuman roster.
         snapshot = game.snapshot("hitman")
         snapshot["me"]["syndicate_hostages"] = []
-        self.assertEqual(gagal_beruntun(snapshot), {})
-        # Hostage semalam berhasil: rangkaian gagal terputus.
+        self.assertEqual(gagal_sandera(snapshot), {})
+        # Hostage semalam berhasil: hitungan gagal sepanjang pertandingan tidak terhapus.
         game.phase = "night"
         game.actions.clear()
         game.act("hitman", "hostage", "civilian2")
         game.resolve_night()
         game.round, game.phase = 3, "day"
-        self.assertEqual(gagal_beruntun(game.snapshot("hitman")), {})
+        self.assertEqual(gagal_sandera(game.snapshot("hitman")), {"civilian": 1})
 
 
 class GagRuleTests(unittest.TestCase):

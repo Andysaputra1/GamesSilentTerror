@@ -206,6 +206,51 @@ class BrainOnEngineTests(unittest.TestCase):
         terapkan(game, "stalker", h["npc_decision"])
         self.assertIn("stalker", game.actions)
 
+    # Urutan A, A, B: A tetap dilewati walau B gagal di antaranya, dan engine menerima target penggantinya.
+    def test_target_failed_twice_stays_skipped_after_another_failure(self):
+        game = malam(pertandingan([], DELAPAN), ronde=4)
+        game.syndicate_log = [
+            {"round": 1, "name": "spy", "success": False},
+            {"round": 2, "name": "spy", "success": False},
+            {"round": 3, "name": "spy2", "success": False},
+        ]
+        _, h = langkah(game, otak_fuzzy.Ingatan("hitman"), "hitman", game.deadline - 25)
+        self.assertEqual(h["pengetahuan"]["gagal_sandera"], {"spy": 2, "spy2": 1})
+        self.assertEqual(h["npc_decision"]["action"], "hostage")
+        self.assertNotEqual(h["npc_decision"]["target"], "spy")
+        terapkan(game, "hitman", h["npc_decision"])
+        self.assertIn("hitman", game.actions)
+
+    # Dua Spy yang saling menjaga: Hitman keluar dari keduanya, dan Hostage berikutnya bisa berhasil.
+    def test_hitman_leaves_both_targets_guarded_by_two_spies(self):
+        game = malam(pertandingan([], DELAPAN), ronde=5)
+        game.syndicate_log = [
+            {"round": r, "name": nama, "success": False}
+            for r, nama in enumerate(("spy", "spy", "spy2", "spy2"), 1)
+        ]
+        _, h = langkah(game, otak_fuzzy.Ingatan("hitman"), "hitman", game.deadline - 25)
+        self.assertNotIn(h["npc_decision"]["target"], ("spy", "spy2"))
+        terapkan(game, "hitman", h["npc_decision"])
+        game.act("spy", "guard", "spy2")
+        game.act("spy2", "guard", "spy")
+        game.resolve_night()
+        self.assertTrue(game.syndicate_log[-1]["success"])
+
+    # Semua target sudah gagal dua kali: Hostage tetap terpakai, bukan menunggu.
+    def test_all_targets_failed_twice_still_picks_one(self):
+        warga = [n for n in DELAPAN if not n.startswith("hitman")]
+        game = malam(pertandingan([], DELAPAN), ronde=2 * len(warga) + 1)
+        game.syndicate_log = [
+            {"round": 2 * i + k + 1, "name": nama, "success": False}
+            for i, nama in enumerate(warga)
+            for k in range(2)
+        ]
+        _, h = langkah(game, otak_fuzzy.Ingatan("hitman"), "hitman", game.deadline - 25)
+        self.assertEqual(set(h["pengetahuan"]["gagal_sandera"].values()), {2})
+        self.assertEqual(h["npc_decision"]["action"], "hostage")
+        terapkan(game, "hitman", h["npc_decision"])
+        self.assertIn("hitman", game.actions)
+
     def test_hostage_and_peek_never_wait_while_the_engine_allows_them(self):
         for nama in ("hitman", "stalker", "spy"):
             game = malam(pertandingan([], DELAPAN))
