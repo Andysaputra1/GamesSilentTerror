@@ -4,6 +4,7 @@ import unittest
 from unittest.mock import patch
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from google.auth.exceptions import TransportError
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -311,6 +312,26 @@ class AccountTests(unittest.TestCase):
         self.assertEqual(self.google(email=self.body["email"])[0].status_code, 409)
         with self.engine.connect() as db:
             self.assertEqual(db.execute(text("SELECT count(*) FROM user_accounts")).scalar(), 1)
+
+    # Library melempar GoogleAuthError untuk issuer salah, dan TransportError adalah turunannya.
+    def test_google_wrong_issuer_is_401_and_network_failure_stays_503(self):
+        with patch.object(settings, "google_client_id", "test-client"):
+            for hasil_cek, status in [
+                ({"return_value": {"iss": "https://evil.invalid"}}, 401),
+                ({"side_effect": TransportError("putus")}, 503),
+            ]:
+                with (
+                    self.subTest(status=status),
+                    patch("app.controller.api.auth.id_token.verify_token", **hasil_cek),
+                ):
+                    response = self.client.post(
+                        "/api/auth/google",
+                        headers=self.origin,
+                        json={"credential": "test-token", "nonce": nonces.issue()},
+                    )
+                    self.assertEqual(response.status_code, status)
+        with self.engine.connect() as db:
+            self.assertEqual(db.execute(text("SELECT count(*) FROM user_accounts")).scalar(), 0)
 
     def test_google_bad_signature_or_audience_rejected(self):
         nonce = nonces.issue()

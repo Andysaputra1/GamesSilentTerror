@@ -9,7 +9,7 @@ import time
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from google.auth.exceptions import TransportError
+from google.auth.exceptions import GoogleAuthError, TransportError
 from google.auth.transport.requests import Request as GoogleRequest
 from google.oauth2 import id_token
 from sqlalchemy.exc import IntegrityError
@@ -348,7 +348,8 @@ def verify_google(credential, nonce):
         ):
             raise ValueError("Invalid Google identity")
         return klaim
-    except (ValueError, TypeError) as error:
-        raise AuthenticationError("Identitas Google tidak valid. Coba login ulang.") from error
+    # Issuer salah dilempar sebagai GoogleAuthError. TransportError turunannya, jadi harus lebih dulu.
     except TransportError as error:
         raise HTTPException(503, "Google belum dapat dihubungi. Coba lagi.") from error
+    except (ValueError, TypeError, GoogleAuthError) as error:
+        raise AuthenticationError("Identitas Google tidak valid. Coba login ulang.") from error
