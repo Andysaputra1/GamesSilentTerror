@@ -1,8 +1,8 @@
 """FILE INI DIHASILKAN OTOMATIS oleh scripts/ekspor_otak_npc.py. JANGAN DIEDIT MANUAL.
 
 Sumber : npc_fuzzy.ipynb
-Sidik  : dafd0d43c5c74ae9
-Dibuat : 2026-11-05 04:37 UTC
+Sidik  : 8e426707c50bd5a5
+Dibuat : 2026-11-05 04:42 UTC
 
 Perubahan logika bot dilakukan di notebook skripsi, dijalankan ulang sampai semua
 skenario/pengujian lulus, lalu diekspor ulang dengan skrip ini.
@@ -1648,6 +1648,7 @@ def vote_pasti(ctx):
 # Hitman tidak pernah membuka vote: tanpa eksekusi lebih menguntungkan Syndicate (malam terus mengurangi warga bebas),
 # sedangkan suara tunggal Hitman menjadi satu-satunya bukti bagi warga. Saat dirinya/rekannya memimpin suara, Hitman
 # menyamakan suara pesaing terkuat; bila warga sudah vote, Hitman ikut suara terbanyak yang layak (kambing hitam).
+# Rekan yang pasti dieksekusi tidak bisa lagi diselamatkan, jadi Hitman ikut memilihnya supaya tidak terlihat membela.
 def keputusan_vote_hitman(ctx):
     view, konteks, bot, diri = ctx["view"], ctx["konteks"], ctx["bot"], ctx["diri"]
     boleh, alasan = izin_vote(view)
@@ -1660,6 +1661,14 @@ def keputusan_vote_hitman(ctx):
     suara = konteks["porsi_suara"]
     pemimpin = max(sorted(suara), key=suara.get) if suara else None
     syndicate_terancam = pemimpin is not None and (pemimpin == bot or pemimpin in ctx["pengetahuan"]["rekan"])
+    if pemimpin in ctx["pengetahuan"]["rekan"]:
+        hitung = Counter(view["suara_tribunal"].values())
+        pesaing_terkuat = max((n for t, n in hitung.items() if t != pemimpin), default=0)
+        sisa_pemilih = sum(p["hidup"] and not p.get("sandera") and p["nama"] not in view["suara_tribunal"] for p in view["pemain"])
+        if hitung[pemimpin] > pesaing_terkuat + sisa_pemilih:
+            alasan_ikut = [f"Ikut suara terbanyak ke {pemimpin}."]
+            return (rencana_vote("vote", pemimpin, alasan_ikut + alasan_curiga(baris_pemain(ctx["publik"], pemimpin), None),
+                                 float(suara[pemimpin])), jejak)
     terdesak = diri["suara_saya"] >= 0.3 or syndicate_terancam
     if not terdesak and konteks["waktu_berjalan"] < VOTE_TUNGGU_FRAKSI:
         return rencana_vote("tunggu", alasan=["Menunggu arah suara warga."]), jejak
