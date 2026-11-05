@@ -1,8 +1,8 @@
 """FILE INI DIHASILKAN OTOMATIS oleh scripts/ekspor_otak_npc.py. JANGAN DIEDIT MANUAL.
 
 Sumber : npc_fuzzy.ipynb
-Sidik  : 935faa980a85d923
-Dibuat : 2026-11-05 02:24 UTC
+Sidik  : 720b1dc10fd89b00
+Dibuat : 2026-11-05 02:33 UTC
 
 Perubahan logika bot dilakukan di notebook skripsi, dijalankan ulang sampai semua
 skenario/pengujian lulus, lalu diekspor ulang dengan skrip ini.
@@ -842,7 +842,8 @@ def hitung_bukti(ingatan, view, publik=False):
             "bersih_klaim": bobot_klaim_bersih * max(klaim["bersih_peek"].get(p, {}).values(), default=0.0),
             "rincian": {"penuduh": sorted(penuduh), "pembela": sorted(pembela), "korban": rinci_korban,
                         "eksekusi": rinci_eks, "memihak": dibela_hitman, "klaim": klaim["rincian"].get(p),
-                        "diserang": sorted(diserang)},
+                        "diserang": sorted(diserang),
+                        "pengaku_bersih": max(sorted(klaim["bersih_peek"].get(p, {})), key=klaim["bersih_peek"].get(p, {}).get, default=None)},
         })
     tabel = pd.DataFrame(baris)
     return tabel, _konteks_permainan(ingatan, view, publik, chats, relasi, klaim, p_sandera)
@@ -1222,16 +1223,19 @@ def alasan_curiga(baris, bot, tanpa_tekanan=False):
         daftar.append((0.8 * baris["plin_plan"], f"Ucapan dan vote {p} tidak konsisten."))
     return [teks for _, teks in sorted(daftar, key=lambda x: -x[0])]
 
-# Kalimat untuk membela pemain yang tidak punya bukti kuat atau pasti bersih.
-# Diawali pembelaan ("X bukan Hitman ...") karena kalimat yang diawali kejanggalan ("tidak vote, tidak chat")
-# terbaca IndoBERT sebagai tuduhan (diuji di npc_nlg).
-def alasan_percaya(baris, pasti_bersih=False):
+# Kalimat pembelaan per jenis. Jenis diklaim bersih tidak memakai bentuk "aku ..." atau "hasil peek", karena POLA_KLAIM milik bot
+# lain akan membaca pembicaranya sebagai pengaku Stalker. Saat warga kritis, jenis tanpa bukti ditambah persuade bahaya salah vote.
+def alasan_bela_orang(jenis, baris):
     p = baris["pemain"]
-    if pasti_bersih:
-        return [f"Aku yakin {p} bukan Hitman."]
-    if baris["n_pembela"]:
-        return [f"{p} bukan Hitman menurutku; tuduhan ke {p} masih sebatas pendapat dan ada yang membela."]
-    return [f"{p} bukan Hitman menurutku; belum ada bukti kuat selain tuduhan."]
+    kalimat = {
+        "peek_bersih": f"Aku Stalker, aku sudah peek {p}: dia bukan Hitman.",
+        "yakin_bersih": f"Aku yakin {p} bukan Hitman.",
+        "diklaim_bersih": f"{baris['rincian']['pengaku_bersih']} yang ngaku Stalker bilang {p} bersih.",
+        "terlalu_awal": f"Masih terlalu awal buat nuduh {p}.",
+        "ada_pembela": f"Tuduhan ke {p} masih pendapat, ada yang membela juga.",
+        "belum_ada_bukti": f"Belum ada bukti kuat kalau {p} Hitman.",
+    }
+    return [kalimat[jenis.removesuffix("_bahaya")], *([KALIMAT_SALAH_VOTE] if jenis.endswith("_bahaya") else [])]
 
 # Alasan pribadi Hitman memilih target (hanya untuk jejak, tidak pernah diucapkan).
 def alasan_ancaman(r):
@@ -1359,6 +1363,23 @@ def paket_jawab(ctx, penanya, tersangka, nilai, keunggulan, alasan):
             "tindakan_sebelumnya": tindakan_publik(ctx), "jawaban_role": "aku orang baik",
             "chat_saya_ronde_ini": sum(a["ronde"] == R for a in ingatan.aksi_bot)}
 
+# Jenis bela_orang, aturan berurutan. Hitman hanya membela rekan lewat jenis tanpa pengetahuan, supaya tidak membuka sumbernya.
+def jenis_bela_orang(ctx, q):
+    konteks, view, bot, p = ctx["konteks"], ctx["view"], ctx["bot"], q["pemain"]
+    if ctx["peran"] != "hitman":
+        terancam = konteks["porsi_suara"].get(p, 0.0) >= BATAS_SUARA_TERANCAM or q["tekanan"] >= BATAS_TEKANAN_TERANCAM
+        peek_bersih = ctx["peran"] == "stalker" and any(x["pemain"] == p and x["peran"] != "hitman" for x in ctx["ingatan"].intel)
+        if peek_bersih and terancam:
+            return "peek_bersih"
+        if peek_bersih or (ctx["peran"] == "spy" and p in view["saya"].get("rekan_spy", [])):
+            return "yakin_bersih"
+        if q["bersih_klaim"] > 0:
+            return "diklaim_bersih"
+    if view["ronde"] <= RONDE_AWAL and q["n_penuduh"] <= 1:
+        return "terlalu_awal"
+    jenis = "ada_pembela" if set(q["rincian"]["pembela"]) - {bot} else "belum_ada_bukti"
+    return f"{jenis}_bahaya" if konteks["warga_terdesak"] >= BATAS_WARGA_KRITIS else jenis
+
 # Kandidat chat role warga (Civilian, Spy, Stalker).
 def _calon_chat_warga(ctx):
     tabel, konteks, ingatan, view, izin = ctx["tabel"], ctx["konteks"], ctx["ingatan"], ctx["view"], ctx["izin"]
@@ -1390,7 +1411,6 @@ def _calon_chat_warga(ctx):
         calon.append({"aksi": "tuduh", "jenis": "alasan_curiga", "target": teratas["pemain"], "alasan": bukti_teratas[:2],
                       "input": {"kecurigaan": teratas["kecurigaan"], "keunggulan": keunggulan,
                                 "volume_info": teratas["volume_info"]}})
-    suara = konteks["porsi_suara"]
     # Ajakan bicara saat diskusi ramai, atau saat ruangan hening setelah ada yang sempat bicara.
     ada_obrolan = konteks["chat_sepi"] == 0 or (konteks["ruangan_hening"] and konteks["chat_sepi"] < 1)
     for _, q in kandidat.sort_values("pemain").iterrows():
@@ -1400,19 +1420,13 @@ def _calon_chat_warga(ctx):
         # Korban Hostage sudah diumumkan, jadi tidak perlu dibela lewat chat.
         if (q["p_sandera"] < 0.5 and q["tekanan"] >= 0.25 and kepercayaan >= 0.5
                 and not sudah_aksi(ingatan, view, "bela_orang", p)):
-            # Stalker membuka klaim hanya bila pemain yang terbukti bersih benar-benar terancam dieksekusi.
-            klaim = (pasti_bersih and ctx["peran"] == "stalker"
-                     and any(x["pemain"] == p for x in ingatan.intel)
-                     and (suara.get(p, 0.0) >= 0.3 or q["tekanan"] >= 0.5))
+            jenis = jenis_bela_orang(ctx, q)
             # Pembelaan biasa tidak diulang bila sudah digemakan; klaim Stalker tetap disampaikan.
+            klaim = jenis == "peek_bersih"
             if klaim or disuarakan["defend"].get(p, 0) < MAKS_GEMA:
-                alasan = ([f"Aku Stalker, aku sudah peek {p}: dia bukan Hitman."] if klaim
-                          else alasan_percaya(q, pasti_bersih))
-                jenis = ("peek_bersih" if klaim else "yakin_bersih" if pasti_bersih
-                         else "ada_pembela" if q["n_pembela"] else "belum_ada_bukti")
                 calon.append({"aksi": "bela_orang", "jenis": jenis, "target": p, "role_diakui": "stalker" if klaim else None,
-                              "bukti_klaim": f"sudah peek {p}, dia bukan Hitman" if klaim else None, "alasan": alasan,
-                              "input": {"tekanan": q["tekanan"], "kepercayaan": kepercayaan}})
+                              "bukti_klaim": f"sudah peek {p}, dia bukan Hitman" if klaim else None,
+                              "alasan": alasan_bela_orang(jenis, q), "input": {"tekanan": q["tekanan"], "kepercayaan": kepercayaan}})
         if (q["diam"] >= 0.5 and q["p_sandera"] < 0.5 and ada_obrolan
                 and p not in konteks["sudah_diajak"] and not sudah_aksi(ingatan, view, "tanya_info", p, lingkup="ronde")):
             calon.append({"aksi": "tanya_info", "jenis": "pemain_diam", "sistem": "ajak_bicara", "target": p,
@@ -1489,14 +1503,17 @@ def _calon_chat_hitman(ctx):
                       "bukti_klaim": f"semalam peek {t}, dia Hitman",
                       "alasan": [f"Aku Stalker, semalam aku peek {t}, dia Hitman."],
                       "input": {"risiko_saya": diri["risiko_saya"], "suara_saya": diri["suara_saya"]}})
-    # Membela rekan Syndicate yang sedang ditekan dengan alasan publik saja. Kepercayaan = citra rekan di mata warga,
-    # jadi rekan yang sudah sangat dicurigai tidak dibela karena pembelaan itu justru mencolok.
+    # Membela rekan Syndicate yang sedang ditekan dengan alasan publik saja. Kepercayaan = citra rekan di mata warga, jadi rekan
+    # yang sudah sangat dicurigai atau hampir dieksekusi tidak dibela, dan Hitman yang berisiko tinggi tidak ikut mencolok.
     rekan_hidup = publik[publik["pemain"].isin(ctx["pengetahuan"]["rekan"]) & publik["kandidat"]]
     for _, q in rekan_hidup.sort_values("pemain").iterrows():
         p = q["pemain"]
-        if q["tekanan"] >= 0.25 and disuarakan["defend"].get(p, 0) < MAKS_GEMA and not sudah_aksi(ingatan, view, "bela_orang", p):
-            calon.append({"aksi": "bela_orang", "jenis": "ada_pembela" if q["n_pembela"] else "belum_ada_bukti", "target": p,
-                          "alasan": alasan_percaya(q), "input": {"tekanan": q["tekanan"], "kepercayaan": 1 - q["kecurigaan"]}})
+        if (q["tekanan"] >= 0.25 and q["kecurigaan"] < 0.5 and konteks["porsi_suara"].get(p, 0.0) < 0.5
+                and diri["risiko_saya"] < RISIKO_TINGGI and disuarakan["defend"].get(p, 0) < MAKS_GEMA
+                and not sudah_aksi(ingatan, view, "bela_orang", p)):
+            jenis = jenis_bela_orang(ctx, q)
+            calon.append({"aksi": "bela_orang", "jenis": jenis, "target": p, "alasan": alasan_bela_orang(jenis, q),
+                          "input": {"tekanan": q["tekanan"], "kepercayaan": 1 - q["kecurigaan"]}})
     alasan_tanya = [KALIMAT_HENING] if konteks["ruangan_hening"] else []  # pemecah keheningan, sama seperti warga
     if (alasan_tanya or not konteks["ada_pertanyaan_baru"]) and not sudah_aksi(ingatan, view, "tanya_info", None):
         calon.append({"aksi": "tanya_info", "jenis": "ruangan_hening" if alasan_tanya else "pertanyaan_umum", "target": None,
@@ -1672,12 +1689,11 @@ def templat_pesan(rencana):
     }
     if rencana.get("jenis") in templat_jenis:
         return templat_jenis[rencana["jenis"]].strip()
-    if rencana["aksi"] == "bela_diri":
+    if rencana["aksi"] in ("bela_diri", "bela_orang"):
         return " ".join(rencana["alasan"]).strip()
     templat = {
         # Jawaban netral yang terbaca netral oleh IndoBERT (versi lama dengan "mencurigakan" terbaca menuduh).
         "jawab": (f"Kalau aku sih curiga {t}. {bukti}" if t else "Aku belum yakin siapa-siapa. Kalian curiga siapa?"),
-        "bela_orang": f"Aku rasa {t} bukan Hitman, tuduhannya belum ada bukti.",
         "tuduh": f"Aku makin curiga sama {t}. {bukti}",
         "tanya_info": (f"{bukti} Ada yang punya info lain?" if bukti
                        else "Ada yang punya info atau curiga sama seseorang? Ceritain alasannya ya."),
