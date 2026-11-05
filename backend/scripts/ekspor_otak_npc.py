@@ -64,7 +64,7 @@ ALUR_MODUL = {
    2.5 Vote: vote_pasti, selain itu keputusan_vote_hitman (Hitman) atau keputusan_vote (warga), lalu pertahanan_suara
    2.6 Chat: chat_pasti bila ada hasil Peek yang harus diungkap, selain itu keputusan_chat
    2.7 Aksi rahasia: keputusan_aksi
-   2.8 Keluaran: format_npc untuk engine dan siapkan_nlg untuk penulis kalimat""",
+   2.8 Keluaran: format_npc untuk engine, siapkan_nlg untuk penulis kalimat, dan siapkan_nlg_tim untuk chat tim""",
     "nlg": """\
 1. tulis_pesan menerima payload rencana chat dari siapkan_nlg, konteks, penulis, dan persona
 2. LLM, bila aktif, paling banyak MAKS_PERCOBAAN_LLM kali:
@@ -72,7 +72,8 @@ ALUR_MODUL = {
    2.2 nilai_kalimat memeriksa aturan, kalimat_mirip menolak parafrase kalimat yang baru terdengar
    2.3 Lolos: kalimat dipakai. Ditolak: alasannya ikut ke percobaan berikutnya
 3. Templat: kalimat_templat dicoba satu per satu, varian pertama yang lolos aturan dipakai
-4. Cadangan: tidak ada varian yang lolos, varian pertama tetap dipakai""",
+4. Cadangan: tidak ada varian yang lolos, varian pertama tetap dipakai
+5. tulis_chat_tim menulis paket siapkan_nlg_tim: LLM, lalu templat, tanpa IndoBERT; kalimatnya boleh kosong""",
 }
 
 KEPALA = '''"""FILE INI DIHASILKAN OTOMATIS oleh scripts/ekspor_otak_npc.py. JANGAN DIEDIT MANUAL.

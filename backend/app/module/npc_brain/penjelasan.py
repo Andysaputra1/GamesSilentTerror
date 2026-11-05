@@ -241,7 +241,7 @@ def _keputusan(hasil):
             "role_diakui", "skor",
         ),
         "vote": _rencana(hasil.get("rencana_vote"), "aksi", "target", "skor"),
-        "aksi": _rencana(hasil.get("rencana_aksi"), "aksi", "target", "skor"),
+        "aksi": _rencana(hasil.get("rencana_aksi"), "aksi", "target", "skor", "pindah"),
     }
 
 

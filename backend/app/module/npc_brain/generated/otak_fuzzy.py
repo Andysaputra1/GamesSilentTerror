@@ -1,8 +1,8 @@
 """FILE INI DIHASILKAN OTOMATIS oleh scripts/ekspor_otak_npc.py. JANGAN DIEDIT MANUAL.
 
 Sumber : npc_fuzzy.ipynb
-Sidik  : 07e1c102eefd8229
-Dibuat : 2026-11-05 03:45 UTC
+Sidik  : baed080f7126c1de
+Dibuat : 2026-11-05 04:44 UTC
 
 Perubahan logika bot dilakukan di notebook skripsi, dijalankan ulang sampai semua
 skenario/pengujian lulus, lalu diekspor ulang dengan skrip ini.
@@ -17,7 +17,7 @@ Alurnya
    2.5 Vote: vote_pasti, selain itu keputusan_vote_hitman (Hitman) atau keputusan_vote (warga), lalu pertahanan_suara
    2.6 Chat: chat_pasti bila ada hasil Peek yang harus diungkap, selain itu keputusan_chat
    2.7 Aksi rahasia: keputusan_aksi
-   2.8 Keluaran: format_npc untuk engine dan siapkan_nlg untuk penulis kalimat
+   2.8 Keluaran: format_npc untuk engine, siapkan_nlg untuk penulis kalimat, dan siapkan_nlg_tim untuk chat tim
 """
 # ruff: noqa
 # fmt: off
@@ -86,7 +86,17 @@ BATAS_SANDERA_VOTE = 0.70
 
 BATAS_SANDERA_AKSI = 0.60
 
-BATAS_TERSANGKA_JAGA = 0.60
+BATAS_YAKIN_JAGA = 0.30
+
+BATAS_PENGAKU_PEEK = 0.40
+
+KUNCI_BOT_DETIK = {"standar": 15, "cepat": 10}
+
+SETUJU_REKAN = 0.80
+
+MAKS_CHAT_TIM = 3
+
+KONTEKS_CHAT_TIM = 6
 
 BATAS_SUARA_TERANCAM = 0.30
 
@@ -128,6 +138,10 @@ def jendela_fase(ingatan, view, ronde, fase):
         return None, None
     berikut = fase_berikut(ronde, fase)
     return mulai, ingatan.mulai_fase.get(berikut, mulai + view["durasi"][fase])
+
+# Bot terkunci saat sisa malam ≤ KUNCI_BOT_DETIK.
+def bot_terkunci(cepat, deadline, waktu):
+    return deadline - waktu <= KUNCI_BOT_DETIK["cepat" if cepat else "standar"]
 
 # Porsi fase sekarang yang sudah berjalan (0–1).
 def waktu_berjalan(ingatan, view):
@@ -248,6 +262,9 @@ class Ingatan:
     _hitman_tersisa: int | None = None
     # Chat tim: hitungan dan id terakhir saja, supaya isinya tidak pernah tersimpan di ingatan.
     _chat_tim: dict = field(default_factory=lambda: {"jumlah": 0, "id_terakhir": None})
+    # Ronde yang saat terkuncinya sudah lewat, dan pemicu chat tim bot yang sudah dikerjakan, tanpa isi kalimat.
+    _ronde_terkunci: set = field(default_factory=set)
+    chat_tim_bot: list = field(default_factory=list)
 
     # Chat dengan id sama hanya dicatat sekali (polling atau reconnect bisa mengirim ulang).
     def catat_chat(self, chat):
@@ -290,6 +307,11 @@ class Ingatan:
             self.vote_bot.append(catatan)
         else:
             lama.update(catatan, dinilai_ulang=True)
+
+    # Dipanggil game sesudah rencana chat tim dikerjakan, juga bila kalimatnya kosong. Isi kalimat tidak pernah disimpan.
+    def catat_chat_tim(self, view, rencana, terkirim):
+        self.chat_tim_bot.append({"ronde": view["ronde"], "pemicu": rencana["pemicu"], "target_saya": rencana["target_saya"],
+                                  "pilihan_rekan": rencana["pilihan_rekan"], "terkirim": terkirim})
 
     # Ingatan: mengubah snapshot backend menjadi view keputusan sambil mencatat pengamatan baru.
     # Masukan : snapshot = Match.snapshot(nama_bot) {round, phase, deadline, players, messages, tribunal_votes, me};
@@ -380,6 +402,12 @@ class Ingatan:
                 chat = anotasi_chat(nlu, chat, self.chat, daftar_pemain)
             self.catat_chat(chat)
 
+        # Langkah pertama sesudah batas kunci adalah saat terkunci, satu-satunya kesempatan bot mengikuti rekan manusia.
+        terkunci = fase == "night" and bot_terkunci(self.cepat, snapshot["deadline"], waktu_terima)
+        saat_terkunci = terkunci and ronde not in self._ronde_terkunci
+        if terkunci:
+            self._ronde_terkunci.add(ronde)
+
         return {
             "ronde": ronde, "fase": fase, "waktu": waktu_terima, "deadline": snapshot["deadline"],
             "durasi": durasi, "pemain": pemain, "suara_tribunal": suara, "komposisi": snapshot.get("composition"),
@@ -391,7 +419,9 @@ class Ingatan:
                      "rekan_spy": list(me.get("spy_allies", [])),
                      "aksi_rekan_spy": [{"pemain": a["name"], "target": a["target"]} for a in me.get("spy_actions", [])],
                      "korban_gag_tim": list(me.get("ally_gags", [])), "rekan_manusia": list(me.get("team_humans", [])),
-                     "chat_tim": chat_tim,
+                     "chat_tim": chat_tim, "can_team_chat": bool(me.get("can_team_chat")),
+                     # Pilihan malam bot sekarang (hanya terisi saat malam), untuk pindah target.
+                     "aksi_malam": (me.get("action") or {}).get("target"), "terkunci": terkunci, "saat_terkunci": saat_terkunci,
                      # Hasil Hostage tim tiap malam dari server (hanya Hitman): berhasil, atau gagal karena Guard.
                      "hasil_sandera": [{"ronde": h["round"], "pemain": h["name"], "berhasil": h["success"]}
                                        for h in me.get("syndicate_hostages", [])]},
@@ -1237,7 +1267,7 @@ def alasan_bela_orang(jenis, baris):
     }
     return [kalimat[jenis.removesuffix("_bahaya")], *([KALIMAT_SALAH_VOTE] if jenis.endswith("_bahaya") else [])]
 
-# Alasan pribadi Hitman memilih target (hanya untuk jejak, tidak pernah diucapkan).
+# Alasan pribadi Hitman memilih target: untuk jejak dan chat tim, tidak pernah untuk chat publik.
 def alasan_ancaman(r):
     alasan = []
     if r["menuduh_tim"] >= 0.3:
@@ -1248,7 +1278,7 @@ def alasan_ancaman(r):
         alasan.append(f"Tuduhan {r['pemain']} diikuti pemain lain.")
     return alasan or [f"{r['pemain']} dipercaya pemain lain."]
 
-# Alasan pribadi Spy memilih target Guard.
+# Alasan pribadi Spy memilih target Guard: untuk jejak dan chat tim, tidak pernah untuk chat publik.
 def alasan_lindung(r, bot):
     p = r["pemain"]
     alasan = []
@@ -1580,8 +1610,8 @@ def rencana_chat(calon):
 def rencana_vote(aksi, target=None, alasan=(), skor=None):
     return {"aksi": aksi, "target": target, "alasan": list(alasan), "skor": skor}
 
-def rencana_aksi(aksi, target=None, alasan=(), skor=None):
-    return {"aksi": aksi, "target": target, "alasan": list(alasan), "skor": skor}
+def rencana_aksi(aksi, target=None, alasan=(), skor=None, pindah=False):
+    return {"aksi": aksi, "target": target, "alasan": list(alasan), "skor": skor, **({"pindah": True} if pindah else {})}
 
 # Stalker yang sudah tahu Hitman langsung membuka klaim; fakta pasti tidak perlu dinalar.
 # Bila ada beberapa Hitman hasil Peek, yang masih hidup dan belum diungkap di fase ini diungkap lebih dulu.
@@ -1646,67 +1676,112 @@ def keputusan_vote_hitman(ctx):
     return (rencana_vote("vote", target, alasan_curiga(baris_pemain(ctx["publik"], target), None),
                          float(layak.iloc[0]["kambing_hitam"])), jejak)
 
-# Kandidat aksi rahasia sesuai kemampuan role saat ini; aturan target mengikuti engine.
-# Masukan : ctx (view.saya: ability, can_act, last_guard, aksi_rekan; fitur_hitman, lindung, tabel, pengetahuan).
+# Rekan manusia yang masih bisa memilih dan membaca chat tim: hidup dan tidak disandera.
+def rekan_manusia_aktif(view):
+    aktif = {p["nama"] for p in view["pemain"] if p["hidup"] and not p.get("sandera")}
+    return set(view["saya"].get("rekan_manusia", [])) & aktif
+
+# Pilihan malam rekan satu role: (target rekan manusia, target rekan bot).
+def pilihan_malam_rekan(view):
+    saya = view["saya"]
+    aksi = saya.get("aksi_rekan_spy", []) if saya["role"] == "spy" else saya.get("aksi_rekan", [])
+    manusia = rekan_manusia_aktif(view)
+    return [a["target"] for a in aksi if a["pemain"] in manusia], [a["target"] for a in aksi if a["pemain"] not in manusia]
+
+# Menyandera satu-satunya penuduh membuka Hitman, jadi ancaman dikurangi jejak yang ditinggalkan.
+def nilai_hostage(r):
+    return float(r["ancaman"]) * (1 - 0.5 * float(r["jejak_tuduhan"]))
+
+# Urutan Hostage: pilihan Hitman manusia saat terkunci, pilihan rekan bot, lalu nilai tertinggi. Target yang gagal dua malam
+# berturut-turut kemungkinan dijaga bergantian oleh dua Spy, jadi dilewati selama ada target lain; pilihan manusia tetap diikuti.
+def calon_hostage(ctx):
+    saya = ctx["view"]["saya"]
+    calon = [{"aksi": "hostage", "target": r["pemain"], "alasan": alasan_ancaman(r), "skor": nilai_hostage(r),
+              "input": {"ancaman": r["ancaman"], "jejak_tuduhan": r["jejak_tuduhan"]}}
+             for _, r in ctx["fitur_hitman"].sort_values("pemain").iterrows()]  # rekan Syndicate tidak ada di tabel ini
+
+    def ikuti(target, kalimat):
+        ikut = [c for c in calon if c["target"] == target]
+        for c in ikut:
+            c["alasan"] = [f"{kalimat}: {target}."] + c["alasan"]
+        return ikut
+
+    manusia, rekan_bot = pilihan_malam_rekan(ctx["view"])
+    ikut = ikuti(pilihan_terbanyak(manusia), "Mengikuti pilihan Hostage rekan") if saya.get("terkunci") else []
+    if ikut:
+        return ikut
+    dijaga_terus = {x for x, k in ctx["pengetahuan"].get("gagal_beruntun", {}).items() if k >= 2}
+    calon = [c for c in calon if c["target"] not in dijaga_terus] or calon
+    # Korban malam hanya satu (pilihan terbanyak), jadi memilih target lain hanya memecah suara Syndicate.
+    return ikuti(pilihan_terbanyak(rekan_bot), "Mengikuti target Hostage rekan Syndicate") or calon
+
+# Bot dituduh lewat chat atau di-vote pemain lain pada ronde ini.
+def diserang_ronde_ini(ingatan, view):
+    bot, R = view["saya"]["nama"], view["ronde"]
+    roster = [p["nama"] for p in view["pemain"]]
+    dituduh = any(c["ronde"] == R and c["pengirim"] != bot and (bot, "offend") in relasi_chat(c, roster) for c in ingatan.chat)
+    return dituduh or any(v["ronde"] == R and v["target"] == bot for v in _semua_vote(ingatan, view))
+
+# Urutan Guard: diri sendiri bila role sudah terbuka dan masih diserang; orang yang diyakini baik dengan terancam tertinggi, menghindari
+# target rekan Spy; selain itu diri sendiri. Korban Hostage tidak bisa disandera lagi, jadi tidak dijaga. Target sama boleh berulang.
+def calon_guard(ctx):
+    view, bot, saya = ctx["view"], ctx["bot"], ctx["view"]["saya"]
+    lindung, tabel = ctx["lindung"].set_index("pemain"), ctx["tabel"].set_index("pemain")
+    rekan_spy = set(saya.get("rekan_spy", []))
+
+    def calon(p):
+        r = lindung.loc[p].to_dict() | {"pemain": p}
+        # Seri: rekan Spy lebih dulu, lalu nama.
+        return {"aksi": "guard", "target": p, "alasan": alasan_lindung(r, bot), "skor": float(r["terancam"]),
+                "seri": (p not in rekan_spy,), "input": {"terancam": r["terancam"]}}
+
+    if role_dibuka(ctx["ingatan"]) and diserang_ronde_ini(ctx["ingatan"], view):
+        return [calon(bot)]
+    yakin = [p for p in sorted(lindung.index) if p != bot and tabel.loc[p, "p_sandera"] < BATAS_SANDERA_AKSI
+             and (p in rekan_spy or tabel.loc[p, "kecurigaan"] < BATAS_YAKIN_JAGA)]
+    dijaga_rekan = {a["target"] for a in saya.get("aksi_rekan_spy", [])}
+    return [calon(p) for p in yakin if p not in dijaga_rekan] or [calon(bot)]
+
+# Peek selalu terpakai: pemain yang belum diperiksa, belum pasti baik, dan bukan korban; bila semua terlewat, pemain hidup mana pun.
+# Klaim Spy atau Civilian hanya bisa dibuktikan lewat Peek, jadi pengaku yang dicurigai mendapat kurang_info penuh.
+def calon_peek(ctx):
+    view, bot, tabel = ctx["view"], ctx["bot"], ctx["tabel"]
+    hidup = sorted(p["nama"] for p in view["pemain"] if p["hidup"] and p["nama"] != bot)
+    sudah = {x["pemain"] for x in ctx["ingatan"].intel}
+    pengaku = {c["pengirim"] for c in ctx["ingatan"].chat
+               if any(re.search(POLA_KLAIM[peran], c["teks"], re.I) for peran in ("spy", "civilian"))}
+
+    def calon(p):
+        b = baris_pemain(tabel, p)
+        kurang_info = 1.0 if p in pengaku and b["kecurigaan"] >= BATAS_PENGAKU_PEEK else 1 - b["volume_info"]
+        return {"aksi": "peek", "target": p, "sistem": "intip", "alasan": alasan_curiga(b, bot) or [f"Belum banyak info tentang {p}."],
+                "input": {"kecurigaan": b["kecurigaan"], "kurang_info": kurang_info}, "seri": (-b["kecurigaan"],)}
+
+    layak = [p for p in hidup if p not in sudah and p not in ctx["pengetahuan"]["pasti_orang_baik"]
+             and baris_pemain(tabel, p)["p_sandera"] < BATAS_SANDERA_AKSI]
+    return [calon(p) for p in layak or hidup]
+
+# Kandidat Gag: semua warga bebas, termasuk yang belum bicara. Target dipilih pilih_gag.
+def calon_gag(ctx):
+    return [{"aksi": "gag", "target": r["pemain"], "sistem": "gag", "alasan": alasan_ancaman(r),
+             "bicara": r["bicara_ronde_ini"], "seri": (-r["ancaman"],),
+             "input": {"ancaman_sekarang": r["ancaman_sekarang"], "ancaman": r["ancaman"]}}
+            for _, r in ctx["fitur_hitman"].sort_values("pemain").iterrows()]  # rekan Syndicate tidak ada di tabel ini
+
+# Kandidat aksi rahasia sesuai kemampuan role saat ini. Bot yang sudah memilih Hostage atau Guard tetap menghitung kandidat, karena
+# pindah target dan chat tim membacanya.
+# Masukan : ctx (view.saya: ability, can_act, aksi_malam, terkunci, aksi_rekan, aksi_rekan_spy; fitur_hitman, lindung, tabel, pengetahuan).
 # Keluaran: (kemampuan, daftar kandidat {aksi, target, alasan, input}); Gag dan Peek membawa sistem dan seri (pemutus seri),
 #           Hostage dan Guard membawa skor 0–1 tanpa sistem.
 # Dipakai oleh: keputusan_aksi metode.
 def calon_aksi(ctx):
-    view, bot = ctx["view"], ctx["bot"]
-    saya = view["saya"]
+    saya = ctx["view"]["saya"]
     kemampuan = saya.get("ability")
+    if kemampuan in ("hostage", "guard") and (saya.get("can_act") or saya.get("aksi_malam")):
+        return kemampuan, calon_hostage(ctx) if kemampuan == "hostage" else calon_guard(ctx)
     if not kemampuan or not saya.get("can_act"):
         return kemampuan, []
-    hidup = sorted(p["nama"] for p in view["pemain"] if p["hidup"])
-    calon = []
-    if kemampuan in ("hostage", "gag"):
-        for _, r in ctx["fitur_hitman"].sort_values("pemain").iterrows():  # rekan Syndicate tidak ada di tabel ini
-            if kemampuan == "hostage":
-                # Menyandera satu-satunya penuduh membuka Hitman, jadi ancaman dikurangi jejak yang ditinggalkan.
-                calon.append({"aksi": "hostage", "target": r["pemain"], "alasan": alasan_ancaman(r),
-                              "skor": float(r["ancaman"]) * (1 - 0.5 * float(r["jejak_tuduhan"])),
-                              "input": {"ancaman": r["ancaman"], "jejak_tuduhan": r["jejak_tuduhan"]}})
-            else:
-                calon.append({"aksi": "gag", "target": r["pemain"], "sistem": "gag", "alasan": alasan_ancaman(r),
-                              "bicara": r["bicara_ronde_ini"], "seri": (-r["ancaman"],),
-                              "input": {"ancaman_sekarang": r["ancaman_sekarang"], "ancaman": r["ancaman"]}})
-        # Target yang Hostage-nya gagal dua malam berturut-turut kemungkinan besar dijaga bergantian oleh lebih dari satu
-        # Spy, jadi ditinggalkan selama masih ada target lain (tanpa ini pertandingan bisa macet tanpa akhir).
-        if kemampuan == "hostage":
-            dijaga_terus = {x for x, k in ctx["pengetahuan"].get("gagal_beruntun", {}).items() if k >= 2}
-            calon = [c for c in calon if c["target"] not in dijaga_terus] or calon
-        # Koordinasi Syndicate: korban malam hanya satu (pilihan terbanyak), jadi ikuti target yang sudah dipilih
-        # rekan selama target itu masih layak; memilih target lain hanya memecah suara Syndicate.
-        if kemampuan == "hostage":
-            target_rekan = pilihan_terbanyak([a["target"] for a in saya.get("aksi_rekan", [])])
-            ikut = [c for c in calon if c["target"] == target_rekan]
-            if ikut:
-                ikut[0]["alasan"] = [f"Mengikuti target Hostage rekan Syndicate: {target_rekan}."] + ikut[0]["alasan"]
-                calon = ikut
-    elif kemampuan == "guard":
-        lindung = ctx["lindung"].set_index("pemain")
-        tabel = ctx["tabel"].set_index("pemain")
-        for p in hidup:
-            if p == saya.get("last_guard"):
-                continue  # engine: tidak boleh Guard target sama dua malam berturut-turut
-            if p != bot and (tabel.loc[p, "p_sandera"] >= BATAS_SANDERA_AKSI
-                             or tabel.loc[p, "kecurigaan"] >= BATAS_TERSANGKA_JAGA):
-                continue
-            r = lindung.loc[p].to_dict() | {"pemain": p}
-            calon.append({"aksi": "guard", "target": p, "alasan": alasan_lindung(r, bot), "skor": float(r["terancam"]),
-                          "input": {"terancam": r["terancam"]}})
-    elif kemampuan == "peek":
-        tabel = ctx["tabel"]
-        sudah = {x["pemain"] for x in ctx["ingatan"].intel}
-        for p in hidup:
-            b = baris_pemain(tabel, p)
-            if p == bot or p in sudah or p in ctx["pengetahuan"]["pasti_orang_baik"] or b["p_sandera"] >= BATAS_SANDERA_AKSI:
-                continue
-            calon.append({"aksi": "peek", "target": p, "sistem": "intip",
-                          "alasan": alasan_curiga(b, bot) or [f"Belum banyak info tentang {p}."],
-                          "input": {"kecurigaan": b["kecurigaan"], "kurang_info": 1 - b["volume_info"]},
-                          "seri": (-b["kecurigaan"],)})
-    return kemampuan, calon
+    return kemampuan, calon_gag(ctx) if kemampuan == "gag" else calon_peek(ctx)
 
 # Kalimat cadangan bila LLM tidak tersedia atau keluarannya ditolak pemeriksa aturan.
 def templat_pesan(rencana):
@@ -1738,7 +1813,8 @@ def templat_pesan(rencana):
 # Keluaran ke game: tiga rencana dipetakan ke bentuk NPCDecision backend.
 # Masukan : rencana chat, vote, dan aksi rahasia (keluaran penalaran metode).
 # Keluaran: {action, target, message}; aksi rahasia diutamakan, lalu vote, selain itu wait; message = kalimat templat
-#           bila chat dikirim, kosong bila tidak. Dipakai oleh: putuskan (kunci npc_decision) → NPCService/engine.
+#           bila chat dikirim, kosong bila tidak; pindah = True bila pilihan malam diganti. Dipakai oleh: putuskan (kunci
+#           npc_decision) → NPCService/engine.
 def format_npc(rencana_c, rencana_v, rencana_a):
     if rencana_a["aksi"] in AKSI_RAHASIA:
         action, target = rencana_a["aksi"], rencana_a["target"]
@@ -1746,7 +1822,8 @@ def format_npc(rencana_c, rencana_v, rencana_a):
         action, target = "vote", rencana_v["target"]
     else:
         action, target = "wait", None
-    return {"action": action, "target": target, "message": templat_pesan(rencana_c) if rencana_c["kirim"] else ""}
+    return {"action": action, "target": target, "message": templat_pesan(rencana_c) if rencana_c["kirim"] else "",
+            **({"pindah": True} if rencana_a.get("pindah") else {})}
 
 BATASAN_NLG = [
     "Pertahankan intent dan target rencana; jangan menambah atau mengganti target.",
@@ -1782,6 +1859,42 @@ def siapkan_nlg(rencana, view):
         "batasan": batasan_nlg(rencana), "cadangan": templat_pesan(rencana),
         **({"penanya": rencana["penanya"]} if rencana.get("penanya") else {}),
     }
+
+# Paket chat tim untuk penulis kalimat, atau None bila tidak ada yang perlu dikabarkan ke rekan manusia. Target tetap dari logika dan
+# isi chat tidak mengubahnya. Role tim hanya ikut di paket ini, karena kalimatnya hanya sampai ke rekan. Sesudah terkunci bot diam,
+# kecuali memberi tahu bahwa ia mengikuti pilihan manusia pada saat terkunci itu.
+# Masukan : ctx dari putuskan, rencana_a = rencana aksi langkah ini.
+# Keluaran: {pembicara, aksi, tim, pemicu, target_saya, pilihan_rekan, alasan, chat_tim} atau None.
+# Dipakai oleh: putuskan (kunci nlg_tim) → NPCService menulis dan mengirimnya.
+def siapkan_nlg_tim(ctx, rencana_a):
+    view, saya, peran = ctx["view"], ctx["view"]["saya"], ctx["peran"]
+    catatan = [x for x in ctx["ingatan"].chat_tim_bot if x["ronde"] == view["ronde"]]
+    if (not saya.get("can_team_chat") or not rekan_manusia_aktif(view)
+            or sum(x["terkirim"] for x in catatan) >= MAKS_CHAT_TIM):
+        return None
+    pilih_baru = rencana_a["aksi"] in ("hostage", "guard")
+    target = rencana_a["target"] if pilih_baru else saya.get("aksi_malam")
+    rekan = pilihan_terbanyak(pilihan_malam_rekan(view)[0])
+
+    def paket(pemicu, pilihan, alasan):
+        return {"pembicara": ctx["bot"], "aksi": "chat_tim", "tim": peran, "pemicu": pemicu, "target_saya": target,
+                "pilihan_rekan": pilihan, "alasan": list(alasan)[:2],
+                "chat_tim": [{"pengirim": m["pengirim"], "teks": m["teks"]} for m in saya.get("chat_tim", [])[-KONTEKS_CHAT_TIM:]]}
+
+    if peran == "hitman" and pilih_baru and saya.get("saat_terkunci") and target == rekan:
+        return paket("ikut_manusia", rekan, [])
+    if saya.get("terkunci") or target is None:
+        return None
+    if rencana_a.get("pindah"):
+        return paket("pindah_sama", saya["aksi_malam"], rencana_a["alasan"])
+    sudah_ditanggapi = any(x["pilihan_rekan"] == rekan and x["pemicu"] in ("setuju", "beda") for x in catatan)
+    if peran == "hitman" and rekan not in (None, target) and not sudah_ditanggapi:
+        fitur = ctx["fitur_hitman"]
+        nilai = {r["pemain"]: nilai_hostage(r) for _, r in fitur.iterrows()}
+        setuju = nilai.get(rekan, 0.0) >= SETUJU_REKAN * nilai.get(target, 0.0)
+        acuan = rekan if setuju else target
+        return paket("setuju" if setuju else "beda", rekan, alasan_ancaman(baris_pemain(fitur, acuan)) if acuan in nilai else [])
+    return paket("pilih_target", None, rencana_a["alasan"]) if pilih_baru else None
 
 R_, S_, T_ = "rendah", "sedang", "tinggi"
 
@@ -2080,21 +2193,38 @@ def keputusan_vote(ctx):
 # Target Gag, atau None bila Gag menunggu. Gag selalu terpakai: wajib sesudah GAG_WAJIB_FRAKSI siang. Rekan manusia yang masih hidup
 # diberi kesempatan memilih lebih dulu, jadi sebelum batas itu hanya bot tanpa rekan manusia yang bertindak.
 def pilih_gag(ctx, calon):
-    hidup = {p["nama"] for p in ctx["view"]["pemain"] if p["hidup"]}
-    tanpa_manusia = not set(ctx["view"]["saya"].get("rekan_manusia", [])) & hidup
+    tanpa_manusia = not rekan_manusia_aktif(ctx["view"])
     urut = sorted(calon, key=lambda c: (-round(c["input"]["ancaman"], 6), -round(c["skor"], 6), c["target"]))
     if (tanpa_manusia and urut[0]["input"]["ancaman"] >= BATAS_ANCAMAN_GAG) or ctx["konteks"]["waktu_berjalan"] >= GAG_WAJIB_FRAKSI:
         return urut[0]
     return next((c for c in urut if c["bicara"] and c["skor"] >= AMBANG_GAG), None) if tanpa_manusia else None
 
+# Bot yang sudah memilih hanya pindah dalam dua keadaan: Hitman mengikuti pilihan manusia pada saat terkunci, dan Spy yang belum terkunci
+# menghindari target rekannya. Antarbot Spy, nama yang lebih akhir yang pindah, supaya keduanya tidak pindah bersamaan.
+def rencana_pindah(ctx, kemampuan, calon):
+    view, bot, saya = ctx["view"], ctx["bot"], ctx["view"]["saya"]
+    lama, pindah = saya["aksi_malam"], False
+    if calon and calon[0]["target"] != lama and saya.get("can_cancel_action"):
+        if kemampuan == "hostage":
+            pindah = saya.get("saat_terkunci") and calon[0]["target"] in pilihan_malam_rekan(view)[0]
+        elif kemampuan == "guard" and not saya.get("terkunci"):
+            manusia = rekan_manusia_aktif(view)
+            pindah = any(a["target"] == lama and (a["pemain"] in manusia or a["pemain"] < bot) for a in saya.get("aksi_rekan_spy", []))
+    if pindah:
+        c = calon[0]
+        return rencana_aksi(c["aksi"], c["target"], c["alasan"], c["skor"], pindah=True)
+    return rencana_aksi("tunggu", alasan=[f"Pilihan malam ini tetap ke {lama}."])
+
 # Aksi rahasia: Gag dan Peek dinilai sistem fuzzy; Hostage dan Guard sudah membawa nilai dari calon_aksi. Skor tertinggi dipilih.
-# Masukan : ctx dari putuskan (view.saya.can_act; kandidat calon_aksi beserta input dan kunci seri).
+# Masukan : ctx dari putuskan (view.saya.can_act, aksi_malam; kandidat calon_aksi beserta input dan kunci seri).
 # Keluaran: (rencana aksi, jejak DataFrame {aksi, target, prioritas, input}); prioritas 0–100 untuk Gag dan Peek, 0–1 untuk
-#           Hostage dan Guard. Target Gag dari pilih_gag; Hostage, Guard, dan Peek selalu memakai target terbaik.
-# Dipakai oleh: putuskan (semua role; tanpa kemampuan yang bisa dipakai hasilnya tidak_bisa).
+#           Hostage dan Guard. Target Gag dari pilih_gag; Hostage, Guard, dan Peek selalu memakai target terbaik. Bot yang sudah
+#           memilih menunggu atau pindah (rencana_pindah).
+# Dipakai oleh: putuskan (semua role; tanpa kemampuan yang bisa dipakai atau tanpa target hasilnya tidak_bisa).
 def keputusan_aksi(ctx):
     kemampuan, calon = calon_aksi(ctx)
-    if not kemampuan or not ctx["view"]["saya"].get("can_act"):
+    saya = ctx["view"]["saya"]
+    if not kemampuan or not (saya.get("can_act") or saya.get("aksi_malam")):
         return rencana_aksi("tidak_bisa", alasan=["Tidak ada aksi rahasia yang tersedia saat ini."]), pd.DataFrame()
     for c in calon:
         if "sistem" in c:
@@ -2104,8 +2234,10 @@ def keputusan_aksi(ctx):
     calon.sort(key=lambda c: (-round(c["skor"], 6), *c.get("seri", ()), c["target"]))
     jejak = pd.DataFrame([{"aksi": c["aksi"], "target": c["target"], "prioritas": c["skor"],
                            "input": {k: round(float(v), 3) for k, v in c["input"].items()}} for c in calon])
+    if saya.get("aksi_malam"):
+        return rencana_pindah(ctx, kemampuan, calon), jejak
     if not calon:
-        return rencana_aksi("tunggu", alasan=["Tidak ada target yang layak."]), jejak
+        return rencana_aksi("tidak_bisa", alasan=["Tidak ada target yang layak."]), jejak
     c = pilih_gag(ctx, calon) if kemampuan == "gag" else calon[0]
     if c is None:
         return rencana_aksi("tunggu", alasan=["Belum ada ancaman yang harus dibungkam sekarang; Gag menunggu."]), jejak
@@ -2128,7 +2260,8 @@ def pertahanan_suara(ctx, rencana, urutan):
 # Satu siklus keputusan untuk role apa pun; satu-satunya fungsi keputusan yang dipanggil game dan simulasi.
 # Masukan : ingatan (Ingatan bot), view (keluaran Ingatan.sinkron_snapshot).
 # Keluaran: dict {tabel, konteks, pengetahuan, urutan_tersangka, fitur_hitman, lindung, rencana_chat/vote/aksi,
-#           jejak_chat/vote/aksi, npc_decision = {action, target, message} untuk engine, nlg = payload penulis}.
+#           jejak_chat/vote/aksi, npc_decision = {action, target, message} untuk engine, nlg = payload penulis,
+#           nlg_tim = payload chat tim atau None}.
 # Alur: hitung_bukti → pengetahuan_peran → penalaran metode (nilai_*, keputusan_*) → format_npc + siapkan_nlg.
 def putuskan(ingatan, view):
     peran, bot = view["saya"]["role"], view["saya"]["nama"]
@@ -2159,4 +2292,5 @@ def putuskan(ingatan, view):
             "fitur_hitman": ctx.get("fitur_hitman"), "lindung": ctx.get("lindung"),
             "rencana_chat": rencana_c, "jejak_chat": jejak_c, "rencana_vote": rencana_v, "jejak_vote": jejak_v,
             "rencana_aksi": rencana_a, "jejak_aksi": jejak_a,
-            "npc_decision": format_npc(rencana_c, rencana_v, rencana_a), "nlg": siapkan_nlg(rencana_c, view)}
+            "npc_decision": format_npc(rencana_c, rencana_v, rencana_a), "nlg": siapkan_nlg(rencana_c, view),
+            "nlg_tim": siapkan_nlg_tim(ctx, rencana_a)}

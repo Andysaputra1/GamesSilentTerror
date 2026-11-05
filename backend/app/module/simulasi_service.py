@@ -12,7 +12,8 @@ from app.services.checker_service import jejak_baru
 from app.module.match_engine import Match, label_unik, snapshot_berlabel
 from app.module.npc_brain.runtime import brain_runtime
 from app.module.npc_service import (
-    AKSI_RAHASIA, BATAS_LANGKAH_DETIK, isi_jejak, roster_label, tulis_kalimat, waktu_jejak,
+    AKSI_RAHASIA, BATAS_LANGKAH_DETIK, isi_jejak, pindahkan_aksi_malam, roster_label, tulis_kalimat,
+    waktu_jejak,
 )  # fmt: skip
 from app.services.room_service import BOT_NAMES
 
@@ -81,7 +82,8 @@ class Simulasi:
             self.match.labels[pengirim], teks, roster_label(self.match),
         )  # fmt: skip
 
-    # Satu langkah bot persis seperti NPCService.brain_turn: keputusan → vote/aksi ke engine → kalimat.
+    # Satu langkah bot persis seperti NPCService.brain_turn: keputusan → vote/aksi ke engine → kalimat. Chat tim
+    # tidak ditulis, karena admin simulasi tidak punya layar untuk membacanya.
     async def _langkah(self, otak, jam):
         m, loop, mulai = self.match, asyncio.get_running_loop(), time.perf_counter()
         lapor = self._lapor(m.labels[otak.nama])
@@ -101,7 +103,10 @@ class Simulasi:
                 m.vote(otak.nama, m.username(npc["target"]))
                 brain_runtime.catat_vote(otak, view, hasil["rencana_vote"])
             elif npc["action"] in AKSI_RAHASIA:
-                m.act(otak.nama, npc["action"], m.username(npc["target"]))
+                if npc.get("pindah"):
+                    pindahkan_aksi_malam(m, otak.nama, npc["action"], m.username(npc["target"]))
+                else:
+                    m.act(otak.nama, npc["action"], m.username(npc["target"]))
         except ValueError as error:
             penolakan = str(error)
         if hasil["nlg"] is not None:

@@ -221,9 +221,10 @@ class EngineTests(unittest.TestCase):
         self.assertFalse(self.game.players["civilian"].hostage)
         self.assertEqual(self.game.players["spy"].last_guard_round, 2)
 
-    # Cadangan engine memilih dengan aturan bot yang lama: tidak menjaga target yang sama berturut-turut.
-    def test_rule_bot_fallback_does_not_repeat_its_guard_target(self):
+    # Cadangan engine mengikuti aturan yang sama dengan manusia: Guard boleh ke target yang sama berturut-turut.
+    def test_rule_bot_fallback_may_repeat_its_guard_target(self):
         names = ["hitman", "spy", "stalker", "civilian", "civilian2", "civilian3"]
+        target = set()
         for seed in range(30):
             game = Match([], names, now=0, rng=random.Random(seed))
             for name, player in game.players.items():
@@ -231,7 +232,8 @@ class EngineTests(unittest.TestCase):
             game.round, game.phase = 2, "night"
             game.players["spy"].last_guard, game.players["spy"].last_guard_round = "stalker", 1
             game.run_bots()
-            self.assertNotEqual(game.actions["spy"]["target"], "stalker", seed)
+            target.add(game.actions["spy"]["target"])
+        self.assertIn("stalker", target)
 
     def test_peek_private_and_cooldown(self):
         self.night()

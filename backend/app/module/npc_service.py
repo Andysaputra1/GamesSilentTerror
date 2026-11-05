@@ -10,10 +10,11 @@ Alurnya
 5. brain_turn (satu langkah satu bot):
    5.1 Lihat: Ambil snapshot permainan milik bot
    5.2 Pikir: IndoBERT membaca chat baru, fuzzy memutuskan (runtime.langkah)
-   5.3 Aksi: Kirim vote atau aksi rahasia ke game, lalu vote yang diterima masuk ingatan bot
-   5.4 Tulis chat: Minta giliran bicara, tulis kalimat (NLG), jeda mengetik, simpan chat
-   5.5 Kirim: Siarkan chat ke room
-   5.6 Catat: Simpan jejak untuk panel checker, IndoBERT membaca kalimat bot
+   5.3 Aksi: Kirim vote atau aksi rahasia ke game (pindah pilihan malam bila otak memintanya), lalu vote yang diterima masuk ingatan bot
+   5.4 Chat tim: Bila ada rekan manusia, tulis kalimat dan simpan di kanal tim, tanpa database, siaran, atau NLU
+   5.5 Tulis chat: Minta giliran bicara, tulis kalimat (NLG), jeda mengetik, simpan chat
+   5.6 Kirim: Siarkan chat ke room
+   5.7 Catat: Simpan jejak untuk panel checker, IndoBERT membaca kalimat bot
 
 Chat manusia masuk lewat sockets/chat.py, lalu bacaannya dicatat catat_nlu di file ini.
 """
@@ -65,7 +66,7 @@ def waktu_jejak(waktu, tulisan):
 
 # Isi jejak checker satu langkah otak; dipakai room asli (NPCService.brain_turn) dan simulasi panel.
 def isi_jejak(trace, match, otak, npc, rencana, tulisan, penolakan, durasi_ms, ditunda, penjelasan,
-              waktu, nlu_sumber, masukan_nlg=None):  # fmt: skip
+              waktu, nlu_sumber, masukan_nlg=None, chat_tim=None):  # fmt: skip
     penjelasan = lengkapi_penjelasan(penjelasan, npc, rencana, tulisan, penolakan, ditunda,
                                      masukan_nlg)  # fmt: skip
     trace.update(match_id=match.id, stage=(
@@ -93,6 +94,8 @@ def isi_jejak(trace, match, otak, npc, rencana, tulisan, penolakan, durasi_ms, d
                 }
             ),
             "nlu": nlu_sumber,
+            # Hanya status dan panjang teks: isi chat tim rahasia.
+            **({"chat_tim": chat_tim} if chat_tim else {}),
         },
         ensure_ascii=False,
         ),  # fmt: skip
@@ -127,6 +130,34 @@ async def tulis_kalimat(runtime, otak, payload, konteks, lapor=None):
     )
     batas = {"sumber": "llm", "status": f"melewati batas {BATAS_TULIS_DETIK} detik"}
     return {**tulisan, "percobaan": [batas, *tulisan["percobaan"]]}
+
+
+# Chat tim dengan batas waktu sisa malam: bila penulis LLM terlalu lama, kabar tetap sampai lewat templat.
+async def tulis_kalimat_tim(runtime, otak, payload, roster, sisa_detik):
+    loop = asyncio.get_running_loop()
+    try:
+        return await asyncio.wait_for(
+            loop.run_in_executor(runtime.eksekutor_nlg, runtime.tulis_tim, otak, payload, roster),
+            timeout=max(1.0, min(BATAS_TULIS_DETIK, sisa_detik - 2)),
+        )
+    except TimeoutError:
+        logger.warning("Chat tim %s melewati batas waktu; memakai templat.", otak.nama)
+    return await asyncio.wait_for(
+        asyncio.to_thread(runtime.tulis_tim, otak, payload, roster, False),
+        timeout=BATAS_TEMPLAT_DETIK,
+    )
+
+
+# Pindah pilihan malam: batal lalu pilih ulang, dalam lock pemanggil. Bila pilihan baru ditolak engine,
+# pilihan lama kembali utuh beserta urutannya, dan penolakan diteruskan ke pemanggil.
+def pindahkan_aksi_malam(match, nama, kemampuan, target):
+    sebelum = dict(match.actions)
+    match.cancel_action(nama)
+    try:
+        match.act(nama, kemampuan, target)
+    except ValueError:
+        match.actions = sebelum
+        raise
 
 
 # Riwayat pencatat NLU per pertandingan (konteks target, urut kronologis); dibuang saat pertandingan usai.
@@ -262,14 +293,30 @@ class NPCService:
                     match.vote(otak.nama, match.username(keputusan_aksi["target"]))
                     self.runtime.catat_vote(otak, view, keputusan["rencana_vote"])
                 elif keputusan_aksi["action"] in AKSI_RAHASIA:
-                    match.act(
-                        otak.nama,
-                        keputusan_aksi["action"],
-                        match.username(keputusan_aksi["target"]),
-                    )
+                    aksi = keputusan_aksi["action"]
+                    target = match.username(keputusan_aksi["target"])
+                    if keputusan_aksi.get("pindah"):
+                        pindahkan_aksi_malam(match, otak.nama, aksi, target)
+                    else:
+                        match.act(otak.nama, aksi, target)
             except ValueError as error:
                 return True, str(error)
             return True, None
+
+    # CHAT TIM: rahasia, jadi tanpa lantai bicara, database, siaran, NLU, atau fungsi @traced (lihat
+    # room_service.team_chat). Penerima membacanya lewat snapshot. Hasil untuk jejak: status dan panjang teks.
+    async def _kirim_chat_tim(self, code, match, fase, otak, view, payload, roster):
+        tulisan = await tulis_kalimat_tim(
+            self.runtime, otak, payload, roster, match.deadline - time.time()
+        )
+        teks, terkirim = tulisan["teks"], False
+        with room_service.lock:
+            if teks and self._berlaku(code, match, fase) and match.can_team_chat(otak.nama):
+                match.add_team_message(otak.nama, teks)
+                terkirim = True
+            self.runtime.catat_chat_tim(otak, view, payload, terkirim)
+        status = "terkirim" if terkirim else "tidak terkirim" if teks else "kosong"
+        return {"status": status, "panjang": len(teks)}
 
     # LANTAI BICARA: paling banyak LANTAI_MAKS bot menyusun/mengetik chat bersamaan per pertandingan (LLM
     # menulis paralel). Ditolak bila lantai penuh, bila bot lain sedang menulis rencana kembar (intent dan
@@ -342,6 +389,13 @@ class NPCService:
             if not masih_berlaku:
                 return  # fase berganti selama bot berpikir: keputusan basi dibuang
 
+            # Pilihan yang ditolak engine tidak dikabarkan ke rekan.
+            status_tim = None
+            if keputusan.get("nlg_tim") is not None and not penolakan:
+                status_tim = await self._kirim_chat_tim(
+                    code, match, fase, otak, view, keputusan["nlg_tim"], konteks["roster"]
+                )
+
             # OUTPUT 2: minta giliran bicara, tulis kalimat, jeda mengetik, lalu kirim chat
             kalimat = pesan_terkirim = id_pesan = None
             chat_ditunda = keputusan["nlg"] is not None and not self._ambil_giliran_bicara(
@@ -381,7 +435,13 @@ class NPCService:
 
             # OUTPUT 3: jejak untuk panel checker (tanpa role pemain lain), siaran chat, bacaan IndoBERT
             jejak = None
-            if pesan_terkirim or keputusan_aksi["action"] != "wait" or penolakan or chat_ditunda:
+            if (
+                pesan_terkirim
+                or keputusan_aksi["action"] != "wait"
+                or penolakan
+                or chat_ditunda
+                or status_tim
+            ):
                 # Masukan NLG ikut dicatat, juga saat ditunda: panel tetap melihat apa yang akan ditulis.
                 masukan_nlg = (
                     None if keputusan["nlg"] is None
@@ -407,6 +467,7 @@ class NPCService:
                     waktu_jejak(keputusan.get("waktu"), kalimat_terkirim),
                     getattr(self.runtime.nlu, "sumber", None),
                     masukan_nlg,
+                    status_tim,
                 )
             if pesan_terkirim:
                 await self.broadcast("receive_chat", pesan_terkirim, to=code)

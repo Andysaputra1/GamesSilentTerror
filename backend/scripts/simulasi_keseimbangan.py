@@ -80,6 +80,8 @@ def satu_game(argumen):
                         match.vote(n, npc["target"])
                         ingatan.catat_vote_bot(view, hasil["rencana_vote"])
                     elif npc["action"] in modul.AKSI_RAHASIA:
+                        if npc.get("pindah"):
+                            match.cancel_action(n)
                         match.act(n, npc["action"], npc["target"])
                 except ValueError:
                     ilegal += 1

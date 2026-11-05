@@ -357,12 +357,11 @@ class Match:
         return role if role in self.team_messages and self.composition()[role] >= 2 else None
 
     # Hak chat tim: hanya saat malam, untuk pemain hidup yang tidak disandera (Hitman tidak bisa disandera).
-    # Gag tidak berpengaruh karena hanya membatasi chat publik. Bot belum mengirim atau membaca chat tim.
+    # Gag tidak berpengaruh karena hanya membatasi chat publik. Bot punya hak yang sama dengan manusia.
     def can_team_chat(self, name):
         pemain = self.players.get(name)
         return bool(
             pemain
-            and not pemain.bot
             and pemain.alive
             and not pemain.hostage
             and self.phase == "night"
@@ -678,10 +677,6 @@ class Match:
                     daftar_target = [target_tim] + [
                         nama for nama in daftar_target if nama != target_tim
                     ]
-            if self.phase == "night" and pemain.last_guard_round == self.round - 1:
-                # Pilihan bot belum berubah: engine membolehkan, tetapi bot tidak menjaga target yang sama
-                # dua malam berturut-turut.
-                daftar_target = [nama for nama in daftar_target if nama != pemain.last_guard]
             if self.phase == "tribunal":
                 # Stalker hanya memakai intel hasil Peek miliknya sendiri.
                 hitman_diketahui = [
@@ -977,12 +972,13 @@ class Match:
                 "team_messages": (
                     list(self.team_messages[self.team_channel(viewer)]) if boleh_chat_tim else []
                 ),
-                # Rekan setim yang manusia, hanya untuk penonton bot: pemain manusia tidak boleh tahu siapa bot.
+                # Rekan setim manusia yang masih hidup, hanya untuk penonton bot: pemain manusia tidak boleh
+                # tahu siapa bot.
                 "team_humans": (
                     [
                         nama
                         for nama in self.allies(viewer) + self.spy_allies(viewer)
-                        if not self.players[nama].bot
+                        if not self.players[nama].bot and self.players[nama].alive
                     ]
                     if pemain.bot
                     else []

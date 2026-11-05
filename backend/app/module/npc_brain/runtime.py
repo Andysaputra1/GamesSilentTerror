@@ -7,7 +7,7 @@ Alurnya
 3. Awal pertandingan (siapkan_pertandingan): Buat persona dan ingatan tiap bot
 4. Tiap langkah bot (langkah, thread keputusan): IndoBERT membaca chat baru, fuzzy memutuskan, penjelasan dibuat untuk panel
 5. Bot mau chat (tulis, thread penulis): Rencana jadi kalimat lewat LLM atau templat, lalu diperiksa aturan
-6. Chat atau vote sudah terjadi (catat_chat, catat_vote): Masuk ingatan bot
+6. Chat, chat tim, atau vote sudah terjadi (catat_chat, catat_chat_tim, catat_vote): Masuk ingatan bot
 7. Chat baru masuk (baca_chat): IndoBERT membaca sekali dan hasilnya masuk memo, jadi bot tidak menghitung ulang
 
 Catatan
@@ -508,7 +508,7 @@ class BrainRuntime:
 
     # KEPUTUSAN (thread otak): sinkron snapshot → anotasi NLU → putuskan() metode bot.
     # Penjelasan panel checker dihitung di thread ini juga (ingatan bot hanya diubah thread ini), hanya
-    # untuk langkah yang bisa menjadi jejak: ada vote/aksi atau rencana chat. Langkah diam tidak dicatat.
+    # untuk langkah yang bisa menjadi jejak: ada vote/aksi, rencana chat, atau chat tim. Langkah diam tidak dicatat.
     # `waktu` mencatat lama tiap tahap (ms) dan `nlu_baru` chat yang baru dibaca IndoBERT di langkah ini.
     # selalu_jelaskan: simulasi panel ingin penjelasan juga untuk langkah diam; lapor(tahap) memberi tahu
     # simulasi tahap yang sedang berjalan (flowchart live).
@@ -533,6 +533,7 @@ class BrainRuntime:
         if (
             selalu_jelaskan
             or keputusan["nlg"] is not None
+            or keputusan.get("nlg_tim") is not None
             or keputusan["npc_decision"]["action"] != "wait"
         ):
             keputusan["penjelasan"] = jelaskan(bot, modul, view, keputusan)
@@ -567,6 +568,13 @@ class BrainRuntime:
         tulisan = self.nlg.tulis_pesan(payload, konteks, jam, bot.persona, hindari=hindari)
         tulisan["llm_detik"] = round(jam.detik, 3) if jam else 0.0
         return tulisan
+
+    # Chat tim (thread penulis): paket rencana → kalimat, tanpa IndoBERT. Hasilnya tidak masuk riwayat kalimat publik.
+    def tulis_tim(self, bot: OtakBot, payload, roster, pakai_llm=True):
+        with self.lock:
+            pakai = pakai_llm and self.konfigurasi.penulis != "templat"
+            penulis = self.penulis if pakai else None
+        return self.nlg.tulis_chat_tim(payload, roster, penulis, bot.persona)
 
     # Pesan pengguna yang dikirim ke LLM penulis pada percobaan pertama (panel: masukan NLG, juga saat ditunda).
     # None bila kalimat ditulis templat saja.
@@ -610,6 +618,10 @@ class BrainRuntime:
     # Dipanggil setelah vote diterima engine.
     def catat_vote(self, bot: OtakBot, view, rencana):
         bot.ingatan.catat_vote_bot(view, rencana)
+
+    # Dipanggil setelah rencana chat tim dikerjakan: yang dicatat pemicunya, bukan kalimatnya.
+    def catat_chat_tim(self, bot: OtakBot, view, rencana, terkirim):
+        bot.ingatan.catat_chat_tim(view, rencana, terkirim)
 
     def tutup(self):
         self.eksekutor_keputusan.shutdown(wait=False, cancel_futures=True)

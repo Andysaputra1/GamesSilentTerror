@@ -349,18 +349,15 @@ class SpyAlliesTests(unittest.TestCase):
         game = pertandingan(["hitman"], [n for n in DELAPAN if n != "hitman"], now=0, labels=labels)
         game.act("hitman2", "gag", "civilian")
         game.phase = "night"
-        pesan = {"id": "t1", "sender": "hitman", "message": RAHASIA_HITMAN}
-        game.team_messages["hitman"].append(pesan)
+        game.add_team_message("hitman", RAHASIA_HITMAN)
         snapshot = game.snapshot("hitman2")
-        # Bot belum menerima pesan tim dari engine (Fase 7), jadi bentuknya ditiru di sini.
-        snapshot["me"]["team_messages"] = [pesan]
         me = snapshot_berlabel(snapshot, game.labels)["me"]
         self.assertEqual(me["ally_gags"], ["Nama civilian"])
         self.assertEqual(me["team_messages"][0]["sender"], "Nama hitman")
         self.assertEqual(me["team_humans"], ["Nama hitman"])
         # Salinan: snapshot asli tetap memakai username.
         self.assertEqual(snapshot["me"]["ally_gags"], ["civilian"])
-        self.assertEqual(pesan["sender"], "hitman")
+        self.assertEqual(snapshot["me"]["team_messages"][0]["sender"], "hitman")
 
 
 class TeamChatTests(unittest.TestCase):
@@ -406,6 +403,30 @@ class TeamChatTests(unittest.TestCase):
                 self.assertNotIn(teks, json.dumps(snapshot["events"]))
         self.assertEqual([m["message"] for m in self.game.messages],
                          ["pesan publik pertama", "pesan publik kedua"])  # fmt: skip
+
+    # Pesan tim bot dan manusia tidak pernah dibaca NLU, masuk ingatan chat, atau mengubah chat publik.
+    def test_bot_and_human_team_messages_stay_out_of_public_data_and_nlu(self):
+        game = pertandingan(
+            ["hitman", "spy"], [n for n in DELAPAN if n not in ("hitman", "spy")], now=0
+        )
+        game.phase = "night"
+        game.add_team_message("hitman", RAHASIA_HITMAN)
+        game.add_team_message("hitman2", f"balasan {RAHASIA_HITMAN}")
+        game.add_team_message("spy2", RAHASIA_SPY)
+        self.assertEqual((game.messages, game.jumlah_pesan), ([], 0))
+        nlu = Mock(ambang=0.0, common_words=frozenset())
+        for bot in ("hitman2", "spy2", "civilian"):
+            ingatan = otak_fuzzy.Ingatan(bot)
+            ingatan.sinkron_snapshot(snapshot_berlabel(game.snapshot(bot), game.labels), 1.0, nlu)
+            self.assertEqual(ingatan.chat, [])
+            self.assertNotIn(RAHASIA_HITMAN, str(vars(ingatan)))
+            self.assertNotIn(RAHASIA_SPY, str(vars(ingatan)))
+        nlu.intent.assert_not_called()
+        nlu.target.assert_not_called()
+        for viewer in DELAPAN:
+            snapshot = game.snapshot(viewer)
+            self.assertEqual(snapshot["messages"], [])
+            self.assertNotIn(RAHASIA_HITMAN, json.dumps(snapshot["events"]))
 
     # Di luar malam dan di layar hasil tidak ada pesan tim untuk siapa pun, termasuk timnya sendiri.
     def test_team_messages_are_absent_outside_the_night_and_on_the_result_screen(self):
@@ -501,28 +522,32 @@ class TeamChatTests(unittest.TestCase):
         semua_bot = pertandingan([], DELAPAN, now=0)
         self.assertEqual(semua_bot.snapshot("hitman")["me"]["team_humans"], [])
 
-    # Bot belum membaca chat tim: snapshot, ingatan, dan prompt LLM mode pembanding bersih.
-    def test_bots_on_the_team_do_not_receive_team_messages(self):
+    # Bot membaca chat timnya sendiri lewat snapshot, dan hanya kanal timnya. Warga tidak melihat apa pun.
+    def test_bots_on_the_team_read_their_channel_only(self):
         game = pertandingan(
             ["hitman", "spy"], [n for n in DELAPAN if n not in ("hitman", "spy")], now=0
         )
         game.phase = "night"
         game.add_team_message("hitman", RAHASIA_HITMAN)
         game.add_team_message("spy", RAHASIA_SPY)
-        self.assertEqual(len(game.snapshot("hitman")["me"]["team_messages"]), 1)
-        for bot in ("hitman2", "spy2"):
+        for bot, rahasia, lain in (
+            ("hitman2", RAHASIA_HITMAN, RAHASIA_SPY),
+            ("spy2", RAHASIA_SPY, RAHASIA_HITMAN),
+        ):
             me = game.snapshot(bot)["me"]
-            self.assertEqual((me["can_team_chat"], me["team_messages"]), (False, []))
-            with self.assertRaises(ValueError):
-                game.add_team_message(bot, "bot belum bicara")
-            pandangan = json.dumps(
-                snapshot_berlabel(game.snapshot(bot), game.labels), ensure_ascii=False
+            self.assertTrue(me["can_team_chat"])
+            self.assertEqual([m["message"] for m in me["team_messages"]], [rahasia])
+            self.assertNotIn(
+                lain,
+                json.dumps(snapshot_berlabel(game.snapshot(bot), game.labels), ensure_ascii=False),
             )
-            self.assertNotIn(RAHASIA_HITMAN, pandangan)
-            self.assertNotIn(RAHASIA_SPY, pandangan)
-            ingatan = otak_fuzzy.Ingatan(bot)
-            ingatan.sinkron_snapshot(snapshot_berlabel(game.snapshot(bot), game.labels), 1.0)
-            self.assertEqual(ingatan.chat, [])
+            game.add_team_message(bot, "bot menjawab")
+        self.assertEqual(game.snapshot("hitman")["me"]["team_messages"][-1]["sender"], "hitman2")
+        warga = json.dumps(
+            snapshot_berlabel(game.snapshot("civilian"), game.labels), ensure_ascii=False
+        )
+        self.assertNotIn(RAHASIA_HITMAN, warga)
+        self.assertNotIn(RAHASIA_SPY, warga)
 
 
 class TeamChatEndpointTests(unittest.TestCase):
