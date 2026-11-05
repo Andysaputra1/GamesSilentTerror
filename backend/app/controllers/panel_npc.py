@@ -12,30 +12,14 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from app.config.settings import BACKEND_DIR
-from app.controller.api.panel import require_panel
-from app.controller.middleware.auth_limits import limit_auth
-from app.controller.middleware.safe_validation import SafeValidationRoute
-from app.module.npc_brain.runtime import brain_runtime
-from app.module.npc_config_service import save_npc_configuration
-from app.module.persistence_service import PersistenceError
+from app.controllers.panel import require_panel
+from app.middleware.auth_limits import limit_auth
+from app.middleware.safe_validation import SafeValidationRoute
+from app.services.persistence_service import PersistenceError
 from app.module.simulasi_service import simulasi_service
+from app.services import panel_service
 
 router = APIRouter(tags=["panel-npc"], route_class=SafeValidationRoute)
-
-PILIHAN = {
-    "penulis": {
-        "otomatis": "Rantai LLM sesuai prioritas; semua gagal → templat",
-        "templat": "Templat bervariasi saja (tanpa LLM)",
-    },
-    # Jalur rantai penulis: nama tampilan dan asal key/link-nya (nilai key tidak pernah dikirim).
-    "jalur_penulis": {
-        "openrouter": {"label": "OpenRouter", "sumber": "API key di menu Konfigurasi AI"},
-        "tautan": {
-            "label": "LLM sendiri lewat link",
-            "sumber": "URL tunnel (Docker/Ollama) di menu Konfigurasi AI",
-        },
-    },
-}
 
 
 class NPCConfig(BaseModel):
@@ -50,14 +34,14 @@ class NPCConfig(BaseModel):
 @router.get("/api/panel/npc")
 # PANEL: status pemuatan otak, sumber NLU, rantai penulis, dan pilihan konfigurasi.
 def npc_status(token=Depends(require_panel)):
-    return {"status": brain_runtime.ringkasan(), "pilihan": PILIHAN}
+    return panel_service.status_npc()
 
 
 @router.put("/api/panel/npc")
 # PANEL: simpan konfigurasi; rantai penulis langsung dipakai.
 def npc_update(body: NPCConfig, token=Depends(require_panel)):
     try:
-        status = save_npc_configuration(
+        return panel_service.simpan_npc(
             body.penulis,
             body.urutan_penulis,
             body.model_openrouter,
@@ -67,13 +51,12 @@ def npc_update(body: NPCConfig, token=Depends(require_panel)):
         raise HTTPException(400, str(error)) from error
     except PersistenceError as error:
         raise HTTPException(503, "Konfigurasi NPC gagal disimpan.") from error
-    return {"status": status, "pilihan": PILIHAN}
 
 
 @router.post("/api/panel/npc/cek-penulis", dependencies=[Depends(limit_auth)])
 # PANEL: hit semua jalur aktif di latar; status per jalur dibaca lewat GET agar tidak timeout.
 def npc_check_writers(token=Depends(require_panel)):
-    return {"status": brain_runtime.segarkan_penulis(latar=True), "pilihan": PILIHAN}
+    return panel_service.cek_penulis_npc()
 
 
 class SimulasiBaru(BaseModel):
@@ -343,11 +326,11 @@ KODE_ALUR = {
         ]),
     ],
     "simpan": [
-        ("app.module.persistence_service", "PersistenceService.record_trace", [
-            ("INSERT INTO checker_traces", "jejak untuk checker"),
+        ("app.services.persistence_service", "PersistenceService.record_trace", [
+            ("save_checker_trace", "jejak untuk checker"),
         ]),
-        ("app.module.persistence_service", "PersistenceService.record_nlu", [
-            ("UPDATE chat_messages SET nlu", "bacaan NLU untuk riwayat chat"),
+        ("app.services.persistence_service", "PersistenceService.record_nlu", [
+            ("set_message_nlu", "bacaan NLU untuk riwayat chat"),
         ]),
         (G + "otak_fuzzy", "Ingatan.catat_aksi_bot", []),
     ],

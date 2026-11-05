@@ -3,11 +3,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from app.controller.api.panel import require_panel
-from app.module.auth_service import AuthenticationPersistenceError
-from app.module import user_management_service as users
+from app.controllers.panel import require_panel
+from app.config.database import PersistenceError
+from app.services import user_service as users
 from app.schemas.auth import UpdateProfileRequest
-from app.controller.middleware.safe_validation import SafeValidationRoute
+from app.middleware.safe_validation import SafeValidationRoute
 
 router = APIRouter(
     prefix="/api/panel/users",
@@ -47,7 +47,7 @@ def _jalankan_operasi_user(operasi):
         raise HTTPException(404, str(error)) from error
     except ValueError as error:
         raise HTTPException(409, str(error)) from error
-    except AuthenticationPersistenceError as error:
+    except PersistenceError as error:
         raise HTTPException(503, "Data user belum dapat diproses. Coba lagi nanti.") from error
 
 

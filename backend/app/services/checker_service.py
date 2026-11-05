@@ -65,7 +65,7 @@ class CheckerService:
     # Bot diambil dari pertandingan live, lalu dari penjelasan di jejak, lalu tabel match_bots (arsip).
     def ringkasan_room(self, code, traces=()):
         from app.module.npc_brain.runtime import brain_runtime
-        from app.module.room_service import room_service
+        from app.services.room_service import room_service
 
         ringkasan = {"kode": code, "status": "arsip", "fase": None, "ronde": None,
                      "pemenang": None, "komposisi": None, "manusia": None, "bot": [], "sumber_bot": None}  # fmt: skip
@@ -128,21 +128,13 @@ class CheckerService:
 
 # Arsip metode/persona/role bot pertandingan terakhir room (migrasi V7); gagal → daftar kosong.
 def _bot_arsip(code):
-    from sqlalchemy import text
-
-    from app.module.persistence_service import PersistenceError, PersistenceService
-
-    def baca_baris_bot(database):
-        return database.execute(
-            text("""
-            SELECT match_id, bot_name, method, persona, role FROM match_bots
-            WHERE room_code=:code ORDER BY created_at DESC, bot_name LIMIT 20
-        """),
-            {"code": code},
-        ).mappings().all()  # fmt: skip
+    from app.config.database import PersistenceError, jalankan_transaksi
+    from app.models import survey_queries
 
     try:
-        daftar_baris = PersistenceService._run(baca_baris_bot)
+        daftar_baris = jalankan_transaksi(
+            lambda database: survey_queries.latest_match_bots(database, code)
+        )
     except PersistenceError:
         return []
     id_pertandingan_terakhir = daftar_baris[0]["match_id"] if daftar_baris else None

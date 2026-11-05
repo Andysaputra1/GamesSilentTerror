@@ -2,9 +2,10 @@
    ROOM PAGE - RESPONSIVE (sama dengan Main)
    HP (<= 640px): binder dilepas, dua lembar kertas bertumpuk dengan gutter 16px;
    halaman boleh bergulir vertikal.
+   HP landscape (tinggi <= 480px): kertas yang sama, tetapi berdampingan.
    ========================================================================== */
 
-@media (max-width: 640px) {
+@media (max-width: 640px), (max-height: 480px) {
   :host {
     height: auto;
     min-height: 100dvh;
@@ -153,6 +154,11 @@
     font-size: 14px;
   }
 
+  /* Target sentuh: kotak centang kecil, jadi seluruh labelnya yang diketuk. */
+  .room-quick-mode {
+    min-height: 44px;
+  }
+
   .room-primary--wood {
     min-height: 56px;
     font-size: 17px;
@@ -170,4 +176,18 @@
     padding-top: 14px;
   }
 
+}
+
+@media (max-height: 480px) and (min-width: 641px) {
+  .room-binder__content {
+    flex-direction: row;
+  }
+
+  .room-sheet,
+  .room-sheet--left,
+  .room-sheet--right {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+  }
 }

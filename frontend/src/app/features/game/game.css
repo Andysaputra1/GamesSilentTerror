@@ -270,10 +270,11 @@ textarea:focus-visible {
   box-sizing: border-box;
   flex-direction: row;
   gap: 0.45em;
-  width: clamp(250px, 18vw, 360px);
+  /* Lebar untuk teks terpanjang ("Ronde 2 · Tribunal", "Permainan selesai") tanpa terpotong. */
+  width: clamp(270px, 19vw, 360px);
   max-width: 100%;
   min-width: 0;
-  padding: 0.62em clamp(2.3em, 12%, 3.1em);
+  padding: 0.62em 1.9em;
   background-image: url('/assets/buttons/btn-leather.png');
   background-size: 100% 100%;
   font-size: 16px;

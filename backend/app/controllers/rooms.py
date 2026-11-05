@@ -3,9 +3,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from typing import Literal
-from app.controller.middleware.auth import require_authenticated_user
-from app.module.room_service import room_service
-from app.module.persistence_service import PersistenceService, PersistenceError
+from app.middleware.auth import require_authenticated_user
+from app.services.room_service import RoomBelumTersimpan, room_service
 
 router = APIRouter(prefix="/api/rooms", tags=["rooms"])
 
@@ -80,9 +79,7 @@ def active(user=Depends(require_authenticated_user)):
 # Pulihkan ruangan milik pengguna, termasuk lobby dan pertandingan selesai.
 @router.get("/current")
 def current(user=Depends(require_authenticated_user)):
-    with room_service.lock:
-        room = room_service.current(user.username)
-        return {"room": room_service.snapshot(room) if room else None}
+    return {"room": room_service.snapshot_room_saat_ini(user.username)}
 
 
 @router.post("/{code}/skip-discussion")
@@ -166,26 +163,16 @@ def _jalankan_perintah_lobby(perintah):
         return room_service.snapshot(perintah())
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
+    except RoomBelumTersimpan as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
 
 
 @router.post("")
 # CONTROLLER: buat ruangan untuk pengguna yang sudah login dan kembalikan kode serta roster.
 def create(body: CreateRoom = CreateRoom(), user=Depends(require_authenticated_user)):
-    def buat_room_terarsip():
-        with room_service.lock:
-            # Kode acak bisa sudah terpakai di arsip lama: buang room itu lalu coba kode lain.
-            for _ in range(10):
-                room = room_service.create(user.username, capacity=body.capacity)
-                try:
-                    if PersistenceService(room.code).archive_new_room(user.username):
-                        return room
-                except PersistenceError as error:
-                    room_service.rooms.pop(room.code, None)
-                    raise HTTPException(503, "Ruangan gagal disimpan. Coba lagi.") from error
-                room_service.rooms.pop(room.code, None)
-            raise HTTPException(503, "Kode ruangan belum tersedia. Coba lagi.")
-
-    return _jalankan_perintah_lobby(buat_room_terarsip)
+    return _jalankan_perintah_lobby(
+        lambda: room_service.buat_room_terarsip(user.username, capacity=body.capacity)
+    )
 
 
 @router.post("/join")

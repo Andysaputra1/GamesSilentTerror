@@ -17,7 +17,7 @@ Sudah dapat dimainkan dari awal sampai akhir:
 - Main page, buat/gabung ruangan, 4–10 peserta, bot opsional untuk mengisi kursi kosong. Hanya pembuat ruangan yang mengatur bot dan memulai game.
 - Role acak dari server, layar persiapan, timer Day → Tribunal → Night (ronde 1 tanpa Tribunal) tanpa batas ronde (berakhir hanya saat salah satu kubu menang), skill/cooldown, voting, eksekusi, dan kondisi kemenangan.
 - Survei singkat setelah pertandingan; jawabannya dipakai untuk menilai bot per metode penalaran.
-- Panel administrator terpadu di `/panel`: Konfigurasi AI, Checker, Riwayat chat, Manajemen user, Otak NPC, Survei, Simulasi, dan Dokumen (ERD dan Proses AI).
+- Panel administrator terpadu di `/panel`: Konfigurasi AI, Checker, Riwayat chat, Manajemen user, Otak NPC, Survei, Simulasi, dan Dokumen (Arsitektur, ERD, Proses AI, Bedah Alur, Bedah Otak Fuzzy, serta kode dan diagram NLU dan Fuzzy).
 
 Role: **Hitman** (Hostage/Gag Order), **Spy** (Guard), **Stalker** (Peek), dan **Civilian** (observasi). Korban Hostage tetap hidup tetapi kehilangan semua aksi permanen (chat, voting, dan skill malam). Saat malam selesai korban diumumkan ke semua pemain dan kartunya bercap *Disandera* sampai akhir; bila Hostage dijaga Guard atau tidak ada pilihan, pengumumannya "Malam ini tidak ada yang disandera" (target yang gagal tidak dibuka).
 
@@ -119,8 +119,8 @@ Isi pengaturan berikut di `.env`:
 
 ```dotenv
 AI_PROVIDER=docker
-OLLAMA_MODEL=8
-OLLAMA_MODELS_TO_PULL=qwen3:8b
+OLLAMA_MODEL=14
+OLLAMA_MODELS_TO_PULL=qwen3:14b
 ```
 
 MacBook / CPU (Ollama tetap di Docker, tidak perlu dipasang di macOS):
@@ -137,7 +137,7 @@ docker compose -f docker-compose.gpu.yml up -d --build
 docker compose -f docker-compose.gpu.yml logs -f ollama-models
 ```
 
-CPU dapat sangat lambat, khususnya 14B. Mulai dari 8B dan pastikan alokasi
+CPU dapat sangat lambat, khususnya 14B yang menjadi bawaan. Bila terlalu berat, pilih 8B dan pastikan alokasi
 memori Docker cukup. Gunakan mode API jika mesin
 tidak sanggup. Model yang tidak muat di memori bisa gagal, bukan hanya lambat.
 
@@ -149,7 +149,7 @@ Periksa model yang tersedia:
 docker compose exec ollama ollama list
 ```
 
-`OLLAMA_MODEL=8` memilih `qwen3:8b`; `OLLAMA_MODEL=14` memilih `qwen3:14b`. Untuk mengunduh hanya model 8B, isi `OLLAMA_MODELS_TO_PULL=qwen3:8b`. Pastikan model yang dipilih sudah diunduh. Model 14B memerlukan sumber daya lebih besar; kecepatan bergantung pada mesin.
+`OLLAMA_MODEL=8` memilih `qwen3:8b`; `OLLAMA_MODEL=14` (bawaan) memilih `qwen3:14b`. Untuk mengunduh hanya model 8B, isi `OLLAMA_MODELS_TO_PULL=qwen3:8b`. Pastikan model yang dipilih sudah diunduh. Model 14B memerlukan sumber daya lebih besar; kecepatan bergantung pada mesin.
 
 ### B. AI melalui OpenRouter, tanpa menjalankan Ollama
 
@@ -209,7 +209,7 @@ Selama pertandingan aktif, membuka halaman aplikasi lain/tab baru atau login ula
 Akun yang sama di beberapa tab tetap satu pemain. Teman bisa mendaftar sendiri lewat halaman login, ditambahkan dari panel **Manajemen user**, atau dibuat lewat CLI lokal (password diminta tersembunyi dan disimpan sebagai hash; akun lama tidak ditimpa):
 
 ```sh
-docker compose exec ai-engine python -m app.module.create_user teman1 --name "Teman Satu"
+docker compose exec ai-engine python scripts/create_user.py teman1 --name "Teman Satu"
 ```
 
 Gunakan `-f docker-compose.gpu.yml` jika memakai stack NVIDIA. Setiap teman login dengan akun sendiri, lalu gabung memakai kode room yang sama. Pengujian lintas perangkat/LAN memerlukan konfigurasi CORS/host yang sesuai.
@@ -235,7 +235,7 @@ Script ini menulis `PANEL_USERNAME=administrator` dan `PANEL_PASSWORD_HASH`, ser
 | 05 Otak NPC | Rantai penulis kalimat, tes koneksi tiap prioritas, status NLU IndoBERT |
 | 06 Survei | Mengatur pertanyaan survei, ringkasan jawaban per metode bot, dan ekspor CSV |
 | 07 Simulasi | Pertandingan tiruan dengan bot (metode dipilih per bot): chat seperti room asli, flowchart proses AI yang menyala sesuai tahap, dan kode asli tiap tahap |
-| 08 Dokumen | ERD database dan penjelasan Proses AI (`backend/public/dokumen`: salinan hasil pembuat dokumen di `communicationfolder/`, folder yang tidak ikut repo) |
+| 08 Dokumen | Arsitektur, ERD, Proses AI, Bedah Alur, Bedah Otak Fuzzy, serta kode dan diagram NLU dan Fuzzy (`backend/public/dokumen`: salinan hasil pembuat dokumen di `communicationfolder/`, folder yang tidak ikut repo) |
 
 CSV (survei dan riwayat chat) memakai UTF-8 dengan BOM dan menyimpan jawaban persis seperti diketik pemain. Saat membuka di spreadsheet, impor kolom teks sebagai teks agar jawaban yang diawali `=`, `+`, `-`, atau `@` tidak dievaluasi sebagai formula.
 
@@ -309,7 +309,7 @@ Jika mengubah daftar model lokal yang harus diunduh, jalankan pula `docker compo
 | Error perangkat/driver NVIDIA | Pastikan file GPU hanya dipakai pada mesin NVIDIA yang didukung; di Mac gunakan file CPU atau mode API. |
 | Port sudah digunakan | Hentikan service lokal lain yang memakai port tersebut. Perubahan port juga perlu diselaraskan dengan URL frontend, CORS, dan proxy. |
 | Login gagal / backend belum siap | Periksa `docker compose ps -a`, log `ai-engine` dan `mysql`, lalu status backend. Database lama mungkin belum memiliki migration akun. |
-| Bot diam atau kualitasnya turun | Buka panel **Otak NPC**: pastikan NLU tertulis IndoBERT (bukan cadangan) dan minimal satu jalur penulis hidup (atau `NPC_WRITER=templat`). Periksa `database_ready=true` di `/app-status`. Untuk mode `llm`, periksa juga `ollama_ready`/key API. |
+| Bot diam atau kualitasnya turun | Buka panel **Otak NPC**: pastikan NLU tertulis IndoBERT dan minimal satu jalur penulis hidup (atau `NPC_WRITER=templat`). Periksa `database_ready=true` di `/app-status`. Untuk mode `llm`, periksa juga `ollama_ready`/key API. |
 | Panel tidak bisa login | Pastikan `PANEL_PASSWORD_HASH` sudah dibuat dengan `setup_panel.py` dan backend sudah di-restart. |
 | Ruangan tidak ditemukan | Buat ruangan baru setelah backend restart, atau periksa kembali kode undangan. |
 
@@ -321,9 +321,12 @@ backend/              Python FastAPI + Socket.IO
   app/                Semua kode aplikasi Python
     __init__.py       Paket aplikasi
     main.py           Entry point ASGI (app.main:asgi_app)
-    config/           Konfigurasi aplikasi, AI, MySQL
-    controller/       Pintu masuk: api/ (REST), realtime/ (event Socket.IO), middleware/
-    module/           Logika autentikasi/game, koneksi MySQL, klien AI, dan CLI akun
+    config/           Konfigurasi aplikasi, AI, MySQL, koneksi database, daftar skin
+    controllers/      API HTTP (REST)
+    middleware/       Cek login, batas percobaan, CORS, respons validasi
+    sockets/          server.py (sio, kirim ke room) dan chat.py (event Socket.IO)
+    services/         Logika login, room, chat, survei, panel, konfigurasi AI, dan klien Ollama
+    module/           Engine pertandingan, bot, dan simulasi
       npc_brain/      Runtime otak NPC; generated/ = ekspor notebook skripsi
     models/           Query SQL terparameterisasi
     schemas/          Validasi request/response API
@@ -331,7 +334,7 @@ backend/              Python FastAPI + Socket.IO
   artifacts/indobert/ Model IndoBERT intent + target untuk otak NPC (disalin manual)
   migrations/         Skema SQL V01–V10 (lokal dan Azure)
   deployment/         Konfigurasi produksi Azure (Dockerfile, Caddy)
-  scripts/            setup_panel.py, ekspor_otak_npc.py, setup_azure.py
+  scripts/            create_user.py, setup_panel.py, ekspor_otak_npc.py, setup_azure.py
 proxy/                Gateway Nginx
 ai-docker/            LLM penulis kalimat bot (Qwen3 4B/14B) di laptop + tunnel untuk VM; jalankan.bat
 docker-compose.yml    Service development dan volume

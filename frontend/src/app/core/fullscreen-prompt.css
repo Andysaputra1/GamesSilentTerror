@@ -54,8 +54,8 @@
   text-align: right;
 }
 
-/* Layar sempit (HUD game tablet/HP): ikon saja; nama tetap lewat aria-label. */
-@media (max-width: 1099px) {
+/* Layar sempit (HUD game laptop kecil, tablet, HP): ikon saja; nama tetap lewat aria-label. */
+@media (max-width: 1399px) {
   .fullscreen-label {
     position: absolute;
     width: 1px;

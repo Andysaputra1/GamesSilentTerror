@@ -215,6 +215,19 @@
    Responsif
    ========================================================================== */
 
+/* Laptop kecil: nama akun dipendekkan lalu dilepas (avatar saja) agar sisi kanan HUD tidak menimpa
+   urutan fase; label Layar penuh ikut dilepas di fullscreen-prompt.css. */
+@media (max-width: 1399px) {
+  .profile-chip {
+    --profile-name-max: 90px;
+  }
+}
+@media (max-width: 1279px) {
+  .profile-chip {
+    --profile-name-display: none;
+  }
+}
+
 /* Tablet: meja + chat; kartu rahasia dibuka lewat tab. */
 @media (max-width: 1099px) {
   .match-grid {
@@ -284,18 +297,46 @@
     min-width: 0;
     font-size: 14px;
   }
-  .profile-chip {
-    --profile-name-display: none;
+  /* Target sentuh tautan teks di layar akhir dan kuesioner, serta tombol tutup pesan. */
+  .text-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+  .toast button {
+    min-height: 40px;
+    min-width: 44px;
   }
 }
-@media (max-width: 899px) {
+/* Tablet potret dan HP landscape: bilah meja di layar persiapan bertumpuk agar nama peserta tidak
+   terpecah per huruf. */
+@media (max-width: 899px), (max-height: 500px) {
   .hud-brand {
     display: none;
   }
+  .splash-table {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .splash-status {
+    padding: 12px 0 0;
+    border-top: 2px dashed rgb(139 90 43 / 0.35);
+    border-left: 0;
+  }
+}
+/* Meja sempit (container .table-felt, termasuk tiga kolom di laptop kecil): chip komposisi tanpa
+   ikon agar tetap satu baris. */
+@container (max-width: 500px) {
+  .felt-composition i {
+    display: none;
+  }
+  .felt-composition .comp-chip {
+    padding: 0.05em 0.5em;
+    font-size: 13px;
+  }
 }
 
-/* HP: satu panel per tab; kartu meja 2–3 kolom tanpa scroll. */
-@media (max-width: 759px) {
+/* HP (termasuk landscape): satu panel per tab; kartu meja 2–3 kolom tanpa scroll. */
+@media (max-width: 759px), (max-height: 500px) and (max-width: 1099px) {
   .hud {
     grid-template-columns: minmax(0, 1fr) auto;
     gap: 8px;
@@ -316,9 +357,12 @@
     padding: 0.5em 1.1em;
     font-size: 11px;
   }
+  /* Nama fase boleh dua baris: ronde dan fase harus terbaca walau ruang di HUD sempit. */
   .phase-sign b {
-    overflow: hidden;
-    text-overflow: ellipsis;
+    overflow: visible;
+    line-height: 1.05;
+    text-wrap: balance;
+    white-space: normal;
   }
   .timer {
     width: 44px;
@@ -327,9 +371,9 @@
   .timer b {
     font-size: 15px;
   }
-  .round-button {
-    width: 36px;
-    height: 36px;
+  .rules-head .round-button {
+    width: 44px;
+    height: 44px;
   }
   .match-grid {
     grid-template-columns: minmax(0, 1fr);
@@ -356,14 +400,6 @@
   .players {
     --gap: 12px;
   }
-  /* Komposisi di meja HP: tanpa ikon agar tetap satu baris. */
-  .felt-composition i {
-    display: none;
-  }
-  .felt-composition .comp-chip {
-    padding: 0.05em 0.5em;
-    font-size: 13px;
-  }
   .hud-side .round-button {
     display: none;
   }
@@ -389,24 +425,12 @@
   .splash-body {
     grid-template-columns: minmax(0, 1fr);
   }
-
-  .splash-table {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .splash-status {
-    padding: 12px 0 0;
-    border-top: 2px dashed rgb(139 90 43 / 0.35);
-    border-left: 0;
-  }
-  /* HUD HP: kotak akun cukup avatar, tombol Keluar cukup ikon (teks tetap untuk pembaca layar). */
+  /* HUD HP: tombol Keluar cukup ikon (teks tetap untuk pembaca layar). */
   .hud-side {
     gap: 6px;
   }
-  .profile-chip {
-    --profile-name-display: none;
-  }
   .leave-match {
-    padding: 0 10px;
+    padding: 0 12px;
   }
   .leave-label {
     position: absolute;
@@ -422,6 +446,54 @@
   }
   .toast {
     top: 64px;
+  }
+  /* Kartu kecil: nama boleh dua baris; pita "Terancam" pindah ke atas kartu agar tidak menimpa
+     jumlah vote di pojok bawah. */
+  .name-tag {
+    display: -webkit-box;
+    line-height: 1.1;
+    text-align: center;
+    white-space: normal;
+    overflow-wrap: break-word;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+  .leading-ribbon {
+    top: -0.75em;
+    bottom: auto;
+  }
+  /* Malam: chat tim yang aktif mendapat ruang lebih dari diskusi meja yang terkunci. */
+  .team-chat {
+    flex-grow: 2;
+  }
+  /* Kartu pemenang lebih lebar agar nama tidak terpotong; baris pemenang boleh membungkus. */
+  .lineup li {
+    --size: clamp(72px, calc(64vw / var(--count, 1)), 170px);
+  }
+}
+
+/* HP landscape: baki aksi di samping meja, karena tinggi layar tidak cukup untuk keduanya bertumpuk. */
+@media (max-height: 500px) and (max-width: 1099px) {
+  .table-panel {
+    flex-direction: row;
+  }
+  .table-felt {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .action-panel,
+  .board-bar {
+    flex: 0 0 clamp(180px, 28vw, 260px);
+    align-content: center;
+    overflow-y: auto;
+    padding: 10px 14px;
+  }
+  .mobile-tabs {
+    padding-block: 3px calc(3px + env(safe-area-inset-bottom));
+  }
+  .mobile-tabs button {
+    min-height: 40px;
   }
 }
 

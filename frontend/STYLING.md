@@ -28,7 +28,8 @@ Setiap halaman memiliki HTML dan CSS terpisah di src/app/features/.
 Khusus auth sekarang memakai `auth.html` dan `auth.scss` dari desain Kimberly:
 meja kayu, kertas register, dan binder login. Asetnya di `public/assets/`.
 Ubah `--em`, padding `.register-sheet`/`.login-journal`, dan breakpoint 899px
-untuk proporsi desktop/mobile. Google memakai tombol resmi GIS. Jangan mengedit
+untuk proporsi desktop/mobile: di bawah 900px binder dilepas menjadi dua lembar kertas
+berdampingan, dan di HP (<= 640px) keduanya bertumpuk. Google memakai tombol resmi GIS. Jangan mengedit
 file `auth_kim.*` atau CSS lama karena sudah digantikan.
 Tidak ada style inline di template Main atau Lobby.
 CSS diformat multiline; bagian responsive ada di bawah file.
@@ -45,16 +46,17 @@ responsif, `prefers-reduced-motion`). Panas vote diatur `--heat` (0–1) per kar
 meja dipilih `Game.tableColumns` dari ukuran papan. Karakter dan warna label pemain mengikuti
 urutan kursi, bukan role. Komposisi role room (`snapshot.composition`) tampil sebagai chip
 `.composition`/`.comp-chip` (gaya dasar di `game-screens.css`) di layar persiapan dan di tepi atas
-papan (`.felt-composition`, ruangnya dipesan lewat padding `.table-felt.has-composition`; di HP tanpa
-ikon). Di room multi-Hitman chip Hitman di tepi meja menampilkan "tersisa/total" dari
+papan (`.felt-composition`, ruangnya dipesan lewat padding `.table-felt.has-composition`; di meja sempit
+tanpa ikon). Di room multi-Hitman chip Hitman di tepi meja menampilkan "tersisa/total" dari
 `snapshot.hitman_remaining` dan diberi kelas `.comp-chip.reduced` (merah) setelah ada Hitman yang
 tereksekusi; pembaca layar mendapat teks `.sr-only` "Hitman tersisa x dari n". Penanda rekan Syndicate
 hanya dirender untuk Hitman: `.ally-tag` di kartu rekan dan `.ally-pick` ("◆ Incaran") di kartu yang
 dipilih rekan saat malam (keduanya di `game-screens.css` karena budget `game-table.css` hampir penuh),
 serta `.ally-plan` di baki aksi (`game-table.css`).
-Breakpoint 1099px: meja + chat dengan tab Meja/Kartu (HUD: kotak akun hanya avatar); 759px: satu
-panel per tab (Meja/Chat/Kartu), tombol Keluar hanya ikon. Perubahan file game ini tidak memengaruhi
-login/main page.
+Breakpoint 1099px: meja + chat dengan tab Meja/Kartu (HUD: kotak akun hanya avatar); 899px: layar
+persiapan bergulir dan bilah mejanya bertumpuk; 759px: satu panel per tab (Meja/Chat/Kartu), tombol
+Keluar hanya ikon. HP landscape (tinggi <= 500px) memakai tab yang sama dengan baki aksi di samping
+meja. Perubahan file game ini tidak memengaruhi login/main page.
 
 **Kontrol meja bersama** (akhir `src/styles.css`, dipakai Main, Room, dan HUD game):
 token `--desk-*`, `--paper-*`, `--danger`, `--radius-control`; kelas `.desk-chip` (tombol gelap di
@@ -65,7 +67,8 @@ kayu), dan `.stamp-label` (label cap di atas kertas, ukuran lewat `--stamp-size`
 
 **Main dan Room** memakai binder kulit yang sama (`main-page.css`, `lobby.css`); di HP (<= 640px)
 binder dilepas menjadi dua lembar kertas bertumpuk (`main-page-responsive.css`,
-`lobby-responsive.css`) dan halaman boleh bergulir vertikal.
+`lobby-responsive.css`) dan halaman boleh bergulir vertikal. HP landscape (tinggi <= 480px) memakai
+kertas yang sama, tetapi berdampingan.
 
 **Layar loading awal**: markup `#boot-loader` ada di `src/index.html` (di luar `app-root`, jadi tampil
 pada paint pertama) dan gayanya di `styles.css`; `core/boot-loader.ts` menghapusnya setelah halaman

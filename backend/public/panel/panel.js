@@ -1231,7 +1231,7 @@ function resetChecker() {
 const ALUR_AI = {
   input: {
     judul: 'Chat pemain masuk',
-    kode: 'Simulasi.kirim · SocketGameController._send_chat · Match.can_chat',
+    kode: 'Simulasi.kirim · chat.send_chat · Match.can_chat',
     tujuan: 'Menerima kalimat pemain pada fase yang boleh chat.',
     proses:
       'Server memeriksa izin chat (siang/Tribunal, tidak dibungkam), lalu pesan masuk ke chat pertandingan.',

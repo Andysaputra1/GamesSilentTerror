@@ -8,11 +8,11 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 
-from app.controller.api.panel import require_panel
-from app.controller.middleware.auth import require_authenticated_user
-from app.controller.middleware.safe_validation import SafeValidationRoute
-from app.module.persistence_service import PersistenceError
-from app.module.survey_service import SurveyAlreadySubmitted, survey_service
+from app.controllers.panel import require_panel
+from app.middleware.auth import require_authenticated_user
+from app.middleware.safe_validation import SafeValidationRoute
+from app.services.persistence_service import PersistenceError
+from app.services.survey_service import SurveyAlreadySubmitted, survey_service
 
 router = APIRouter(tags=["survey"], route_class=SafeValidationRoute)
 

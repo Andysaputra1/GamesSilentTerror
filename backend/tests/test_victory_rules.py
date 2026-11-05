@@ -4,7 +4,7 @@ import random
 import unittest
 
 from app.module.match_engine import Match
-from app.module.room_service import RoomService
+from app.services.room_service import RoomService
 
 
 class VictoryRulesTests(unittest.TestCase):

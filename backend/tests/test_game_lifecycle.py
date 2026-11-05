@@ -7,9 +7,9 @@ from unittest.mock import patch
 from fastapi import FastAPI, Header
 from fastapi.testclient import TestClient
 
-from app.controller.api.rooms import router
-from app.controller.middleware.auth import require_authenticated_user
-from app.module.room_service import RoomService
+from app.controllers.rooms import router
+from app.middleware.auth import require_authenticated_user
+from app.services.room_service import RoomService
 
 
 class GameLifecycleTests(unittest.TestCase):
@@ -21,8 +21,8 @@ class GameLifecycleTests(unittest.TestCase):
         app.dependency_overrides[require_authenticated_user] = lambda x_user=Header(
             "player0"
         ): SimpleNamespace(username=x_user)
-        self.enterContext(patch("app.controller.api.rooms.room_service", self.rooms))
-        self.enterContext(patch("app.controller.api.rooms.PersistenceService"))
+        self.enterContext(patch("app.controllers.rooms.room_service", self.rooms))
+        self.enterContext(patch("app.services.room_service.PersistenceService"))
         self.enterContext(patch("app.module.match_engine.time.time", side_effect=lambda: self.now))
         self.client = self.enterContext(TestClient(app))
 

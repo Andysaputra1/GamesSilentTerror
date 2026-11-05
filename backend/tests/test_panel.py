@@ -3,12 +3,14 @@ import json
 import unittest
 from datetime import date, datetime
 from unittest.mock import patch
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
+from sqlalchemy.exc import OperationalError
 from app.config.settings import settings
-from app.controller.api.panel import router, require_panel, history_filter, validate_endpoint
-from app.module.password_service import hash_password
+from app.controllers.panel import router, require_panel
+from app.services.panel_service import history_filter, validate_endpoint
+from app.services.password_service import hash_password
 
 # Bacaan NLU satu pesan seperti yang disimpan pencatat NLU (BrainRuntime.baca_chat), beserta konteksnya.
 NLU_CONTOH = json.dumps(
@@ -64,8 +66,10 @@ class PanelTests(unittest.TestCase):
             ("erd", "ERD Silent Terror"),
             ("proses-ai", "Proses AI Silent Terror"),
             ("arsitektur", "Arsitektur Sistem Silent Terror"),
+            ("bedah-alur", "Bedah Alur Silent Terror"),
             ("kode-fuzzy", "Kode Fuzzy Logic"),
             ("diagram-alir-fuzzy", "Diagram Alir Fuzzy Logic"),
+            ("bedah-otak-fuzzy", "Bedah Otak Fuzzy"),
             ("kode-nlu-intent", "Kode NLU Intent"),
             ("kode-nlu-target", "Kode NLU Target"),
             ("diagram-alir-nlu", "Diagram Alir NLU"),
@@ -87,7 +91,7 @@ class PanelTests(unittest.TestCase):
         hashed = base64.b64encode(hash_password("fixture-password").encode()).decode()
         with (
             patch.object(settings, "panel_password_hash", SecretStr(hashed)),
-            patch("app.controller.api.panel.transaction") as db,
+            patch("app.services.panel_service.transaction") as db,
         ):
             self.assertEqual(
                 self.client.post(
@@ -97,11 +101,22 @@ class PanelTests(unittest.TestCase):
             )
             db.assert_not_called()
 
+    # Service melempar PersistenceError; controller yang menjadikannya 503 dengan pesan yang sama seperti dulu.
+    def test_database_failure_keeps_panel_503_message(self):
+        self.app.dependency_overrides[require_panel] = lambda: "test-admin"
+        gagal = OperationalError("SELECT", {}, Exception("server hilang"))
+        pesan = "Database panel belum siap. Periksa koneksi dan migrasi V5/V6."
+        for alamat in ["/api/panel/rooms", "/api/panel/history", "/api/panel/history.csv",
+                       "/api/panel/checker/ABC123", f"/api/panel/checker/ABC123/jejak/{'a' * 32}"]:  # fmt: skip
+            with self.subTest(alamat=alamat), patch("sqlalchemy.orm.Session.execute", side_effect=gagal):
+                hasil = self.client.get(alamat)
+                self.assertEqual((hasil.status_code, hasil.json()["detail"]), (503, pesan))
+
     def test_date_filters_cover_full_wib_day(self):
         _, params = history_filter(None, date(2026, 9, 23), date(2026, 9, 23))
         self.assertEqual(params["start"], datetime(2026, 9, 22, 17))
         self.assertEqual(params["end"], datetime(2026, 9, 23, 17))
-        with self.assertRaises(HTTPException):
+        with self.assertRaises(ValueError):
             history_filter(None, date(2026, 9, 24), date(2026, 9, 23))
 
     def test_tunnel_rejects_credentials_private_addresses_and_http(self):
@@ -110,21 +125,21 @@ class PanelTests(unittest.TestCase):
             "https://name:pass@example.com",
             "https://example.com/?key=secret",
         ]:
-            with self.assertRaises(HTTPException):
+            with self.assertRaises(ValueError):
                 validate_endpoint(url)
         with patch(
-            "app.controller.api.panel.socket.getaddrinfo",
+            "app.services.panel_service.socket.getaddrinfo",
             return_value=[(2, 1, 6, "", ("169.254.169.254", 443))],
         ):
-            with self.assertRaises(HTTPException):
+            with self.assertRaises(ValueError):
                 validate_endpoint("https://metadata.test")
 
     def test_empty_room_is_archived_and_db_failure_removes_live_room(self):
         from types import SimpleNamespace
-        from app.controller.api.rooms import router as room_router
-        from app.controller.middleware.auth import require_authenticated_user
-        from app.module.room_service import RoomService
-        from app.module.persistence_service import PersistenceError
+        from app.controllers.rooms import router as room_router
+        from app.middleware.auth import require_authenticated_user
+        from app.services.room_service import RoomService
+        from app.services.persistence_service import PersistenceError
 
         self.app.include_router(room_router)
         self.app.dependency_overrides[require_authenticated_user] = lambda: SimpleNamespace(
@@ -132,8 +147,8 @@ class PanelTests(unittest.TestCase):
         )
         rooms = RoomService()
         with (
-            patch("app.controller.api.rooms.room_service", rooms),
-            patch("app.controller.api.rooms.PersistenceService") as factory,
+            patch("app.controllers.rooms.room_service", rooms),
+            patch("app.services.room_service.PersistenceService") as factory,
         ):
             factory.return_value.archive_new_room.return_value = True
             response = self.client.post("/api/rooms")
@@ -145,7 +160,22 @@ class PanelTests(unittest.TestCase):
                 username="bob"
             )
             factory.return_value.archive_new_room.side_effect = PersistenceError("fail")
-            self.assertEqual(self.client.post("/api/rooms").status_code, 503)
+            gagal = self.client.post("/api/rooms")
+            self.assertEqual(
+                (gagal.status_code, gagal.json()["detail"]),
+                (503, "Ruangan gagal disimpan. Coba lagi."),
+            )
+            self.assertEqual(set(rooms.rooms), before)
+            # Semua kode acak sudah terpakai di arsip: berhenti sesudah 10 percobaan, tanpa room tertinggal.
+            factory.return_value.archive_new_room.side_effect = None
+            factory.return_value.archive_new_room.return_value = False
+            factory.return_value.archive_new_room.reset_mock()
+            bentrok = self.client.post("/api/rooms")
+            self.assertEqual(
+                (bentrok.status_code, bentrok.json()["detail"]),
+                (503, "Kode ruangan belum tersedia. Coba lagi."),
+            )
+            self.assertEqual(factory.return_value.archive_new_room.call_count, 10)
             self.assertEqual(set(rooms.rooms), before)
 
 
@@ -195,7 +225,7 @@ class HistoryFilterTests(unittest.TestCase):
             with self.engine.begin() as db:
                 return operation(db)
 
-        self.db_patch = patch("app.controller.api.panel.transaction", side_effect=transaction)
+        self.db_patch = patch("app.services.panel_service.transaction", side_effect=transaction)
         self.db_patch.start()
 
     def tearDown(self):

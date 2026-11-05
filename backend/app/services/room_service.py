@@ -18,17 +18,22 @@ Alurnya tiap detak jam (perbarui_fase_semua_room, dipanggil main.py tiap 0,5 det
 
 import logging
 from dataclasses import dataclass, field
-from sqlalchemy import text
 import secrets
 import threading
-from app.module.mysql_connector import SessionLocal
+from app.config.database import SessionLocal
+from app.models import auth_queries
 from app.module.match_engine import Match, label_unik, phase_durations
-from app.module.activity_service import activity, traced
+from app.services.activity_service import activity, traced
+from app.services.persistence_service import PersistenceError, PersistenceService
 
 logger = logging.getLogger("shadow_heist.rooms")
 
 # Nama NPC; juga dicadangkan agar tidak bisa dipakai sebagai username akun.
 BOT_NAMES = ("NOX", "ECHO", "VEIL", "RAVEN", "ASH", "DUSK", "IRIS", "SAGE", "ONYX", "LARK")
+
+
+class RoomBelumTersimpan(RuntimeError):
+    """Ruangan baru gagal dicatat di arsip, jadi tidak jadi dibuat."""
 
 
 @dataclass
@@ -56,15 +61,9 @@ class RoomService:
             return {}
         database = SessionLocal()
         try:
-            penanda_sql = ", ".join([f":u{urutan}" for urutan in range(len(daftar_username))])
-            nilai_sql = {f"u{urutan}": username for urutan, username in enumerate(daftar_username)}
-            perintah_sql = text(f"""
-                SELECT username, skin_id, display_name FROM user_accounts
-                WHERE username IN ({penanda_sql})
-            """)
             profil_tersimpan = {
                 baris.username: (baris.skin_id, baris.display_name)
-                for baris in database.execute(perintah_sql, nilai_sql)
+                for baris in auth_queries.account_profiles(database, daftar_username)
             }
             return {
                 username: profil_tersimpan.get(username, ("dexter", username))
@@ -78,7 +77,8 @@ class RoomService:
         for username, (skin_id, nama_tampilan) in self._ambil_profil_akun(daftar_username).items():
             room.members_skin[username], room.members_label[username] = skin_id, nama_tampilan
 
-    # SERVICE AKSES: ambil ruangan berdasarkan kode serta pastikan pengguna merupakan anggotanya.
+    # Mengambil room dari kodenya, sekaligus memastikan pemain itu anggotanya.
+    # Room hanya ada di memori: tidak ada query DB di sini, dan semua room hilang saat server restart.
     def get(self, code: str, username: str) -> Room:
         with self.lock:
             room = self.rooms.get(code.strip().upper())
@@ -112,7 +112,7 @@ class RoomService:
             return
         room.peserta_tercatat = True
         # Impor lambat: survey_service mengimpor modul ini.
-        from app.module.survey_service import survey_service
+        from app.services.survey_service import survey_service
 
         baris_peserta = survey_service.baris_peserta(room)
         threading.Thread(
@@ -136,7 +136,7 @@ class RoomService:
             if room.match:
                 # Survei akhir tetap bisa dikirim setelah keluar (room mungkin segera dibersihkan).
                 # Impor lambat: survey_service mengimpor modul ini.
-                from app.module.survey_service import survey_service
+                from app.services.survey_service import survey_service
 
                 survey_service.ingat_pertandingan(room)
                 # Room bisa dihapus di bawah sebelum timer sempat mencatat.
@@ -177,6 +177,21 @@ class RoomService:
             self._ingat_profil(room, [username])
             self.rooms[kode_room] = room
             return room
+
+    # Buat ruangan yang sudah tercatat di arsip. Gagal mencatat berarti ruangannya tidak jadi dibuat.
+    def buat_room_terarsip(self, username, capacity=6):
+        with self.lock:
+            # Kode acak bisa sudah terpakai di arsip lama: buang room itu lalu coba kode lain.
+            for _ in range(10):
+                room = self.create(username, capacity=capacity)
+                try:
+                    if PersistenceService(room.code).archive_new_room(username):
+                        return room
+                except PersistenceError as error:
+                    self.rooms.pop(room.code, None)
+                    raise RoomBelumTersimpan("Ruangan gagal disimpan. Coba lagi.") from error
+                self.rooms.pop(room.code, None)
+            raise RoomBelumTersimpan("Kode ruangan belum tersedia. Coba lagi.")
 
     # SERVICE LOBBY: tambahkan anggota tanpa duplikasi; tolak ruangan hilang atau kapasitas pilihan host penuh.
     @traced
@@ -255,6 +270,12 @@ class RoomService:
                     "quick": phase_durations(jumlah_peserta, True),
                 },
             }
+
+    # Snapshot ruangan milik pengguna, termasuk lobby dan pertandingan selesai; None bila tidak ada.
+    def snapshot_room_saat_ini(self, username):
+        with self.lock:
+            room = self.current(username)
+            return self.snapshot(room) if room else None
 
     # START: hanya host; role tidak pernah dikembalikan lewat snapshot lobby.
     @traced

@@ -1,9 +1,9 @@
 """Konfigurasi otak NPC dari panel (penulis kalimat dan rantai penulis); .env tetap nilai awal.
 
 Disimpan di baris panel_configuration id=2 agar tidak bercampur dengan konfigurasi provider LLM
-(id=1) yang ditulis ulang utuh oleh save_panel_configuration.
+(id=1) yang ditulis ulang utuh oleh simpan_konfigurasi_ai.
 
-Alurnya saat server nyala (load_npc_configuration, dipanggil main.py sebelum otak dimuat)
+Alurnya saat server nyala (muat_konfigurasi_npc, dipanggil main.py sebelum otak dimuat)
 1. Baca baris id=2 dari DB
 2. Baris kosong: selesai, otak memakai nilai .env
 3. Ada isi: titipkan ke runtime otak, yang baru membangun rantai penulisnya saat otak dimuat. Isi tidak valid diabaikan, otak memakai nilai .env
@@ -17,24 +17,21 @@ Alurnya saat panel menyimpan (save_npc_configuration)
 import json
 import logging
 
-from sqlalchemy import text
-
+from app.config.database import jalankan_transaksi
+from app.models import panel_queries
 from app.module.npc_brain.runtime import brain_runtime
-from app.module.persistence_service import PersistenceService
 
 BARIS_NPC = 2
 logger = logging.getLogger("shadow_heist.npc_config")
 
 
 # Baca konfigurasi tersimpan lalu terapkan ke runtime saat backend dimulai.
-def load_npc_configuration():
+def muat_konfigurasi_npc():
     def read(database):
-        value = database.execute(
-            text("SELECT config FROM panel_configuration WHERE id=:id"), {"id": BARIS_NPC}
-        ).scalar()
+        value = panel_queries.panel_configuration(database, BARIS_NPC)
         return json.loads(value) if isinstance(value, str) else value
 
-    stored = PersistenceService._run(read)
+    stored = jalankan_transaksi(read)
     if stored:
         try:
             # Baris lama tanpa urutan/model penulis → None → nilai .env dipertahankan.
@@ -64,17 +61,12 @@ def save_npc_configuration(penulis, urutan_penulis=None, model_openrouter=None, 
         "model_tautan": summary["model_tautan"],
     }
 
-    def write(database):
-        database.execute(
-            text("""
-            INSERT INTO panel_configuration(id, config) VALUES(:id, :config)
-            ON DUPLICATE KEY UPDATE config=:config
-        """),
-            {"id": BARIS_NPC, "config": json.dumps(config)},
-        )
-
     try:
-        PersistenceService._run(write)
+        jalankan_transaksi(
+            lambda database: panel_queries.write_panel_configuration(
+                database, BARIS_NPC, json.dumps(config)
+            )
+        )
     except Exception:
         # Gagal simpan: kembalikan runtime ke konfigurasi sebelumnya agar panel dan server konsisten.
         brain_runtime.atur(

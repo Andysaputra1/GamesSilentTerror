@@ -1,5 +1,5 @@
 import unittest
-from app.module.activity_service import ActivityService
+from app.services.activity_service import ActivityService
 from app.module.match_engine import Match
 
 

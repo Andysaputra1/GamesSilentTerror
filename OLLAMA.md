@@ -24,11 +24,11 @@ docker compose -f docker-compose.gpu.yml exec ollama ollama list
 
 Kedua versi menjalankan Ollama di Docker. Tidak perlu instalasi Ollama native
 untuk Mac. Versi CPU tidak meminta perangkat NVIDIA dan dapat jauh lebih lambat.
-Pastikan memori Docker cukup untuk model yang dipilih; mulai dari 8B atau gunakan API.
+Pastikan memori Docker cukup untuk model yang dipilih (bawaan 14B); bila kurang, pilih 8B atau gunakan API.
 
 Service `ollama-models` menunggu server sehat, lalu mengunduh model yang belum
-tersedia. `.env.example` mengunduh `qwen3:8b` saja; fallback Compose jika variabel
-tidak diisi tetap `qwen3:8b qwen3:14b`. Setelah selesai, initializer keluar dengan
+tersedia. `.env.example` dan fallback Compose mengunduh `qwen3:14b` saja. Setelah selesai,
+initializer keluar dengan
 kode 0; server tetap berjalan. Ubah `OLLAMA_MODELS_TO_PULL` di .env untuk mengganti
 daftar model. Model yang telah tersedia dilewati, bukan diunduh ulang.
 
@@ -74,7 +74,7 @@ Isi file .env di root:
 
 ```dotenv
 AI_PROVIDER=docker
-OLLAMA_MODEL=8
+OLLAMA_MODEL=14
 OLLAMA_TIMEOUT_SECONDS=180
 OLLAMA_MAX_OUTPUT_TOKENS=160
 ```

@@ -13,10 +13,10 @@ from unittest.mock import AsyncMock, Mock, patch
 from fastapi import FastAPI, Header
 from fastapi.testclient import TestClient
 
-from app.controller.api.rooms import router
-from app.controller.middleware.auth import require_authenticated_user
-from app.module.activity_service import activity
-from app.module.checker_service import checker_service
+from app.controllers.rooms import router
+from app.middleware.auth import require_authenticated_user
+from app.services.activity_service import activity
+from app.services.checker_service import checker_service
 from app.module.match_engine import (
     TEAM_CHAT_LIMIT,
     TRIBUNAL_EXTRA_QUICK_SECONDS,
@@ -26,7 +26,7 @@ from app.module.match_engine import (
 )
 from app.module.npc_brain.generated import otak_fuzzy
 from app.module.npc_service import NPCService, riwayat_nlu
-from app.module.room_service import Room, RoomService
+from app.services.room_service import Room, RoomService
 
 ENAM = ["hitman", "spy", "stalker", "civilian", "civilian2", "civilian3"]
 DELAPAN = ["hitman", "hitman2", "spy", "spy2", "stalker", "civilian", "civilian2", "civilian3"]
@@ -538,7 +538,7 @@ class TeamChatEndpointTests(unittest.TestCase):
             "hitman"
         ): SimpleNamespace(username=x_user)
         self.client = TestClient(app)
-        patcher = patch("app.controller.api.rooms.room_service", self.rooms)
+        patcher = patch("app.controllers.rooms.room_service", self.rooms)
         patcher.start()
         self.addCleanup(patcher.stop)
 
@@ -581,7 +581,7 @@ class TeamChatEndpointTests(unittest.TestCase):
     # Privasi: pesan tim tidak masuk jejak aktivitas panel, checker, riwayat NLU, atau database.
     def test_team_message_stays_out_of_activity_checker_nlu_and_database(self):
         with (
-            patch("app.controller.api.rooms.PersistenceService") as arsip,
+            patch("app.services.room_service.PersistenceService") as arsip,
             patch("app.module.npc_service.PersistenceService") as arsip_npc,
         ):
             self.assertEqual(self.post("hitman").status_code, 200)

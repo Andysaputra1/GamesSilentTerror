@@ -1,13 +1,61 @@
 """Run with: python -m unittest discover -s tests -v (from backend)."""
 
+import ast
 from datetime import datetime, timedelta
+import os
+from pathlib import Path
 import unittest
+from unittest.mock import patch
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session
 
 from app.config.mysql import MySQLSettings
 from app.models import auth_queries
+
+
+# Nama yang diimpor sebuah berkas dari satu modul, di mana pun letak impornya di dalam berkas itu.
+def _impor_dari(berkas, modul):
+    pohon = ast.parse(berkas.read_text(encoding="utf-8"))
+    return {
+        alias.name
+        for simpul in ast.walk(pohon)
+        if isinstance(simpul, ast.ImportFrom) and simpul.module == modul
+        for alias in simpul.names
+    }
+
+
+class LayerRuleTests(unittest.TestCase):
+    APP = Path(__file__).resolve().parents[1] / "app"
+
+    # SQL hanya di models; satu-satunya pengecualian SELECT 1 pemeriksa koneksi di config/database.py.
+    def test_sql_text_only_in_models(self):
+        for berkas in self.APP.rglob("*.py"):
+            relatif = berkas.relative_to(self.APP).as_posix()
+            if relatif.startswith("models/") or relatif == "config/database.py":
+                continue
+            with self.subTest(berkas=relatif):
+                self.assertNotIn("text", _impor_dari(berkas, "sqlalchemy"))
+
+    # Transaksi ditentukan service, jadi controller tidak membuka database sendiri.
+    def test_controllers_do_not_open_transactions(self):
+        for berkas in (self.APP / "controllers").glob("*.py"):
+            with self.subTest(berkas=berkas.name):
+                self.assertEqual(_impor_dari(berkas, "sqlalchemy"), set())
+                self.assertEqual(
+                    _impor_dari(berkas, "app.config.database")
+                    & {"jalankan_transaksi", "SessionLocal", "engine"},
+                    set(),
+                )
+                self.assertNotIn(
+                    "PersistenceService", _impor_dari(berkas, "app.services.persistence_service")
+                )
+
+    # Service dipakai controller maupun bot, jadi error-nya diterjemahkan ke HTTP di controller.
+    def test_services_do_not_know_http(self):
+        for berkas in (self.APP / "services").glob("*.py"):
+            with self.subTest(berkas=berkas.name):
+                self.assertEqual(_impor_dari(berkas, "fastapi"), set())
 
 
 class ConfigurationTests(unittest.TestCase):
@@ -19,6 +67,11 @@ class ConfigurationTests(unittest.TestCase):
         self.assertIn("a%40b", config.sqlalchemy_database_url)
         with self.assertRaises(ValueError):
             MySQLSettings(DB_PORT=70000)
+
+    # Password DB tidak punya nilai bawaan di kode.
+    def test_db_password_is_required(self):
+        with patch.dict(os.environ, {}, clear=True), self.assertRaises(ValueError):
+            MySQLSettings()
 
 
 class AccountQueryTests(unittest.TestCase):
@@ -41,10 +94,20 @@ class AccountQueryTests(unittest.TestCase):
             auth_queries.create_session(
                 db, user_id=1, token_hash="test", expires_at=now + timedelta(hours=1)
             )
-            self.assertEqual(auth_queries.account_for_token(db, "test", now)["username"], "user1")
-            self.assertIsNone(auth_queries.account_for_token(db, "test", now + timedelta(hours=2)))
+            self.assertEqual(auth_queries.account_by_token(db, "test", now)["username"], "user1")
+            self.assertIsNone(auth_queries.account_by_token(db, "test", now + timedelta(hours=2)))
             self.assertEqual(auth_queries.delete_session(db, "test"), 1)
-            self.assertIsNone(auth_queries.account_for_token(db, "test", now))
+            self.assertIsNone(auth_queries.account_by_token(db, "test", now))
+            # Membuat sesi baru membersihkan sesi yang sudah kedaluwarsa.
+            auth_queries.create_session(
+                db, user_id=1, token_hash="lama", expires_at=datetime(2000, 1, 1)
+            )
+            auth_queries.create_session(
+                db, user_id=1, token_hash="baru", expires_at=datetime(2999, 1, 1)
+            )
+            self.assertEqual(
+                db.execute(text("SELECT token_hash FROM auth_sessions")).scalars().all(), ["baru"]
+            )
         engine.dispose()
 
 

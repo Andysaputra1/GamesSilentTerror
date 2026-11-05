@@ -1,6 +1,6 @@
 import unittest
 
-from app.module.checker_service import MAKS_ROOM_LIVE, CheckerService
+from app.services.checker_service import MAKS_ROOM_LIVE, CheckerService
 
 
 class CheckerTests(unittest.TestCase):

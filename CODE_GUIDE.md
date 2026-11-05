@@ -12,21 +12,23 @@ permintaan pengguna.
 | `frontend/src/app/core/` | Request API, sesi, guard navigasi, dan komponen profil |
 | `frontend/src/app/app.routes.ts` | Route frontend dan guard yang harus dilalui |
 | `frontend/docker/start.mjs` | Menjalankan frontend lokal menggunakan konfigurasi publik |
-| `backend/app/` | Semua kode aplikasi: entry point, controller, module, model, konfigurasi |
+| `backend/app/` | Semua kode aplikasi: entry point, controller, socket, service, module, model, konfigurasi |
 | `backend/app/main.py` | Startup FastAPI, Socket.IO, model analisis, dan lifecycle server |
-| `backend/app/controller/controller_main.py` | Daftar router HTTP yang aktif |
-| `backend/app/controller/api/` | Validasi request, autentikasi route, dan respons HTTP |
-| `backend/app/module/` | Aturan aplikasi, pertandingan, analisis, dan transaksi; termasuk koneksi database, klien AI (OpenRouter/Ollama), dan CLI akun |
+| `backend/app/controllers/routes.py` | Daftar router HTTP yang aktif |
+| `backend/app/controllers/` | Validasi request, autentikasi route, dan respons HTTP |
+| `backend/app/services/` | Aturan login dan Google (`auth_service.py`), panel (`panel_service.py`), chat manusia (`chat_service.py`), penyimpanan chat dan jejak (`persistence_service.py`), password, room, survei, checker, konfigurasi AI, dan klien Ollama |
+| `backend/app/module/` | Pertandingan, bot NPC, dan simulasi |
 | `backend/app/models/` | Kueri SQL berparameter |
-| `backend/app/controller/realtime/socket_handlers.py` | Autentikasi socket, otorisasi, penyimpanan, dan siaran chat |
-| `backend/app/config/` | Konfigurasi environment dan database |
-| `backend/app/controller/middleware/` | Autentikasi request, batas percobaan login, dan CORS |
+| `backend/app/sockets/server.py` | Membuat `sio`, mencatat sambungan, dan mengirim ke room (`emit_room`) |
+| `backend/app/sockets/chat.py` | Event `connect`, `disconnect`, dan `send_chat`; penolakan chat dikirim sebagai `system_alert` |
+| `backend/app/config/` | Konfigurasi environment, koneksi database, dan daftar skin |
+| `backend/app/middleware/` | Autentikasi request, batas percobaan login, CORS, dan respons validasi |
 | `backend/public/panel/` | Halaman administrasi yang disajikan backend |
-| `backend/scripts/` | Penyiapan environment deployment dan kredensial panel |
+| `backend/scripts/` | CLI akun, penyiapan environment deployment, dan kredensial panel |
 | `backend/app/module/npc_brain/` | Runtime otak NPC; `generated/` adalah ekspor notebook (jangan diedit manual) |
 | `backend/tests/` | Unit/integration test serta skrip smoke test manual |
 
-Daftar router di `controller_main.py` adalah acuan endpoint aktif. Modul admin,
+Daftar router di `controllers/routes.py` adalah acuan endpoint aktif. Modul admin,
 history, dan checker lama masih memiliki pemeriksaan kompatibilitas; keberadaan
 file saja tidak berarti route tersebut dibuka pada aplikasi utama.
 
@@ -47,7 +49,7 @@ file saja tidak berarti route tersebut dibuka pada aplikasi utama.
    Chat tim malam memakai `POST /api/rooms/{code}/team-chat`: pesannya hanya di memori
    `Match` dan `me.team_messages`, sengaja tanpa socket, database, NLU, atau `@traced`.
    Aturan kemenangan dijelaskan lebih lengkap di `GAME_CONCEPT.md`.
-5. **Chat dan AI:** handler socket memeriksa sesi/hak chat, lalu menyimpan dan
+5. **Chat dan AI:** `services/chat_service.py` memeriksa sesi/hak chat, lalu menyimpan dan
    menyiarkan pesan tanpa menganalisisnya. Pada pertandingan, `NPCService`
    mengambil langkah mandiri dari timer untuk setiap bot: snapshot privat ->
    `backend/app/module/npc_brain` (IndoBERT -> fuzzy hasil ekspor notebook -> NLG
@@ -82,8 +84,8 @@ file saja tidak berarti route tersebut dibuka pada aplikasi utama.
 - Ikon pensil profil menyimpan nama dan username melalui `POST /api/auth/me`.
   Username hanya dapat diganti setelah keluar dari ruangan. ID akun dan identitas
   Google tetap sama; nama pengirim pada arsip chat tetap sesuai saat pesan dikirim.
-- Menu Manajemen user di `/panel` memakai controller `api/users.py` dan service
-  `user_management_service.py`. Hanya sesi administrator panel yang diizinkan.
+- Menu Manajemen user di `/panel` memakai controller `controllers/users.py` dan service
+  `services/user_service.py`. Hanya sesi administrator panel yang diizinkan.
 - Tambah user membuat akun username/password dengan nama lengkap, tanpa membuat
   sesi login pemain. Akun Google dibuat melalui alur Google yang terverifikasi.
 - Edit user mengubah nama/username lewat panel. Rename ditolak jika masih di room;

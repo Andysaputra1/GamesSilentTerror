@@ -8,7 +8,7 @@ Alurnya saat server nyala (muat_konfigurasi_ai, dipanggil main.py)
 2. Baris kosong: selesai, bot memakai .env
 3. Ada isi: buka enkripsi key dan token, lalu simpan ke memori
 
-Alurnya saat panel menyimpan (save_panel_configuration)
+Alurnya saat panel menyimpan (simpan_konfigurasi_ai)
 1. Baca isi lama dengan baris dikunci. Gagal baca: panel menerima gagal
 2. Susun isi baru dan enkripsi key. Sumber key salah atau key kosong: batal, DB tidak berubah
 3. Uji buka hasil enkripsinya. Gagal: batal, DB tidak berubah
@@ -21,10 +21,11 @@ from threading import RLock
 
 from cryptography.fernet import Fernet, InvalidToken
 from pydantic import SecretStr
-from sqlalchemy import text
-
 from app.config.settings import settings
-from app.module.persistence_service import PersistenceError, PersistenceService
+from app.config.database import PersistenceError, jalankan_transaksi
+from app.models import panel_queries
+
+BARIS_AI = 1
 
 
 class AIRuntimeService:
@@ -98,9 +99,7 @@ def _decode_config(stored):
 # Ambil konfigurasi AI yang disimpan di panel saat server nyala, supaya key dan link tidak hilang
 # saat restart. Baris kosong bukan error: bot memakai nilai .env.
 def muat_konfigurasi_ai():
-    nilai = PersistenceService._run(
-        lambda db: db.execute(text("SELECT config FROM panel_configuration WHERE id=1")).scalar()
-    )
+    nilai = jalankan_transaksi(lambda db: panel_queries.panel_configuration(db, BARIS_AI))
     stored = json.loads(nilai) if isinstance(nilai, str) else nilai
     if stored:
         override = _decode_config(stored)
@@ -109,7 +108,7 @@ def muat_konfigurasi_ai():
 
 
 # Simpan konfigurasi AI dari panel ke DB dan memori, supaya langsung berlaku tanpa restart.
-def save_panel_configuration(
+def simpan_konfigurasi_ai(
     provider,
     endpoint,
     api_key=None,
@@ -126,9 +125,7 @@ def save_panel_configuration(
     with ai_runtime.lock:
         # Kunci baris konfigurasi agar pembaruan sumber kunci tidak menimpa perubahan lain.
         def write(db):
-            previous = db.execute(
-                text("SELECT config FROM panel_configuration WHERE id=1 FOR UPDATE")
-            ).scalar()
+            previous = panel_queries.panel_configuration(db, BARIS_AI, for_update=True)
             previous = json.loads(previous) if isinstance(previous, str) else (previous or {})
             # Model lokal (ai-docker: qwen3:4b-instruct/qwen3:14b); kosong = pilihan sebelumnya.
             stored["ollama_model"] = model or previous.get("ollama_model") or "qwen3:14b"
@@ -162,14 +159,8 @@ def save_panel_configuration(
                 raise ValueError("Isi API key sendiri sebelum memilih mode ini.")
             # Uji buka sebelum menulis: kalau gagal, error dilempar dan DB tidak berubah.
             override = _decode_config(stored)
-            db.execute(
-                text("""
-                INSERT INTO panel_configuration(id,config) VALUES(1,:config)
-                ON DUPLICATE KEY UPDATE config=:config
-            """),
-                {"config": json.dumps(stored)},
-            )
+            panel_queries.write_panel_configuration(db, BARIS_AI, json.dumps(stored))
             return override
 
-        # Gagal baca atau tulis: _run melempar error, memori tidak berubah, panel menerima gagal.
-        ai_runtime.override = PersistenceService._run(write)
+        # Gagal baca atau tulis: error dilempar, memori tidak berubah, panel menerima gagal.
+        ai_runtime.override = jalankan_transaksi(write)

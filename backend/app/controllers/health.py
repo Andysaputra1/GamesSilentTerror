@@ -4,13 +4,12 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
-from sqlalchemy import text
 
-from app.module.mysql_connector import database_is_ready
+from app.config.database import database_is_ready
 from app.config.settings import settings
-from app.module.ollama_client import model_available
-from app.module.ai_runtime_service import ai_runtime
-from app.module.persistence_service import PersistenceService, PersistenceError
+from app.services import panel_service
+from app.services.ollama_client import model_available
+from app.services.ai_config_service import ai_runtime
 
 router = APIRouter(tags=["system"])
 
@@ -44,20 +43,7 @@ async def app_status() -> dict[str, object]:
 # CONTROLLER READY: 200 hanya bila migrasi V5 dan V6 sudah ada; tanpa memanggil provider AI.
 def ready():
     """Cheap deployment readiness; never calls a paid or local AI provider."""
-    skema_siap = False
-    try:
-        skema_siap = (
-            PersistenceService._run(
-                lambda database: database.execute(
-                    text(
-                        "SELECT COUNT(*) FROM schema_migrations WHERE version IN ('V5__chat_history','V6__admin_panel')"
-                    )
-                ).scalar()
-            )
-            == 2
-        )
-    except PersistenceError:
-        pass
+    skema_siap = panel_service.skema_siap()
     return JSONResponse(
         {"ready": skema_siap},
         status_code=200 if skema_siap else 503,

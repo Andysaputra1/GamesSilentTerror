@@ -4,13 +4,18 @@ import unittest
 from unittest.mock import patch
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from google.auth.exceptions import TransportError
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
-from app.controller.api.auth import router
-from app.controller.middleware.auth_limits import _riwayat_percobaan
+from app.controllers.auth import router
+from app.middleware.auth_limits import _riwayat_percobaan
 from app.config.settings import settings
-from app.controller.api.auth import nonces
+from app.services.auth_service import nonces
+
+# Diimpor sebelum setUp mem-patch SessionLocal: room_service menyalin nama itu saat pertama diimpor,
+# jadi impor pertama di tengah patch mengikatnya selamanya ke engine tes yang sudah ditutup.
+from app.services.room_service import room_service
 
 
 class AccountTests(unittest.TestCase):
@@ -36,7 +41,7 @@ class AccountTests(unittest.TestCase):
                 )
             )
         self.session_patch = patch(
-            "app.module.auth_service.SessionLocal", sessionmaker(bind=self.engine)
+            "app.config.database.SessionLocal", sessionmaker(bind=self.engine)
         )
         self.session_patch.start()
         app = FastAPI()
@@ -200,7 +205,7 @@ class AccountTests(unittest.TestCase):
         with (
             patch.object(settings, "google_client_id", "test-client"),
             patch(
-                "app.controller.api.auth.id_token.verify_oauth2_token", return_value=claims
+                "app.services.auth_service.id_token.verify_oauth2_token", return_value=claims
             ) as verify,
         ):
             response = self.client.post(
@@ -261,8 +266,6 @@ class AccountTests(unittest.TestCase):
         )
 
     def test_username_change_conflicts_rooms_and_google_identity(self):
-        from app.module.room_service import room_service
-
         first, _ = self.google(name="Google Name")
         original = first.json()["user"]["username"]
         headers = {"Authorization": "Bearer " + first.json()["access_token"]}
@@ -310,12 +313,32 @@ class AccountTests(unittest.TestCase):
         with self.engine.connect() as db:
             self.assertEqual(db.execute(text("SELECT count(*) FROM user_accounts")).scalar(), 1)
 
+    # Library melempar GoogleAuthError untuk issuer salah, dan TransportError adalah turunannya.
+    def test_google_wrong_issuer_is_401_and_network_failure_stays_503(self):
+        with patch.object(settings, "google_client_id", "test-client"):
+            for hasil_cek, status in [
+                ({"return_value": {"iss": "https://evil.invalid"}}, 401),
+                ({"side_effect": TransportError("putus")}, 503),
+            ]:
+                with (
+                    self.subTest(status=status),
+                    patch("app.services.auth_service.id_token.verify_token", **hasil_cek),
+                ):
+                    response = self.client.post(
+                        "/api/auth/google",
+                        headers=self.origin,
+                        json={"credential": "test-token", "nonce": nonces.issue()},
+                    )
+                    self.assertEqual(response.status_code, status)
+        with self.engine.connect() as db:
+            self.assertEqual(db.execute(text("SELECT count(*) FROM user_accounts")).scalar(), 0)
+
     def test_google_bad_signature_or_audience_rejected(self):
         nonce = nonces.issue()
         with (
             patch.object(settings, "google_client_id", "test-client"),
             patch(
-                "app.controller.api.auth.id_token.verify_oauth2_token",
+                "app.services.auth_service.id_token.verify_oauth2_token",
                 side_effect=ValueError("bad token"),
             ),
         ):

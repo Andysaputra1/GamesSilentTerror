@@ -1,13 +1,12 @@
 """Pengelolaan akun oleh admin; arsip permainan tidak diubah ketika akun dihapus."""
 
-from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from app.config.settings import settings
 from app.models import auth_queries
 
-from app.module.auth_service import auth_service
-from app.module.password_service import hash_password
-from app.module.room_service import BOT_NAMES, room_service
+from app.config.database import jalankan_transaksi
+from app.services.password_service import hash_password
+from app.services.room_service import BOT_NAMES, room_service
 
 
 class UserNotFound(ValueError):
@@ -38,7 +37,7 @@ def create_user(username, display_name, password):
             raise ValueError("Username sudah digunakan.") from error
         return account_for_management(database, id_akun_baru)
 
-    return auth_service._jalankan_transaksi(simpan_akun_baru)
+    return jalankan_transaksi(simpan_akun_baru)
 
 
 # Edit identitas berdasarkan ID; arsip pengirim lama dan identitas Google tetap dipertahankan.
@@ -55,30 +54,17 @@ def update_user(user_id, display_name, username=None):
                 auth_queries.update_username(database, user_id, username_terpilih)
             except IntegrityError as error:
                 raise ValueError("Username sudah digunakan.") from error
-            database.execute(text("DELETE FROM auth_sessions WHERE user_id=:id"), {"id": user_id})
+            auth_queries.delete_user_sessions(database, user_id)
         auth_queries.update_display_name(database, user_id, display_name)
         return account_for_management(database, user_id)
 
     with room_service.lock:
-        return auth_service._jalankan_transaksi(simpan_perubahan_profil)
+        return jalankan_transaksi(simpan_perubahan_profil)
 
 
 # Baca akun terkini di dalam transaksi; password hanya dipakai menentukan metode login.
 def account_for_management(database, user_id):
-    akun = (
-        database.execute(
-            text("""
-            SELECT u.id, u.username, u.display_name,
-                   CASE WHEN i.google_subject IS NOT NULL OR u.password_hash = 'google_only'
-                        THEN 'google' ELSE 'password' END AS login_method
-            FROM user_accounts u LEFT JOIN account_identities i ON i.user_id = u.id
-            WHERE u.id = :user_id
-        """),
-            {"user_id": user_id},
-        )
-        .mappings()
-        .one_or_none()
-    )
+    akun = auth_queries.account_for_management(database, user_id)
     if akun is None:
         raise UserNotFound("Akun tidak ditemukan atau sudah dihapus.")
     return dict(akun)
@@ -87,21 +73,7 @@ def account_for_management(database, user_id):
 # Daftar akun berhalaman tidak pernah mengirim hash password, token, atau Google subject.
 def list_users(after_id=0, search=""):
     def baca_satu_halaman(database):
-        baris_akun = (
-            database.execute(
-                text("""
-                SELECT u.id, u.username, u.display_name,
-                       CASE WHEN i.google_subject IS NOT NULL OR u.password_hash = 'google_only'
-                            THEN 'google' ELSE 'password' END AS login_method
-                FROM user_accounts u LEFT JOIN account_identities i ON i.user_id = u.id
-                WHERE u.id > :after_id AND (u.username LIKE :search OR u.display_name LIKE :search)
-                ORDER BY u.id LIMIT 51
-            """),
-                {"after_id": after_id, "search": "%" + search + "%"},
-            )
-            .mappings()
-            .all()
-        )
+        baris_akun = auth_queries.accounts_for_management(database, after_id, search)
         # Baris ke-51 hanya penanda masih ada halaman berikutnya; yang dikirim paling banyak 50.
         halaman = baris_akun[:50]
         return {
@@ -110,7 +82,7 @@ def list_users(after_id=0, search=""):
             "next_after_id": halaman[-1]["id"] if halaman else after_id,
         }
 
-    return auth_service._jalankan_transaksi(baca_satu_halaman)
+    return jalankan_transaksi(baca_satu_halaman)
 
 
 # Ganti hash dan cabut semua sesi secara atomik; akun Google tidak memiliki password aplikasi.
@@ -119,13 +91,10 @@ def reset_password(user_id, password):
         akun = account_for_management(database, user_id)
         if akun["login_method"] == "google":
             raise ValueError("Akun Google tidak dapat diubah password-nya di aplikasi ini.")
-        database.execute(
-            text("UPDATE user_accounts SET password_hash = :password WHERE id = :id"),
-            {"id": user_id, "password": hash_password(password)},
-        )
-        database.execute(text("DELETE FROM auth_sessions WHERE user_id = :id"), {"id": user_id})
+        auth_queries.update_password_hash(database, user_id, hash_password(password))
+        auth_queries.delete_user_sessions(database, user_id)
 
-    auth_service._jalankan_transaksi(simpan_password_baru)
+    jalankan_transaksi(simpan_password_baru)
 
 
 # Hapus hanya data autentikasi; jangan DELETE players, chat_messages, ai_analyses, atau checker_traces.
@@ -138,11 +107,9 @@ def delete_user(user_id, confirm_username):
             raise ValueError(
                 "User masih berada di ruangan. Minta user keluar dahulu sebelum menghapus akun."
             )
-        database.execute(text("DELETE FROM auth_sessions WHERE user_id = :id"), {"id": user_id})
-        database.execute(
-            text("DELETE FROM account_identities WHERE user_id = :id"), {"id": user_id}
-        )
-        database.execute(text("DELETE FROM user_accounts WHERE id = :id"), {"id": user_id})
+        auth_queries.delete_user_sessions(database, user_id)
+        auth_queries.delete_identity(database, user_id)
+        auth_queries.delete_account(database, user_id)
 
     with room_service.lock:
-        auth_service._jalankan_transaksi(hapus_data_autentikasi)
+        jalankan_transaksi(hapus_data_autentikasi)

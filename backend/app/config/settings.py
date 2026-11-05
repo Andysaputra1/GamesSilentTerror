@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import re
-from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
@@ -48,7 +47,7 @@ class Settings(MySQLSettings):
     cors_origins: str = "http://localhost:4200,http://127.0.0.1:4200"
     ai_provider: Literal["api", "docker"] = "api"
     ollama_base_url: str = "http://localhost:11435"
-    ollama_model: str = "qwen3:8b"
+    ollama_model: str = "qwen3:14b"
 
     @field_validator("ollama_model", mode="before")
     @classmethod
@@ -118,15 +117,10 @@ class Settings(MySQLSettings):
         return key.get_secret_value().strip() or None if key else None
 
     @property
-    # PROPERTY: pecah konfigurasi CORS menjadi daftar origin browser yang diizinkan.
+    # Mengubah pengaturan CORS dari satu teks menjadi daftar alamat web.
+    # Dipakai di 3 tempat (Socket.IO, middleware CORS, login Google), jadi rumusnya cukup ditulis sekali.
     def allowed_origins(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
 
 
-@lru_cache
-# FUNCTION CACHE: buat konfigurasi tervalidasi sekali, lalu gunakan ulang hasilnya.
-def get_settings() -> Settings:
-    return Settings()
-
-
-settings = get_settings()
+settings = Settings()

@@ -80,10 +80,20 @@
   .prep-books { height: 100px; }
   .prep-action-list { max-width: 370px; }
 }
+/* Tablet potret: gambar lebih pendek dan satu baris peserta agar tombol Siap tetap dekat. */
+@media (min-width: 760px) and (max-width: 899px) {
+  .splash-sign { width: min(92vw, 320px); font-size: 13px; }
+  .prep-role-art { width: min(120px, 100%); }
+  .prep-illustration { height: 100px; }
+  .prep-books { height: 64px; margin-top: 0; }
+  .splash-cast ul { gap: 10px 8px; }
+  .splash-cast li { width: 60px; }
+}
 
 /* Desktop: layar persiapan muat satu layar tanpa scroll. Papan nama, kartu, dan meja berbagi tinggi layar;
-   ukuran gambar dan huruf mengikuti tinggi layar. Teks tidak boleh menyusut, hanya gambar. */
-@media (min-width: 760px) {
+   ukuran gambar dan huruf mengikuti tinggi layar. Teks tidak boleh menyusut, hanya gambar.
+   Tablet potret dan HP landscape tidak cukup ruang untuk itu, jadi layarnya bergulir (.splash). */
+@media (min-width: 900px) and (min-height: 501px) {
   .splash {
     overflow: hidden;
   }

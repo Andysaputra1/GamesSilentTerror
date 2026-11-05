@@ -16,7 +16,7 @@ import pandas as pd
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.module.checker_service import CheckerService, checker_service
+from app.services.checker_service import CheckerService, checker_service
 from app.module.match_engine import Match
 from app.module.npc_brain.penjelasan import (
     BATAS_BYTE,
@@ -28,7 +28,7 @@ from app.module.npc_brain.penjelasan import (
     ukuran,
 )
 from app.module.npc_service import NPCService
-from app.module.room_service import RoomService
+from app.services.room_service import RoomService
 from tests.test_npc_brain import AKSI_RAHASIA, runtime_siap
 
 
@@ -272,7 +272,7 @@ class CheckerPenjelasanTests(unittest.TestCase):
         rooms.start(room.code, "human")
         runtime.siapkan_pertandingan(room.match, room.code)
         with (
-            patch("app.module.room_service.room_service", rooms),
+            patch("app.services.room_service.room_service", rooms),
             patch("app.module.npc_brain.runtime.brain_runtime", runtime),
         ):
             live = CheckerService().ringkasan_room(room.code)
@@ -280,7 +280,7 @@ class CheckerPenjelasanTests(unittest.TestCase):
             jejak = [{"sender": "NOX", "provider": "otak:bt", "model": "persona:gaul"},
                      {"ringkas": {"bot": {"nama": "ECHO", "role": "spy", "metode": "fuzzy",
                                           "persona": "kalem"}}}]  # fmt: skip
-            with patch("app.module.checker_service._bot_arsip", return_value=[]) as arsip:
+            with patch("app.services.checker_service._bot_arsip", return_value=[]) as arsip:
                 dari_jejak = CheckerService().ringkasan_room("ARSIP1", jejak)
                 kosong = CheckerService().ringkasan_room("ARSIP2", [])
         runtime.tutup()
@@ -344,7 +344,7 @@ class NPCServicePenjelasanTests(unittest.IsolatedAsyncioTestCase):
 
 class PanelCheckerEndpointTests(unittest.TestCase):
     def setUp(self):
-        from app.controller.api.panel import require_panel, router
+        from app.controllers.panel import require_panel, router
 
         self.app = FastAPI()
         self.app.include_router(router)
@@ -366,7 +366,7 @@ class PanelCheckerEndpointTests(unittest.TestCase):
 
     def test_list_has_room_summary_without_explanations_and_detail_has_them(self):
         self.app.dependency_overrides[self.require_panel] = lambda: "fixture-token"
-        with patch("app.controller.api.panel.transaction", return_value=[]):
+        with patch("app.services.panel_service.transaction", return_value=[]):
             data = self.client.get(f"/api/panel/checker/{self.code}").json()
         self.assertNotIn("penjelasan", data["traces"][0])
         self.assertEqual(data["room"]["bot"][0]["nama"], "NOX")
@@ -376,10 +376,10 @@ class PanelCheckerEndpointTests(unittest.TestCase):
         self.assertEqual(data["room"]["bot"][0]["metode"], "bt")
         self.assertEqual(detail["penjelasan"]["penalaran"]["chat"]["cabang"], "tuduh")
         stored = json.dumps({"id": "a" * 32, "penjelasan": {"bot": {"nama": "ECHO"}}})
-        with patch("app.controller.api.panel.transaction", return_value=stored):
+        with patch("app.services.panel_service.transaction", return_value=stored):
             arsip = self.client.get(f"/api/panel/checker/{self.code}/jejak/{'a' * 32}")
         self.assertEqual(arsip.json()["penjelasan"]["bot"]["nama"], "ECHO")
-        with patch("app.controller.api.panel.transaction", return_value=None):
+        with patch("app.services.panel_service.transaction", return_value=None):
             self.assertEqual(
                 self.client.get(f"/api/panel/checker/{self.code}/jejak/{'b' * 32}").status_code, 404
             )

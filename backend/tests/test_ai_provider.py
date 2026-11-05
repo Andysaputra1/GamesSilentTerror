@@ -2,6 +2,7 @@
 
 import unittest
 from app.config.settings import Settings
+from app.services.panel_service import MODEL_LOKAL
 
 
 class ProviderTests(unittest.TestCase):
@@ -9,6 +10,12 @@ class ProviderTests(unittest.TestCase):
     def test_invalid_provider_rejected(self):
         with self.assertRaises(ValueError):
             Settings(_env_file=None, ai_provider="invalid")
+
+    # Bawaan settings harus sama dengan bawaan panel dan termasuk pilihan model di panel.
+    def test_default_local_model_matches_panel(self):
+        bawaan = Settings.model_fields["ollama_model"].default
+        self.assertEqual(bawaan, "qwen3:14b")
+        self.assertIn(bawaan, MODEL_LOKAL)
 
     # TES VALIDASI: petakan pilihan 4/8/14 ke model yang tepat dan tolak ukuran lain.
     def test_model_size_selection(self):

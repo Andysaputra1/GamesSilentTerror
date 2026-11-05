@@ -1,8 +1,9 @@
 import unittest
-from unittest.mock import Mock, AsyncMock, patch
-from app.module.room_service import RoomService
-from app.module.persistence_service import PersistenceError
-from app.controller.realtime.socket_handlers import SocketGameController
+from unittest.mock import Mock, patch
+from app.services.room_service import RoomService
+from app.services.persistence_service import PersistenceError
+from app.sockets import chat
+from socket_palsu import socket_palsu
 
 
 class ChatDurabilityTests(unittest.IsolatedAsyncioTestCase):
@@ -10,19 +11,16 @@ class ChatDurabilityTests(unittest.IsolatedAsyncioTestCase):
         rooms = RoomService()
         room = rooms.create("alice")
         rooms.set_bot(room.code, "alice", True)
-        sio = Mock(emit=AsyncMock(), enter_room=AsyncMock())
         persistence = Mock()
         persistence.record_player_message.return_value = 42
         if db_fails:
             persistence.record_player_message.side_effect = PersistenceError("DB unavailable")
-        controller = SocketGameController(sio)
-        controller.socket_players["sid"] = "alice"
-        controller.socket_rooms["sid"] = room.code
+        sambungan = {"sid": {"username": "alice", "token": "alice", "room": room.code}}
         with (
-            patch("app.controller.realtime.socket_handlers.room_service", rooms),
-            patch("app.controller.realtime.socket_handlers.PersistenceService", return_value=persistence),
+            socket_palsu(rooms, sambungan) as sio,
+            patch("app.services.chat_service.PersistenceService", return_value=persistence),
         ):
-            await controller.send_chat("sid", {"username": "alice", "message": "Halo bot"})
+            await chat.send_chat("sid", {"username": "alice", "message": "Halo bot"})
         chats = [c.args[1] for c in sio.emit.call_args_list if c.args[0] == "receive_chat"]
         return persistence, chats
 
@@ -32,6 +30,11 @@ class ChatDurabilityTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(persistence.record_player_message.call_args.kwargs["message"], "Halo bot")
         persistence.record_bot_message.assert_not_called()
         self.assertEqual([c["sender"] for c in chats], ["alice"])
+
+    # players.status tidak pernah berubah di jalur chat, jadi chat tidak perlu menulisnya.
+    async def test_chat_does_not_write_player_status(self):
+        persistence, _ = await self.run_chat()
+        self.assertNotIn("status", persistence.record_player_message.call_args.kwargs)
 
     async def test_database_failure_prevents_echo(self):
         _, chats = await self.run_chat(db_fails=True)

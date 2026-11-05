@@ -108,6 +108,17 @@ def record_match_bot(database: Session, bot: dict) -> None:
     )
 
 
+# Identitas bot pertandingan-pertandingan terakhir sebuah room, terbaru lebih dulu.
+def latest_match_bots(database: Session, room_code: str):
+    return database.execute(
+        text("""
+            SELECT match_id, bot_name, method, persona, role FROM match_bots
+            WHERE room_code=:code ORDER BY created_at DESC, bot_name LIMIT 20
+        """),
+        {"code": room_code},
+    ).mappings().all()  # fmt: skip
+
+
 # QUERY DELETE: kosongkan jawaban beserta arsip peserta. Tanpa arsip ikut terhapus, pertandingan lama
 # muncul lagi sebagai survei tertunda karena jawabannya sudah tidak ada (lihat pending_surveys).
 def clear_responses(database: Session) -> int:

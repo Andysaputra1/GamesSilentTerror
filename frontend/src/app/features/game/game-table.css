@@ -67,7 +67,8 @@
   isolation: isolate;
   width: var(--card-w);
   aspect-ratio: 4 / 5;
-  font-size: calc(var(--card-w) * 0.1);
+  /* Batas bawah agar nama dan label tetap terbaca pada kartu kecil (10 pemain di HP). */
+  font-size: max(10px, calc(var(--card-w) * 0.1));
 }
 .player-card::before {
   content: '';

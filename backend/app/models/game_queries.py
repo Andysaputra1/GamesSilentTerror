@@ -21,6 +21,14 @@ def ensure_room(database: Session, room_code: str) -> int:
     )
 
 
+# Catat ruangan baru sebagai lobby. Hasil 0 berarti kodenya sudah pernah dipakai di arsip.
+def insert_lobby_room(database: Session, room_code: str) -> int:
+    return database.execute(
+        text("INSERT IGNORE INTO game_sessions(room_code,phase) VALUES(:code,'lobby')"),
+        {"code": room_code},
+    ).rowcount
+
+
 # QUERY UPSERT: pastikan pemain tercatat sekali dalam ruangan, lalu kembalikan ID pemain.
 def ensure_player(database: Session, room_id: int, username: str) -> int:
     nilai_sql = {"room_id": room_id, "username": username}
@@ -40,14 +48,6 @@ def ensure_player(database: Session, room_id: int, username: str) -> int:
             nilai_sql,
         ).scalar_one()
     )
-
-
-# QUERY UPDATE: ubah status pemain berdasarkan ID dan kembalikan jumlah baris terpengaruh.
-def update_player_status(database: Session, player_id: int, status: str):
-    return database.execute(
-        text("UPDATE players SET status = :status WHERE id = :player_id"),
-        {"player_id": player_id, "status": status},
-    ).rowcount
 
 
 # QUERY INSERT: simpan pesan (pemain atau bot) dan kembalikan ID pesan. Kolom lama intent/suspicion_score
@@ -92,4 +92,23 @@ def set_message_context(database, message_id, *, sender_kind, context):
             round_number=context.get("round_number"),
             phase=context.get("phase"),
         ),
+    )
+
+
+# Simpan bacaan NLU satu pesan (kolom migrasi V9).
+def set_message_nlu(database, message_id, nlu):
+    database.execute(
+        text("UPDATE chat_messages SET nlu=:nlu WHERE id=:id"),
+        {"id": message_id, "nlu": nlu},
+    )
+
+
+# Simpan jejak checker; jejak ber-ID sama ditimpa.
+def save_checker_trace(database, trace_id, room_code, trace):
+    database.execute(
+        text("""
+            INSERT INTO checker_traces(id,room_code,trace) VALUES(:id,:room,:trace)
+            ON DUPLICATE KEY UPDATE trace=:trace
+        """),
+        {"id": trace_id, "room": room_code, "trace": trace},
     )

@@ -20,8 +20,8 @@ class MySQLSettings(BaseSettings):
     mysql_user: str = Field(
         default="shadow_app", validation_alias=AliasChoices("MYSQL_USER", "DB_USER")
     )
+    # Tanpa nilai bawaan: server harus gagal saat password belum diisi, bukan diam-diam memakai password lain.
     mysql_password: str = Field(
-        default="shadow_app_dev_2026",
         repr=False,
         validation_alias=AliasChoices("MYSQL_PASSWORD", "DB_PASSWORD"),
     )
@@ -31,7 +31,8 @@ class MySQLSettings(BaseSettings):
     database_max_overflow: int = Field(default=10, ge=0)
 
     @property
-    # PROPERTY: susun URL koneksi MySQL dengan kredensial yang di-encode, atau gunakan database_url khusus.
+    # Menyusun alamat DB yang dipakai engine, atau memakai DATABASE_URL apa adanya kalau diisi.
+    # User, password, dan nama DB di-encode, supaya karakter seperti @ tidak merusak alamat.
     def sqlalchemy_database_url(self) -> str:
         if self.database_url:
             return self.database_url

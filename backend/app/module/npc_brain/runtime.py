@@ -41,7 +41,7 @@ from app.config.settings import (
     BACKEND_DIR, JALUR_PENULIS_NPC, POLA_MODEL_OPENROUTER,
     PROJECT_DIR, settings,
 )  # fmt: skip
-from app.module.ai_runtime_service import ai_runtime
+from app.services.ai_config_service import ai_runtime
 from app.module.match_engine import phase_durations
 from app.module.npc_brain.penjelasan import jelaskan
 

@@ -14,8 +14,8 @@ from unittest.mock import AsyncMock, Mock, patch
 from app.module.match_engine import Match
 from app.module.npc_brain.runtime import BrainRuntime, NLUBersama
 from app.module.npc_service import LANTAI_MAKS, NPCService, catat_nlu
-from app.module.persistence_service import PersistenceError
-from app.module.room_service import RoomService
+from app.services.persistence_service import PersistenceError
+from app.services.room_service import RoomService
 from tests.nlu_palsu import NLUPalsu
 
 AKSI_RAHASIA = {"gag", "hostage", "guard", "peek"}
