@@ -119,8 +119,8 @@ Isi pengaturan berikut di `.env`:
 
 ```dotenv
 AI_PROVIDER=docker
-OLLAMA_MODEL=8
-OLLAMA_MODELS_TO_PULL=qwen3:8b
+OLLAMA_MODEL=14
+OLLAMA_MODELS_TO_PULL=qwen3:14b
 ```
 
 MacBook / CPU (Ollama tetap di Docker, tidak perlu dipasang di macOS):
@@ -137,7 +137,7 @@ docker compose -f docker-compose.gpu.yml up -d --build
 docker compose -f docker-compose.gpu.yml logs -f ollama-models
 ```
 
-CPU dapat sangat lambat, khususnya 14B. Mulai dari 8B dan pastikan alokasi
+CPU dapat sangat lambat, khususnya 14B yang menjadi bawaan. Bila terlalu berat, pilih 8B dan pastikan alokasi
 memori Docker cukup. Gunakan mode API jika mesin
 tidak sanggup. Model yang tidak muat di memori bisa gagal, bukan hanya lambat.
 
@@ -149,7 +149,7 @@ Periksa model yang tersedia:
 docker compose exec ollama ollama list
 ```
 
-`OLLAMA_MODEL=8` memilih `qwen3:8b`; `OLLAMA_MODEL=14` memilih `qwen3:14b`. Untuk mengunduh hanya model 8B, isi `OLLAMA_MODELS_TO_PULL=qwen3:8b`. Pastikan model yang dipilih sudah diunduh. Model 14B memerlukan sumber daya lebih besar; kecepatan bergantung pada mesin.
+`OLLAMA_MODEL=8` memilih `qwen3:8b`; `OLLAMA_MODEL=14` (bawaan) memilih `qwen3:14b`. Untuk mengunduh hanya model 8B, isi `OLLAMA_MODELS_TO_PULL=qwen3:8b`. Pastikan model yang dipilih sudah diunduh. Model 14B memerlukan sumber daya lebih besar; kecepatan bergantung pada mesin.
 
 ### B. AI melalui OpenRouter, tanpa menjalankan Ollama
 

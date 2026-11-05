@@ -47,7 +47,7 @@ class Settings(MySQLSettings):
     cors_origins: str = "http://localhost:4200,http://127.0.0.1:4200"
     ai_provider: Literal["api", "docker"] = "api"
     ollama_base_url: str = "http://localhost:11435"
-    ollama_model: str = "qwen3:8b"
+    ollama_model: str = "qwen3:14b"
 
     @field_validator("ollama_model", mode="before")
     @classmethod

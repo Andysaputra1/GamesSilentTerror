@@ -101,7 +101,7 @@ Secret tidak disimpan dalam mysql.json atau kode controller. Lihat `.env.example
 `OPENROUTER_API_KEY` dan `OLLAMA_TUNNEL_TOKEN` hanya dibaca backend.
 Default model dan batas respons tetap di settings.py.
 Pilih `AI_PROVIDER=docker` untuk Ollama (lokal/tunnel) atau `AI_PROVIDER=api` untuk OpenRouter.
-`OLLAMA_MODEL` memilih model lokal (default qwen3:8b). Recreate service ai-engine
+`OLLAMA_MODEL` memilih model lokal (default qwen3:14b). Recreate service ai-engine
 setelah mengubah .env; lihat ../OLLAMA.md untuk perintah dan pemeriksaan status.
 
 ## Menjalankan dan menguji
