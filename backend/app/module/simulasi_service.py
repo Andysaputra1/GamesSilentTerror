@@ -12,8 +12,8 @@ from app.services.checker_service import jejak_baru
 from app.module.match_engine import Match, label_unik, snapshot_berlabel
 from app.module.npc_brain.runtime import brain_runtime
 from app.module.npc_service import (
-    AKSI_RAHASIA, BATAS_LANGKAH_DETIK, isi_jejak, pindahkan_aksi_malam, roster_label, tulis_kalimat,
-    waktu_jejak,
+    AKSI_RAHASIA, BATAS_LANGKAH_DETIK, isi_jejak, pindahkan_aksi_malam, pindahkan_vote, roster_label,
+    tulis_kalimat, waktu_jejak,
 )  # fmt: skip
 from app.services.room_service import BOT_NAMES
 
@@ -100,7 +100,10 @@ class Simulasi:
         lapor("engine")
         try:
             if npc["action"] == "vote":
-                m.vote(otak.nama, m.username(npc["target"]))
+                if npc.get("pindah"):
+                    pindahkan_vote(m, otak.nama, m.username(npc["target"]))
+                else:
+                    m.vote(otak.nama, m.username(npc["target"]))
                 brain_runtime.catat_vote(otak, view, hasil["rencana_vote"])
             elif npc["action"] in AKSI_RAHASIA:
                 if npc.get("pindah"):

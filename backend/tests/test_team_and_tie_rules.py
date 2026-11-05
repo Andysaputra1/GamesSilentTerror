@@ -183,9 +183,9 @@ class TribunalExtraTests(unittest.TestCase):
 
 
 class BrainExtraTimeTests(unittest.TestCase):
-    # Otak hasil ekspor tidak diubah: selama waktu tambahan, porsi fase tetap penuh, bot yang sudah vote
-    # tidak memilih lagi, dan keputusan bot lain tetap berjalan.
-    def test_brains_keep_deciding_without_moving_votes_already_cast(self):
+    # Selama waktu tambahan, porsi fase tetap penuh dan keputusan bot lain tetap berjalan. Bot yang sudah vote
+    # menilai ulang, tetapi tidak pindah bila targetnya sudah yang terkuat menurut aturannya.
+    def test_brains_keep_votes_without_a_stronger_target_in_extra_time(self):
         game = pertandingan([], ENAM, now=0.0)
         game.round, game.phase = 2, "tribunal"
         otak = {nama: otak_fuzzy.Ingatan(nama) for nama in ENAM}
@@ -200,9 +200,10 @@ class BrainExtraTimeTests(unittest.TestCase):
         for nama, ingatan in otak.items():
             view = ingatan.sinkron_snapshot(game.snapshot(nama), sekarang)
             self.assertEqual(otak_fuzzy.waktu_berjalan(ingatan, view), 1.0)
-            aksi = otak_fuzzy.putuskan(ingatan, view)["npc_decision"]["action"]
+            npc = otak_fuzzy.putuskan(ingatan, view)["npc_decision"]
             if nama in ("spy", "hitman"):
-                self.assertNotEqual(aksi, "vote", nama)
+                self.assertNotEqual(npc["action"], "vote", nama)
+                self.assertNotIn("pindah", npc)
 
     # Bot yang pertama melangkah saat waktu tambahan tetap mencatat awal Tribunal yang sebenarnya.
     def test_first_step_in_extra_time_keeps_the_real_phase_start(self):

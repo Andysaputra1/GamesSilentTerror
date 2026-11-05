@@ -77,6 +77,8 @@ def satu_game(argumen):
                         label[rekaman["id"]] = label_rencana(rc)
                         ingatan.catat_aksi_bot(view, rc)
                     if npc["action"] == "vote":
+                        if npc.get("pindah"):
+                            match.cancel_vote(n)
                         match.vote(n, npc["target"])
                         ingatan.catat_vote_bot(view, hasil["rencana_vote"])
                     elif npc["action"] in modul.AKSI_RAHASIA:
