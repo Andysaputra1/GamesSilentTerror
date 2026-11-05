@@ -8,14 +8,14 @@ from google.auth.exceptions import TransportError
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
-from app.controller.api.auth import router
-from app.controller.middleware.auth_limits import _riwayat_percobaan
+from app.controllers.auth import router
+from app.middleware.auth_limits import _riwayat_percobaan
 from app.config.settings import settings
-from app.controller.api.auth import nonces
+from app.controllers.auth import nonces
 
 # Diimpor sebelum setUp mem-patch SessionLocal: room_service menyalin nama itu saat pertama diimpor,
 # jadi impor pertama di tengah patch mengikatnya selamanya ke engine tes yang sudah ditutup.
-from app.module.room_service import room_service
+from app.services.room_service import room_service
 
 
 class AccountTests(unittest.TestCase):
@@ -41,7 +41,7 @@ class AccountTests(unittest.TestCase):
                 )
             )
         self.session_patch = patch(
-            "app.module.mysql_connector.SessionLocal", sessionmaker(bind=self.engine)
+            "app.config.database.SessionLocal", sessionmaker(bind=self.engine)
         )
         self.session_patch.start()
         app = FastAPI()
@@ -205,7 +205,7 @@ class AccountTests(unittest.TestCase):
         with (
             patch.object(settings, "google_client_id", "test-client"),
             patch(
-                "app.controller.api.auth.id_token.verify_oauth2_token", return_value=claims
+                "app.controllers.auth.id_token.verify_oauth2_token", return_value=claims
             ) as verify,
         ):
             response = self.client.post(
@@ -322,7 +322,7 @@ class AccountTests(unittest.TestCase):
             ]:
                 with (
                     self.subTest(status=status),
-                    patch("app.controller.api.auth.id_token.verify_token", **hasil_cek),
+                    patch("app.controllers.auth.id_token.verify_token", **hasil_cek),
                 ):
                     response = self.client.post(
                         "/api/auth/google",
@@ -338,7 +338,7 @@ class AccountTests(unittest.TestCase):
         with (
             patch.object(settings, "google_client_id", "test-client"),
             patch(
-                "app.controller.api.auth.id_token.verify_oauth2_token",
+                "app.controllers.auth.id_token.verify_oauth2_token",
                 side_effect=ValueError("bad token"),
             ),
         ):

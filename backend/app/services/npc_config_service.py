@@ -19,7 +19,7 @@ import logging
 
 from sqlalchemy import text
 
-from app.module.mysql_connector import jalankan_transaksi
+from app.config.database import jalankan_transaksi
 from app.module.npc_brain.runtime import brain_runtime
 
 BARIS_NPC = 2

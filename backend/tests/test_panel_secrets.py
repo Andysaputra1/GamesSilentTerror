@@ -6,13 +6,13 @@ from pydantic import SecretStr
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from app.config.settings import settings
-from app.module.ai_runtime_service import (
+from app.services.ai_config_service import (
     ai_runtime,
     simpan_konfigurasi_ai,
     muat_konfigurasi_ai,
 )
 from app.module.persistence_service import PersistenceError
-from app.controller.api.panel import router, require_panel
+from app.controllers.panel import router, require_panel
 
 
 class PanelSecretsTests(unittest.TestCase):
@@ -28,7 +28,7 @@ class PanelSecretsTests(unittest.TestCase):
 
         self.db.execute.side_effect = execute
         self.run = patch(
-            "app.module.ai_runtime_service.jalankan_transaksi",
+            "app.services.ai_config_service.jalankan_transaksi",
             side_effect=lambda fn: fn(self.db),
         )
         self.run.start()
@@ -82,7 +82,7 @@ class PanelSecretsTests(unittest.TestCase):
     def test_tunnel_token_from_panel_is_encrypted_kept_and_clearable(self):
         with patch.object(settings, "ollama_tunnel_token", SecretStr("env-token")):
             body = {"provider": "docker", "endpoint": "https://example.com"}
-            with patch("app.controller.api.panel.validate_endpoint", side_effect=lambda e: e):
+            with patch("app.controllers.panel.validate_endpoint", side_effect=lambda e: e):
                 self.assertEqual(self.client.get("/api/panel/config").json()["token_source"], "env")
                 result = self.client.put(
                     "/api/panel/config", json={**body, "tunnel_token": "panel-token-123"}
@@ -108,7 +108,7 @@ class PanelSecretsTests(unittest.TestCase):
     # MODEL LOKAL: dipilih di panel (4B/14B), dipertahankan bila kosong, dan dipakai tes koneksi.
     def test_local_model_is_selectable_kept_and_used_by_check(self):
         body = {"provider": "docker", "endpoint": "https://example.com"}
-        with patch("app.controller.api.panel.validate_endpoint", side_effect=lambda e: e):
+        with patch("app.controllers.panel.validate_endpoint", side_effect=lambda e: e):
             view = self.client.put("/api/panel/config", json=body).json()
             self.assertEqual(view["local_model"], "qwen3:14b")  # bawaan pertama kali
             self.assertIn("qwen3:4b-instruct", view["local_models"])

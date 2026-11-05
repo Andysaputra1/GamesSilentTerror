@@ -10,8 +10,8 @@ import time
 from sqlalchemy.exc import IntegrityError
 
 from app.models import survey_queries as queries
-from app.module.mysql_connector import PersistenceError, jalankan_transaksi
-from app.module.room_service import room_service
+from app.config.database import PersistenceError, jalankan_transaksi
+from app.services.room_service import room_service
 
 logger = logging.getLogger("shadow_heist.survey")
 

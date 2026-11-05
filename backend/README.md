@@ -1,6 +1,6 @@
 # Shadow Heist Python Backend
 
-Struktur API menggunakan controller, module, dan model berisi SQL langsung.
+Struktur API menggunakan controller, service, dan model berisi SQL langsung.
 
 ```text
 backend/
@@ -10,42 +10,48 @@ backend/
     config/
       settings.py               # Pengaturan aplikasi/AI dan pembaca environment
       mysql.py                  # Host, port, database, kredensial, pool
-    controller/
-      controller_main.py        # Menggabungkan router HTTP
-      api/
-        auth.py
-        health.py
-        panel.py                # Panel administrator (/panel)
-        rooms.py                # Lobby, start, snapshot privat, aksi/vote, checker
-      realtime/
-        socket_handlers.py      # Controller event Socket.IO (chat)
-      middleware/
-        auth.py                 # Validasi bearer token sebelum controller
-        cors.py                 # Kebijakan cross-origin
+      database.py               # Pool, sesi, jalankan_transaksi, PersistenceError, health probe
+      skins.py                  # Daftar skin pemain dan bot
+    controllers/                # API HTTP
+      routes.py                 # Menggabungkan router HTTP
+      auth.py
+      health.py
+      panel.py                  # Panel administrator (/panel)
+      panel_npc.py              # Panel Otak NPC, simulasi, dan peta kode
+      rooms.py                  # Lobby, start, snapshot privat, aksi/vote, checker
+      survey.py
+      users.py                  # Manajemen user di panel
+    middleware/
+      auth.py                   # Validasi bearer token sebelum controller
+      auth_limits.py            # Batas percobaan login
+      cors.py                   # Kebijakan cross-origin
+      safe_validation.py        # Respons 422 tanpa isi input
+    sockets/
+      server.py                 # Membuat sio dan mengirim ke room (emit_room)
+      chat.py                   # Event Socket.IO: connect, disconnect, send_chat
+    services/                   # Logika login, password, room, survei, dan konfigurasi AI
+      ollama_client.py          # Cek model di link Ollama
     models/
       auth_queries.py           # SELECT/INSERT/DELETE akun dan sesi
-      game_queries.py           # SELECT/INSERT/UPDATE pemain dan chat
-    module/                     # Logika password, sesi login, AI, dan game
-      mysql_connector.py        # Pool, sesi, jalankan_transaksi, PersistenceError, health probe
-      ollama_client.py          # Cek model di link Ollama
-      create_user.py            # CLI akun tambahan untuk multiplayer lokal
+      game_queries.py           # SELECT/INSERT pemain dan chat
+    module/                     # Engine pertandingan, bot, simulasi, dan penyimpanan chat
     schemas/                    # Validasi request/response API
   artifacts/
     indobert/                   # Model NLU intent dan target
   deployment/                   # Dockerfile Azure dan proxy
   migrations/                   # SQL untuk membuat/mengubah struktur tabel
   public/                       # Panel administrator dan dokumen
-  scripts/                      # Penyiapan deployment, ekspor, dan simulasi
+  scripts/                      # CLI akun, penyiapan deployment, ekspor, dan simulasi
   tests/
 ```
 
-Alur: HTTP/Socket.IO -> controller -> module -> models (SQL) -> MySQL.
-Koneksi dan pool MySQL disediakan oleh `app/module/mysql_connector.py`.
-Model tidak menyimpan aturan HTTP atau menulis respons API. Module mengatur
+Alur: HTTP -> controllers, atau Socket.IO -> sockets, lalu services dan module -> models (SQL) -> MySQL.
+Koneksi dan pool MySQL disediakan oleh `app/config/database.py`.
+Model tidak menyimpan aturan HTTP atau menulis respons API. Service mengatur
 transaksi agar beberapa query bisa commit/rollback bersama.
 
 Engine murni ada di `app/module/match_engine.py`: role, fase, skill, cooldown,
-voting, kemenangan, serta snapshot privat. `app/module/room_service.py` membatasi
+voting, kemenangan, serta snapshot privat. `app/services/room_service.py` membatasi
 akses anggota/host dan memegang lock. `app/main.py` menjalankan clock pertandingan;
 frontend hanya menampilkan keputusan server. Lihat [alur dan aturan game](../GAME_CONCEPT.md).
 
@@ -69,10 +75,10 @@ def account_by_username(database, username):
     return database.execute(sql, {"username": username}).mappings().one_or_none()
 ```
 
-Pemakaian dari module:
+Pemakaian dari service:
 
 ```python
-from app.module.mysql_connector import jalankan_transaksi
+from app.config.database import jalankan_transaksi
 from app.models.auth_queries import account_by_username
 
 account = jalankan_transaksi(lambda database: account_by_username(database, "user1"))
@@ -83,7 +89,7 @@ account = jalankan_transaksi(lambda database: account_by_username(database, "use
 SQLAlchemy digunakan sebagai konektor/pool dan pengikat parameter SQL; query
 aplikasi ditulis sebagai SQL langsung, bukan query ORM. Jangan interpolasi input
 pengguna ke SQL. Gunakan `:username` dan dictionary parameter, padanan placeholder
-`?` di mysql2. Exception diteruskan ke module untuk rollback dan diterjemahkan
+`?` di mysql2. Exception diteruskan ke service untuk rollback dan diterjemahkan
 controller menjadi respons API. Pool ditutup hanya saat aplikasi berhenti,
 bukan setiap query. Semua perubahan tabel tetap melalui migrations.
 
@@ -121,4 +127,4 @@ Tes MySQL menulis data percobaan; jangan arahkan ke database pengguna. Tes
 controller memakai respons AI mock untuk memeriksa jalur API dan penyimpanan
 SQL, tanpa panggilan berbayar ke OpenAI.
 
-Migration tidak membuat akun; buat akun lewat halaman daftar atau CLI `create_user`.
+Migration tidak membuat akun; buat akun lewat halaman daftar atau CLI `scripts/create_user.py`.

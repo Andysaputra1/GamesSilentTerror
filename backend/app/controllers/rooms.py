@@ -3,8 +3,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from typing import Literal
-from app.controller.middleware.auth import require_authenticated_user
-from app.module.room_service import room_service
+from app.middleware.auth import require_authenticated_user
+from app.services.room_service import room_service
 from app.module.persistence_service import PersistenceService, PersistenceError
 
 router = APIRouter(prefix="/api/rooms", tags=["rooms"])

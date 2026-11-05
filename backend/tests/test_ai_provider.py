@@ -2,7 +2,7 @@
 
 import unittest
 from app.config.settings import Settings
-from app.controller.api.panel import MODEL_LOKAL
+from app.controllers.panel import MODEL_LOKAL
 
 
 class ProviderTests(unittest.TestCase):

@@ -6,10 +6,10 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
-from app.module.mysql_connector import PersistenceError, database_is_ready, jalankan_transaksi
+from app.config.database import PersistenceError, database_is_ready, jalankan_transaksi
 from app.config.settings import settings
-from app.module.ollama_client import model_available
-from app.module.ai_runtime_service import ai_runtime
+from app.services.ollama_client import model_available
+from app.services.ai_config_service import ai_runtime
 
 router = APIRouter(tags=["system"])
 

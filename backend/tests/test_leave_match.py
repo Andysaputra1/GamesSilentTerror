@@ -9,10 +9,10 @@ from unittest.mock import patch
 from fastapi import FastAPI, Header
 from fastapi.testclient import TestClient
 
-from app.controller.api.rooms import router
-from app.controller.middleware.auth import require_authenticated_user
+from app.controllers.rooms import router
+from app.middleware.auth import require_authenticated_user
 from app.module.match_engine import PREPARATION_MIN_SECONDS, Match, snapshot_berlabel
-from app.module.room_service import RoomService
+from app.services.room_service import RoomService
 
 RAHASIA = " Role tetap dirahasiakan sampai permainan selesai."
 KUNCI_PUBLIK = {"name", "label", "alive", "skin_id"}
@@ -310,7 +310,7 @@ class LeaveRoomTests(unittest.TestCase):
             "alice"
         ): SimpleNamespace(username=x_user)
         base = f"/api/rooms/{self.room.code}"
-        with patch("app.controller.api.rooms.room_service", self.rooms), TestClient(app) as client:
+        with patch("app.controllers.rooms.room_service", self.rooms), TestClient(app) as client:
             for _ in range(2):
                 response = client.post(base + "/leave", headers={"x-user": "alice"})
                 self.assertEqual((response.status_code, response.json()), (200, {"left": True}))

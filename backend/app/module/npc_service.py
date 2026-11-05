@@ -15,7 +15,7 @@ Alurnya
    5.5 Kirim: Siarkan chat ke room
    5.6 Catat: Simpan jejak untuk panel checker, IndoBERT membaca kalimat bot
 
-Chat manusia masuk lewat socket_handlers.py, lalu bacaannya dicatat catat_nlu di file ini.
+Chat manusia masuk lewat sockets/chat.py, lalu bacaannya dicatat catat_nlu di file ini.
 """
 
 import asyncio
@@ -25,14 +25,15 @@ import time
 from functools import partial
 from time import perf_counter
 
-from app.module.checker_service import checker_service
+from app.services.checker_service import checker_service
 from app.module.npc_brain.penjelasan import lengkapi as lengkapi_penjelasan
 from app.module.npc_brain.penjelasan import ringkas as ringkas_penjelasan
 from app.module.npc_brain.runtime import brain_runtime
 from app.module.persistence_service import PersistenceService, PersistenceError
 from app.module.match_engine import snapshot_berlabel
-from app.module.room_service import room_service
-from app.module.survey_service import survey_service
+from app.services.room_service import room_service
+from app.services.survey_service import survey_service
+from app.sockets.server import emit_room, sio
 from app.config.settings import settings
 
 logger = logging.getLogger("shadow_heist.npc")
@@ -488,3 +489,6 @@ class NPCService:
         for task in list(self.tasks):
             task.cancel()
         await asyncio.gather(*self.tasks, return_exceptions=True)
+
+
+npc_service = NPCService(sio, broadcast=emit_room)

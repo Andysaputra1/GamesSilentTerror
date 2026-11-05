@@ -15,7 +15,7 @@ from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
 from app.config.settings import Settings
-from app.controller.api.panel import require_panel
+from app.controllers.panel import require_panel
 from app.module.npc_brain.runtime import (
     JALUR_PENULIS, BrainRuntime, NLUBersama, OtakBot,
 )  # fmt: skip
@@ -313,7 +313,7 @@ class NpcConfigStoreTests(unittest.TestCase):
     """Baris konfigurasi NPC di DB: baris lama/tidak valid aman, simpan gagal dikembalikan utuh."""
 
     def test_old_and_invalid_rows_keep_env_values(self):
-        from app.module import npc_config_service as layanan
+        from app.services import npc_config_service as layanan
 
         with (
             patch.object(layanan, "brain_runtime") as runtime,
@@ -332,7 +332,7 @@ class NpcConfigStoreTests(unittest.TestCase):
                 layanan.muat_konfigurasi_npc()  # tidak melempar error saat startup
 
     def test_failed_save_restores_every_field(self):
-        from app.module import npc_config_service as layanan
+        from app.services import npc_config_service as layanan
         from app.module.persistence_service import PersistenceError
 
         sebelum = {"penulis_diminta": "otomatis",
@@ -368,7 +368,7 @@ class WriterSettingsTests(unittest.TestCase):
 
 class PanelWriterApiTests(unittest.TestCase):
     def setUp(self):
-        from app.controller.api import panel, panel_npc
+        from app.controllers import panel, panel_npc
 
         self.app = FastAPI()
         self.app.include_router(panel_npc.router)
@@ -382,8 +382,8 @@ class PanelWriterApiTests(unittest.TestCase):
                      "urutan_penulis": ["openrouter", "tautan"], "model_openrouter": "",
                      "model_tautan": "qwen3:4b-instruct"}  # fmt: skip
         with (
-            patch("app.module.npc_config_service.brain_runtime") as runtime,
-            patch("app.module.npc_config_service.jalankan_transaksi") as simpan,
+            patch("app.services.npc_config_service.brain_runtime") as runtime,
+            patch("app.services.npc_config_service.jalankan_transaksi") as simpan,
         ):
             runtime.atur.return_value = ringkasan
             # Klien lama (skrip kirim-link versi lama) masih boleh mengirim kunci validasi; kuncinya diabaikan.
@@ -416,7 +416,7 @@ class PanelWriterApiTests(unittest.TestCase):
             self.assertEqual(simulasi.status_code, 422)
 
     def test_check_endpoint_rebuilds_and_checks_in_background(self):
-        with patch("app.controller.api.panel_npc.brain_runtime") as runtime:
+        with patch("app.controllers.panel_npc.brain_runtime") as runtime:
             runtime.segarkan_penulis.return_value = {"penulis": "openrouter"}
             response = self.client.post("/api/panel/npc/cek-penulis")
         self.assertEqual(response.status_code, 200)

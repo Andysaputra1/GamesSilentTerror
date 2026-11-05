@@ -12,11 +12,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from app.config.settings import BACKEND_DIR
-from app.controller.api.panel import require_panel
-from app.controller.middleware.auth_limits import limit_auth
-from app.controller.middleware.safe_validation import SafeValidationRoute
+from app.controllers.panel import require_panel
+from app.middleware.auth_limits import limit_auth
+from app.middleware.safe_validation import SafeValidationRoute
 from app.module.npc_brain.runtime import brain_runtime
-from app.module.npc_config_service import save_npc_configuration
+from app.services.npc_config_service import save_npc_configuration
 from app.module.persistence_service import PersistenceError
 from app.module.simulasi_service import simulasi_service
 

@@ -65,7 +65,7 @@ class CheckerService:
     # Bot diambil dari pertandingan live, lalu dari penjelasan di jejak, lalu tabel match_bots (arsip).
     def ringkasan_room(self, code, traces=()):
         from app.module.npc_brain.runtime import brain_runtime
-        from app.module.room_service import room_service
+        from app.services.room_service import room_service
 
         ringkasan = {"kode": code, "status": "arsip", "fase": None, "ronde": None,
                      "pemenang": None, "komposisi": None, "manusia": None, "bot": [], "sumber_bot": None}  # fmt: skip
@@ -130,7 +130,7 @@ class CheckerService:
 def _bot_arsip(code):
     from sqlalchemy import text
 
-    from app.module.mysql_connector import PersistenceError, jalankan_transaksi
+    from app.config.database import PersistenceError, jalankan_transaksi
 
     def baca_baris_bot(database):
         return database.execute(

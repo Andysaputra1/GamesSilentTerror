@@ -3,16 +3,17 @@
 import random
 import unittest
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import patch
 
 from fastapi import FastAPI, Header
 from fastapi.testclient import TestClient
-from app.controller.api.rooms import router
-from app.controller.middleware.auth import require_authenticated_user
-from app.controller.realtime.socket_handlers import SocketGameController
+from app.controllers.rooms import router
+from app.middleware.auth import require_authenticated_user
+from app.sockets import chat
+from socket_palsu import socket_palsu
 from app.module.match_engine import KOMPOSISI_PERAN, Match, label_unik, snapshot_berlabel
-from app.module.skin_constants import ALL_SKINS
-from app.module.room_service import RoomService
+from app.config.skins import ALL_SKINS
+from app.services.room_service import RoomService
 
 
 class EngineTests(unittest.TestCase):
@@ -687,8 +688,8 @@ class RoomGameTests(unittest.TestCase):
             username="host"
         )
         with (
-            patch("app.controller.api.rooms.room_service", self.rooms),
-            patch("app.controller.api.rooms.PersistenceService"),
+            patch("app.controllers.rooms.room_service", self.rooms),
+            patch("app.controllers.rooms.PersistenceService"),
             TestClient(app) as client,
         ):
             for body in [{"capacity": 3}, {"capacity": 11}]:
@@ -757,7 +758,7 @@ class RoomGameTests(unittest.TestCase):
         app.dependency_overrides[require_authenticated_user] = lambda x_user=Header(
             "alice"
         ): SimpleNamespace(username=x_user)
-        with patch("app.controller.api.rooms.room_service", self.rooms), TestClient(app) as client:
+        with patch("app.controllers.rooms.room_service", self.rooms), TestClient(app) as client:
             base = "/api/rooms/" + self.room.code
             self.assertEqual(
                 client.post(
@@ -781,16 +782,11 @@ class RoomGameTests(unittest.TestCase):
 
 class SocketGameTests(unittest.IsolatedAsyncioTestCase):
     async def test_revoked_socket_token_cannot_send(self):
-        from app.module.auth_service import SessionValidationError
+        from app.services.auth_service import SessionValidationError
 
-        sio = Mock(emit=AsyncMock())
-        controller = SocketGameController(sio)
-        controller.sockets["sid"] = {"username": "alice", "token": "revoked-test-token"}
-        with patch(
-            "app.controller.realtime.socket_handlers.auth_service.check_user_by_token",
-            side_effect=SessionValidationError(),
-        ):
-            await controller.send_chat("sid", {"username": "alice", "message": "halo"})
+        sambungan = {"sid": {"username": "alice", "token": "revoked-test-token"}}
+        with socket_palsu(RoomService(), sambungan, SessionValidationError()) as sio:
+            await chat.send_chat("sid", {"username": "alice", "message": "halo"})
         self.assertEqual(sio.emit.call_args.args[0], "system_alert")
         self.assertIn("login", sio.emit.call_args.args[1]["msg"])
 
@@ -799,16 +795,10 @@ class SocketGameTests(unittest.IsolatedAsyncioTestCase):
         room = rooms.create("alice")
         rooms.set_bot(room.code, "alice", True)
         rooms.start(room.code, "alice")
-        sio = Mock(emit=AsyncMock(), enter_room=AsyncMock())
-        controller = SocketGameController(sio)
-        controller.sockets["sid"] = {"username": "alice", "token": "token-palsu", "room": room.code}
+        sambungan = {"sid": {"username": "alice", "token": "alice", "room": room.code}}
         with (
-            patch("app.controller.realtime.socket_handlers.room_service", rooms),
-            patch(
-                "app.controller.realtime.socket_handlers.auth_service.check_user_by_token",
-                return_value=Mock(username="alice"),
-            ),
-            patch("app.controller.realtime.socket_handlers.PersistenceService"),
+            socket_palsu(rooms, sambungan) as sio,
+            patch("app.sockets.chat.PersistenceService"),
         ):
             for data in [
                 None,
@@ -816,15 +806,15 @@ class SocketGameTests(unittest.IsolatedAsyncioTestCase):
                 {"username": "alice", "message": {}},
                 {"username": "NOX", "message": "spoof"},
             ]:
-                await controller.send_chat("sid", data)
+                await chat.send_chat("sid", data)
             room.match.phase = "night"
-            await controller.send_chat("sid", {"username": "alice", "message": "night"})
+            await chat.send_chat("sid", {"username": "alice", "message": "night"})
             room.match.phase = "day"
             room.match.players["alice"].gagged = True
-            await controller.send_chat("sid", {"username": "alice", "message": "gag"})
+            await chat.send_chat("sid", {"username": "alice", "message": "gag"})
             room.match.players["alice"].gagged = False
             room.match.players["alice"].hostage = True
-            await controller.send_chat("sid", {"username": "alice", "message": "hostage"})
+            await chat.send_chat("sid", {"username": "alice", "message": "hostage"})
         self.assertFalse(any(c.args[0] == "receive_chat" for c in sio.emit.call_args_list))
         self.assertEqual(room.match.messages, [])
 

@@ -3,11 +3,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from app.controller.api.panel import require_panel
-from app.module.mysql_connector import PersistenceError
-from app.module import user_management_service as users
+from app.controllers.panel import require_panel
+from app.config.database import PersistenceError
+from app.services import user_service as users
 from app.schemas.auth import UpdateProfileRequest
-from app.controller.middleware.safe_validation import SafeValidationRoute
+from app.middleware.safe_validation import SafeValidationRoute
 
 router = APIRouter(
     prefix="/api/panel/users",

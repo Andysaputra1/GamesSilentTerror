@@ -13,10 +13,10 @@ import secrets
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.module.mysql_connector import jalankan_transaksi
+from app.config.database import jalankan_transaksi
 from app.config.settings import settings
 from app.models import auth_queries
-from app.module.password_service import verify_password
+from app.services.password_service import verify_password
 
 # Controller auth mengirim teks ini ke klien sebagai detail HTTP 503.
 PESAN_LOGIN = "Layanan login sedang tidak tersedia."
@@ -107,12 +107,12 @@ class AuthService:
     def update_profile(
         self, user: AuthenticatedUser, display_name: str, username: str | None = None
     ) -> AuthenticatedUser:
-        from app.module.room_service import room_service
+        from app.services.room_service import room_service
 
         username_terpilih = username or user.username
         username_berubah = username_terpilih != user.username
         if username_berubah:
-            from app.module.user_management_service import validate_username
+            from app.services.user_service import validate_username
 
             validate_username(username_terpilih)
 
@@ -133,7 +133,7 @@ class AuthService:
 
     # Ubah skin pilihan pengguna; hanya skin dalam daftar yang diizinkan.
     def update_skin(self, user: AuthenticatedUser, skin_id: str) -> str:
-        from app.module.skin_constants import ALL_SKINS
+        from app.config.skins import ALL_SKINS
 
         if skin_id not in ALL_SKINS:
             raise ValueError(f"Skin tidak valid. Pilihan: {', '.join(ALL_SKINS)}")

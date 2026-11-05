@@ -14,7 +14,7 @@ from app.module.npc_brain import runtime as runtime_modul
 from app.module.npc_brain.runtime import BrainRuntime, NLUBersama, folder_model
 from tests.nlu_palsu import NLUPalsu
 from app.module.npc_service import NPCService
-from app.module.room_service import RoomService
+from app.services.room_service import RoomService
 
 
 def runtime_siap():

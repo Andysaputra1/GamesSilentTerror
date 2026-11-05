@@ -21,9 +21,9 @@ from dataclasses import dataclass, field
 from sqlalchemy import text
 import secrets
 import threading
-from app.module.mysql_connector import SessionLocal
+from app.config.database import SessionLocal
 from app.module.match_engine import Match, label_unik, phase_durations
-from app.module.activity_service import activity, traced
+from app.services.activity_service import activity, traced
 
 logger = logging.getLogger("shadow_heist.rooms")
 
@@ -113,7 +113,7 @@ class RoomService:
             return
         room.peserta_tercatat = True
         # Impor lambat: survey_service mengimpor modul ini.
-        from app.module.survey_service import survey_service
+        from app.services.survey_service import survey_service
 
         baris_peserta = survey_service.baris_peserta(room)
         threading.Thread(
@@ -137,7 +137,7 @@ class RoomService:
             if room.match:
                 # Survei akhir tetap bisa dikirim setelah keluar (room mungkin segera dibersihkan).
                 # Impor lambat: survey_service mengimpor modul ini.
-                from app.module.survey_service import survey_service
+                from app.services.survey_service import survey_service
 
                 survey_service.ingat_pertandingan(room)
                 # Room bisa dihapus di bawah sebelum timer sempat mencatat.

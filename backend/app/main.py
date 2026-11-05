@@ -2,7 +2,7 @@
 Membangun Server HTTP, Mengkoneksi dengan Socket.IO,Mengatur Jam Server dan mengatur bot NPC.
 
 Alurnya 
-1. Membangun Socket.IO
+1. Memasang Socket.IO (dibuat di sockets/server.py, event-nya di sockets/chat.py)
 2. Membangun Server (Koneksi ke DB, Konfigurasi AI, Konfigurasi NPC, Memuat Otak AI, Menyalakan Jam (cek terus setiap 0.5 Detik))
 
 Jadinya AI Mulai Mikir dari Sini (isi pikirannya di module/npc_service.py)
@@ -18,16 +18,18 @@ import socketio
 from fastapi import FastAPI
 
 from app.config.settings import settings
-from app.controller.controller_main import api_router
-from app.controller.middleware.cors import configure_cors
-from app.controller.realtime.socket_handlers import SocketGameController
-from app.module.ai_runtime_service import muat_konfigurasi_ai
-from app.module.mysql_connector import engine, database_is_ready
+from app.controllers.routes import api_router
+from app.middleware.cors import configure_cors
+from app.services.ai_config_service import muat_konfigurasi_ai
+from app.config.database import engine, database_is_ready
 from app.module.npc_brain.runtime import brain_runtime
-from app.module.npc_config_service import muat_konfigurasi_npc
-from app.module.npc_service import NPCService
+from app.services.npc_config_service import muat_konfigurasi_npc
+from app.module.npc_service import npc_service
 from app.module.persistence_service import PersistenceError
-from app.module.room_service import room_service
+from app.services.room_service import room_service
+# Cukup diimpor: chat.py mendaftarkan event connect, disconnect, dan send_chat ke sio.
+from app.sockets import chat  # noqa: F401
+from app.sockets.server import sio
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
@@ -83,15 +85,6 @@ async def lifespan(_: FastAPI):
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("shadow_heist")
 
-# Socket.IO: jalur yang tetap terbuka antara server dan browser, jadi server bisa mengirim chat kapan saja.
-# Di sini hanya persiapan: connect, disconnect, dan send_chat baru jalan saat ada pemain.
-sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins=settings.allowed_origins)
-socket_controller = SocketGameController(sio)
-sio.on("connect", socket_controller.connect)
-sio.on("disconnect", socket_controller.disconnect)
-sio.on("send_chat", socket_controller.send_chat)
-npc_service = NPCService(sio, broadcast=socket_controller.emit_room)
-
 # Bangun FastAPI dan daftarkan lifespan(Koneksi ke DB, Konfigurasi AI, Konfigurasi NPC, Memuat Otak AI, Menyalakan Jam (cek terus setiap 0.5 Detik)).
 # Lifespan baru jalan saat Uvicorn menyalakan server.
 app = FastAPI(title=settings.app_name, lifespan=lifespan)
@@ -99,4 +92,6 @@ app = FastAPI(title=settings.app_name, lifespan=lifespan)
 configure_cors(app)
 app.include_router(api_router)
 
+# Socket.IO: jalur yang tetap terbuka antara server dan browser, jadi server bisa mengirim chat kapan saja.
+# Di sini hanya persiapan: connect, disconnect, dan send_chat baru jalan saat ada pemain.
 asgi_app = socketio.ASGIApp(sio, other_asgi_app=app)

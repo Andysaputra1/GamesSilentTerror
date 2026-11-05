@@ -1,12 +1,16 @@
-"""CLI admin lokal: python -m app.module.create_user username --name 'Nama pemain'."""
+"""CLI admin lokal, dari folder backend: python scripts/create_user.py username --name 'Nama pemain'."""
 
 import argparse
 from getpass import getpass
+from pathlib import Path
 import re
+import sys
 from sqlalchemy.exc import IntegrityError
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.models.auth_queries import create_account
-from app.module.mysql_connector import SessionLocal
-from app.module.password_service import hash_password
+from app.config.database import SessionLocal
+from app.services.password_service import hash_password
 
 
 # Buat satu akun pemain dari baris perintah tanpa mengubah akun lama.

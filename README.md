@@ -209,7 +209,7 @@ Selama pertandingan aktif, membuka halaman aplikasi lain/tab baru atau login ula
 Akun yang sama di beberapa tab tetap satu pemain. Teman bisa mendaftar sendiri lewat halaman login, ditambahkan dari panel **Manajemen user**, atau dibuat lewat CLI lokal (password diminta tersembunyi dan disimpan sebagai hash; akun lama tidak ditimpa):
 
 ```sh
-docker compose exec ai-engine python -m app.module.create_user teman1 --name "Teman Satu"
+docker compose exec ai-engine python scripts/create_user.py teman1 --name "Teman Satu"
 ```
 
 Gunakan `-f docker-compose.gpu.yml` jika memakai stack NVIDIA. Setiap teman login dengan akun sendiri, lalu gabung memakai kode room yang sama. Pengujian lintas perangkat/LAN memerlukan konfigurasi CORS/host yang sesuai.
@@ -321,9 +321,12 @@ backend/              Python FastAPI + Socket.IO
   app/                Semua kode aplikasi Python
     __init__.py       Paket aplikasi
     main.py           Entry point ASGI (app.main:asgi_app)
-    config/           Konfigurasi aplikasi, AI, MySQL
-    controller/       Pintu masuk: api/ (REST), realtime/ (event Socket.IO), middleware/
-    module/           Logika autentikasi/game, koneksi MySQL, klien AI, dan CLI akun
+    config/           Konfigurasi aplikasi, AI, MySQL, koneksi database, daftar skin
+    controllers/      API HTTP (REST)
+    middleware/       Cek login, batas percobaan, CORS, respons validasi
+    sockets/          server.py (sio, kirim ke room) dan chat.py (event Socket.IO)
+    services/         Logika login, room, survei, konfigurasi AI, dan klien Ollama
+    module/           Engine pertandingan, bot, simulasi, dan penyimpanan chat
       npc_brain/      Runtime otak NPC; generated/ = ekspor notebook skripsi
     models/           Query SQL terparameterisasi
     schemas/          Validasi request/response API
@@ -331,7 +334,7 @@ backend/              Python FastAPI + Socket.IO
   artifacts/indobert/ Model IndoBERT intent + target untuk otak NPC (disalin manual)
   migrations/         Skema SQL V01–V10 (lokal dan Azure)
   deployment/         Konfigurasi produksi Azure (Dockerfile, Caddy)
-  scripts/            setup_panel.py, ekspor_otak_npc.py, setup_azure.py
+  scripts/            create_user.py, setup_panel.py, ekspor_otak_npc.py, setup_azure.py
 proxy/                Gateway Nginx
 ai-docker/            LLM penulis kalimat bot (Qwen3 4B/14B) di laptop + tunnel untuk VM; jalankan.bat
 docker-compose.yml    Service development dan volume

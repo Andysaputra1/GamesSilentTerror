@@ -7,8 +7,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 from app.config.settings import settings
-from app.controller.api.panel import router, require_panel, history_filter, validate_endpoint
-from app.module.password_service import hash_password
+from app.controllers.panel import router, require_panel, history_filter, validate_endpoint
+from app.services.password_service import hash_password
 
 # Bacaan NLU satu pesan seperti yang disimpan pencatat NLU (BrainRuntime.baca_chat), beserta konteksnya.
 NLU_CONTOH = json.dumps(
@@ -89,7 +89,7 @@ class PanelTests(unittest.TestCase):
         hashed = base64.b64encode(hash_password("fixture-password").encode()).decode()
         with (
             patch.object(settings, "panel_password_hash", SecretStr(hashed)),
-            patch("app.controller.api.panel.transaction") as db,
+            patch("app.controllers.panel.transaction") as db,
         ):
             self.assertEqual(
                 self.client.post(
@@ -115,7 +115,7 @@ class PanelTests(unittest.TestCase):
             with self.assertRaises(HTTPException):
                 validate_endpoint(url)
         with patch(
-            "app.controller.api.panel.socket.getaddrinfo",
+            "app.controllers.panel.socket.getaddrinfo",
             return_value=[(2, 1, 6, "", ("169.254.169.254", 443))],
         ):
             with self.assertRaises(HTTPException):
@@ -123,9 +123,9 @@ class PanelTests(unittest.TestCase):
 
     def test_empty_room_is_archived_and_db_failure_removes_live_room(self):
         from types import SimpleNamespace
-        from app.controller.api.rooms import router as room_router
-        from app.controller.middleware.auth import require_authenticated_user
-        from app.module.room_service import RoomService
+        from app.controllers.rooms import router as room_router
+        from app.middleware.auth import require_authenticated_user
+        from app.services.room_service import RoomService
         from app.module.persistence_service import PersistenceError
 
         self.app.include_router(room_router)
@@ -134,8 +134,8 @@ class PanelTests(unittest.TestCase):
         )
         rooms = RoomService()
         with (
-            patch("app.controller.api.rooms.room_service", rooms),
-            patch("app.controller.api.rooms.PersistenceService") as factory,
+            patch("app.controllers.rooms.room_service", rooms),
+            patch("app.controllers.rooms.PersistenceService") as factory,
         ):
             factory.return_value.archive_new_room.return_value = True
             response = self.client.post("/api/rooms")
@@ -197,7 +197,7 @@ class HistoryFilterTests(unittest.TestCase):
             with self.engine.begin() as db:
                 return operation(db)
 
-        self.db_patch = patch("app.controller.api.panel.transaction", side_effect=transaction)
+        self.db_patch = patch("app.controllers.panel.transaction", side_effect=transaction)
         self.db_patch.start()
 
     def tearDown(self):

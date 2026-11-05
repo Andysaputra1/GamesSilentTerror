@@ -24,7 +24,7 @@ from pydantic import SecretStr
 from sqlalchemy import text
 
 from app.config.settings import settings
-from app.module.mysql_connector import PersistenceError, jalankan_transaksi
+from app.config.database import PersistenceError, jalankan_transaksi
 
 
 class AIRuntimeService:

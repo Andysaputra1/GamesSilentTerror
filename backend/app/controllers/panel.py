@@ -21,18 +21,18 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field, SecretStr
 from sqlalchemy import text
 from app.config.settings import settings
-from app.module.password_service import verify_password
-from app.module.mysql_connector import PersistenceError, jalankan_transaksi
-from app.module.ai_runtime_service import ai_runtime, simpan_konfigurasi_ai
-from app.module.checker_service import checker_service
+from app.services.password_service import verify_password
+from app.config.database import PersistenceError, jalankan_transaksi
+from app.services.ai_config_service import ai_runtime, simpan_konfigurasi_ai
+from app.services.checker_service import checker_service
 from app.module.npc_brain.runtime import POLA_MODEL_TAUTAN, brain_runtime
-from app.module.activity_service import activity
-from app.module.room_service import room_service
-from app.controller.middleware.auth_limits import limit_auth
-from app.controller.middleware.safe_validation import SafeValidationRoute
+from app.services.activity_service import activity
+from app.services.room_service import room_service
+from app.middleware.auth_limits import limit_auth
+from app.middleware.safe_validation import SafeValidationRoute
 
 router = APIRouter(tags=["panel"], route_class=SafeValidationRoute)
-ASSETS = Path(__file__).resolve().parents[3] / "public" / "panel"
+ASSETS = Path(__file__).resolve().parents[2] / "public" / "panel"
 bearer = HTTPBearer(auto_error=False)
 
 

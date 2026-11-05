@@ -5,10 +5,10 @@ from types import SimpleNamespace
 from unittest.mock import patch
 from fastapi import FastAPI, Header
 from fastapi.testclient import TestClient
-from app.controller.api.rooms import router
-from app.controller.middleware.auth import require_authenticated_user
+from app.controllers.rooms import router
+from app.middleware.auth import require_authenticated_user
 from app.module.match_engine import Match
-from app.module.room_service import RoomService
+from app.services.room_service import RoomService
 
 
 class SkipTests(unittest.TestCase):
@@ -106,7 +106,7 @@ class ActiveRoomTests(unittest.TestCase):
         app.dependency_overrides[require_authenticated_user] = lambda x_user=Header(
             "alice"
         ): SimpleNamespace(username=x_user)
-        with patch("app.controller.api.rooms.room_service", self.rooms), TestClient(app) as client:
+        with patch("app.controllers.rooms.room_service", self.rooms), TestClient(app) as client:
             self.assertEqual(
                 client.get("/api/rooms/active").json()["active"]["code"], self.room.code
             )

@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import text
 
 from app.main import app
-from app.module.mysql_connector import SessionLocal
+from app.config.database import SessionLocal
 from app.module.persistence_service import PersistenceError, PersistenceService
 
 

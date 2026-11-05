@@ -176,7 +176,7 @@ untuk benar-benar menguji jawaban; mode API memakai saldo OpenRouter.
 
 Riwayat menampilkan semua pesan chat yang tercatat, pemain dan bot. Download
 menghasilkan CSV UTF-8 (BOM) dengan kolom format dataset NLU (`KOLOM_CSV` di
-`controller/api/panel.py`), termasuk teks_chat dan chat_id. Filter tanggal
+`controllers/panel.py`), termasuk teks_chat dan chat_id. Filter tanggal
 opsional menggunakan hari WIB, batas awal inklusif dan akhir sampai penghujung hari.
 Download selalu semua room, meski tampilan sedang memilih satu room. CSV mempertahankan
 isi pesan persis termasuk tanda kutip dan baris baru; ketika mengimpor ke spreadsheet,

@@ -5,10 +5,10 @@ import json
 from sqlalchemy import text
 
 # PersistenceError ikut diimpor agar file lain tetap bisa mengimpornya dari modul ini.
-from app.module.mysql_connector import PersistenceError, jalankan_transaksi  # noqa: F401
+from app.config.database import PersistenceError, jalankan_transaksi  # noqa: F401
 from app.models import game_queries as queries
 
-# socket_handlers mengirim teks ini ke pemain saat pesan chat gagal disimpan.
+# sockets/chat.py mengirim teks ini ke pemain saat pesan chat gagal disimpan.
 PESAN_GAME = "Data game gagal disimpan ke database."
 
 

@@ -3,12 +3,12 @@
 from fastapi import HTTPException, Security
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from app.module.auth_service import (
+from app.services.auth_service import (
     AuthenticatedUser,
     SessionValidationError,
     auth_service,
 )
-from app.module.mysql_connector import PersistenceError
+from app.config.database import PersistenceError
 
 _skema_bearer = HTTPBearer(auto_error=False)
 

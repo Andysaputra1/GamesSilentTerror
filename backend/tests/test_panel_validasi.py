@@ -3,10 +3,10 @@ import unittest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.controller.api.panel import require_panel, router
-from app.controller.api.users import router as users_router
-from app.controller.controller_main import api_router
-from app.controller.middleware.auth_limits import _riwayat_percobaan
+from app.controllers.panel import require_panel, router
+from app.controllers.users import router as users_router
+from app.controllers.routes import api_router
+from app.middleware.auth_limits import _riwayat_percobaan
 
 
 class PanelSafetyTests(unittest.TestCase):

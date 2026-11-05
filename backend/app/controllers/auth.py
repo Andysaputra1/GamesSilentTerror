@@ -14,7 +14,7 @@ from google.auth.transport.requests import Request as GoogleRequest
 from google.oauth2 import id_token
 from sqlalchemy.exc import IntegrityError
 
-from app.controller.middleware.auth import require_authenticated_user
+from app.middleware.auth import require_authenticated_user
 from app.schemas.auth import (
     AuthenticatedUserResponse,
     GoogleLoginRequest,
@@ -25,18 +25,18 @@ from app.schemas.auth import (
     UpdateSkinRequest,
 )
 from app.config.settings import settings
-from app.controller.middleware.auth_limits import limit_auth
-from app.controller.middleware.safe_validation import SafeValidationRoute
+from app.middleware.auth_limits import limit_auth
+from app.middleware.safe_validation import SafeValidationRoute
 from app.models import auth_queries
-from app.module.auth_service import (
+from app.services.auth_service import (
     AuthenticatedUser,
     AuthenticationError,
     LoginResult,
     PESAN_LOGIN,
     auth_service,
 )
-from app.module.mysql_connector import PersistenceError, jalankan_transaksi
-from app.module.password_service import hash_password
+from app.config.database import PersistenceError, jalankan_transaksi
+from app.services.password_service import hash_password
 
 router = APIRouter(prefix="/api/auth", tags=["auth"], route_class=SafeValidationRoute)
 _skema_bearer = HTTPBearer(auto_error=False)
@@ -214,7 +214,7 @@ def issue_session(database, akun):
 
 def register_account(body):
     """Simpan akun + email dalam satu transaksi dan login setelah pendaftaran."""
-    from app.module.user_management_service import validate_username
+    from app.services.user_service import validate_username
 
     try:
         validate_username(body.username)

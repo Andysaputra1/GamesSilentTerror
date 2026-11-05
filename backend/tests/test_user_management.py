@@ -9,10 +9,10 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.controller.api.users import router
-from app.controller.api.panel import require_panel
-from app.module.password_service import hash_password, verify_password
-from app.module.room_service import room_service
+from app.controllers.users import router
+from app.controllers.panel import require_panel
+from app.services.password_service import hash_password, verify_password
+from app.services.room_service import room_service
 
 
 class UserManagementTests(unittest.TestCase):
@@ -50,7 +50,7 @@ class UserManagementTests(unittest.TestCase):
             db.execute(text("INSERT INTO ai_analyses VALUES (1,1,'Analisis tetap disimpan')"))
             db.execute(text("INSERT INTO checker_traces VALUES (1,'trace tetap disimpan')"))
         self.session_patch = patch(
-            "app.module.mysql_connector.SessionLocal", sessionmaker(bind=self.engine)
+            "app.config.database.SessionLocal", sessionmaker(bind=self.engine)
         )
         self.session_patch.start()
         self.app = FastAPI()
