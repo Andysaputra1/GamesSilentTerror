@@ -36,6 +36,11 @@ class ChatDurabilityTests(unittest.IsolatedAsyncioTestCase):
         persistence.record_bot_message.assert_not_called()
         self.assertEqual([c["sender"] for c in chats], ["alice"])
 
+    # players.status tidak pernah berubah di jalur chat, jadi chat tidak perlu menulisnya.
+    async def test_chat_does_not_write_player_status(self):
+        persistence, _ = await self.run_chat()
+        self.assertNotIn("status", persistence.record_player_message.call_args.kwargs)
+
     async def test_database_failure_prevents_echo(self):
         _, chats = await self.run_chat(db_fails=True)
         self.assertEqual(chats, [])

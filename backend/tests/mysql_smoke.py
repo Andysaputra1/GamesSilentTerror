@@ -38,12 +38,11 @@ class MySQLIntegration(unittest.TestCase):
         username = "sql-test-" + uuid4().hex[:10]
         # Dua pesan dari pemain yang sama tidak boleh membuat baris pemain ganda.
         PersistenceService("local-lobby").record_player_message(
-            username=username, message="pertama", status="active"
+            username=username, message="pertama"
         )
         message_id = PersistenceService("local-lobby").record_player_message(
             username=username,
             message="'quoted'; --",
-            status="active",
         )
         with SessionLocal() as db:
             self.assertEqual(
@@ -63,8 +62,7 @@ class MySQLIntegration(unittest.TestCase):
         with self.assertRaises(PersistenceError):
             PersistenceService("local-lobby").record_player_message(
                 username=bad_name,
-                message="bad",
-                status="INVALID",
+                message=None,  # kolom NOT NULL: gagal sesudah baris pemain ditulis
             )
         with SessionLocal() as db:
             self.assertEqual(

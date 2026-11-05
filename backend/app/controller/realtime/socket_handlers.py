@@ -183,7 +183,6 @@ class SocketGameController:
                     jejak["message_id"] = PersistenceService(kode_room).record_player_message(
                         username=pengirim,
                         message=pesan,
-                        status="active",  # Gag/Hostage ditegakkan Match.can_chat, bukan status arsip
                         context=konteks,
                     )
                     if pertandingan:

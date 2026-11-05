@@ -22,20 +22,17 @@ class PersistenceService:
         id_room = queries.ensure_room(database, self.room_code)
         return id_room, queries.ensure_player(database, id_room, username)
 
-    # SERVICE CHAT SOCKET: simpan pesan pemain, status pemain, dan konteks fase dalam satu transaksi.
+    # Simpan pesan pemain dan konteks fase dalam satu transaksi.
     def record_player_message(
         self,
         *,
         username: str,
         message: str,
-        status: str | None = None,
         context: dict | None = None,
     ) -> int:
-        # CALLBACK TRANSAKSI: pastikan pemain ada, perbarui status, simpan pesan, lalu kembalikan ID pesan.
+        # Pastikan pemain ada, simpan pesan, lalu kembalikan ID pesan.
         def simpan_pesan_pemain(database):
             id_room, id_pemain = self._pastikan_room_dan_pemain(database, username)
-            if status is not None:
-                queries.update_player_status(database, id_pemain, status)
             id_pesan = queries.insert_message(
                 database,
                 room_id=id_room,

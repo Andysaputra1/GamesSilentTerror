@@ -42,14 +42,6 @@ def ensure_player(database: Session, room_id: int, username: str) -> int:
     )
 
 
-# QUERY UPDATE: ubah status pemain berdasarkan ID dan kembalikan jumlah baris terpengaruh.
-def update_player_status(database: Session, player_id: int, status: str):
-    return database.execute(
-        text("UPDATE players SET status = :status WHERE id = :player_id"),
-        {"player_id": player_id, "status": status},
-    ).rowcount
-
-
 # QUERY INSERT: simpan pesan (pemain atau bot) dan kembalikan ID pesan. Kolom lama intent/suspicion_score
 # di chat_messages dibiarkan NULL; analisis SVM/fuzzy per pesan sudah tidak dipakai.
 def insert_message(
