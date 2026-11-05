@@ -257,7 +257,12 @@ KODE_ALUR = {
         (G + "otak_fuzzy", "AMBANG_CHAT", []),
         (G + "otak_fuzzy", "keputusan_aksi", [
             ('if "sistem" in c:', "Gag dan Peek dinilai sistem; Hostage dan Guard sudah membawa nilai"),
-            ("< AMBANG_GAG", "Gag di bawah ambang: disimpan"),
+            ("pilih_gag(ctx, calon)", "Gag memakai aturan urutan sendiri"),
+        ]),
+        (G + "otak_fuzzy", "pilih_gag", [
+            ("BATAS_ANCAMAN_GAG", "ancaman tinggi tanpa rekan manusia: Gag sekarang"),
+            ("GAG_WAJIB_FRAKSI", "sesudah 60% siang: Gag wajib"),
+            ("AMBANG_GAG", "warga yang sudah bicara: nilai minimal"),
         ]),
     ],
     "keputusan": [

@@ -844,7 +844,8 @@ function planText(r, chat = false) {
   if (!r?.aksi) return '—';
   if (chat && !r.kirim) return `diam — ${r.alasan?.[0] || ''}`;
   if (DIAM.includes(r.aksi)) return `${r.aksi.replace('_', ' ')} — ${r.alasan?.[0] || ''}`;
-  const intent = chat && r.intent ? ` (${r.intent}${r.klaim ? ', mengaku role' : ''})` : '';
+  const klaim = r.role_diakui ? `, mengaku ${r.role_diakui}` : r.klaim ? ', mengaku role' : '';
+  const intent = chat && r.intent ? ` (${r.intent}${klaim})` : '';
   const skor = typeof r.skor === 'number' ? ` · skor ${teks(r.skor)}` : '';
   const jenis = chat && r.jenis ? ` · ${r.jenis.replaceAll('_', ' ')}` : '';
   return `${r.aksi}${jenis}${r.target ? ` → ${r.target}` : ''}${intent}${skor}`;
@@ -1342,7 +1343,7 @@ const ALUR_AI = {
     kode: 'keputusan_chat · keputusan_vote · keputusan_aksi',
     tujuan: 'Memutuskan bertindak atau menunggu.',
     proses:
-      'Prioritas terbaik dibandingkan AMBANG_CHAT, VOTE_LANGSUNG/AMBANG_VOTE, dan AMBANG_GAG. Bela diri dan jawab tidak melewati ambang; Hostage, Guard, dan Peek selalu memakai target terbaik.',
+      'Prioritas terbaik dibandingkan AMBANG_CHAT dan VOTE_LANGSUNG/AMBANG_VOTE. Bela diri dan jawab tidak melewati ambang, dan gali tersangka menjadi cadangan saat semua chat di bawah ambang. Gag selalu terpakai: ancaman tinggi langsung, nilai ≥ AMBANG_GAG sebelum 60% siang, dan wajib sesudahnya. Hostage, Guard, dan Peek selalu memakai target terbaik.',
     keluaran: 'Rencana chat, vote, dan aksi rahasia.',
     alasan: 'Bot tidak menuduh tanpa bukti yang cukup.',
   },

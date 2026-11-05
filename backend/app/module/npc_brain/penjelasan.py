@@ -67,8 +67,10 @@ AMBANG_CHAT = {
     "fuzzy": [("AMBANG_CHAT", "prioritas minimal agar bot chat")],
 }
 AMBANG_AKSI = {
-    "fuzzy": [("AMBANG_GAG", "prioritas minimal Gag (aksi lain memilih kandidat terbaik)")],
-}
+    "fuzzy": [("BATAS_ANCAMAN_GAG", "ancaman setinggi ini langsung di-Gag bila tidak ada rekan manusia hidup"),
+              ("AMBANG_GAG", "nilai minimal Gag ke warga yang sudah bicara, sebelum Gag wajib"),
+              ("GAG_WAJIB_FRAKSI", "sesudah porsi siang ini Gag wajib (aksi lain memilih kandidat terbaik)")],
+}  # fmt: skip
 AMBANG_VOTE = {
     "fuzzy": [("VOTE_LANGSUNG", "kesiapan ≥ nilai ini: vote langsung"),
               ("AMBANG_VOTE", "kesiapan ≥ nilai ini: vote setelah separuh Tribunal"),
@@ -235,7 +237,8 @@ def _rencana(rencana, *kunci):
 def _keputusan(hasil):
     return {
         "chat": _rencana(
-            hasil.get("rencana_chat"), "kirim", "aksi", "jenis", "intent", "target", "klaim", "skor"
+            hasil.get("rencana_chat"), "kirim", "aksi", "jenis", "intent", "target", "klaim",
+            "role_diakui", "skor",
         ),
         "vote": _rencana(hasil.get("rencana_vote"), "aksi", "target", "skor"),
         "aksi": _rencana(hasil.get("rencana_aksi"), "aksi", "target", "skor"),

@@ -1,8 +1,8 @@
 """FILE INI DIHASILKAN OTOMATIS oleh scripts/ekspor_otak_npc.py. JANGAN DIEDIT MANUAL.
 
 Sumber : npc_fuzzy.ipynb
-Sidik  : a6416d4679842436
-Dibuat : 2026-11-05 02:41 UTC
+Sidik  : acb4df124d3d7c92
+Dibuat : 2026-11-05 02:51 UTC
 
 Perubahan logika bot dilakukan di notebook skripsi, dijalankan ulang sampai semua
 skenario/pengujian lulus, lalu diekspor ulang dengan skrip ini.
@@ -1287,7 +1287,8 @@ def klaim_role_bot(ctx):
         x = ctx["ingatan"].intel[-1]
         hitman = x["peran"] == "hitman"
         # Hasil Peek menyebut orang itu langsung, jadi ia ikut menjadi target. Saksi Guard tidak.
-        return ("stalker", f"semalam peek {x['pemain']}, dia {'Hitman' if hitman else 'bukan Hitman'}",
+        waktu = "semalam" if x["ronde"] == ronde - 1 else "kemarin"
+        return ("stalker", f"{waktu} peek {x['pemain']}, dia {'Hitman' if hitman else 'bukan Hitman'}",
                 [{"pemain": x["pemain"], "relasi": "offend" if hitman else "defend"}])
     return peran, None, []
 
@@ -1306,7 +1307,7 @@ def calon_bela_diri(ctx, dituduh, tersangka, bukti_tersangka):
         kalimat = f"Jangan vote aku, aku {sebutan}"
         if bukti:
             return {**dasar, "jenis": "role_bukti_aksi", "role_diakui": role, "bukti_klaim": bukti, "relasi_tambahan": relasi,
-                    "alasan": [f"{kalimat}, {bukti.replace('semalam ', 'semalam aku ', 1)}."]}
+                    "alasan": [f"{kalimat}, {bukti.replace(' ', ' aku ', 1)}."]}
         return {**dasar, "jenis": "buka_role", "role_diakui": role, "alasan": [f"{kalimat}."]}
     if view["ronde"] <= RONDE_AWAL and baris["n_penuduh"] <= 1:
         return {**dasar, "jenis": "terlalu_awal", "alasan": ["Jangan vote aku, masih terlalu awal, buktinya belum ada."]}
@@ -1576,6 +1577,12 @@ def rencana_chat(calon):
             "alasan": calon["alasan"], "skor": calon.get("skor"),
             **({"penanya": calon["penanya"]} if calon.get("penanya") else {})}
 
+def rencana_vote(aksi, target=None, alasan=(), skor=None):
+    return {"aksi": aksi, "target": target, "alasan": list(alasan), "skor": skor}
+
+def rencana_aksi(aksi, target=None, alasan=(), skor=None):
+    return {"aksi": aksi, "target": target, "alasan": list(alasan), "skor": skor}
+
 # Stalker yang sudah tahu Hitman langsung membuka klaim; fakta pasti tidak perlu dinalar.
 # Bila ada beberapa Hitman hasil Peek, yang masih hidup dan belum diungkap di fase ini diungkap lebih dulu.
 def chat_pasti(ctx):
@@ -1659,10 +1666,10 @@ def calon_aksi(ctx):
                 calon.append({"aksi": "hostage", "target": r["pemain"], "alasan": alasan_ancaman(r),
                               "skor": float(r["ancaman"]) * (1 - 0.5 * float(r["jejak_tuduhan"])),
                               "input": {"ancaman": r["ancaman"], "jejak_tuduhan": r["jejak_tuduhan"]}})
-            elif r["bicara_ronde_ini"]:
+            else:
                 calon.append({"aksi": "gag", "target": r["pemain"], "sistem": "gag", "alasan": alasan_ancaman(r),
-                              "input": {"ancaman_sekarang": r["ancaman_sekarang"], "ancaman": r["ancaman"]},
-                              "seri": (-r["ancaman"],)})
+                              "bicara": r["bicara_ronde_ini"], "seri": (-r["ancaman"],),
+                              "input": {"ancaman_sekarang": r["ancaman_sekarang"], "ancaman": r["ancaman"]}})
         # Target yang Hostage-nya gagal dua malam berturut-turut kemungkinan besar dijaga bergantian oleh lebih dari satu
         # Spy, jadi ditinggalkan selama masih ada target lain (tanpa ini pertandingan bisa macet tanpa akhir).
         if kemampuan == "hostage":
@@ -1700,12 +1707,6 @@ def calon_aksi(ctx):
                           "input": {"kecurigaan": b["kecurigaan"], "kurang_info": 1 - b["volume_info"]},
                           "seri": (-b["kecurigaan"],)})
     return kemampuan, calon
-
-def rencana_vote(aksi, target=None, alasan=(), skor=None):
-    return {"aksi": aksi, "target": target, "alasan": list(alasan), "skor": skor}
-
-def rencana_aksi(aksi, target=None, alasan=(), skor=None):
-    return {"aksi": aksi, "target": target, "alasan": list(alasan), "skor": skor}
 
 # Kalimat cadangan bila LLM tidak tersedia atau keluarannya ditolak pemeriksa aturan.
 def templat_pesan(rencana):
@@ -1855,6 +1856,10 @@ AMBANG_VOTE = 45
 VOTE_LANGSUNG = 75
 
 AMBANG_GAG = 60
+
+BATAS_ANCAMAN_GAG = 0.70
+
+GAG_WAJIB_FRAKSI = 0.60
 
 PAKSA_VOTE_BUKTI_LEMAH = False
 
@@ -2072,10 +2077,20 @@ def keputusan_vote(ctx):
     return rencana_vote("abstain", alasan=["Belum cukup yakin; vote yang salah mengurangi warga bebas."],
                         skor=kesiapan), jejak
 
+# Target Gag, atau None bila Gag menunggu. Gag selalu terpakai: wajib sesudah GAG_WAJIB_FRAKSI siang. Rekan manusia yang masih hidup
+# diberi kesempatan memilih lebih dulu, jadi sebelum batas itu hanya bot tanpa rekan manusia yang bertindak.
+def pilih_gag(ctx, calon):
+    hidup = {p["nama"] for p in ctx["view"]["pemain"] if p["hidup"]}
+    tanpa_manusia = not set(ctx["view"]["saya"].get("rekan_manusia", [])) & hidup
+    urut = sorted(calon, key=lambda c: (-round(c["input"]["ancaman"], 6), -round(c["skor"], 6), c["target"]))
+    if (tanpa_manusia and urut[0]["input"]["ancaman"] >= BATAS_ANCAMAN_GAG) or ctx["konteks"]["waktu_berjalan"] >= GAG_WAJIB_FRAKSI:
+        return urut[0]
+    return next((c for c in urut if c["bicara"] and c["skor"] >= AMBANG_GAG), None) if tanpa_manusia else None
+
 # Aksi rahasia: Gag dan Peek dinilai sistem fuzzy; Hostage dan Guard sudah membawa nilai dari calon_aksi. Skor tertinggi dipilih.
 # Masukan : ctx dari putuskan (view.saya.can_act; kandidat calon_aksi beserta input dan kunci seri).
 # Keluaran: (rencana aksi, jejak DataFrame {aksi, target, prioritas, input}); prioritas 0–100 untuk Gag dan Peek, 0–1 untuk
-#           Hostage dan Guard. Gag hanya bila skor ≥ AMBANG_GAG (60); Hostage, Guard, dan Peek selalu memakai target terbaik.
+#           Hostage dan Guard. Target Gag dari pilih_gag; Hostage, Guard, dan Peek selalu memakai target terbaik.
 # Dipakai oleh: putuskan (semua role; tanpa kemampuan yang bisa dipakai hasilnya tidak_bisa).
 def keputusan_aksi(ctx):
     kemampuan, calon = calon_aksi(ctx)
@@ -2091,9 +2106,9 @@ def keputusan_aksi(ctx):
                            "input": {k: round(float(v), 3) for k, v in c["input"].items()}} for c in calon])
     if not calon:
         return rencana_aksi("tunggu", alasan=["Tidak ada target yang layak."]), jejak
-    if kemampuan == "gag" and calon[0]["skor"] < AMBANG_GAG:
-        return rencana_aksi("tunggu", alasan=["Belum ada penggalang suara yang layak dibungkam; Gag disimpan."]), jejak
-    c = calon[0]
+    c = pilih_gag(ctx, calon) if kemampuan == "gag" else calon[0]
+    if c is None:
+        return rencana_aksi("tunggu", alasan=["Belum ada ancaman yang harus dibungkam sekarang; Gag menunggu."]), jejak
     return rencana_aksi(c["aksi"], c["target"], c["alasan"], c["skor"]), jejak
 
 # Mekanik engine: satu suara pun cukup untuk eksekusi. Untuk metode dengan PAKSA_VOTE_BUKTI_LEMAH, abstain di

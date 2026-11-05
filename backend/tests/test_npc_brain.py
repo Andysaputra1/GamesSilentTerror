@@ -498,6 +498,47 @@ class HostageResultTests(unittest.TestCase):
         self.assertEqual(gagal_beruntun(game.snapshot("hitman")), {})
 
 
+class GagRuleTests(unittest.TestCase):
+    # Keputusan Gag otak harus diterima engine, juga untuk target yang belum bicara.
+    def langkah_hitman(self, detik, votes=(), rekan_manusia=()):
+        import importlib
+
+        names = ["hitman", "spy", "stalker", "civilian", "civilian2", "civilian3"]
+        game = Match(names, [], now=0, rng=random.Random(1))
+        for name, player in game.players.items():
+            player.role = name.rstrip("23")
+        game.round, game.phase = 3, "day"
+        game.deadline = game.durations["day"]
+        M = importlib.import_module("app.module.npc_brain.generated.otak_fuzzy")
+        ingatan = M.Ingatan("hitman")
+        snapshot = game.snapshot("hitman")
+        snapshot["me"]["team_humans"] = list(rekan_manusia)
+        ingatan.sinkron_snapshot(snapshot, 0.0)
+        for pemilih, target in votes:
+            ingatan.catat_vote(2, pemilih, target)
+        view = ingatan.sinkron_snapshot(snapshot, detik)
+        return game, M.putuskan(ingatan, view)["npc_decision"]
+
+    def test_high_threat_is_gagged_early_even_before_speaking(self):
+        game, npc = self.langkah_hitman(5.0, votes=[("spy", "hitman")])
+        self.assertEqual((npc["action"], npc["target"]), ("gag", "spy"))
+        game.act("hitman", npc["action"], npc["target"])
+        self.assertTrue(game.players["spy"].gagged)
+
+    def test_quiet_day_waits_until_sixty_percent_then_gag_is_mandatory(self):
+        durasi = Match(["a", "b", "c", "d", "e", "f"], [], now=0).durations["day"]
+        self.assertEqual(self.langkah_hitman(durasi * 0.59)[1]["action"], "wait")
+        game, npc = self.langkah_hitman(durasi * 0.60)
+        self.assertEqual(npc["action"], "gag")
+        game.act("hitman", npc["action"], npc["target"])
+
+    def test_human_teammate_delays_gag_until_sixty_percent(self):
+        votes, manusia = [("spy", "hitman")], ["stalker"]
+        self.assertEqual(self.langkah_hitman(5.0, votes, manusia)[1]["action"], "wait")
+        durasi = Match(["a", "b", "c", "d", "e", "f"], [], now=0).durations["day"]
+        self.assertEqual(self.langkah_hitman(durasi * 0.60, votes, manusia)[1]["target"], "spy")
+
+
 class ExportFreshnessTests(unittest.TestCase):
     def test_generated_modules_match_notebooks_when_available(self):
         from pathlib import Path
