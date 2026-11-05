@@ -26,6 +26,7 @@ def socket_palsu(rooms, sambungan, cek_token=akun_dari_token):
         patch.dict(server.sockets, sambungan, clear=True),
         patch("app.sockets.server.room_service", rooms),
         patch("app.sockets.chat.room_service", rooms),
+        patch("app.services.chat_service.room_service", rooms),
         (
             patch.object(server.auth_service, "check_user_by_token", side_effect=cek_token)
             if cek_token

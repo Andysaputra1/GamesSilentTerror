@@ -16,7 +16,7 @@ from app.controllers.panel import require_panel
 from app.controllers.survey import router
 from app.middleware.auth import require_authenticated_user
 from app.models import survey_queries
-from app.module.persistence_service import PersistenceError
+from app.services.persistence_service import PersistenceError
 from app.services.room_service import RoomService
 from app.services.survey_service import (
     BERLAKU_SELESAI_DETIK,

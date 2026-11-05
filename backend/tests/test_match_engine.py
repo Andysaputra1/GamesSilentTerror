@@ -798,7 +798,7 @@ class SocketGameTests(unittest.IsolatedAsyncioTestCase):
         sambungan = {"sid": {"username": "alice", "token": "alice", "room": room.code}}
         with (
             socket_palsu(rooms, sambungan) as sio,
-            patch("app.sockets.chat.PersistenceService"),
+            patch("app.services.chat_service.PersistenceService"),
         ):
             for data in [
                 None,

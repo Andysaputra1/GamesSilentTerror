@@ -29,7 +29,7 @@ from app.services.checker_service import checker_service
 from app.module.npc_brain.penjelasan import lengkapi as lengkapi_penjelasan
 from app.module.npc_brain.penjelasan import ringkas as ringkas_penjelasan
 from app.module.npc_brain.runtime import brain_runtime
-from app.module.persistence_service import PersistenceService, PersistenceError
+from app.services.persistence_service import PersistenceService, PersistenceError
 from app.module.match_engine import snapshot_berlabel
 from app.services.room_service import room_service
 from app.services.survey_service import survey_service

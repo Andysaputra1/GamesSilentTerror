@@ -333,7 +333,7 @@ class NpcConfigStoreTests(unittest.TestCase):
 
     def test_failed_save_restores_every_field(self):
         from app.services import npc_config_service as layanan
-        from app.module.persistence_service import PersistenceError
+        from app.services.persistence_service import PersistenceError
 
         sebelum = {"penulis_diminta": "otomatis",
                    "urutan_penulis": ["openrouter", "tautan"], "model_openrouter": "",

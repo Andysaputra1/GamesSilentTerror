@@ -140,13 +140,30 @@ class SocketRoomTests(unittest.IsolatedAsyncioTestCase):
                 sambungan = {"sid": {"username": "alice", "token": "alice", "room": room.code}}
                 with (
                     socket_palsu(rooms, sambungan) as sio,
-                    patch("app.sockets.chat.PersistenceService") as persistence,
-                    patch("app.sockets.chat.checker_service.begin", side_effect=begin),
+                    patch("app.services.chat_service.PersistenceService") as persistence,
+                    patch("app.services.chat_service.checker_service.begin", side_effect=begin),
                 ):
                     await chat.send_chat("sid", {"username": "alice", "message": "Halo"})
                 persistence.return_value.record_player_message.assert_not_called()
                 self.assertEqual(room.match.messages, [])
                 self.assertFalse(any(c.args[0] == "receive_chat" for c in sio.emit.call_args_list))
+
+    # Hanya penolakan yang menjadi system_alert; error sesudah pesan terkirim tidak boleh tampil sebagai penolakan.
+    async def test_error_after_delivery_is_not_sent_as_rejection(self):
+        rooms = RoomService()
+        room = rooms.create("alice")
+        rooms.set_bot(room.code, "alice", True)
+        rooms.start(room.code, "alice")
+        room.match.phase = "day"
+        sambungan = {"sid": {"username": "alice", "token": "alice", "room": room.code}}
+        with (
+            socket_palsu(rooms, sambungan) as sio,
+            patch("app.services.chat_service.PersistenceService"),
+            patch("app.services.chat_service.catat_nlu", side_effect=ValueError("rusak")),
+            self.assertRaises(ValueError),
+        ):
+            await chat.send_chat("sid", {"username": "alice", "message": "Halo"})
+        self.assertEqual([c.args[0] for c in sio.emit.call_args_list], ["receive_chat"])
 
     # TES ASYNC SOCKET: pesan hanya disiarkan ke ruangan pengirim dan tidak dibalas bot secara langsung.
     async def test_chat_scoped_to_room_without_direct_bot_reply(self):
@@ -157,7 +174,7 @@ class SocketRoomTests(unittest.IsolatedAsyncioTestCase):
         sambungan = {"sid": {"username": "alice", "token": "alice", "room": room.code}}
         with (
             socket_palsu(rooms, sambungan) as sio,
-            patch("app.sockets.chat.PersistenceService") as persistence,
+            patch("app.services.chat_service.PersistenceService") as persistence,
         ):
             await chat.send_chat("sid", {"username": "alice", "message": "Halo"})
         chats = [c for c in sio.emit.call_args_list if c.args[0] == "receive_chat"]

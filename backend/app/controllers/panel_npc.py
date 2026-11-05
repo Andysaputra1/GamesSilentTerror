@@ -15,7 +15,7 @@ from app.config.settings import BACKEND_DIR
 from app.controllers.panel import require_panel
 from app.middleware.auth_limits import limit_auth
 from app.middleware.safe_validation import SafeValidationRoute
-from app.module.persistence_service import PersistenceError
+from app.services.persistence_service import PersistenceError
 from app.module.simulasi_service import simulasi_service
 from app.services import panel_service
 
@@ -314,10 +314,10 @@ KODE_ALUR = {
         ]),
     ],
     "simpan": [
-        ("app.module.persistence_service", "PersistenceService.record_trace", [
+        ("app.services.persistence_service", "PersistenceService.record_trace", [
             ("save_checker_trace", "jejak untuk checker"),
         ]),
-        ("app.module.persistence_service", "PersistenceService.record_nlu", [
+        ("app.services.persistence_service", "PersistenceService.record_nlu", [
             ("set_message_nlu", "bacaan NLU untuk riwayat chat"),
         ]),
         (G + "otak_fuzzy", "Ingatan.catat_aksi_bot", []),

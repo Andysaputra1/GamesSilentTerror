@@ -11,7 +11,7 @@ from app.services.ai_config_service import (
     simpan_konfigurasi_ai,
     muat_konfigurasi_ai,
 )
-from app.module.persistence_service import PersistenceError
+from app.services.persistence_service import PersistenceError
 from app.controllers.panel import router, require_panel
 
 

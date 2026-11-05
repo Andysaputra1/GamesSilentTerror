@@ -7,7 +7,7 @@ import json
 from app.config.database import PersistenceError, jalankan_transaksi  # noqa: F401
 from app.models import game_queries as queries
 
-# sockets/chat.py mengirim teks ini ke pemain saat pesan chat gagal disimpan.
+# chat_service.py meneruskan teks ini ke pemain saat pesan chat gagal disimpan.
 PESAN_GAME = "Data game gagal disimpan ke database."
 
 

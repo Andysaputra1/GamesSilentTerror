@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import Mock, patch
 from app.services.room_service import RoomService
-from app.module.persistence_service import PersistenceError
+from app.services.persistence_service import PersistenceError
 from app.sockets import chat
 from socket_palsu import socket_palsu
 
@@ -18,7 +18,7 @@ class ChatDurabilityTests(unittest.IsolatedAsyncioTestCase):
         sambungan = {"sid": {"username": "alice", "token": "alice", "room": room.code}}
         with (
             socket_palsu(rooms, sambungan) as sio,
-            patch("app.sockets.chat.PersistenceService", return_value=persistence),
+            patch("app.services.chat_service.PersistenceService", return_value=persistence),
         ):
             await chat.send_chat("sid", {"username": "alice", "message": "Halo bot"})
         chats = [c.args[1] for c in sio.emit.call_args_list if c.args[0] == "receive_chat"]

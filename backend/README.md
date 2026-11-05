@@ -28,17 +28,19 @@ backend/
       safe_validation.py        # Respons 422 tanpa isi input
     sockets/
       server.py                 # Membuat sio dan mengirim ke room (emit_room)
-      chat.py                   # Event Socket.IO: connect, disconnect, send_chat
-    services/                   # Logika login, password, room, survei, panel, dan konfigurasi AI
+      chat.py                   # Event Socket.IO: connect, disconnect, send_chat (menerima dan mengirim system_alert)
+    services/                   # Logika login, password, room, chat, survei, panel, dan konfigurasi AI
       auth_service.py           # Login, pendaftaran, login Google, dan sesi pemain
+      chat_service.py           # Tahap chat manusia: cek, simpan, kirim ke room, baca IndoBERT
       panel_service.py          # Sesi admin, konfigurasi, arsip room, jejak, dan riwayat chat
+      persistence_service.py    # Penyimpanan chat, jejak, dan arsip room per transaksi
       ollama_client.py          # Cek model di link Ollama
     models/
       auth_queries.py           # SELECT/INSERT/UPDATE/DELETE akun dan sesi
       game_queries.py           # SELECT/INSERT/UPDATE pemain, chat, dan jejak checker
       panel_queries.py          # Sesi panel, konfigurasi, arsip room, jejak, riwayat, kesiapan skema
       survey_queries.py         # Survei akhir pertandingan dan catatan metode bot
-    module/                     # Engine pertandingan, bot, simulasi, dan penyimpanan chat
+    module/                     # Engine pertandingan, bot, dan simulasi
     schemas/                    # Validasi request/response API
   artifacts/
     indobert/                   # Model NLU intent dan target

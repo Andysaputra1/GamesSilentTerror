@@ -13,7 +13,7 @@ from sqlalchemy import text
 
 from app.main import app
 from app.config.database import SessionLocal
-from app.module.persistence_service import PersistenceError, PersistenceService
+from app.services.persistence_service import PersistenceError, PersistenceService
 
 
 @unittest.skipUnless(os.getenv("STRUCTURE_TEST_DB") == "1", "requires disposable MySQL")

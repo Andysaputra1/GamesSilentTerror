@@ -25,7 +25,7 @@ from app.config.database import engine, database_is_ready
 from app.module.npc_brain.runtime import brain_runtime
 from app.services.npc_config_service import muat_konfigurasi_npc
 from app.module.npc_service import npc_service
-from app.module.persistence_service import PersistenceError
+from app.services.persistence_service import PersistenceError
 from app.services.room_service import room_service
 # Cukup diimpor: chat.py mendaftarkan event connect, disconnect, dan send_chat ke sio.
 from app.sockets import chat  # noqa: F401

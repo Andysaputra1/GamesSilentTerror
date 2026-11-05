@@ -139,7 +139,7 @@ class PanelTests(unittest.TestCase):
         from app.controllers.rooms import router as room_router
         from app.middleware.auth import require_authenticated_user
         from app.services.room_service import RoomService
-        from app.module.persistence_service import PersistenceError
+        from app.services.persistence_service import PersistenceError
 
         self.app.include_router(room_router)
         self.app.dependency_overrides[require_authenticated_user] = lambda: SimpleNamespace(
