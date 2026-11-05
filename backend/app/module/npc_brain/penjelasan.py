@@ -402,6 +402,8 @@ def _blok_vote(modul, metode, jejak, rencana, peran):
         blok["catatan"] = (
             "Warga kritis: abstain diganti vote ke tersangka layak teratas (PAKSA_VOTE_KRITIS)."
         )
+    if (rencana or {}).get("pindah"):
+        blok["catatan"] = "Waktu tambahan seri: suara yang sudah masuk dipindah ke target ini."
     return blok
 
 

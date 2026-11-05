@@ -129,6 +129,18 @@ async def tulis_kalimat(runtime, otak, payload, konteks, lapor=None):
     return {**tulisan, "percobaan": [batas, *tulisan["percobaan"]]}
 
 
+# Pindah suara saat waktu tambahan. Pemanggil memegang kunci room. Bila suara baru ditolak, suara lama dikembalikan,
+# supaya bot tidak kehilangan suaranya.
+def pindahkan_vote(match, nama, target):
+    lama = match.votes.get(nama)
+    match.cancel_vote(nama)
+    try:
+        match.vote(nama, target)
+    except ValueError:
+        match.vote(nama, lama)
+        raise
+
+
 # Riwayat pencatat NLU per pertandingan (konteks target, urut kronologis); dibuang saat pertandingan usai.
 riwayat_nlu: dict[str, list] = {}
 
@@ -259,7 +271,10 @@ class NPCService:
             match.npc_decisions.add((fase[1], fase[2], otak.nama))
             try:
                 if keputusan_aksi["action"] == "vote":
-                    match.vote(otak.nama, match.username(keputusan_aksi["target"]))
+                    if keputusan_aksi.get("pindah"):
+                        pindahkan_vote(match, otak.nama, match.username(keputusan_aksi["target"]))
+                    else:
+                        match.vote(otak.nama, match.username(keputusan_aksi["target"]))
                     self.runtime.catat_vote(otak, view, keputusan["rencana_vote"])
                 elif keputusan_aksi["action"] in AKSI_RAHASIA:
                     match.act(

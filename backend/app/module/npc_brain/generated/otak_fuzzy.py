@@ -1,8 +1,8 @@
 """FILE INI DIHASILKAN OTOMATIS oleh scripts/ekspor_otak_npc.py. JANGAN DIEDIT MANUAL.
 
 Sumber : npc_fuzzy.ipynb
-Sidik  : 8e426707c50bd5a5
-Dibuat : 2026-11-05 04:42 UTC
+Sidik  : 038815ab3f19f8d2
+Dibuat : 2026-11-05 04:49 UTC
 
 Perubahan logika bot dilakukan di notebook skripsi, dijalankan ulang sampai semua
 skenario/pengujian lulus, lalu diekspor ulang dengan skrip ini.
@@ -14,7 +14,8 @@ Alurnya
    2.2 pengetahuan_peran: fakta pasti menurut role
    2.3 Warga: nilai_kecurigaan lalu terapkan_pengetahuan; Spy juga fitur_lindung
    2.4 Hitman: hitung_bukti publik, nilai_kecurigaan, fitur_hitman, lalu nilai_ancaman
-   2.5 Vote: vote_pasti, selain itu keputusan_vote_hitman (Hitman) atau keputusan_vote (warga), lalu pertahanan_suara
+   2.5 Vote: keputusan_pindah_vote saat waktu tambahan, selain itu vote_pasti, keputusan_vote_hitman (Hitman) atau
+       keputusan_vote (warga), lalu pertahanan_suara
    2.6 Chat: chat_pasti bila ada hasil Peek yang harus diungkap, selain itu keputusan_chat
    2.7 Aksi rahasia: keputusan_aksi
    2.8 Keluaran: format_npc untuk engine dan siapkan_nlg untuk penulis kalimat
@@ -286,7 +287,7 @@ class Ingatan:
     # Dipanggil game setelah vote bot diterima engine. Satu catatan per ronde: suara yang pindah mengganti catatan lama.
     def catat_vote_bot(self, view, rencana):
         catatan = {"ronde": view["ronde"], "target": rencana["target"], "alasan": list(rencana["alasan"]),
-                   "dinilai_ulang": False, **({"paksa": True} if rencana.get("paksa") else {})}
+                   "dinilai_ulang": bool(rencana.get("pindah")), **({"paksa": True} if rencana.get("paksa") else {})}
         lama = next((v for v in self.vote_bot if v["ronde"] == view["ronde"]), None)
         if lama is None:
             self.vote_bot.append(catatan)
@@ -1649,10 +1650,10 @@ def vote_pasti(ctx):
 # sedangkan suara tunggal Hitman menjadi satu-satunya bukti bagi warga. Saat dirinya/rekannya memimpin suara, Hitman
 # menyamakan suara pesaing terkuat; bila warga sudah vote, Hitman ikut suara terbanyak yang layak (kambing hitam).
 # Rekan yang pasti dieksekusi tidak bisa lagi diselamatkan, jadi Hitman ikut memilihnya supaya tidak terlihat membela.
-def keputusan_vote_hitman(ctx):
+def keputusan_vote_hitman(ctx, sudah_vote=False):
     view, konteks, bot, diri = ctx["view"], ctx["konteks"], ctx["bot"], ctx["diri"]
     boleh, alasan = izin_vote(view)
-    if not boleh:
+    if not boleh and not sudah_vote:
         return rencana_vote("tidak_bisa", alasan=[alasan]), pd.DataFrame()
     layak = _kambing_layak(ctx["fitur_hitman"])  # tabel fitur Hitman tidak memuat rekan Syndicate
     if layak.empty:
@@ -1784,8 +1785,8 @@ def templat_pesan(rencana):
 
 # Keluaran ke game: tiga rencana dipetakan ke bentuk NPCDecision backend.
 # Masukan : rencana chat, vote, dan aksi rahasia (keluaran penalaran metode).
-# Keluaran: {action, target, message}; aksi rahasia diutamakan, lalu vote, selain itu wait; message = kalimat templat
-#           bila chat dikirim, kosong bila tidak. Dipakai oleh: putuskan (kunci npc_decision) → NPCService/engine.
+# Keluaran: {action, target, message}, ditambah pindah: True bila suara yang sudah masuk harus dipindah; aksi rahasia
+#           diutamakan, lalu vote, selain itu wait; message = kalimat templat bila chat dikirim, kosong bila tidak. Dipakai oleh: putuskan (kunci npc_decision) → NPCService/engine.
 def format_npc(rencana_c, rencana_v, rencana_a):
     if rencana_a["aksi"] in AKSI_RAHASIA:
         action, target = rencana_a["aksi"], rencana_a["target"]
@@ -1793,7 +1794,8 @@ def format_npc(rencana_c, rencana_v, rencana_a):
         action, target = "vote", rencana_v["target"]
     else:
         action, target = "wait", None
-    return {"action": action, "target": target, "message": templat_pesan(rencana_c) if rencana_c["kirim"] else ""}
+    keputusan = {"action": action, "target": target, "message": templat_pesan(rencana_c) if rencana_c["kirim"] else ""}
+    return {**keputusan, "pindah": True} if action == "vote" and rencana_v.get("pindah") else keputusan
 
 BATASAN_NLG = [
     "Pertahankan intent dan target rencana; jangan menambah atau mengganti target.",
@@ -2124,6 +2126,28 @@ def keputusan_vote(ctx):
     return rencana_vote("abstain", alasan=["Belum cukup yakin; vote yang salah mengurangi warga bebas."],
                         skor=kesiapan), jejak
 
+# Waktu tambahan seri: bot yang sudah vote menilai ulang sampai pindah paling banyak sekali. Warga pindah hanya ke target layak yang
+# kecurigaannya lebih tinggi, boleh nama yang tidak seri. Hitman memakai aturan votenya sendiri, termasuk mempertahankan seri.
+# Keluaran: (rencana vote, jejak), atau None bila bot tidak sedang menilai ulang.
+def keputusan_pindah_vote(ctx):
+    view, ingatan, bot = ctx["view"], ctx["ingatan"], ctx["bot"]
+    lama = view["suara_tribunal"].get(bot)
+    catatan = next((v for v in ingatan.vote_bot if v["ronde"] == view["ronde"]), {})
+    if not (view["tribunal_tambahan"] and view["saya"]["can_cancel_vote"] and lama) or catatan.get("dinilai_ulang"):
+        return None
+    tetap = rencana_vote("tunggu", alasan=["Belum ada target yang lebih kuat; suaraku tetap."])
+    if ctx["peran"] == "hitman":
+        rencana, jejak = keputusan_vote_hitman(ctx, sudah_vote=True)
+        return ({**rencana, "pindah": True}, jejak) if rencana["aksi"] == "vote" and rencana["target"] != lama else (tetap, jejak)
+    kandidat, _ = urutkan_kandidat(ctx["tabel"])
+    layak = kandidat[(kandidat["p_sandera"] < BATAS_SANDERA_VOTE) & ~kandidat["pemain"].isin(ctx["pengetahuan"]["pasti_orang_baik"])]
+    kec_lama = float(baris_pemain(ctx["tabel"], lama)["kecurigaan"])
+    if layak.empty or round(float(layak.iloc[0]["kecurigaan"]) - kec_lama, 6) <= 0:
+        return tetap, pd.DataFrame()
+    baru = layak.iloc[0]
+    jejak = pd.DataFrame([{"kandidat": baru["pemain"], "kecurigaan": baru["kecurigaan"], "suara_lama": lama, "kecurigaan_lama": kec_lama}])
+    return rencana_vote("vote", baru["pemain"], alasan_curiga(baru, bot), pindah=True), jejak
+
 # Target Gag, atau None bila Gag menunggu. Gag selalu terpakai: wajib sesudah GAG_WAJIB_FRAKSI siang. Rekan manusia yang masih hidup
 # diberi kesempatan memilih lebih dulu, jadi sebelum batas itu hanya bot tanpa rekan manusia yang bertindak.
 def pilih_gag(ctx, calon):
@@ -2202,7 +2226,8 @@ def putuskan(ingatan, view):
         if peran == "spy":
             ctx["lindung"] = fitur_lindung(ingatan, view, tabel)
         urutan = urutan_tersangka(tabel)
-    rencana_v, jejak_v = vote_pasti(ctx) or (keputusan_vote_hitman(ctx) if peran == "hitman" else keputusan_vote(ctx))
+    rencana_v, jejak_v = (keputusan_pindah_vote(ctx) or vote_pasti(ctx)
+                          or (keputusan_vote_hitman(ctx) if peran == "hitman" else keputusan_vote(ctx)))
     rencana_v = pertahanan_suara(ctx, rencana_v, urutan)
     ctx["rencana_vote"] = rencana_v  # chat ajak vote (Fase 6) membutuhkan target vote langkah ini
     rencana_c, jejak_c = chat_pasti(ctx) or keputusan_chat(ctx)
