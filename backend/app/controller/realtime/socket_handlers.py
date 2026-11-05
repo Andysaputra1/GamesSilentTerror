@@ -46,12 +46,13 @@ class SocketGameController:
             raise ValueError("Identitas pemain tidak sesuai dengan sesi login.")
 
         # Token handshake diperiksa lagi supaya logout/expiry mencabut akses chat.
+        # PersistenceError sengaja diteruskan: database gagal bukan berarti sesi pemain berakhir.
         if "token" in socket:
             try:
                 akun = auth_service.check_user_by_token(socket["token"])
                 if akun.username != socket["username"]:
                     raise ValueError("Sesi login berubah. Silakan sambungkan ulang.")
-            except (SessionValidationError, PersistenceError) as error:
+            except SessionValidationError as error:
                 raise ValueError("Sesi login berakhir. Silakan login ulang.") from error
 
         return room_service.get(socket["room"], socket["username"])
@@ -65,6 +66,9 @@ class SocketGameController:
                 self._verifikasi_socket(sid, socket["username"])
             except ValueError:
                 await self.sio.leave_room(sid, to)
+            except PersistenceError:
+                # Dikeluarkan di sini berarti pemain berhenti menerima chat sampai menyambung ulang.
+                logger.warning("Token socket %s belum bisa dicek; tetap di kanal %s.", sid, to)
         await self.sio.emit(event, data, to=to)
 
     # Jalan saat browser menyambung: mengecek siapa yang masuk dan ke room mana, sebelum sambungan boleh menerima chat.
@@ -112,7 +116,7 @@ class SocketGameController:
                     raise ValueError("Pesan chat harus berisi 1–1000 karakter.")
                 # Socket sudah masuk kanal ruangan saat connect; pemain dicatat di transaksi pesan (tahap 3).
                 room = self._verifikasi_socket(sid, pengirim)
-            except ValueError as error:
+            except (ValueError, PersistenceError) as error:
                 await self.sio.emit("system_alert", {"msg": str(error)}, to=sid)
                 return
 

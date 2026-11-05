@@ -1,10 +1,14 @@
 import unittest
 from unittest.mock import AsyncMock, Mock, patch
 
+from sqlalchemy.exc import OperationalError
+
 from app.module.room_service import RoomService
 from app.controller.realtime.socket_handlers import SocketGameController
 from app.module.checker_service import checker_service
 from app.module.auth_service import SessionValidationError
+
+DATABASE_GAGAL = OperationalError("SELECT", {}, Exception("server hilang"))
 
 
 class RoomTests(unittest.TestCase):
@@ -77,6 +81,38 @@ class SocketRoomTests(unittest.IsolatedAsyncioTestCase):
             ):
                 await controller.emit_room("receive_chat", {"message": "next"}, to=room.code)
             sio.leave_room.assert_awaited_once_with("bob-sid", room.code)
+
+    # Database sempat gagal bukan berarti sesinya berakhir: pemain tetap di kanal dan tetap menerima chat.
+    async def test_database_failure_keeps_socket_in_room_channel(self):
+        rooms = RoomService()
+        room = rooms.create("alice")
+        sio = Mock(emit=AsyncMock(), leave_room=AsyncMock())
+        controller = SocketGameController(sio)
+        controller.sockets["sid"] = {"username": "alice", "token": "token-uji", "room": room.code}
+        with (
+            patch("app.controller.realtime.socket_handlers.room_service", rooms),
+            patch("app.models.auth_queries.account_by_token", side_effect=DATABASE_GAGAL),
+            self.assertLogs("shadow_heist.socket", "WARNING"),
+        ):
+            await controller.emit_room("receive_chat", {"message": "halo"}, to=room.code)
+        sio.leave_room.assert_not_awaited()
+        sio.emit.assert_awaited_once_with("receive_chat", {"message": "halo"}, to=room.code)
+
+    # Pengirim harus tahu layanannya yang bermasalah, bukan disuruh login ulang.
+    async def test_database_failure_tells_sender_login_service_unavailable(self):
+        rooms = RoomService()
+        room = rooms.create("alice")
+        sio = Mock(emit=AsyncMock())
+        controller = SocketGameController(sio)
+        controller.sockets["sid"] = {"username": "alice", "token": "token-uji", "room": room.code}
+        with (
+            patch("app.controller.realtime.socket_handlers.room_service", rooms),
+            patch("app.models.auth_queries.account_by_token", side_effect=DATABASE_GAGAL),
+        ):
+            await controller.send_chat("sid", {"username": "alice", "message": "halo"})
+        sio.emit.assert_awaited_once_with(
+            "system_alert", {"msg": "Layanan login sedang tidak tersedia."}, to="sid"
+        )
 
     async def test_human_chat_rechecks_phase_and_gag_before_saving(self):
         for change in ["night", "gag"]:
