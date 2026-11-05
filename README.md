@@ -325,7 +325,7 @@ backend/              Python FastAPI + Socket.IO
     controllers/      API HTTP (REST)
     middleware/       Cek login, batas percobaan, CORS, respons validasi
     sockets/          server.py (sio, kirim ke room) dan chat.py (event Socket.IO)
-    services/         Logika login, room, survei, konfigurasi AI, dan klien Ollama
+    services/         Logika login, room, survei, panel, konfigurasi AI, dan klien Ollama
     module/           Engine pertandingan, bot, simulasi, dan penyimpanan chat
       npc_brain/      Runtime otak NPC; generated/ = ekspor notebook skripsi
     models/           Query SQL terparameterisasi

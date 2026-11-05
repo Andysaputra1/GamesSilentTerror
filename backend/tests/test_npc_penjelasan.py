@@ -306,7 +306,7 @@ class PanelCheckerEndpointTests(unittest.TestCase):
 
     def test_list_has_room_summary_without_explanations_and_detail_has_them(self):
         self.app.dependency_overrides[self.require_panel] = lambda: "fixture-token"
-        with patch("app.controllers.panel.transaction", return_value=[]):
+        with patch("app.services.panel_service.transaction", return_value=[]):
             data = self.client.get(f"/api/panel/checker/{self.code}").json()
         self.assertNotIn("penjelasan", data["traces"][0])
         self.assertEqual(data["room"]["bot"][0]["nama"], "NOX")
@@ -316,10 +316,10 @@ class PanelCheckerEndpointTests(unittest.TestCase):
         self.assertEqual(data["room"]["bot"][0]["metode"], "bt")
         self.assertEqual(detail["penjelasan"]["penalaran"]["chat"]["cabang"], "tuduh")
         stored = json.dumps({"id": "a" * 32, "penjelasan": {"bot": {"nama": "ECHO"}}})
-        with patch("app.controllers.panel.transaction", return_value=stored):
+        with patch("app.services.panel_service.transaction", return_value=stored):
             arsip = self.client.get(f"/api/panel/checker/{self.code}/jejak/{'a' * 32}")
         self.assertEqual(arsip.json()["penjelasan"]["bot"]["nama"], "ECHO")
-        with patch("app.controllers.panel.transaction", return_value=None):
+        with patch("app.services.panel_service.transaction", return_value=None):
             self.assertEqual(
                 self.client.get(f"/api/panel/checker/{self.code}/jejak/{'b' * 32}").status_code, 404
             )

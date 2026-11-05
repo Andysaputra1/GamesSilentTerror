@@ -29,7 +29,9 @@ backend/
     sockets/
       server.py                 # Membuat sio dan mengirim ke room (emit_room)
       chat.py                   # Event Socket.IO: connect, disconnect, send_chat
-    services/                   # Logika login, password, room, survei, dan konfigurasi AI
+    services/                   # Logika login, password, room, survei, panel, dan konfigurasi AI
+      auth_service.py           # Login, pendaftaran, login Google, dan sesi pemain
+      panel_service.py          # Sesi admin, konfigurasi, arsip room, jejak, dan riwayat chat
       ollama_client.py          # Cek model di link Ollama
     models/
       auth_queries.py           # SELECT/INSERT/UPDATE/DELETE akun dan sesi

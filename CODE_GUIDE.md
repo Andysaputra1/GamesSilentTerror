@@ -16,7 +16,7 @@ permintaan pengguna.
 | `backend/app/main.py` | Startup FastAPI, Socket.IO, model analisis, dan lifecycle server |
 | `backend/app/controllers/routes.py` | Daftar router HTTP yang aktif |
 | `backend/app/controllers/` | Validasi request, autentikasi route, dan respons HTTP |
-| `backend/app/services/` | Aturan login, password, room, survei, checker, konfigurasi AI, dan klien Ollama |
+| `backend/app/services/` | Aturan login dan Google (`auth_service.py`), panel (`panel_service.py`), password, room, survei, checker, konfigurasi AI, dan klien Ollama |
 | `backend/app/module/` | Pertandingan, bot NPC, simulasi, dan penyimpanan chat |
 | `backend/app/models/` | Kueri SQL berparameter |
 | `backend/app/sockets/server.py` | Membuat `sio`, mencatat sambungan, dan mengirim ke room (`emit_room`) |

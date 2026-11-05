@@ -3,11 +3,13 @@ import json
 import unittest
 from datetime import date, datetime
 from unittest.mock import patch
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
+from sqlalchemy.exc import OperationalError
 from app.config.settings import settings
-from app.controllers.panel import router, require_panel, history_filter, validate_endpoint
+from app.controllers.panel import router, require_panel
+from app.services.panel_service import history_filter, validate_endpoint
 from app.services.password_service import hash_password
 
 # Bacaan NLU satu pesan seperti yang disimpan pencatat NLU (BrainRuntime.baca_chat), beserta konteksnya.
@@ -89,7 +91,7 @@ class PanelTests(unittest.TestCase):
         hashed = base64.b64encode(hash_password("fixture-password").encode()).decode()
         with (
             patch.object(settings, "panel_password_hash", SecretStr(hashed)),
-            patch("app.controllers.panel.transaction") as db,
+            patch("app.services.panel_service.transaction") as db,
         ):
             self.assertEqual(
                 self.client.post(
@@ -99,11 +101,22 @@ class PanelTests(unittest.TestCase):
             )
             db.assert_not_called()
 
+    # Service melempar PersistenceError; controller yang menjadikannya 503 dengan pesan yang sama seperti dulu.
+    def test_database_failure_keeps_panel_503_message(self):
+        self.app.dependency_overrides[require_panel] = lambda: "test-admin"
+        gagal = OperationalError("SELECT", {}, Exception("server hilang"))
+        pesan = "Database panel belum siap. Periksa koneksi dan migrasi V5/V6."
+        for alamat in ["/api/panel/rooms", "/api/panel/history", "/api/panel/history.csv",
+                       "/api/panel/checker/ABC123", f"/api/panel/checker/ABC123/jejak/{'a' * 32}"]:  # fmt: skip
+            with self.subTest(alamat=alamat), patch("sqlalchemy.orm.Session.execute", side_effect=gagal):
+                hasil = self.client.get(alamat)
+                self.assertEqual((hasil.status_code, hasil.json()["detail"]), (503, pesan))
+
     def test_date_filters_cover_full_wib_day(self):
         _, params = history_filter(None, date(2026, 9, 23), date(2026, 9, 23))
         self.assertEqual(params["start"], datetime(2026, 9, 22, 17))
         self.assertEqual(params["end"], datetime(2026, 9, 23, 17))
-        with self.assertRaises(HTTPException):
+        with self.assertRaises(ValueError):
             history_filter(None, date(2026, 9, 24), date(2026, 9, 23))
 
     def test_tunnel_rejects_credentials_private_addresses_and_http(self):
@@ -112,13 +125,13 @@ class PanelTests(unittest.TestCase):
             "https://name:pass@example.com",
             "https://example.com/?key=secret",
         ]:
-            with self.assertRaises(HTTPException):
+            with self.assertRaises(ValueError):
                 validate_endpoint(url)
         with patch(
-            "app.controllers.panel.socket.getaddrinfo",
+            "app.services.panel_service.socket.getaddrinfo",
             return_value=[(2, 1, 6, "", ("169.254.169.254", 443))],
         ):
-            with self.assertRaises(HTTPException):
+            with self.assertRaises(ValueError):
                 validate_endpoint("https://metadata.test")
 
     def test_empty_room_is_archived_and_db_failure_removes_live_room(self):
@@ -197,7 +210,7 @@ class HistoryFilterTests(unittest.TestCase):
             with self.engine.begin() as db:
                 return operation(db)
 
-        self.db_patch = patch("app.controllers.panel.transaction", side_effect=transaction)
+        self.db_patch = patch("app.services.panel_service.transaction", side_effect=transaction)
         self.db_patch.start()
 
     def tearDown(self):

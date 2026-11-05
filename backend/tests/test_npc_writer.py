@@ -369,13 +369,14 @@ class WriterSettingsTests(unittest.TestCase):
 class PanelWriterApiTests(unittest.TestCase):
     def setUp(self):
         from app.controllers import panel, panel_npc
+        from app.services import panel_service
 
         self.app = FastAPI()
         self.app.include_router(panel_npc.router)
         self.app.include_router(panel.router)
         self.app.dependency_overrides[require_panel] = lambda: "fixture-token"
         self.client = TestClient(self.app)
-        self.panel = panel
+        self.panel = panel_service
 
     def test_save_sends_order_and_model_to_runtime(self):
         ringkasan = {"penulis_diminta": "otomatis",
@@ -416,7 +417,7 @@ class PanelWriterApiTests(unittest.TestCase):
             self.assertEqual(simulasi.status_code, 422)
 
     def test_check_endpoint_rebuilds_and_checks_in_background(self):
-        with patch("app.controllers.panel_npc.brain_runtime") as runtime:
+        with patch("app.services.panel_service.brain_runtime") as runtime:
             runtime.segarkan_penulis.return_value = {"penulis": "openrouter"}
             response = self.client.post("/api/panel/npc/cek-penulis")
         self.assertEqual(response.status_code, 200)

@@ -5,9 +5,9 @@ from datetime import datetime, timezone
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
-from app.config.database import PersistenceError, database_is_ready, jalankan_transaksi
+from app.config.database import database_is_ready
 from app.config.settings import settings
-from app.models import panel_queries
+from app.services import panel_service
 from app.services.ollama_client import model_available
 from app.services.ai_config_service import ai_runtime
 
@@ -43,11 +43,7 @@ async def app_status() -> dict[str, object]:
 # CONTROLLER READY: 200 hanya bila migrasi V5 dan V6 sudah ada; tanpa memanggil provider AI.
 def ready():
     """Cheap deployment readiness; never calls a paid or local AI provider."""
-    skema_siap = False
-    try:
-        skema_siap = jalankan_transaksi(panel_queries.count_required_migrations) == 2
-    except PersistenceError:
-        pass
+    skema_siap = panel_service.skema_siap()
     return JSONResponse(
         {"ready": skema_siap},
         status_code=200 if skema_siap else 503,
