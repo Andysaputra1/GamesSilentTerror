@@ -8,7 +8,7 @@ Alurnya saat server nyala (muat_konfigurasi_ai, dipanggil main.py)
 2. Baris kosong: selesai, bot memakai .env
 3. Ada isi: buka enkripsi key dan token, lalu simpan ke memori
 
-Alurnya saat panel menyimpan (save_panel_configuration)
+Alurnya saat panel menyimpan (simpan_konfigurasi_ai)
 1. Baca isi lama dengan baris dikunci. Gagal baca: panel menerima gagal
 2. Susun isi baru dan enkripsi key. Sumber key salah atau key kosong: batal, DB tidak berubah
 3. Uji buka hasil enkripsinya. Gagal: batal, DB tidak berubah
@@ -109,7 +109,7 @@ def muat_konfigurasi_ai():
 
 
 # Simpan konfigurasi AI dari panel ke DB dan memori, supaya langsung berlaku tanpa restart.
-def save_panel_configuration(
+def simpan_konfigurasi_ai(
     provider,
     endpoint,
     api_key=None,

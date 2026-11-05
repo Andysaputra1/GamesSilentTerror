@@ -24,7 +24,7 @@ from app.controller.realtime.socket_handlers import SocketGameController
 from app.module.ai_runtime_service import muat_konfigurasi_ai
 from app.module.mysql_connector import engine, database_is_ready
 from app.module.npc_brain.runtime import brain_runtime
-from app.module.npc_config_service import load_npc_configuration
+from app.module.npc_config_service import muat_konfigurasi_npc
 from app.module.npc_service import NPCService
 from app.module.persistence_service import PersistenceError
 from app.module.room_service import room_service
@@ -55,7 +55,7 @@ async def lifespan(_: FastAPI):
             logger.error("Konfigurasi AI panel gagal dimuat; memakai .env: %s", error)
         try:
             # Pengaturan Otak NPC dari panel (penulis kalimat dan model) dibaca dari DB ke otak bot.
-            load_npc_configuration()
+            muat_konfigurasi_npc()
         except PersistenceError as error:
             logger.warning("Konfigurasi Otak NPC panel gagal dimuat; memakai .env: %s", error)
     else:

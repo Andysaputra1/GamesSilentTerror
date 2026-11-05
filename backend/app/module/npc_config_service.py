@@ -1,9 +1,9 @@
 """Konfigurasi otak NPC dari panel (penulis kalimat dan rantai penulis); .env tetap nilai awal.
 
 Disimpan di baris panel_configuration id=2 agar tidak bercampur dengan konfigurasi provider LLM
-(id=1) yang ditulis ulang utuh oleh save_panel_configuration.
+(id=1) yang ditulis ulang utuh oleh simpan_konfigurasi_ai.
 
-Alurnya saat server nyala (load_npc_configuration, dipanggil main.py sebelum otak dimuat)
+Alurnya saat server nyala (muat_konfigurasi_npc, dipanggil main.py sebelum otak dimuat)
 1. Baca baris id=2 dari DB
 2. Baris kosong: selesai, otak memakai nilai .env
 3. Ada isi: titipkan ke runtime otak, yang baru membangun rantai penulisnya saat otak dimuat. Isi tidak valid diabaikan, otak memakai nilai .env
@@ -27,7 +27,7 @@ logger = logging.getLogger("shadow_heist.npc_config")
 
 
 # Baca konfigurasi tersimpan lalu terapkan ke runtime saat backend dimulai.
-def load_npc_configuration():
+def muat_konfigurasi_npc():
     def read(database):
         value = database.execute(
             text("SELECT config FROM panel_configuration WHERE id=:id"), {"id": BARIS_NPC}

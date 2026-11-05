@@ -23,7 +23,7 @@ from sqlalchemy import text
 from app.config.settings import settings
 from app.module.password_service import verify_password
 from app.module.mysql_connector import PersistenceError, jalankan_transaksi
-from app.module.ai_runtime_service import ai_runtime, save_panel_configuration
+from app.module.ai_runtime_service import ai_runtime, simpan_konfigurasi_ai
 from app.module.checker_service import checker_service
 from app.module.npc_brain.runtime import POLA_MODEL_TAUTAN, brain_runtime
 from app.module.activity_service import activity
@@ -268,7 +268,7 @@ def set_config(body: Configuration, token=Depends(require_panel)):
     else:
         endpoint = ai_runtime.current().ollama_base_url
     try:
-        save_panel_configuration(
+        simpan_konfigurasi_ai(
             body.provider,
             endpoint,
             api_key=api_key or None,

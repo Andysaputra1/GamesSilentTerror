@@ -321,7 +321,7 @@ class NpcConfigStoreTests(unittest.TestCase):
         ):
             # Baris produksi lama masih memuat kunci metode dan validasi; keduanya diabaikan.
             baca.return_value = {"metode": "fuzzy", "penulis": "otomatis", "validasi": True}
-            layanan.load_npc_configuration()
+            layanan.muat_konfigurasi_npc()
             runtime.atur.assert_called_once_with(
                 penulis="otomatis",
                 urutan_penulis=None, model_openrouter=None, model_tautan=None,
@@ -329,7 +329,7 @@ class NpcConfigStoreTests(unittest.TestCase):
             runtime.atur.side_effect = ValueError("jalur tidak dikenal")
             baca.return_value = {"urutan_penulis": ["gpt"]}
             with self.assertLogs("shadow_heist.npc_config", "WARNING"):
-                layanan.load_npc_configuration()  # tidak melempar error saat startup
+                layanan.muat_konfigurasi_npc()  # tidak melempar error saat startup
 
     def test_failed_save_restores_every_field(self):
         from app.module import npc_config_service as layanan
@@ -425,7 +425,7 @@ class PanelWriterApiTests(unittest.TestCase):
 
     def test_saving_ai_link_refreshes_writer_chain(self):
         with (
-            patch.object(self.panel, "save_panel_configuration"),
+            patch.object(self.panel, "simpan_konfigurasi_ai"),
             patch.object(self.panel, "validate_endpoint", side_effect=lambda e: e),
             patch.object(self.panel, "brain_runtime") as runtime,
         ):
