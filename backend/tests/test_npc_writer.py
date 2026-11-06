@@ -427,6 +427,25 @@ class AnswerPlanTests(unittest.TestCase):
         self.assertNotIn("Tersangka saya", pesan)
 
 
+class TeamChatIntentTests(unittest.TestCase):
+    """Chat tim Spy dari uji model 6 November: Spy menjaga, jadi prompt tidak memakai target_saya dan kata serangan ditolak."""
+
+    PAKET = {"pembicara": "Nara", "aksi": "chat_tim", "tim": "spy", "pemicu": "pilih_target", "target_saya": "Andi",
+             "pilihan_rekan": None, "alasan": ["Andi menuduh atau vote aku."], "chat_tim": []}  # fmt: skip
+
+    def test_spy_attack_words_are_rewritten(self):
+        runtime = runtime_siap()
+        self.addCleanup(runtime.tutup)
+        runtime.konfigurasi.penulis = "otomatis"
+        penulis = PenulisTiruan(["Gw incer Andi malem ini.", "Gw jaga Andi malem ini."])
+        runtime.penulis = penulis
+        bot = OtakBot("Nara", "fuzzy", "gaul", "spy", None)
+        tulisan = runtime.tulis_tim(bot, self.PAKET, ["Nara", "Andi", "Budi"])
+        self.assertEqual((tulisan["sumber"], tulisan["teks"]), ("llm", "Gw jaga Andi malem ini."))
+        self.assertIn("dijaga_malam_ini: Andi", penulis.pesan[0])
+        self.assertIn("ditolak karena: kata_dilarang", penulis.pesan[1])
+
+
 class WriterCheckTests(unittest.TestCase):
     """Cek rantai sungguhan (jalur asli, `_cek` tiruan): flag antre, status, log, dan alamat link."""
 
