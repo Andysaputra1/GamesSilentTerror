@@ -201,10 +201,13 @@ KODE_ALUR = {
         (G + "otak_fuzzy", "putuskan", [
             ("hitung_bukti(ingatan, view)", "bukti tiap pemain"),
             ("nilai_kecurigaan(tabel)", "kecurigaan lewat hierarki fuzzy"),
-            ("keputusan_chat(ctx)", "pilih chat"),
+            ("keputusan_pindah_vote(ctx)", "waktu tambahan seri: suara yang sudah ada dinilai ulang"),
             ("keputusan_vote(ctx)", "pilih vote"),
+            ("pertahanan_suara(ctx", "warga kritis tidak abstain"),
+            ("keputusan_chat(ctx)", "pilih chat"),
             ("keputusan_aksi(ctx)", "pilih aksi rahasia"),
             ('"nlg": siapkan_nlg(', "rencana kalimat untuk NLG"),
+            ('"nlg_tim": siapkan_nlg_tim(', "paket chat tim malam"),
         ]),
     ],
     "fl_1": [
@@ -250,6 +253,10 @@ KODE_ALUR = {
     ],
     "keputusan": [
         (G + "otak_fuzzy", "rencana_chat", []),
+        (G + "otak_fuzzy", "pertahanan_suara", [
+            ('["warga_terdesak"] < BATAS_WARGA_KRITIS', "hanya saat warga kritis"),
+            ("hashlib.sha256(kunci)", "semua tersangka bernilai sama: acak stabil per bot dan ronde"),
+        ]),
         (G + "otak_fuzzy", "format_npc", [
             ('if rencana_a["aksi"] in AKSI_RAHASIA', "aksi rahasia diutamakan"),
             ('elif rencana_v["aksi"] == "vote"', "lalu vote"),
@@ -257,6 +264,10 @@ KODE_ALUR = {
         (G + "otak_fuzzy", "siapkan_nlg", [
             ('if not rencana["kirim"]', "tidak chat: NLG tidak dijalankan"),
             ('"cadangan": templat_pesan(', "kalimat cadangan bila semua gagal"),
+        ]),
+        (G + "otak_fuzzy", "siapkan_nlg_tim", [
+            ("MAKS_CHAT_TIM", "paling banyak 3 pesan tim per malam"),
+            ('paket("ikut_manusia"', "Hitman memberi tahu ikut pilihan rekan manusia saat terkunci"),
         ]),
     ],
     "penjelasan": [
