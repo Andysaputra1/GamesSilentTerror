@@ -32,8 +32,9 @@ from app.services.room_service import RoomService
 from tests.test_npc_brain import AKSI_RAHASIA, runtime_siap
 
 
-# Satu pertandingan bot singkat: kumpulkan penjelasan lengkap setiap langkah yang menghasilkan jejak.
-def kumpulkan(runtime, seed=3, jumlah=6, ronde_maks=3):
+# Satu pertandingan bot singkat: kumpulkan penjelasan lengkap setiap langkah yang menghasilkan jejak. Seed dipilih supaya
+# pertandingan memuat vote, Hostage, dan Guard; sejak seri Hostage diacak, seed 3 berakhir tanpa satu vote pun.
+def kumpulkan(runtime, seed=4, jumlah=6, ronde_maks=3):
     nama = ["NOX", "ECHO", "VEIL", "RAVEN", "ASH", "DUSK"][:jumlah]
     match = Match([], nama, rng=random.Random(seed), now=0.0)
     runtime.siapkan_pertandingan(match, f"PJ{seed}")

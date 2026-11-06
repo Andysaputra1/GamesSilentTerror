@@ -1,8 +1,8 @@
 """FILE INI DIHASILKAN OTOMATIS oleh scripts/ekspor_otak_npc.py. JANGAN DIEDIT MANUAL.
 
 Sumber : npc_fuzzy.ipynb
-Sidik  : 270dd8821eff9356
-Dibuat : 2026-11-05 08:57 UTC
+Sidik  : 2a47dea58821c4ec
+Dibuat : 2026-11-06 07:20 UTC
 
 Perubahan logika bot dilakukan di notebook skripsi, dijalankan ulang sampai semua
 skenario/pengujian lulus, lalu diekspor ulang dengan skrip ini.
@@ -560,9 +560,12 @@ def _klaim_peran(relasi, hidup, pengamat, R, peran_bot=None, komposisi_peran=Non
             if re.search(pola, chat["teks"], re.I):
                 pengaku[peran].add(chat["pengirim"])
 
+    # Pengaku yang terbukti Hitman lewat fakta (eksekusi, keluar, atau hasil Peek bot) pasti bohong, juga sesudah ia mati, jadi
+    # klaimnya tidak dihitung dan tidak membuat pengaku lain tampak bentrok.
+    terbukti = set().union(*pengaku.values()) & set(terbukti_hitman)
     konflik, rincian = {}, {}
     for peran, jumlah_role in batas.items():
-        aktif = sorted(o for o in pengaku[peran] if o in hidup)
+        aktif = sorted(o for o in pengaku[peran] if o in hidup and o not in terbukti)
         if len(aktif) > jumlah_role:
             jumlah = "satu" if jumlah_role == 1 else str(jumlah_role)
             for o in aktif:
@@ -570,10 +573,11 @@ def _klaim_peran(relasi, hidup, pengamat, R, peran_bot=None, komposisi_peran=Non
                 lawan = ", ".join(x for x in aktif if x != o)
                 rincian[o] = f"{o} dan {lawan} sama-sama mengaku {peran.capitalize()}, padahal role itu hanya {jumlah}."
 
-    # Stalker/Spy tahu pasti: orang lain yang mengaku role miliknya berbohong, selain rekan Spy di room 2 Spy.
-    pembohong = set()
+    # Stalker/Spy tahu pasti: orang lain yang mengaku role miliknya berbohong, selain rekan Spy di room 2 Spy. Kebohongan itu tetap
+    # berlaku sesudah pengakunya mati, supaya klaim lamanya tidak dipercaya lagi.
+    pembohong = set(terbukti)
     if peran_bot in batas:
-        pembohong = {o for o in pengaku[peran_bot] if o in hidup} - set(rekan_spy)
+        pembohong |= set(pengaku[peran_bot]) - set(rekan_spy)
 
     # Hanya pengaku Stalker yang menyebut peek: (pengaku, ronde, target, relasi).
     peek = [(chat["pengirim"], chat["ronde"], target, rel) for chat, pasangan in relasi
@@ -599,7 +603,8 @@ def _klaim_peran(relasi, hidup, pengamat, R, peran_bot=None, komposisi_peran=Non
             bersih_peek[target][s] = (0.4 if s in konflik else 0.8) * _luruh(ronde, R, PELURUHAN_KERAS)
 
     for o in pembohong:
-        rincian[o] = f"Klaim {peran_bot.capitalize()} dari {o} tidak bisa dipercaya."
+        rincian[o] = (f"{o} terbukti Hitman, jadi klaim role-nya tidak bisa dipercaya." if o in terbukti
+                      else f"Klaim {peran_bot.capitalize()} dari {o} tidak bisa dipercaya.")
     for s in bohong_peek:
         rincian[s] = f"{s} mengaku peek dan menyebut aku Hitman, padahal aku tahu itu bohong."
     return {"pengaku": pengaku, "konflik": konflik, "pembohong": pembohong, "tuduhan_peek": tuduhan_peek,
@@ -1735,11 +1740,17 @@ def pilihan_malam_rekan(view):
 def nilai_hostage(r):
     return float(r["ancaman"]) * (1 - 0.5 * float(r["jejak_tuduhan"]))
 
+# Pemutus seri Hostage: acak tetapi stabil per bot dan ronde, sama di semua proses. Dengan pemutus nama, Hitman dan Spy sama-sama memilih
+# nama abjad pertama, sehingga Guard sering tepat hanya karena kebetulan nama.
+def seri_acak(bot, ronde, nama):
+    return hashlib.sha256(f"{bot}|{ronde}|{nama}".encode("utf-8")).hexdigest()
+
 # Urutan Hostage: pilihan Hitman manusia saat terkunci, pilihan rekan bot, lalu nilai tertinggi. Target yang sudah gagal dua kali
 # sepanjang pertandingan kemungkinan terus dijaga, jadi dilewati selama ada target lain; pilihan manusia tetap diikuti.
 def calon_hostage(ctx):
     saya = ctx["view"]["saya"]
     calon = [{"aksi": "hostage", "target": r["pemain"], "alasan": alasan_ancaman(r), "skor": nilai_hostage(r),
+              "seri": (seri_acak(ctx["bot"], ctx["view"]["ronde"], r["pemain"]),),
               "input": {"ancaman": r["ancaman"], "jejak_tuduhan": r["jejak_tuduhan"]}}
              for _, r in ctx["fitur_hitman"].sort_values("pemain").iterrows()]  # rekan Syndicate tidak ada di tabel ini
 
