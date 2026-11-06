@@ -1,4 +1,4 @@
-"""Penyimpanan data game. Sebagian besar SQL ada di models; setiap aksi satu transaksi."""
+"""Penyimpanan data game. SQL-nya ada di models; setiap aksi satu transaksi."""
 
 from __future__ import annotations
 import json

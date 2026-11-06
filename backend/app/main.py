@@ -81,7 +81,7 @@ async def lifespan(_: FastAPI):
         engine.dispose()
 
 
-# Menyiapkan pencatat log. File lain memakai anak dari nama ini (mis. shadow_heist.auth), jadi pesannya ikut aturan yang sama.
+# Menyiapkan pencatat log. File lain memakai anak dari nama ini (mis. shadow_heist.database), jadi pesannya ikut aturan yang sama.
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("shadow_heist")
 
