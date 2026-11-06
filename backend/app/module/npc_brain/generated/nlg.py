@@ -1,8 +1,8 @@
 """FILE INI DIHASILKAN OTOMATIS oleh scripts/ekspor_otak_npc.py. JANGAN DIEDIT MANUAL.
 
 Sumber : npc_nlg.ipynb
-Sidik  : 11384a4f3fd98f88
-Dibuat : 2026-11-06 01:13 UTC
+Sidik  : 5cb007fe871f2960
+Dibuat : 2026-11-06 01:16 UTC
 
 Perubahan logika bot dilakukan di notebook skripsi, dijalankan ulang sampai semua
 skenario/pengujian lulus, lalu diekspor ulang dengan skrip ini.
@@ -1155,7 +1155,8 @@ ARAHAN_JAWAB = [
 
 POLA_TANYA_ROLE = r"\b(?:role|peran)\b|(?<!menurut )(?<!kalau )(?<!kalo )\b(?:kamu|lu|lo|elu)\s+(?:itu\s+|ini\s+|sebenarnya\s+)*(?:siapa|apa)\b"
 
-POLA_TANYA_TINDAKAN = r"\b(?:kenapa|mengapa|napa|kok|ngapain)\b.*\b(?:vote|pilih|nuduh|tuduh|menuduh|bela|belain|membela|curiga)"
+POLA_TANYA_TINDAKAN = (r"\b(?:kenapa|mengapa|napa|kok|ngapain)\b.*\b(?:vote|pilih|milih|memilih|nuduh|tuduh|menuduh|bela|belain|membela|curiga)"
+                       r"|\b(?:jelasin|jelaskan|ngejelasin|menjelaskan|penjelasan|alasan|maksud|versi)\w*")
 
 POLA_TANYA_DIAM = r"\b(?:diam|diem|sepi|ngomong|bicara)\b"
 

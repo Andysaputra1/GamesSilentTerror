@@ -417,7 +417,14 @@ class AnswerPlanTests(unittest.TestCase):
             "Saya vote DUSK karena ECHO mengaku sudah peek dia.",
         )
         self.assertIn("ditolak karena: bela_lain", penulis.pesan[1])
-        self.assertEqual((tulisan["sumber"], tulisan["teks"]), ("llm", "Saya vote DUSK karena ECHO mengaku sudah peek dia."))
+        self.assertEqual(tulisan["sumber"], "llm")
+        self.assertEqual(tulisan["teks"], "Saya vote DUSK karena ECHO mengaku sudah peek dia.")
+
+    # Permintaan penjelasan dulu jatuh ke data tersangka; sekarang tindakan sebelumnya yang dikirim ke penulis.
+    def test_explanation_request_sends_previous_actions(self):
+        pesan = self.runtime.nlg.buat_prompt(self.PAYLOAD, self.KONTEKS, "kalem")[1]
+        self.assertIn("Di ronde 7 saya vote DUSK. ECHO mengaku peek DUSK sebagai Hitman.", pesan)
+        self.assertNotIn("Tersangka saya", pesan)
 
 
 class WriterCheckTests(unittest.TestCase):
