@@ -1,8 +1,8 @@
 """FILE INI DIHASILKAN OTOMATIS oleh scripts/ekspor_otak_npc.py. JANGAN DIEDIT MANUAL.
 
 Sumber : npc_nlg.ipynb
-Sidik  : 6ebb933fd7d0ad41
-Dibuat : 2026-11-06 01:08 UTC
+Sidik  : 11384a4f3fd98f88
+Dibuat : 2026-11-06 01:13 UTC
 
 Perubahan logika bot dilakukan di notebook skripsi, dijalankan ulang sampai semua
 skenario/pengujian lulus, lalu diekspor ulang dengan skrip ini.
@@ -467,12 +467,19 @@ def nama_boleh(p, roster, boleh_sebut=()):
     return ({p["target"], p["pembicara"], p.get("penanya"), *boleh_sebut, *(r["pemain"] for r in p.get("relasi_tambahan") or [])}
             | nama_disebut(" ".join(data), roster))
 
-# Nama yang memang boleh dituduh rencana ini: target, relasi tambahan offend, serta tersangka dan pendapat curiga di paket jawab.
-def nama_boleh_dituduh(p):
+# Peran nama di paket jawab: (dicurigai, dipercaya). Dicurigai = tersangka, pendapat curiga, dan target vote atau tuduh sebelumnya;
+# dipercaya = pendapat percaya dan target bela sebelumnya. Nama lain di paket, misalnya saksi di alasan, hanya boleh disebut.
+def peran_paket(p):
     paket = p.get("paket") or {}
-    return ({p["target"], *(r["pemain"] for r in p.get("relasi_tambahan") or [] if r["relasi"] == "offend"),
-             (paket.get("tersangka") or {}).get("nama"),
-             *(n for n, d in (paket.get("pendapat_pemain") or {}).items() if d["sikap"] == "curiga")})
+    pendapat, tindakan = paket.get("pendapat_pemain") or {}, paket.get("tindakan_sebelumnya") or []
+    dicurigai = {(paket.get("tersangka") or {}).get("nama"), *(n for n, d in pendapat.items() if d["sikap"] == "curiga"),
+                 *(t["target"] for t in tindakan if t["tindakan"] in ("vote", "tuduh"))}
+    dipercaya = {*(n for n, d in pendapat.items() if d["sikap"] == "percaya"), *(t["target"] for t in tindakan if t["tindakan"] == "bela")}
+    return dicurigai - {None}, dipercaya
+
+# Nama yang memang boleh dituduh rencana ini: target, relasi tambahan offend, dan nama yang dicurigai di paket jawab.
+def nama_boleh_dituduh(p):
+    return {p["target"], *(r["pemain"] for r in p.get("relasi_tambahan") or [] if r["relasi"] == "offend"), *peran_paket(p)[0]}
 
 # Apakah kalimat menuduh atau mengajak vote nama ini. Nama yang boleh disebut tetap tidak boleh menjadi tersangka baru.
 def menuduh_nama(kecil, nama):
@@ -485,6 +492,27 @@ def menuduh_nama(kecil, nama):
                      r"(?:mencurigakan|aneh|hitman)\b", kecil):
             return True
     return False
+
+# Apakah kalimat membela nama ini: "X bukan Hitman", "X bersih", atau "jangan vote X". Pengandaian dan kutipan langsung tidak dihitung.
+def membela_nama(kecil, nama):
+    for bentuk in {nama, nama.split()[0]}:
+        n = re.escape(bentuk.casefold())
+        if re.search(rf"(?<!kalau )(?<!kalo )(?<!bilang )(?<!kata )(?<!\w){n}\s+(?:(?:itu|juga|sih|tuh|kok|memang|emang|pasti|jelas)\s+)*"
+                     r"(?:bukan\s+hitman|bersih|orang\s+baik)\b"
+                     rf"|\b(?:jangan|gak\s+usah|nggak\s+usah|ga\s+usah|tidak\s+usah)\s+(?:(?:buru-buru|asal|dulu)\s+)*"
+                     rf"(?:vote|pilih|eksekusi|tuduh|nuduh|curigai)\s+{n}(?!\w)", kecil):
+            return True
+    return False
+
+# Nama yang boleh dibela jawaban: pembicara, nama yang dipercaya di paket, dan nama yang memang dibela kalimat data (misalnya
+# "jadi Dodi bukan Hitman" di alasan tersangka). calon = nama yang disebut kalimat.
+def nama_boleh_dibela(p, calon):
+    paket = p.get("paket") or {}
+    data = " ".join([*p["bukti"], *((paket.get("tersangka") or {}).get("alasan") or []),
+                     *(d["alasan"] for d in (paket.get("pendapat_pemain") or {}).values()),
+                     *(a for t in paket.get("tindakan_sebelumnya") or [] for a in t["alasan"])]).casefold()
+    return {p["pembicara"], p["target"] if p["intent"] == "defend" else None, *peran_paket(p)[1],
+            *(n for n in calon if membela_nama(data, n))}
 
 # Daftar pelanggaran aturan; kosong berarti lolos. Aturan sama untuk semua role, karena yang dinilai role yang diakui rencana.
 # boleh_sebut = nama dari chat pemicu (penuduh, pemilih, penanya) yang boleh disapa walau bukan target.
@@ -526,6 +554,9 @@ def periksa_aturan(teks, p, roster, boleh_sebut=()):
         langgar.append("nama_lain")
     if not tim and any(menuduh_nama(kecil, n) for n in disebut - nama_boleh_dituduh(p) - {p["pembicara"]}):
         langgar.append("tuduh_lain")
+    # Jawaban tidak boleh tiba-tiba membela pemain yang dicurigai atau divote bot, maupun pemain yang tidak dipercaya di paket.
+    if p["aksi"] == "jawab" and any(membela_nama(kecil, n) for n in disebut - nama_boleh_dibela(p, disebut)):
+        langgar.append("bela_lain")
     if re.search(POLA_INJEKSI, kecil):
         langgar.append("injeksi")
     return langgar

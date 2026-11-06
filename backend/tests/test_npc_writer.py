@@ -381,6 +381,45 @@ class WriterSentenceRuleTests(unittest.TestCase):
         self.assertEqual(tahap, ["nlg", "llm", "aturan"])
 
 
+class AnswerPlanTests(unittest.TestCase):
+    """Rencana jawab F18 dari uji model 6 November: VEIL ditanya ONYX, tersangkanya SAGE, dan ronde ini VEIL vote DUSK."""
+
+    ROSTER = ["NOX", "ECHO", "VEIL", "RAVEN", "ASH", "DUSK", "IRIS", "SAGE", "ONYX", "LARK"]
+    ALASAN = ["SAGE menuduh atau vote aku, padahal aku tahu aku bukan Hitman."]
+    PAYLOAD = {
+        "pembicara": "VEIL", "aksi": "jawab", "jenis": None, "intent": "offend", "target": "SAGE", "role_diakui": None,
+        "bukti_klaim": None, "relasi_tambahan": [], "bukti": ALASAN, "penanya": "ONYX",
+        "paket": {"pertanyaan": "VEIL, gimana penjelasanmu?", "penanya": "ONYX", "kondisi": "agak yakin",
+                  "tersangka": {"nama": "SAGE", "alasan": ALASAN}, "pendapat_pemain": {},
+                  "tindakan_sebelumnya": [
+                      {"tindakan": "bela", "ronde": 7, "target": "ONYX", "alasan": ["Tuduhan ke ONYX masih pendapat, ada yang membela juga."]},
+                      {"tindakan": "vote", "ronde": 7, "target": "DUSK", "alasan": ["ECHO mengaku peek DUSK sebagai Hitman."]}],
+                  "jawaban_role": "aku orang baik", "chat_saya_ronde_ini": 1},
+    }  # fmt: skip
+    KONTEKS = {"roster": ROSTER, "chat_terbaru": [
+        {"pengirim": "ONYX", "teks": "VEIL, gimana penjelasanmu?", "intent": "neutral", "target": [{"pemain": "VEIL", "relasi": "neutral"}]}]}  # fmt: skip
+
+    def setUp(self):
+        self.runtime = runtime_siap()
+        self.addCleanup(self.runtime.tutup)
+        self.runtime.konfigurasi.penulis = "otomatis"
+        self.bot = OtakBot("VEIL", "fuzzy", "kalem", "civilian", None)
+
+    def tulis(self, *jawaban):
+        penulis = PenulisTiruan(jawaban)
+        self.runtime.penulis = penulis
+        return self.runtime.tulis(self.bot, self.PAYLOAD, self.KONTEKS), penulis
+
+    # Dulu "saya yakin DUSK bukan Hitman" lolos karena semua nama di paket boleh dipakai. Target vote boleh dijelaskan, tidak dibela.
+    def test_answer_cannot_defend_its_own_vote_target(self):
+        tulisan, penulis = self.tulis(
+            "Saya tidak menuduh siapa pun, tapi saya yakin DUSK bukan Hitman.",
+            "Saya vote DUSK karena ECHO mengaku sudah peek dia.",
+        )
+        self.assertIn("ditolak karena: bela_lain", penulis.pesan[1])
+        self.assertEqual((tulisan["sumber"], tulisan["teks"]), ("llm", "Saya vote DUSK karena ECHO mengaku sudah peek dia."))
+
+
 class WriterCheckTests(unittest.TestCase):
     """Cek rantai sungguhan (jalur asli, `_cek` tiruan): flag antre, status, log, dan alamat link."""
 
