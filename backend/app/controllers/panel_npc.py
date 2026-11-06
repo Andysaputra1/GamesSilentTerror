@@ -300,6 +300,7 @@ KODE_ALUR = {
             ("for ke in range(1, MAKS_PERCOBAAN_LLM + 1)", "maksimal 2 percobaan LLM"),
             ("nilai_kalimat(bersihkan(", "kalimat dibersihkan lalu dinilai"),
             ("kalimat_mirip(nilai[", "parafrase tipis kalimat yang baru terdengar ditolak"),
+            ("fakta_disalin(nilai[", "fakta panjang yang disalin hampir utuh ditulis ulang sekali"),
             ('alasan_tolak = ", ".join', "alasan ditolak dikirim ke percobaan berikutnya"),
             ("# 2) Templat bervariasi.", "LLM gagal: templat"),
         ]),

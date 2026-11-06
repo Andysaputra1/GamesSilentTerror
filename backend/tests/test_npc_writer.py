@@ -373,6 +373,22 @@ class WriterSentenceRuleTests(unittest.TestCase):
         self.assertIn("ECHO", tulisan["teks"])
         self.assertEqual(tulisan["pelanggaran"], [])
 
+    # Salinan fakta panjang ditulis ulang sekali; bila percobaan ulang gagal, salinan itu tetap dipakai, bukan templat.
+    def test_salinan_fakta_ditulis_ulang_sekali(self):
+        fakta = (
+            "ECHO ikut mendorong eksekusi VEIL (ronde 2), padahal jumlah Hitman tidak berkurang"
+            " jadi VEIL bukan Hitman."
+        )
+        salinan = (
+            "Aku curiga ECHO, dia ikut mendorong eksekusi VEIL padahal jumlah Hitman gak berkurang,"
+            " jadi VEIL bukan Hitman."
+        )
+        penulis = PenulisTiruan([salinan, "Aku bot."])
+        self.runtime.penulis = penulis
+        tulisan = self.runtime.tulis(self.bot, {**self.PAYLOAD, "bukti": [fakta]}, self.KONTEKS)
+        self.assertIn("ditolak karena: salin_fakta", penulis.pesan[1])
+        self.assertEqual((tulisan["sumber"], tulisan["teks"]), ("llm", salinan))
+
     # Nama tahap ini dipakai kotak nlg_cek di flowchart simulasi panel.
     def test_tahap_yang_dilaporkan_ke_flowchart(self):
         tahap = []

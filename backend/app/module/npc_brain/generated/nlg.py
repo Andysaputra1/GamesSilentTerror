@@ -1,8 +1,8 @@
 """FILE INI DIHASILKAN OTOMATIS oleh scripts/ekspor_otak_npc.py. JANGAN DIEDIT MANUAL.
 
 Sumber : npc_nlg.ipynb
-Sidik  : e88cad2ffe08dd0b
-Dibuat : 2026-11-06 01:22 UTC
+Sidik  : 9cc439b2d051a449
+Dibuat : 2026-11-06 01:29 UTC
 
 Perubahan logika bot dilakukan di notebook skripsi, dijalankan ulang sampai semua
 skenario/pengujian lulus, lalu diekspor ulang dengan skrip ini.
@@ -11,8 +11,10 @@ Alurnya
 1. tulis_pesan menerima payload rencana chat dari siapkan_nlg, konteks, penulis, dan persona
 2. LLM, bila aktif, paling banyak MAKS_PERCOBAAN_LLM kali:
    2.1 buat_prompt menyusun prompt, lalu penulis.tulis meminta kalimat
-   2.2 nilai_kalimat memeriksa aturan, kalimat_mirip menolak parafrase kalimat yang baru terdengar
-   2.3 Lolos: kalimat dipakai. Ditolak: alasannya ikut ke percobaan berikutnya
+   2.2 nilai_kalimat memeriksa aturan, kalimat_mirip menolak parafrase kalimat yang baru terdengar, dan fakta_disalin
+       meminta tulis ulang bila fakta panjang disalin hampir utuh
+   2.3 Lolos: kalimat dipakai. Ditolak: alasannya ikut ke percobaan berikutnya. Salinan fakta tetap dipakai bila
+       percobaan ulang gagal
 3. Templat: kalimat_templat dicoba satu per satu, varian pertama yang lolos aturan dipakai
 4. Cadangan: tidak ada varian yang lolos, varian pertama tetap dipakai
 5. tulis_chat_tim menulis paket siapkan_nlg_tim: LLM, lalu templat, tanpa IndoBERT; kalimatnya boleh kosong
@@ -63,6 +65,8 @@ KALIMAT_MAKS = 2
 JUMLAH_CHAT_KONTEKS = 12
 
 MIRIP_MAKS = 0.75
+
+FAKTA_KATA_MIN = 14
 
 PERSONA = {
     "santai": {"deskripsi": "santai dan ramah, memakai aku/kamu, sesekali 'sih', 'deh', atau 'nih'",
@@ -1347,6 +1351,15 @@ def nilai_kalimat(teks, p, konteks):
     langgar = periksa_aturan(teks, p, konteks["roster"], pemicu(p, konteks)[1])
     return {"teks": teks, "lolos": not langgar, "pelanggaran": langgar}
 
+# Fakta rencana yang disalin hampir utuh (kemiripan ≥ MIRIP_MAKS), atau None. Hanya fakta panjang dan gabungan fakta yang dihitung,
+# karena fakta pendek dan klaim role memang wajar diucapkan apa adanya.
+def fakta_disalin(teks, p, persona):
+    if p.get("role_diakui"):
+        return None
+    fakta = data_jawab(p, persona) if p["aksi"] == "jawab" else p["bukti"]
+    calon = [f for f in [*fakta, " ".join(fakta)] if len(bentuk_dasar(f).split()) >= FAKTA_KATA_MIN]
+    return next((f for f in calon if kemiripan(teks, f) >= MIRIP_MAKS), None)
+
 # Rencana chat → kalimat akhir. Selalu mengembalikan kalimat, apa pun yang gagal.
 def tulis_pesan(p, konteks, penulis=None, persona="santai", hindari=()):
     mulai, percobaan = perf_counter(), []
@@ -1356,8 +1369,8 @@ def tulis_pesan(p, konteks, penulis=None, persona="santai", hindari=()):
                 "pelanggaran": nilai["pelanggaran"], "persona": persona,
                 "percobaan": percobaan, "detik": round(perf_counter() - mulai, 3)}
 
-    # 1) LLM, bila aktif.
-    alasan_tolak = None
+    # 1) LLM, bila aktif. Kalimat yang hanya menyalin fakta disimpan sebagai cadangan, karena templat juga memuat fakta apa adanya.
+    alasan_tolak, salinan = None, None
     for ke in range(1, MAKS_PERCOBAAN_LLM + 1):
         if penulis is None or not penulis.aktif:
             break
@@ -1374,14 +1387,20 @@ def tulis_pesan(p, konteks, penulis=None, persona="santai", hindari=()):
         nilai = nilai_kalimat(bersihkan(mentah, p["pembicara"]), p, konteks)
         # Parafrase tipis dari kalimat yang baru terdengar (milik bot sendiri atau pemain lain) ikut ditolak.
         mirip = kalimat_mirip(nilai["teks"], hindari)
+        salin = fakta_disalin(nilai["teks"], p, persona) if nilai["lolos"] and mirip is None else None
         percobaan.append({"sumber": "llm", "ke": ke, "penulis": jalur, "status": status, "teks": nilai["teks"],
-                          "lolos": nilai["lolos"], "pelanggaran": nilai["pelanggaran"], "mirip": mirip})
-        if nilai["lolos"] and mirip is None:
+                          "lolos": nilai["lolos"], "pelanggaran": nilai["pelanggaran"], "mirip": mirip, "salin_fakta": salin})
+        if nilai["lolos"] and mirip is None and salin is None:
             return selesai(nilai, "llm", jalur)
-        if nilai["pelanggaran"]:
+        if salin:
+            salinan = salinan or (nilai, jalur)
+            alasan_tolak = "salin_fakta: fakta rencana disalin hampir utuh; tulis ulang dengan kata-katamu sendiri"
+        elif nilai["pelanggaran"]:
             alasan_tolak = ", ".join(nilai["pelanggaran"])
         else:
             alasan_tolak = f'terlalu mirip dengan kalimat yang baru terdengar ("{mirip}"); pakai susunan lain'
+    if salinan:
+        return selesai(salinan[0], "llm", salinan[1])
 
     # 2) Templat bervariasi.
     dinilai = []
