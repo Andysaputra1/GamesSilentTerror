@@ -10,6 +10,7 @@ Pemakaian (dari folder backend, Python dengan numpy + pandas + skfuzzy, mis. ven
 
 import importlib.util
 import math
+import os
 import random
 import sys
 from multiprocessing import Pool
@@ -32,6 +33,9 @@ def muat(nama):
 
 
 MODUL = {"fuzzy": muat("otak_fuzzy")}
+NLG = muat("nlg")  # templat chat tim, tanpa LLM
+# Paling banyak separuh core, supaya mesin tetap bisa dipakai. SIM_PROSES boleh menurunkannya lagi.
+PROSES = max(1, min(int(os.environ.get("SIM_PROSES", "64")), (os.cpu_count() or 2) // 2))
 
 
 def label_rencana(rencana):
@@ -91,6 +95,12 @@ def satu_game(argumen):
                         if npc.get("pindah"):
                             match.cancel_action(n)
                         match.act(n, npc["action"], npc["target"])
+                    # Chat tim hanya ada bila rekan manusia aktif, jadi di room semua bot paket ini selalu kosong.
+                    if hasil.get("nlg_tim"):
+                        teks = NLG.tulis_chat_tim(hasil["nlg_tim"], nama, None, "santai")["teks"]
+                        if teks:
+                            match.add_team_message(n, teks)
+                        ingatan.catat_chat_tim(view, hasil["nlg_tim"], bool(teks))
                 except ValueError:
                     ilegal += 1
         for n in otak:
@@ -104,7 +114,7 @@ if __name__ == "__main__":
     n_game, langkah = int(sys.argv[2]), int(sys.argv[3])
     jumlah = int(sys.argv[4]) if len(sys.argv) > 4 else 6
     tugas = [(m, p, jumlah, 4242 + i, langkah) for m in MODUL for p in (True, False) for i in range(n_game)]
-    with Pool() as kolam:
+    with Pool(processes=PROSES) as kolam:
         hasil = kolam.map(satu_game, tugas, chunksize=2)
     print(f"{n_game} game per sel, {jumlah} pemain, {langkah} langkah per fase")
     for m in MODUL:

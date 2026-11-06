@@ -9,6 +9,7 @@ Pemakaian (dari folder backend, Python dengan numpy + pandas, mis. venv prethesi
 
 import importlib.util
 import math
+import os
 import random
 import sys
 from multiprocessing import Pool
@@ -31,6 +32,9 @@ def muat(nama):
 
 
 modul = muat("otak_fuzzy")
+nlg = muat("nlg")  # templat chat tim, tanpa LLM
+# Paling banyak separuh core, supaya mesin tetap bisa dipakai. SIM_PROSES boleh menurunkannya lagi.
+PROSES = max(1, min(int(os.environ.get("SIM_PROSES", "64")), (os.cpu_count() or 2) // 2))
 
 
 def label_rencana(rencana):
@@ -85,6 +89,12 @@ def satu_game(argumen):
                         if npc.get("pindah"):
                             match.cancel_action(n)
                         match.act(n, npc["action"], npc["target"])
+                    # Chat tim hanya ada bila rekan manusia aktif, jadi di room semua bot paket ini selalu kosong.
+                    if hasil.get("nlg_tim"):
+                        teks = nlg.tulis_chat_tim(hasil["nlg_tim"], nama, None, "santai")["teks"]
+                        if teks:
+                            match.add_team_message(n, teks)
+                        ingatan.catat_chat_tim(view, hasil["nlg_tim"], bool(teks))
                 except ValueError:
                     ilegal += 1
         for n in otak:
@@ -101,7 +111,7 @@ if __name__ == "__main__":
         jumlah, susunan = teks.split(":")
         sel.append((int(jumlah), tuple(int(x) for x in susunan.split("/"))))
     tugas = [(j, k, 2026 + 7919 * j + i, langkah) for j, k in sel for i in range(n_game)]
-    with Pool() as kolam:
+    with Pool(processes=PROSES) as kolam:
         hasil = kolam.map(satu_game, tugas, chunksize=4)
     print(f"{n_game} game per sel, {langkah} langkah per fase")
     for idx, (jumlah, komposisi) in enumerate(sel):
