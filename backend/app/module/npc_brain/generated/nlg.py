@@ -1,8 +1,8 @@
 """FILE INI DIHASILKAN OTOMATIS oleh scripts/ekspor_otak_npc.py. JANGAN DIEDIT MANUAL.
 
 Sumber : npc_nlg.ipynb
-Sidik  : cbc2bb0993d10785
-Dibuat : 2026-11-05 09:15 UTC
+Sidik  : 6ebb933fd7d0ad41
+Dibuat : 2026-11-06 01:08 UTC
 
 Perubahan logika bot dilakukan di notebook skripsi, dijalankan ulang sampai semua
 skenario/pengujian lulus, lalu diekspor ulang dengan skrip ini.
@@ -1153,7 +1153,8 @@ def data_jawab(p, persona):
 # Chat yang memicu rencana, supaya kalimat menanggapi kejadian nyata, bukan kalimat umum: bela diri → tuduhan dan suara
 # Tribunal ke pembicara; bela orang, tuduh, dan tanya → tuduhan dan suara ke target; tuduh dan tanya juga tuduhan dari target itu;
 # jawab → pertanyaan penanya.
-# Keluaran: (baris pemicu untuk prompt, nama di pemicu yang boleh disebut walau bukan target).
+# Keluaran: (baris pemicu untuk prompt, nama yang boleh disebut walau bukan target: pengirim pemicu, pemilih, dan pada bela_orang
+# juga sesama pembela target di chat terbaru).
 def pemicu(p, konteks):
     chat = konteks["chat_terbaru"][-JUMLAH_CHAT_KONTEKS:]
     sasaran = {"bela_diri": p["pembicara"], "bela_orang": p["target"], "tuduh": p["target"], "tanya_info": p["target"]}.get(p["aksi"])
@@ -1172,7 +1173,10 @@ def pemicu(p, konteks):
     if pemilih:
         baris.append(f"Suara Tribunal ke {sasaran} saat ini: {', '.join(pemilih)}")
     nama = {t["pemain"] for c in dipilih for t in c.get("target") or [] if t["relasi"] == "offend" and c["pengirim"] == sasaran}
-    return baris, {c["pengirim"] for c in dipilih} | set(pemilih) | nama
+    # Membela bersama orang lain wajar ("aku setuju Dodi, jangan vote Citra"), jadi pembela target boleh disapa.
+    pembela = {c["pengirim"] for c in chat if p["aksi"] == "bela_orang" and c["pengirim"] != p["pembicara"]
+               and any(t["pemain"] == sasaran and t["relasi"] == "defend" for t in c.get("target") or [])}
+    return baris, {c["pengirim"] for c in dipilih} | set(pemilih) | nama | pembela
 
 # Prompt sistem dan pesan pengguna untuk satu rencana. Sengaja tidak menerima role bot: role_diakui adalah isi rencana, bukan role asli.
 # Tidak ada contoh kalimat templat di prompt: model kecil cenderung menyalinnya, sehingga kalimat bot terdengar sama setiap kali.
