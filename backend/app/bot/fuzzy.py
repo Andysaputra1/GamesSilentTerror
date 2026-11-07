@@ -1385,12 +1385,13 @@ def calon_gali(ctx):
     return {"aksi": "tanya_info", "jenis": "gali_tersangka", "target": teratas["pemain"], "alasan": alasan[:1]} if alasan else None
 
 # Jenis bela_orang, aturan berurutan. Hitman hanya membela rekan lewat jenis tanpa pengetahuan, supaya tidak membuka sumbernya.
+# Klaim Peek bersih yang sudah diucapkan di ronde ini tidak diulang; sesudahnya Stalker cukup yakin tanpa sumber.
 def jenis_bela_orang(ctx, q):
     konteks, view, bot, p = ctx["konteks"], ctx["view"], ctx["bot"], q["pemain"]
     if ctx["peran"] != "hitman":
         terancam = konteks["porsi_suara"].get(p, 0.0) >= BATAS_SUARA_TERANCAM or q["tekanan"] >= BATAS_TEKANAN_TERANCAM
         peek_bersih = ctx["peran"] == "stalker" and any(x["pemain"] == p and x["peran"] != "hitman" for x in ctx["ingatan"].intel)
-        if peek_bersih and terancam:
+        if peek_bersih and terancam and not sudah_aksi(ctx["ingatan"], view, "bela_orang", p, lingkup="ronde", jenis="peek_bersih"):
             return "peek_bersih"
         if peek_bersih or (ctx["peran"] == "spy" and p in view["saya"].get("rekan_spy", [])):
             return "yakin_bersih"
@@ -1594,13 +1595,14 @@ def rencana_aksi(aksi, target=None, alasan=(), skor=None, pindah=False):
     return {"aksi": aksi, "target": target, "alasan": list(alasan), "skor": skor, **({"pindah": True} if pindah else {})}
 
 # Stalker yang sudah tahu Hitman langsung membuka klaim; fakta pasti tidak perlu dinalar. Kalimatnya menyebut malam Peek yang
-# sebenarnya. Bila ada beberapa Hitman hasil Peek, yang masih hidup dan belum diungkap di fase ini diungkap lebih dulu.
+# sebenarnya. Bila ada beberapa Hitman hasil Peek, yang masih hidup dan belum diungkap di ronde ini diungkap lebih dulu. Klaim yang
+# sudah diucapkan siang tidak diulang di Tribunal ronde yang sama; di sana bot cukup mengajak vote lewat keputusan_chat.
 def chat_pasti(ctx):
     view, ingatan = ctx["view"], ctx["ingatan"]
     hidup = {p["nama"] for p in view["pemain"] if p["hidup"]}
     malam = {x["pemain"]: x["ronde"] for x in ingatan.intel}
     ph = next((h for h in ctx["pengetahuan"]["hitman_diketahui"]
-               if h in hidup and h in malam and not sudah_aksi(ingatan, view, "tuduh", h, jenis="hasil_peek")), None)
+               if h in hidup and h in malam and not sudah_aksi(ingatan, view, "tuduh", h, lingkup="ronde", jenis="hasil_peek")), None)
     aksi_fase = _aksi_fase(ingatan, view)
     inisiatif = sum(a["aksi"] not in AKSI_REAKTIF for a in aksi_fase)
     if (ph is None or view["fase"] not in ("day", "tribunal") or not view["saya"]["can_chat"]

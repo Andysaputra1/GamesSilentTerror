@@ -22,6 +22,7 @@ from app.bot.fuzzy import (
     seri_acak,
     putuskan,
 )
+from app.bot.nlg import tulis_pesan
 from app.bot.nlu import pemain_disebut
 
 # fmt: off
@@ -1696,7 +1697,7 @@ def skenario_fase9():
 SKENARIO += skenario_fase9()
 
 # Skenario perbaikan 7 November 2026 (nomor 600–699), di sel sendiri: semua jenis tuduh Hitman dinilai, malam klaim Peek yang
-# mungkin, dan klaim Peek yang tidak diulang di ronde yang sama.
+# mungkin, dan klaim Peek (Hitman maupun bersih) yang tidak diulang di ronde yang sama.
 def skenario_perbaikan():
     S = []
     peek_budi = [ch(3, "day", 10, "Citra", "Aku Stalker, semalam aku peek Budi, dia Hitman.", "offend", ["Budi"])]
@@ -1729,6 +1730,28 @@ def skenario_perbaikan():
                   view=buat_view(3, "day", 30, peran="stalker", next_peek=3),
                   harapan={"chat": [("tuduh", "Dodi")], "jenis": "hasil_peek", "bukti_klaim": "di malam ronde 1 peek Dodi, dia Hitman",
                            "pesan_bukan": ["semalam"]}))
+
+    # Klaim yang sudah diucapkan siang tidak diulang di Tribunal ronde yang sama. Catatan aksi_bot berbentuk catat_aksi_bot.
+    ungkap_r2 = [{"ronde": 2, "fase": "day", "waktu": jam(2, "day", 5), "aksi": "tuduh", "intent": "offend", "target": "Dodi",
+                  "alasan": ["Aku Stalker, semalam aku peek Dodi: dia Hitman."], "jenis": "hasil_peek", "pemicu": None, "role_diakui": "stalker"}]
+    S.append(dict(nama="605 Klaim Peek siang tidak diulang di Tribunal",
+                  cerita="Stalker sudah mengungkap Dodi di siang ronde 2. Di Tribunal ronde itu ia tidak mengulang klaim, tetapi menjelaskan vote ke Dodi.",
+                  ingatan=buat_ingatan(sampai=(2, "tribunal"), peran="stalker", intel=[(1, "Dodi", "hitman")], aksi_bot=ungkap_r2),
+                  view=buat_view(2, "tribunal", 30, peran="stalker", next_peek=3),
+                  harapan={"chat": [("tuduh", "Dodi")], "jenis": "jelaskan_vote", "role_diakui": None, "vote": [("vote", "Dodi")]}))
+    S.append(dict(nama="606 Klaim Peek diungkap lagi di ronde berikutnya",
+                  cerita="Dodi lolos dari Tribunal ronde 2. Siang ronde 3 adalah diskusi baru, jadi Stalker mengungkapnya lagi dengan malam Peek yang benar.",
+                  ingatan=buat_ingatan(sampai=(3, "day"), peran="stalker", intel=[(1, "Dodi", "hitman")], aksi_bot=ungkap_r2),
+                  view=buat_view(3, "day", 30, peran="stalker", next_peek=3),
+                  harapan={"chat": [("tuduh", "Dodi")], "jenis": "hasil_peek", "bukti_klaim": "di malam ronde 1 peek Dodi, dia Hitman"}))
+    bela_klaim = [{"ronde": 3, "fase": "day", "waktu": jam(3, "day", 20), "aksi": "bela_orang", "intent": "defend", "target": "Citra",
+                   "alasan": ["Aku Stalker, aku sudah peek Citra: dia bukan Hitman."], "jenis": "peek_bersih", "pemicu": None, "role_diakui": "stalker"}]
+    S.append(dict(nama="607 Klaim Peek bersih siang tidak diulang di Tribunal",
+                  cerita="Stalker sudah mengklaim Peek bersih Citra di siang ronde 3. Di Tribunal Citra masih terancam, jadi Stalker membelanya lagi tanpa mengulang klaim.",
+                  ingatan=buat_ingatan([ch(3, "day", d, p, "Citra aneh.", "offend", ["Citra"]) for d, p in ((10, "Andi"), (15, "Budi"))],
+                                       sampai=(3, "tribunal"), peran="stalker", intel=[(2, "Citra", "civilian")], aksi_bot=bela_klaim),
+                  view=buat_view(3, "tribunal", 30, peran="stalker", next_peek=4, suara={"Andi": "Citra", "Budi": "Citra"}),
+                  harapan={"chat": [("bela_orang", "Citra")], "jenis": "yakin_bersih", "role_diakui": None, "pesan_bukan": ["peek"]}))
     return S
 
 
@@ -1820,8 +1843,8 @@ def cek_harapan(hasil, harapan):
 
 class SkenarioFuzzyTests(unittest.TestCase):
     def test_jumlah_skenario_sama_dengan_notebook(self):
-        self.assertEqual(len(SKENARIO), 325)
-        self.assertEqual(len({s["nama"] for s in SKENARIO}), 325)
+        self.assertEqual(len(SKENARIO), 328)
+        self.assertEqual(len({s["nama"] for s in SKENARIO}), 328)
 
     def test_semua_skenario_lulus(self):
         for s in SKENARIO:
@@ -1833,3 +1856,18 @@ class SkenarioFuzzyTests(unittest.TestCase):
         urut_seri = [min(PEMAIN_DEMO[1:], key=lambda p: seri_acak(BOT_DEMO, r, p)) for r in range(1, 9)]
         self.assertGreater(len(set(urut_seri)), 1)
         self.assertEqual(urut_seri, [min(PEMAIN_DEMO[1:], key=lambda p: seri_acak(BOT_DEMO, r, p)) for r in range(1, 9)])
+
+    # Kalimat kembar dari uji main 7 November 2026: klaim Peek siang tidak terulang persis di Tribunal ronde yang sama, juga lewat
+    # templat NLG yang menaruh kalimat mirip di belakang (semua varian hasil_peek saling mirip, jadi dulu varian sama terpilih lagi).
+    def test_klaim_peek_tidak_kembar_siang_lalu_tribunal(self):
+        intel, konteks = [(1, "Dodi", "hitman")], {"roster": PEMAIN_DEMO, "chat_terbaru": []}
+        siang, view_siang = buat_ingatan(sampai=(2, "day"), peran="stalker", intel=intel), buat_view(2, "day", 30, peran="stalker", next_peek=3)
+        hasil_siang = putuskan(siang, view_siang)
+        teks_siang = tulis_pesan(hasil_siang["nlg"], konteks, None, "gaul")["teks"]
+        siang.catat_aksi_bot(view_siang, hasil_siang["rencana_chat"])
+        tribunal = buat_ingatan(sampai=(2, "tribunal"), peran="stalker", intel=intel, aksi_bot=siang.aksi_bot)
+        hasil_tribunal = putuskan(tribunal, buat_view(2, "tribunal", 30, peran="stalker", next_peek=3))
+        teks_tribunal = tulis_pesan(hasil_tribunal["nlg"], konteks, None, "gaul", hindari=(teks_siang,))["teks"]
+        self.assertEqual(hasil_siang["rencana_chat"]["jenis"], "hasil_peek")
+        self.assertNotEqual(hasil_tribunal["rencana_chat"]["jenis"], "hasil_peek")
+        self.assertNotEqual(teks_tribunal, teks_siang)
