@@ -62,7 +62,7 @@ file saja tidak berarti route tersebut dibuka pada aplikasi utama.
    repo, di `../arsip_bt_utility_2026-11-03/` (cara menariknya kembali ada di README folder
    itu). Nilai lama `campuran`, `utility`, dan `bt` di `.env` atau `panel_configuration`
    dibaca sebagai `fuzzy`, dan jejak lama tetap bisa dibuka di panel. Angka keseimbangan di
-   `GAME_CONCEPT.md` diukur dengan metode campuran, jadi belum berlaku untuk Fuzzy saja.
+   `GAME_CONCEPT.md` sudah diukur ulang dengan Fuzzy saja (6 November 2026).
    Setelah Mulai, `Match` berada di fase `preparing` sampai otak bot siap.
 6. **Logout:** `ProfileMenu` → `SessionService` → endpoint logout. Setelah token
    dicabut atau sudah tidak berlaku, data sesi browser dibersihkan dan pengguna

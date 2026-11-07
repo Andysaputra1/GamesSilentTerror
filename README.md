@@ -21,7 +21,7 @@ Sudah dapat dimainkan dari awal sampai akhir:
 
 Role: **Hitman** (Hostage/Gag Order), **Spy** (Guard), **Stalker** (Peek), dan **Civilian** (observasi). Korban Hostage tetap hidup tetapi kehilangan semua aksi permanen (chat, voting, dan skill malam). Saat malam selesai korban diumumkan ke semua pemain dan kartunya bercap *Disandera* sampai akhir; bila Hostage dijaga Guard atau tidak ada pilihan, pengumumannya "Malam ini tidak ada yang disandera" (target yang gagal tidak dibuka).
 
-Aturan terbaru (3 November 2026): Guard boleh ke target yang sama berturut-turut; suara seri di Tribunal menambah waktu sekali (30 detik, mode cepat 10 detik), dan bila masih seri tidak ada eksekusi; Spy di room dengan ≥ 2 Spy saling tahu dan melihat pilihan Guard rekan; Hitman dan Spy di room dengan ≥ 2 pemain role itu punya chat tim rahasia saat malam, dengan kanal terpisah. **Angka keseimbangan di GAME_CONCEPT.md belum diukur ulang setelah perubahan ini**, dan logika pilihan bot belum mengikutinya.
+Aturan terbaru (3 November 2026): Guard boleh ke target yang sama berturut-turut; suara seri di Tribunal menambah waktu sekali (30 detik, mode cepat 10 detik), dan bila masih seri tidak ada eksekusi; Spy di room dengan ≥ 2 Spy saling tahu dan melihat pilihan Guard rekan; Hitman dan Spy di room dengan ≥ 2 pemain role itu punya chat tim rahasia saat malam, dengan kanal terpisah. Sejak rombak otak (November 2026) logika bot mengikuti aturan ini; aturan bot ringkas, tabel keseimbangan, dan uji A/B paksa vote ada di GAME_CONCEPT.md.
 
 Engine backend menjadi sumber kebenaran, bukan browser atau AI. Engine memvalidasi setiap aksi/vote/chat bot; fallback aturan mengisi aksi yang kosong jika otak bot gagal. Baca [aturan, alur kode, dan batas implementasi](GAME_CONCEPT.md) serta [panduan membaca kode](CODE_GUIDE.md).
 
@@ -35,7 +35,7 @@ Semua AI ada di **otak bot** (NPC yang ikut bermain). Chat manusia hanya diotori
 | **Fuzzy Mamdani** | Penalaran bot: memilih tuduhan, pembelaan, vote, dan skill malam | Setiap langkah bot, untuk semua bot; metode tiap bot dicatat di tabel `match_bots` |
 | **NLG** (rantai penulis LLM atau templat) | Mengubah rencana bot menjadi kalimat | Saat bot memutuskan bicara. Jalur LLM yang gagal dilewati; tanpa jalur yang hidup, bot memakai templat |
 
-Game hanya memakai otak Fuzzy. Utility AI dan Behavior Tree diarsipkan di luar repo, di `../arsip_bt_utility_2026-11-03/` (isi dan cara menariknya kembali ada di README folder itu). Angka keseimbangan di `GAME_CONCEPT.md` diukur dengan metode campuran, jadi belum berlaku untuk Fuzzy saja.
+Game hanya memakai otak Fuzzy. Utility AI dan Behavior Tree diarsipkan di luar repo, di `../arsip_bt_utility_2026-11-03/` (isi dan cara menariknya kembali ada di README folder itu). Angka keseimbangan di `GAME_CONCEPT.md` diukur ulang dengan Fuzzy saja (6 November 2026): warga menang 46–59,5% untuk 4–10 pemain, dengan 10 pemain dekat batas atas target 40–60%.
 
 Kalimat bot diperiksa aturan lalu langsung dikirim; IndoBERT baru membacanya sesudah terkirim. Pembacaan ulang sebelum kirim diarsipkan di luar repo, di `../arsip_validasi_nlg_2026-11-04/` (alasan dan cara mengembalikannya ada di README folder itu).
 

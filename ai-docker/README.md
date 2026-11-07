@@ -26,7 +26,7 @@ Dua model disiapkan. Model yang dipakai bot dipilih di panel â†’ **Otak NPC** â†
 | `gerbang.conf.template` | Hanya `/api/tags`, `/api/show`, `/api/chat`, `/api/version` dengan token yang benar |
 | `.env` | Dibuat otomatis: `LLM_TOKEN` acak, `LLM_MODELS`, dan login panel (`PANEL_USERNAME`, password terenkripsi DPAPI). Opsional `BACKEND_URL` (bawaan `https://backendthesis.andylabs.site`). Tidak masuk Git |
 
-Game hanya memakai otak Fuzzy; Utility AI dan Behavior Tree diarsipkan di luar repo, di `../arsip_bt_utility_2026-11-03/`. Hasil lama `uji-waktu.bat` dan angka keseimbangan di `GAME_CONCEPT.md` diukur dengan metode campuran, jadi belum berlaku untuk Fuzzy saja.
+Game hanya memakai otak Fuzzy; Utility AI dan Behavior Tree diarsipkan di luar repo, di `../arsip_bt_utility_2026-11-03/`. Hasil lama `uji-waktu.bat` diukur dengan metode campuran, jadi belum berlaku untuk Fuzzy saja. Angka keseimbangan di `GAME_CONCEPT.md` sudah diukur ulang dengan Fuzzy saja (6 November 2026).
 
 ## Pemakaian
 

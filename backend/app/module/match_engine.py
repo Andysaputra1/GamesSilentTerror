@@ -48,9 +48,9 @@ TRIBUNAL_EXTRA_QUICK_SECONDS = 10
 TEAM_CHAT_LIMIT = 100
 
 # Komposisi role per jumlah peserta: (hitman, spy, stalker); sisanya civilian.
-# Dipilih lewat simulasi keseimbangan semua kursi bot metode campuran (sebelum game hanya memakai Fuzzy), dengan
-# pengumuman jumlah Hitman tersisa (hitman_remaining). Hasil ukur itu belum diulang untuk Fuzzy saja, jadi
-# belum tentu berlaku untuk game sekarang; data dan alasannya ada di GAME_CONCEPT.md, bagian Ruangan dan role.
+# Diukur ulang dengan Fuzzy saja (6 Nov 2026, 200 game per ukuran, semua kursi bot, dengan pengumuman
+# hitman_remaining). Warga menang 4–10 pemain: 47,0 / 47,0 / 46,0 / 58,0 / 54,0 / 55,0 / 59,5%, semua di
+# target 40–60%; 10 pemain dekat batas atas. Data dan alasannya ada di GAME_CONCEPT.md, bagian Ruangan dan role.
 KOMPOSISI_PERAN = {
     4: (1, 1, 1),
     5: (1, 1, 1),
