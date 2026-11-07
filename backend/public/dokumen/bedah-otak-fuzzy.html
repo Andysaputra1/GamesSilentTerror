@@ -47,6 +47,31 @@ li { margin: .25em 0; }
 .l { background: var(--live); color: var(--live-fg); }
 .t { background: var(--tolak); color: var(--tolak-fg); }
 .kecil { color: var(--muted); font-size: .9rem; }
+.pohon { margin: 1em 0 1.2em; }
+.pohon-gulir { overflow-x: auto; background: var(--panel); border: 1px solid var(--rule); border-radius: 8px; padding: 6px; }
+.pohon svg { display: block; height: auto; }
+.pohon text { font: 13.5px ui-monospace, SFMono-Regular, Consolas, monospace; }
+.pohon text.teks { font: 13.5px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+.pohon text.sub { font: 12.5px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+.pohon .sisi { fill: none; stroke: var(--muted); stroke-width: 1.3; }
+.pohon .ujung { fill: var(--muted); }
+.pohon rect { stroke-width: 1.3; }
+.pohon .bahan rect { fill: var(--panel); stroke: var(--muted); } .pohon .bahan text { fill: var(--fg); }
+.pohon .tegas rect { fill: var(--code); stroke: var(--kode-fg); stroke-dasharray: 4 3; } .pohon .tegas text { fill: var(--fg); }
+.pohon .f1 rect { fill: var(--live); stroke: var(--live-fg); } .pohon .f1 text { fill: var(--live-fg); }
+.pohon .f2 rect { fill: var(--setuju); stroke: var(--setuju-fg); } .pohon .f2 text { fill: var(--setuju-fg); }
+.pohon .ambang rect { fill: var(--usul); stroke: var(--usul-fg); } .pohon .ambang text { fill: var(--usul-fg); }
+.pohon .aksi rect { fill: var(--panel); stroke: var(--accent); stroke-width: 2.2; } .pohon .aksi text { fill: var(--accent); }
+.pohon a:hover rect, .pohon a:focus rect { stroke-width: 3; }
+.pohon a:focus { outline: none; }
+.pohon figcaption { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 6px; font-size: .88rem; }
+.pohon-tanda { display: inline-block; width: 12px; height: 12px; margin-right: 5px; border: 1.5px solid; border-radius: 3px; vertical-align: -1px; }
+.pohon-tanda.bahan { background: var(--panel); border-color: var(--muted); }
+.pohon-tanda.tegas { background: var(--code); border-color: var(--kode-fg); border-style: dashed; }
+.pohon-tanda.f1 { background: var(--live); border-color: var(--live-fg); }
+.pohon-tanda.f2 { background: var(--setuju); border-color: var(--setuju-fg); }
+.pohon-tanda.ambang { background: var(--usul); border-color: var(--usul-fg); }
+.pohon-tanda.aksi { background: var(--panel); border-color: var(--accent); }
 </style>
 </head>
 <body>
@@ -541,24 +566,51 @@ Bobot 1,0 bila tuduhan chat di ronde ini, 0,6 bila ronde lalu.</code></pre>
 
 <h2 id="kecurigaan">6. Menilai kecurigaan</h2>
 <p>Kecurigaan menjawab "seberapa mungkin orang ini Hitman?". Nilainya 0–1. <span class="b k">terpasang</span> Bukti dihitung <code>hitung_bukti</code>, lalu dinilai <code>nilai_kecurigaan</code> lewat <code>HIERARKI</code>, dan fakta pasti diterapkan <code>terapkan_pengetahuan</code>. Nama lama yang masih dikenali panel untuk jejak lama: <code>sosial</code>, <code>perilaku</code>, <code>pribadi</code>, <code>inkonsistensi</code>, <code>pengalihan</code>, <code>dituduh_korban</code>, <code>dorong_salah_eksekusi</code>, <code>serang_bersih</code>, <code>klaim</code>.</p>
-<pre><code>BUKTI                        TAHAP 1                  TAHAP 2         TAHAP 3
-
-tekanan ───────────────┐
-                       ├─→ sentimen_sosial ───────┐
-dukungan ──────────────┘                          │
-                                                  ├─→ ucapan ──────┐
-plin_plan ─────────────┐                          │                │
-                       ├─→ perilaku_mencurigakan ─┘                │
-alihkan_tuduhan ───────┘                                           │
-                                                                   ├─→ KECURIGAAN
-penuduh_dibungkam ─────┐                                           │
-                       ├─→ jejak ─────────────────┐                │
-ikut_salah_eksekusi    │                          │                │
-atau memihak_hitman ───┘                          ├─→ bukti_keras ─┘
-                                                  │
-menuduh_orang_baik ────┐                          │
-                       ├─→ kejanggalan ───────────┘
-klaim_role_bermasalah ─┘</code></pre>
+<!-- gen:pohon:kecurigaan -->
+<figure class="pohon" id="pohon-kecurigaan">
+<div class="pohon-gulir"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 950 391" width="950" height="391" style="width:100%;max-width:950px;min-width:903px" role="group" aria-labelledby="judul-kecurigaan desk-kecurigaan">
+<title id="judul-kecurigaan">Pohon kecurigaan [FUZZY 1]: bukti per pemain sampai kecurigaan akhir</title>
+<desc id="desk-kecurigaan">jejak_kedua dari ikut_salah_eksekusi, memihak_hitman; sentimen_sosial dari tekanan, dukungan; perilaku_mencurigakan dari plin_plan, alihkan_tuduhan; jejak dari penuduh_dibungkam, jejak_kedua; kejanggalan dari menuduh_orang_baik, klaim_role_bermasalah; ucapan dari sentimen_sosial, perilaku_mencurigakan; bukti_keras dari jejak, kejanggalan; kecurigaan dari ucapan, bukti_keras; kecurigaan akhir dari kecurigaan.</desc>
+<defs><marker id="panah-kecurigaan" viewBox="0 0 8 8" refX="7.5" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path class="ujung" d="M0,0 L8,4 L0,8 z"/></marker></defs>
+<path class="sisi" d="M196.1,238.5 C207.1,238.5 207.1,221.9 218.1,221.9" marker-end="url(#panah-kecurigaan)"/>
+<path class="sisi" d="M196.1,281.5 C207.1,281.5 207.1,228.9 218.1,228.9" marker-end="url(#panah-kecurigaan)"/>
+<path class="sisi" d="M196.1,23.5 C207.1,23.5 207.1,123.8 218.1,123.8 L325.2,123.8 C336.2,123.8 336.2,123.8 347.2,123.8" marker-end="url(#panah-kecurigaan)"/>
+<path class="sisi" d="M196.1,66.5 C207.1,66.5 207.1,130.8 218.1,130.8 L325.2,130.8 C336.2,130.8 336.2,130.8 347.2,130.8" marker-end="url(#panah-kecurigaan)"/>
+<path class="sisi" d="M196.1,109.5 C207.1,109.5 207.1,166.8 218.1,166.8 L325.2,166.8 C336.2,166.8 336.2,166.8 347.2,166.8" marker-end="url(#panah-kecurigaan)"/>
+<path class="sisi" d="M196.1,152.5 C207.1,152.5 207.1,173.8 218.1,173.8 L325.2,173.8 C336.2,173.8 336.2,173.8 347.2,173.8" marker-end="url(#panah-kecurigaan)"/>
+<path class="sisi" d="M196.1,195.5 C207.1,195.5 207.1,194.9 218.1,194.9 L325.2,194.9 C336.2,194.9 336.2,209.8 347.2,209.8" marker-end="url(#panah-kecurigaan)"/>
+<path class="sisi" d="M325.2,225.4 C336.2,225.4 336.2,216.8 347.2,216.8" marker-end="url(#panah-kecurigaan)"/>
+<path class="sisi" d="M196.1,324.5 C207.1,324.5 207.1,255.9 218.1,255.9 L325.2,255.9 C336.2,255.9 336.2,252.8 347.2,252.8" marker-end="url(#panah-kecurigaan)"/>
+<path class="sisi" d="M196.1,367.5 C207.1,367.5 207.1,262.9 218.1,262.9 L325.2,262.9 C336.2,262.9 336.2,259.8 347.2,259.8" marker-end="url(#panah-kecurigaan)"/>
+<path class="sisi" d="M535.3,127.3 C546.3,127.3 546.3,166.8 557.3,166.8" marker-end="url(#panah-kecurigaan)"/>
+<path class="sisi" d="M535.3,170.3 C546.3,170.3 546.3,173.8 557.3,173.8" marker-end="url(#panah-kecurigaan)"/>
+<path class="sisi" d="M535.3,213.3 C546.3,213.3 546.3,209.8 557.3,209.8" marker-end="url(#panah-kecurigaan)"/>
+<path class="sisi" d="M535.3,256.3 C546.3,256.3 546.3,216.8 557.3,216.8" marker-end="url(#panah-kecurigaan)"/>
+<path class="sisi" d="M664.4,170.3 C675.4,170.3 675.4,188.3 686.4,188.3" marker-end="url(#panah-kecurigaan)"/>
+<path class="sisi" d="M664.4,213.3 C675.4,213.3 675.4,195.3 686.4,195.3" marker-end="url(#panah-kecurigaan)"/>
+<path class="sisi" d="M785.4,191.8 C796.4,191.8 796.4,191.8 807.4,191.8" marker-end="url(#panah-kecurigaan)"/>
+<a href="#sentimen"><g class="simpul bahan"><rect x="8.0" y="8.0" width="188.1" height="31.0" rx="6"/><text class="kode" x="102.0" y="28.2" text-anchor="middle">tekanan</text></g></a>
+<a href="#sentimen"><g class="simpul bahan"><rect x="8.0" y="51.0" width="188.1" height="31.0" rx="6"/><text class="kode" x="102.0" y="71.2" text-anchor="middle">dukungan</text></g></a>
+<a href="#perilaku"><g class="simpul bahan"><rect x="8.0" y="94.0" width="188.1" height="31.0" rx="6"/><text class="kode" x="102.0" y="114.2" text-anchor="middle">plin_plan</text></g></a>
+<a href="#perilaku"><g class="simpul bahan"><rect x="8.0" y="137.0" width="188.1" height="31.0" rx="6"/><text class="kode" x="102.0" y="157.2" text-anchor="middle">alihkan_tuduhan</text></g></a>
+<a href="#jejak"><g class="simpul bahan"><rect x="8.0" y="180.0" width="188.1" height="31.0" rx="6"/><text class="kode" x="102.0" y="200.2" text-anchor="middle">penuduh_dibungkam</text></g></a>
+<a href="#jejak"><g class="simpul bahan"><rect x="8.0" y="223.0" width="188.1" height="31.0" rx="6"/><text class="kode" x="102.0" y="243.2" text-anchor="middle">ikut_salah_eksekusi</text></g></a>
+<a href="#jejak"><g class="simpul bahan"><rect x="8.0" y="266.0" width="188.1" height="31.0" rx="6"/><text class="kode" x="102.0" y="286.2" text-anchor="middle">memihak_hitman</text></g></a>
+<a href="#jejak"><g class="simpul tegas"><rect x="218.1" y="201.9" width="107.1" height="47.0" rx="6"/><text class="kode" x="271.6" y="222.1" text-anchor="middle">jejak_kedua</text><text class="sub" x="271.6" y="238.1" text-anchor="middle">maks</text></g></a>
+<a href="#kejanggalan"><g class="simpul bahan"><rect x="8.0" y="309.0" width="188.1" height="31.0" rx="6"/><text class="kode" x="102.0" y="329.2" text-anchor="middle">menuduh_orang_baik</text></g></a>
+<a href="#kejanggalan"><g class="simpul bahan"><rect x="8.0" y="352.0" width="188.1" height="31.0" rx="6"/><text class="kode" x="102.0" y="372.2" text-anchor="middle">klaim_role_bermasalah</text></g></a>
+<a href="#sentimen"><g class="simpul f1"><rect x="347.2" y="111.8" width="188.1" height="31.0" rx="6"/><text class="kode" x="441.2" y="132.0" text-anchor="middle">sentimen_sosial</text></g></a>
+<a href="#perilaku"><g class="simpul f1"><rect x="347.2" y="154.8" width="188.1" height="31.0" rx="6"/><text class="kode" x="441.2" y="175.0" text-anchor="middle">perilaku_mencurigakan</text></g></a>
+<a href="#jejak"><g class="simpul f1"><rect x="347.2" y="197.8" width="188.1" height="31.0" rx="6"/><text class="kode" x="441.2" y="218.0" text-anchor="middle">jejak</text></g></a>
+<a href="#kejanggalan"><g class="simpul f1"><rect x="347.2" y="240.8" width="188.1" height="31.0" rx="6"/><text class="kode" x="441.2" y="261.0" text-anchor="middle">kejanggalan</text></g></a>
+<a href="#ucapan"><g class="simpul f1"><rect x="557.3" y="154.8" width="107.1" height="31.0" rx="6"/><text class="kode" x="610.8" y="175.0" text-anchor="middle">ucapan</text></g></a>
+<a href="#bukti-keras"><g class="simpul f1"><rect x="557.3" y="197.8" width="107.1" height="31.0" rx="6"/><text class="kode" x="610.8" y="218.0" text-anchor="middle">bukti_keras</text></g></a>
+<a href="#kecurigaan-akhir"><g class="simpul f1"><rect x="686.4" y="176.3" width="99.0" height="31.0" rx="6"/><text class="kode" x="735.9" y="196.5" text-anchor="middle">kecurigaan</text></g></a>
+<a href="#kecurigaan-akhir"><g class="simpul tegas"><rect x="807.4" y="136.3" width="134.8" height="111.0" rx="6"/><text class="teks" x="874.8" y="156.5" text-anchor="middle">kecurigaan akhir</text><text class="sub" x="874.8" y="172.5" text-anchor="middle">× (1 − p_sandera)</text><text class="sub" x="874.8" y="188.5" text-anchor="middle">Peek Hitman → 1</text><text class="sub" x="874.8" y="204.5" text-anchor="middle">pasti baik → 0</text><text class="sub" x="874.8" y="220.5" text-anchor="middle">diklaim bersih →</text><text class="sub" x="874.8" y="236.5" text-anchor="middle">× (1 − bobot)</text></g></a>
+</svg></div>
+<figcaption><span><span class="pohon-tanda bahan"></span>bahan mentah</span><span><span class="pohon-tanda tegas"></span>olahan tegas</span><span><span class="pohon-tanda f1"></span>[FUZZY 1]</span><span class="kecil">Kotak bisa diklik ke penjelasannya.</span></figcaption>
+</figure>
+<!-- /gen -->
 <p><strong>Kenapa dipasangkan:</strong> satu sistem dengan 8 input membutuhkan 3⁸ = 6.561 aturan, sedangkan 7 sistem dua input hanya 63 aturan. Bukti dipasangkan menurut kesamaan makna. Pembagian ini pilihan perancang dan belum dibandingkan dengan pasangan lain.</p>
 
 <h3 id="kurva">Kurva rendah, sedang, tinggi</h3>
@@ -838,6 +890,35 @@ klaim_role_bermasalah ─┘</code></pre>
 
 <h2 id="ancaman">7. Menilai ancaman dan kambing hitam</h2>
 <p><span class="b k">terpasang</span> Hanya bot Hitman yang memakai bagian ini (<code>fitur_hitman</code>, lalu <code>nilai_ancaman</code>). Tabel aturannya sama dengan sebelum rombak. Yang berubah adalah hitungan masukannya.</p>
+<!-- gen:pohon:ancaman -->
+<figure class="pohon" id="pohon-ancaman">
+<div class="pohon-gulir"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 643 219" width="643" height="219" style="width:100%;max-width:643px;min-width:611px" role="group" aria-labelledby="judul-ancaman desk-ancaman">
+<title id="judul-ancaman">Pohon ancaman dan kambing hitam [FUZZY 1] untuk bot Hitman</title>
+<desc id="desk-ancaman">kredibilitas dari kecurigaan_publik; ancaman_langsung dari menuduh_tim, pengaruh; ancaman_peran dari mengaku_role_penting, kredibilitas; ancaman dari ancaman_langsung, ancaman_peran; kambing dari kecurigaan_publik, dukungan_suara.</desc>
+<defs><marker id="panah-ancaman" viewBox="0 0 8 8" refX="7.5" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path class="ujung" d="M0,0 L8,4 L0,8 z"/></marker></defs>
+<path class="sisi" d="M188.0,149.0 C199.0,149.0 199.0,120.1 210.0,120.1" marker-end="url(#panah-ancaman)"/>
+<path class="sisi" d="M188.0,23.5 C199.0,23.5 199.0,58.4 210.0,58.4 L368.7,58.4 C379.7,58.4 379.7,58.4 390.7,58.4" marker-end="url(#panah-ancaman)"/>
+<path class="sisi" d="M188.0,66.5 C199.0,66.5 199.0,65.4 210.0,65.4 L368.7,65.4 C379.7,65.4 379.7,65.4 390.7,65.4" marker-end="url(#panah-ancaman)"/>
+<path class="sisi" d="M188.0,109.5 C199.0,109.5 199.0,89.6 210.0,89.6 L368.7,89.6 C379.7,89.6 379.7,101.4 390.7,101.4" marker-end="url(#panah-ancaman)"/>
+<path class="sisi" d="M368.7,120.1 C379.7,120.1 379.7,108.4 390.7,108.4" marker-end="url(#panah-ancaman)"/>
+<path class="sisi" d="M538.3,61.9 C549.3,61.9 549.3,79.9 560.3,79.9" marker-end="url(#panah-ancaman)"/>
+<path class="sisi" d="M538.3,104.9 C549.3,104.9 549.3,86.9 560.3,86.9" marker-end="url(#panah-ancaman)"/>
+<path class="sisi" d="M188.0,156.0 C199.0,156.0 199.0,178.0 210.0,178.0 L368.7,178.0 C379.7,178.0 379.7,178.0 390.7,178.0" marker-end="url(#panah-ancaman)"/>
+<path class="sisi" d="M188.0,195.5 C199.0,195.5 199.0,185.0 210.0,185.0 L368.7,185.0 C379.7,185.0 379.7,185.0 390.7,185.0" marker-end="url(#panah-ancaman)"/>
+<a href="#ancaman"><g class="simpul bahan"><rect x="8.0" y="8.0" width="180.0" height="31.0" rx="6"/><text class="kode" x="98.0" y="28.2" text-anchor="middle">menuduh_tim</text></g></a>
+<a href="#ancaman"><g class="simpul bahan"><rect x="8.0" y="51.0" width="180.0" height="31.0" rx="6"/><text class="kode" x="98.0" y="71.2" text-anchor="middle">pengaruh</text></g></a>
+<a href="#ancaman"><g class="simpul bahan"><rect x="8.0" y="94.0" width="180.0" height="31.0" rx="6"/><text class="kode" x="98.0" y="114.2" text-anchor="middle">mengaku_role_penting</text></g></a>
+<a href="#kecurigaan"><g class="simpul f1"><rect x="8.0" y="137.0" width="180.0" height="31.0" rx="6"/><text class="kode" x="98.0" y="157.2" text-anchor="middle">kecurigaan_publik</text></g></a>
+<a href="#ancaman"><g class="simpul tegas"><rect x="210.0" y="96.6" width="158.7" height="47.0" rx="6"/><text class="kode" x="289.4" y="116.9" text-anchor="middle">kredibilitas</text><text class="sub" x="289.4" y="132.9" text-anchor="middle">1 − kecurigaan_publik</text></g></a>
+<a href="#kambing"><g class="simpul bahan"><rect x="8.0" y="180.0" width="180.0" height="31.0" rx="6"/><text class="kode" x="98.0" y="200.2" text-anchor="middle">dukungan_suara</text></g></a>
+<a href="#ancaman"><g class="simpul f1"><rect x="390.7" y="46.4" width="147.6" height="31.0" rx="6"/><text class="kode" x="464.5" y="66.6" text-anchor="middle">ancaman_langsung</text></g></a>
+<a href="#ancaman"><g class="simpul f1"><rect x="390.7" y="89.4" width="147.6" height="31.0" rx="6"/><text class="kode" x="464.5" y="109.6" text-anchor="middle">ancaman_peran</text></g></a>
+<a href="#kambing"><g class="simpul f1"><rect x="390.7" y="158.0" width="147.6" height="47.0" rx="6"/><text class="kode" x="464.5" y="178.3" text-anchor="middle">kambing</text><text class="sub" x="464.5" y="194.3" text-anchor="middle">→ kambing_hitam</text></g></a>
+<a href="#ancaman"><g class="simpul f1"><rect x="560.3" y="67.9" width="74.7" height="31.0" rx="6"/><text class="kode" x="597.7" y="88.1" text-anchor="middle">ancaman</text></g></a>
+</svg></div>
+<figcaption><span><span class="pohon-tanda bahan"></span>bahan mentah</span><span><span class="pohon-tanda tegas"></span>olahan tegas</span><span><span class="pohon-tanda f1"></span>[FUZZY 1]</span><span class="kecil">Kotak bisa diklik ke penjelasannya.</span></figcaption>
+</figure>
+<!-- /gen -->
 <h3>Ancaman</h3>
 <p><strong>Arti:</strong> seberapa berbahaya warga ini bagi tim Hitman. Dipakai <code>hostage</code> dan <code>gag</code>.</p>
 <p><strong>Cerita:</strong> Andi menuduh Hitman sekali lewat chat, tuduhannya diikuti seperempat pemain, Andi mengaku Stalker sendirian, dan kecurigaan publiknya 0,15.</p>
@@ -848,9 +929,6 @@ klaim_role_bermasalah ─┘</code></pre>
 <li><strong>Hasil:</strong> 0,50 dan 0,85, lalu <code>ancaman</code> 0,85.</li>
 <li><strong>Dipakai oleh:</strong> <code>hostage</code> dan <code>gag</code>.</li>
 </ol>
-<pre><code>menuduh_tim + pengaruh               → ancaman_langsung ┐
-                                                        ├─→ ancaman
-mengaku_role_penting + kredibilitas  → ancaman_peran ───┘</code></pre>
 <div class="tabel"><table>
 <tr><th>Masukan</th><th>Hitungan</th></tr>
 <tr><td><code>menuduh_tim</code></td><td>Chat menuduh bot Hitman +0,5, vote ke bot +1, dikali 0,7 per ronde, paling tinggi 1. Tuduhan ke rekan dihitung separuh: chat +0,25, vote +0,5 (perkiraan A1, disetel di Fase 9)</td></tr>
@@ -964,21 +1042,149 @@ mengaku_role_penting + kredibilitas  → ancaman_peran ───┘</code></pre>
 <p>Setiap sistem [FUZZY 2] dijelaskan dengan format bagian 6: arti, cerita, hitungan, tabel aturan, dan contoh hasil. Tabel aturan, angka contoh, dan hasilnya diisi skrip pembangun dokumen dari kode otak, jadi ikut berubah bila kodenya berubah.</p>
 <p class="kecil">Kode: <code>SISTEM_KECURIGAAN</code> (7) dan <code>SISTEM_ANCAMAN</code> (4) untuk [FUZZY 1], <code>SISTEM_KEPUTUSAN</code> (10) untuk [FUZZY 2]; <code>nilai_kecurigaan</code>, <code>nilai_ancaman</code>, <code>keputusan_chat</code>, <code>keputusan_vote</code>, <code>keputusan_aksi</code>. Kode lama punya 28 sistem; rombak menghapus <code>bela_diri</code>, <code>h_bela_diri</code>, <code>jawab</code>, <code>h_jawab</code>, <code>info_sandera</code>, <code>sandera</code>, dan <code>lindung</code>.</p>
 
-<h3 id="fuzzy-1">Pohon [FUZZY 1]: menilai pemain</h3>
-<pre><code>[FUZZY 1] WARGA (Civilian, Spy, Stalker): satu nilai per pemain
-kecurigaan ← ucapan      ← sentimen_sosial       (tekanan, dukungan)
-                         ← perilaku_mencurigakan (plin_plan, alihkan_tuduhan)
-           ← bukti_keras ← jejak                 (penuduh_dibungkam, jejak_kedua)
-                         ← kejanggalan           (menuduh_orang_baik, klaim_role_bermasalah)
-   lalu × (1 − p_sandera), lalu fakta menimpa:
-     hasil Peek Hitman                → 1
-     pasti orang baik                 → 0
-     diklaim bersih pengaku Stalker   → × (1 − bersih_klaim)
-
-[FUZZY 1] HITMAN: dihitung dari tabel publik, satu nilai per warga bebas
-ancaman       ← ancaman_langsung (menuduh_tim, pengaruh)
-              ← ancaman_peran    (mengaku_role_penting, kredibilitas)
-kambing_hitam ← kambing          (kecurigaan_publik, dukungan_suara)</code></pre>
+<h3 id="fuzzy-1">Pohon ujung ke ujung: dari bahan sampai tindakan</h3>
+<p>Pohon ini membaca dari kiri ke kanan. Bahan mentah masuk ke [FUZZY 1], yang di sini diringkas satu kotak per keluaran; rinciannya ada di <a href="#pohon-kecurigaan">pohon kecurigaan</a> dan <a href="#pohon-ancaman">pohon ancaman</a>. Sesudah itu bot menghitung masukan tegas, menilai calon dengan [FUZZY 2], lalu ambang memilih tindakan.</p>
+<!-- gen:pohon:keputusan -->
+<figure class="pohon" id="pohon-keputusan">
+<div class="pohon-gulir"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 970 680" width="970" height="680" style="width:100%;max-width:970px;min-width:922px" role="group" aria-labelledby="judul-keputusan desk-keputusan">
+<title id="judul-keputusan">Pohon ujung ke ujung: bahan, [FUZZY 1], masukan, [FUZZY 2], ambang, sampai tindakan</title>
+<desc id="desk-keputusan">kecurigaan dari bukti pemain, pengetahuan; ancaman dari fitur Hitman; kambing_hitam dari fitur Hitman; keunggulan dari kecurigaan; tekanan dari bukti pemain; kepercayaan dari kecurigaan, pengetahuan; diam dari chat ronde ini; chat_membingungkan dari chat ronde ini; chat_sepi dari chat ronde ini; risiko_saya dari kecurigaan; suara_saya dari suara Tribunal; warga_terdesak dari pemain hidup; ancaman_sekarang dari fitur Hitman; kurang_info dari bukti pemain; tuduh dari kecurigaan, keunggulan; bela_orang dari tekanan, kepercayaan; ajak_bicara dari diam, kecurigaan; tanya_info dari chat_membingungkan, chat_sepi; h_tuduh dari kambing_hitam, risiko_saya; klaim_palsu dari risiko_saya, suara_saya; keyakinan_vote dari kecurigaan, keunggulan; kesiapan_vote dari keyakinan_vote, warga_terdesak; gag dari ancaman_sekarang, ancaman; intip dari kecurigaan, kurang_info; chat dari ≥ 40; vote dari ≥ 75 / ≥ 45; Gag dari ancaman, ≥ 60; Peek dari tertinggi; ≥ 40 dari tuduh, bela_orang, ajak_bicara, tanya_info, h_tuduh, klaim_palsu; ≥ 75 / ≥ 45 dari kesiapan_vote; ancaman, ≥ 60 dari gag; tertinggi dari intip.</desc>
+<defs><marker id="panah-keputusan" viewBox="0 0 8 8" refX="7.5" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path class="ujung" d="M0,0 L8,4 L0,8 z"/></marker></defs>
+<path class="sisi" d="M128.2,115.0 C139.2,115.0 139.2,198.4 150.2,198.4" marker-end="url(#panah-keputusan)"/>
+<path class="sisi" d="M128.2,240.2 C139.2,240.2 139.2,205.4 150.2,205.4" marker-end="url(#panah-keputusan)"/>
+<path class="sisi" d="M128.2,575.5 C139.2,575.5 139.2,585.0 150.2,585.0" marker-end="url(#panah-keputusan)"/>
+<path class="sisi" d="M128.2,568.5 C139.2,568.5 139.2,526.0 150.2,526.0" marker-end="url(#panah-keputusan)"/>
+<path class="sisi" d="M273.5,195.8 C284.5,195.8 284.5,158.5 295.5,158.5" marker-end="url(#panah-keputusan)"/>
+<path class="sisi" d="M128.2,108.0 C139.2,108.0 139.2,90.5 150.2,90.5 L273.5,90.5 C284.5,90.5 284.5,90.5 295.5,90.5" marker-end="url(#panah-keputusan)"/>
+<path class="sisi" d="M273.5,220.4 C284.5,220.4 284.5,282.0 295.5,282.0" marker-end="url(#panah-keputusan)"/>
+<path class="sisi" d="M128.2,247.2 C139.2,247.2 139.2,285.5 150.2,285.5 L273.5,285.5 C284.5,285.5 284.5,289.0 295.5,289.0" marker-end="url(#panah-keputusan)"/>
+<path class="sisi" d="M128.2,446.8 C139.2,446.8 139.2,403.5 150.2,403.5 L273.5,403.5 C284.5,403.5 284.5,403.5 295.5,403.5" marker-end="url(#panah-keputusan)"/>
+<path class="sisi" d="M128.2,453.8 C139.2,453.8 139.2,462.5 150.2,462.5 L273.5,462.5 C284.5,462.5 284.5,462.5 295.5,462.5" marker-end="url(#panah-keputusan)"/>
+<path class="sisi" d="M128.2,460.8 C139.2,460.8 139.2,495.5 150.2,495.5 L273.5,495.5 C284.5,495.5 284.5,521.5 295.5,521.5" marker-end="url(#panah-keputusan)"/>
+<path class="sisi" d="M273.5,201.9 C284.5,201.9 284.5,217.5 295.5,217.5" marker-end="url(#panah-keputusan)"/>
+<path class="sisi" d="M128.2,344.5 C139.2,344.5 139.2,344.5 150.2,344.5 L273.5,344.5 C284.5,344.5 284.5,344.5 295.5,344.5" marker-end="url(#panah-keputusan)"/>
+<path class="sisi" d="M128.2,648.5 C139.2,648.5 139.2,648.5 150.2,648.5 L273.5,648.5 C284.5,648.5 284.5,648.5 295.5,648.5" marker-end="url(#panah-keputusan)"/>
+<path class="sisi" d="M128.2,582.5 C139.2,582.5 139.2,615.5 150.2,615.5 L273.5,615.5 C284.5,615.5 284.5,589.5 295.5,589.5" marker-end="url(#panah-keputusan)"/>
+<path class="sisi" d="M128.2,101.0 C139.2,101.0 139.2,31.5 150.2,31.5 L273.5,31.5 C284.5,31.5 284.5,31.5 295.5,31.5" marker-end="url(#panah-keputusan)"/>
+<path class="sisi" d="M273.5,189.6 C284.5,189.6 284.5,128.0 295.5,128.0 L459.3,128.0 C470.3,128.0 470.3,132.4 481.3,132.4" marker-end="url(#panah-keputusan)"/>
+<path class="sisi" d="M459.3,155.0 C470.3,155.0 470.3,139.4 481.3,139.4" marker-end="url(#panah-keputusan)"/>
+<path class="sisi" d="M459.3,90.5 C470.3,90.5 470.3,191.4 481.3,191.4" marker-end="url(#panah-keputusan)"/>
+<path class="sisi" d="M459.3,285.5 C470.3,285.5 470.3,198.4 481.3,198.4" marker-end="url(#panah-keputusan)"/>
+<path class="sisi" d="M459.3,403.5 C470.3,403.5 470.3,375.4 481.3,375.4" marker-end="url(#panah-keputusan)"/>
+<path class="sisi" d="M273.5,208.1 C284.5,208.1 284.5,248.0 295.5,248.0 L459.3,248.0 C470.3,248.0 470.3,368.4 481.3,368.4" marker-end="url(#panah-keputusan)"/>
+<path class="sisi" d="M459.3,462.5 C470.3,462.5 470.3,486.4 481.3,486.4" marker-end="url(#panah-keputusan)"/>
+<path class="sisi" d="M459.3,521.5 C470.3,521.5 470.3,493.4 481.3,493.4" marker-end="url(#panah-keputusan)"/>
+<path class="sisi" d="M273.5,526.0 C284.5,526.0 284.5,552.0 295.5,552.0 L459.3,552.0 C470.3,552.0 470.3,434.4 481.3,434.4" marker-end="url(#panah-keputusan)"/>
+<path class="sisi" d="M459.3,221.0 C470.3,221.0 470.3,427.4 481.3,427.4" marker-end="url(#panah-keputusan)"/>
+<path class="sisi" d="M459.3,214.0 C470.3,214.0 470.3,309.4 481.3,309.4" marker-end="url(#panah-keputusan)"/>
+<path class="sisi" d="M459.3,344.5 C470.3,344.5 470.3,316.4 481.3,316.4" marker-end="url(#panah-keputusan)"/>
+<path class="sisi" d="M273.5,214.3 C284.5,214.3 284.5,255.0 295.5,255.0 L459.3,255.0 C470.3,255.0 470.3,257.4 481.3,257.4" marker-end="url(#panah-keputusan)"/>
+<path class="sisi" d="M459.3,162.0 C470.3,162.0 470.3,250.4 481.3,250.4" marker-end="url(#panah-keputusan)"/>
+<path class="sisi" d="M612.7,253.9 C623.7,253.9 623.7,368.4 634.7,368.4" marker-end="url(#panah-keputusan)"/>
+<path class="sisi" d="M459.3,648.5 C470.3,648.5 470.3,579.4 481.3,579.4 L612.7,579.4 C623.7,579.4 623.7,375.4 634.7,375.4" marker-end="url(#panah-keputusan)"/>
+<path class="sisi" d="M459.3,589.5 C470.3,589.5 470.3,552.4 481.3,552.4" marker-end="url(#panah-keputusan)"/>
+<path class="sisi" d="M273.5,585.0 C284.5,585.0 284.5,559.0 295.5,559.0 L459.3,559.0 C470.3,559.0 470.3,545.4 481.3,545.4" marker-end="url(#panah-keputusan)"/>
+<path class="sisi" d="M273.5,183.4 C284.5,183.4 284.5,121.0 295.5,121.0 L459.3,121.0 C470.3,121.0 470.3,66.0 481.3,66.0" marker-end="url(#panah-keputusan)"/>
+<path class="sisi" d="M459.3,31.5 C470.3,31.5 470.3,59.0 481.3,59.0" marker-end="url(#panah-keputusan)"/>
+<path class="sisi" d="M892.9,312.7 C903.9,312.7 903.9,312.7 914.9,312.7" marker-end="url(#panah-keputusan)"/>
+<path class="sisi" d="M892.9,461.5 C903.9,461.5 903.9,461.5 914.9,461.5" marker-end="url(#panah-keputusan)"/>
+<path class="sisi" d="M892.9,609.3 C903.9,609.3 903.9,609.3 914.9,609.3" marker-end="url(#panah-keputusan)"/>
+<path class="sisi" d="M892.9,62.5 C903.9,62.5 903.9,62.5 914.9,62.5" marker-end="url(#panah-keputusan)"/>
+<path class="sisi" d="M612.7,135.9 C623.7,135.9 623.7,298.7 634.7,298.7 L758.0,298.7 C769.0,298.7 769.0,295.2 780.0,295.2" marker-end="url(#panah-keputusan)"/>
+<path class="sisi" d="M612.7,194.9 C623.7,194.9 623.7,305.7 634.7,305.7 L758.0,305.7 C769.0,305.7 769.0,302.2 780.0,302.2" marker-end="url(#panah-keputusan)"/>
+<path class="sisi" d="M612.7,371.9 C623.7,371.9 623.7,319.7 634.7,319.7 L758.0,319.7 C769.0,319.7 769.0,316.2 780.0,316.2" marker-end="url(#panah-keputusan)"/>
+<path class="sisi" d="M612.7,489.9 C623.7,489.9 623.7,402.4 634.7,402.4 L758.0,402.4 C769.0,402.4 769.0,330.2 780.0,330.2" marker-end="url(#panah-keputusan)"/>
+<path class="sisi" d="M612.7,430.9 C623.7,430.9 623.7,326.7 634.7,326.7 L758.0,326.7 C769.0,326.7 769.0,323.2 780.0,323.2" marker-end="url(#panah-keputusan)"/>
+<path class="sisi" d="M612.7,312.9 C623.7,312.9 623.7,312.7 634.7,312.7 L758.0,312.7 C769.0,312.7 769.0,309.2 780.0,309.2" marker-end="url(#panah-keputusan)"/>
+<path class="sisi" d="M758.0,371.9 C769.0,371.9 769.0,461.5 780.0,461.5" marker-end="url(#panah-keputusan)"/>
+<path class="sisi" d="M612.7,548.9 C623.7,548.9 623.7,609.3 634.7,609.3 L758.0,609.3 C769.0,609.3 769.0,609.3 780.0,609.3" marker-end="url(#panah-keputusan)"/>
+<path class="sisi" d="M612.7,62.5 C623.7,62.5 623.7,62.5 634.7,62.5 L758.0,62.5 C769.0,62.5 769.0,62.5 780.0,62.5" marker-end="url(#panah-keputusan)"/>
+<a href="#kecurigaan"><g class="simpul bahan"><rect x="8.0" y="92.5" width="120.2" height="31.0" rx="6"/><text class="teks" x="68.1" y="112.7" text-anchor="middle">bukti pemain</text></g></a>
+<a href="#pengetahuan"><g class="simpul bahan"><rect x="8.0" y="228.2" width="120.2" height="31.0" rx="6"/><text class="teks" x="68.1" y="248.5" text-anchor="middle">pengetahuan</text></g></a>
+<a href="#fitur-hitman"><g class="simpul bahan"><rect x="8.0" y="560.0" width="120.2" height="31.0" rx="6"/><text class="teks" x="68.1" y="580.2" text-anchor="middle">fitur Hitman</text></g></a>
+<a href="#konteks"><g class="simpul bahan"><rect x="8.0" y="438.3" width="120.2" height="31.0" rx="6"/><text class="teks" x="68.1" y="458.6" text-anchor="middle">chat ronde ini</text></g></a>
+<a href="#konteks"><g class="simpul bahan"><rect x="8.0" y="633.0" width="120.2" height="31.0" rx="6"/><text class="teks" x="68.1" y="653.2" text-anchor="middle">pemain hidup</text></g></a>
+<a href="#konteks"><g class="simpul bahan"><rect x="8.0" y="329.0" width="120.2" height="31.0" rx="6"/><text class="teks" x="68.1" y="349.2" text-anchor="middle">suara Tribunal</text></g></a>
+<a href="#kecurigaan"><g class="simpul f1"><rect x="150.2" y="178.4" width="123.3" height="47.0" rx="6"/><text class="kode" x="211.8" y="198.7" text-anchor="middle">kecurigaan</text><text class="sub" x="211.8" y="214.7" text-anchor="middle">pohon bagian 6</text></g></a>
+<a href="#ancaman"><g class="simpul f1"><rect x="150.2" y="561.5" width="123.3" height="47.0" rx="6"/><text class="kode" x="211.8" y="581.8" text-anchor="middle">ancaman</text><text class="sub" x="211.8" y="597.8" text-anchor="middle">pohon bagian 7</text></g></a>
+<a href="#kambing"><g class="simpul f1"><rect x="150.2" y="502.5" width="123.3" height="47.0" rx="6"/><text class="kode" x="211.8" y="522.8" text-anchor="middle">kambing_hitam</text><text class="sub" x="211.8" y="538.8" text-anchor="middle">pohon bagian 7</text></g></a>
+<a href="#f2-tuduh"><g class="simpul tegas"><rect x="295.5" y="135.0" width="163.8" height="47.0" rx="6"/><text class="kode" x="377.4" y="155.2" text-anchor="middle">keunggulan</text><text class="sub" x="377.4" y="171.2" text-anchor="middle">(#1 − #2) ÷ 0,30</text></g></a>
+<a href="#f2-bela-orang"><g class="simpul tegas"><rect x="295.5" y="67.0" width="163.8" height="47.0" rx="6"/><text class="kode" x="377.4" y="87.2" text-anchor="middle">tekanan</text><text class="sub" x="377.4" y="103.2" text-anchor="middle">penuduh ÷ pemain</text></g></a>
+<a href="#f2-bela-orang"><g class="simpul tegas"><rect x="295.5" y="262.0" width="163.8" height="47.0" rx="6"/><text class="kode" x="377.4" y="282.2" text-anchor="middle">kepercayaan</text><text class="sub" x="377.4" y="298.2" text-anchor="middle">0,7(1 − x) atau 1</text></g></a>
+<a href="#f2-ajak-bicara"><g class="simpul tegas"><rect x="295.5" y="380.0" width="163.8" height="47.0" rx="6"/><text class="kode" x="377.4" y="400.2" text-anchor="middle">diam</text><text class="sub" x="377.4" y="416.2" text-anchor="middle">detik ÷ 0,35 siang</text></g></a>
+<a href="#f2-tanya-info"><g class="simpul tegas"><rect x="295.5" y="439.0" width="163.8" height="47.0" rx="6"/><text class="kode" x="377.4" y="459.2" text-anchor="middle">chat_membingungkan</text><text class="sub" x="377.4" y="475.2" text-anchor="middle">tidak jelas ÷ chat</text></g></a>
+<a href="#f2-tanya-info"><g class="simpul tegas"><rect x="295.5" y="498.0" width="163.8" height="47.0" rx="6"/><text class="kode" x="377.4" y="518.2" text-anchor="middle">chat_sepi</text><text class="sub" x="377.4" y="534.2" text-anchor="middle">1 − chat ÷ 4</text></g></a>
+<a href="#f2-h-tuduh"><g class="simpul tegas"><rect x="295.5" y="194.0" width="163.8" height="47.0" rx="6"/><text class="kode" x="377.4" y="214.2" text-anchor="middle">risiko_saya</text><text class="sub" x="377.4" y="230.2" text-anchor="middle">kecurigaan diri</text></g></a>
+<a href="#f2-klaim-palsu"><g class="simpul tegas"><rect x="295.5" y="321.0" width="163.8" height="47.0" rx="6"/><text class="kode" x="377.4" y="341.2" text-anchor="middle">suara_saya</text><text class="sub" x="377.4" y="357.2" text-anchor="middle">suara bot ÷ semua</text></g></a>
+<a href="#f2-kesiapan-vote"><g class="simpul tegas"><rect x="295.5" y="625.0" width="163.8" height="47.0" rx="6"/><text class="kode" x="377.4" y="645.2" text-anchor="middle">warga_terdesak</text><text class="sub" x="377.4" y="661.2" text-anchor="middle">(5 − selisih) ÷ 4</text></g></a>
+<a href="#f2-gag"><g class="simpul tegas"><rect x="295.5" y="566.0" width="163.8" height="47.0" rx="6"/><text class="kode" x="377.4" y="586.2" text-anchor="middle">ancaman_sekarang</text><text class="sub" x="377.4" y="602.2" text-anchor="middle">tuduhan + ½ klaim</text></g></a>
+<a href="#f2-intip"><g class="simpul tegas"><rect x="295.5" y="8.0" width="163.8" height="47.0" rx="6"/><text class="kode" x="377.4" y="28.2" text-anchor="middle">kurang_info</text><text class="sub" x="377.4" y="44.2" text-anchor="middle">e^(−n_info ÷ 4)</text></g></a>
+<a href="#f2-tuduh"><g class="simpul f2"><rect x="481.3" y="112.4" width="131.4" height="47.0" rx="6"/><text class="kode" x="547.0" y="132.7" text-anchor="middle">tuduh</text><text class="sub" x="547.0" y="148.7" text-anchor="middle">warga</text></g></a>
+<a href="#f2-bela-orang"><g class="simpul f2"><rect x="481.3" y="171.4" width="131.4" height="47.0" rx="6"/><text class="kode" x="547.0" y="191.7" text-anchor="middle">bela_orang</text><text class="sub" x="547.0" y="207.7" text-anchor="middle">warga, Hitman</text></g></a>
+<a href="#f2-ajak-bicara"><g class="simpul f2"><rect x="481.3" y="348.4" width="131.4" height="47.0" rx="6"/><text class="kode" x="547.0" y="368.7" text-anchor="middle">ajak_bicara</text><text class="sub" x="547.0" y="384.7" text-anchor="middle">pemain diam</text></g></a>
+<a href="#f2-tanya-info"><g class="simpul f2"><rect x="481.3" y="466.4" width="131.4" height="47.0" rx="6"/><text class="kode" x="547.0" y="486.7" text-anchor="middle">tanya_info</text><text class="sub" x="547.0" y="502.7" text-anchor="middle">ke semua</text></g></a>
+<a href="#f2-h-tuduh"><g class="simpul f2"><rect x="481.3" y="407.4" width="131.4" height="47.0" rx="6"/><text class="kode" x="547.0" y="427.7" text-anchor="middle">h_tuduh</text><text class="sub" x="547.0" y="443.7" text-anchor="middle">Hitman</text></g></a>
+<a href="#f2-klaim-palsu"><g class="simpul f2"><rect x="481.3" y="289.4" width="131.4" height="47.0" rx="6"/><text class="kode" x="547.0" y="309.7" text-anchor="middle">klaim_palsu</text><text class="sub" x="547.0" y="325.7" text-anchor="middle">Hitman</text></g></a>
+<a href="#f2-keyakinan-vote"><g class="simpul f2"><rect x="481.3" y="230.4" width="131.4" height="47.0" rx="6"/><text class="kode" x="547.0" y="250.7" text-anchor="middle">keyakinan_vote</text><text class="sub" x="547.0" y="266.7" text-anchor="middle">vote warga</text></g></a>
+<a href="#f2-kesiapan-vote"><g class="simpul f2"><rect x="634.7" y="348.4" width="123.3" height="47.0" rx="6"/><text class="kode" x="696.3" y="368.6" text-anchor="middle">kesiapan_vote</text><text class="sub" x="696.3" y="384.6" text-anchor="middle">vote warga</text></g></a>
+<a href="#f2-gag"><g class="simpul f2"><rect x="481.3" y="525.4" width="131.4" height="47.0" rx="6"/><text class="kode" x="547.0" y="545.7" text-anchor="middle">gag</text><text class="sub" x="547.0" y="561.7" text-anchor="middle">Hitman, siang</text></g></a>
+<a href="#f2-intip"><g class="simpul f2"><rect x="481.3" y="39.0" width="131.4" height="47.0" rx="6"/><text class="kode" x="547.0" y="59.2" text-anchor="middle">intip</text><text class="sub" x="547.0" y="75.2" text-anchor="middle">Stalker</text></g></a>
+<a href="#urutan-ambang"><g class="simpul ambang"><rect x="780.0" y="289.2" width="112.9" height="47.0" rx="6"/><text class="teks" x="836.4" y="309.5" text-anchor="middle">≥ 40</text><text class="sub" x="836.4" y="325.5" text-anchor="middle">keputusan_chat</text></g></a>
+<a href="#memilih"><g class="simpul aksi"><rect x="914.9" y="297.2" width="47.2" height="31.0" rx="6"/><text class="teks" x="938.5" y="317.5" text-anchor="middle">chat</text></g></a>
+<a href="#urutan-ambang"><g class="simpul ambang"><rect x="780.0" y="438.0" width="112.9" height="47.0" rx="6"/><text class="teks" x="836.4" y="458.2" text-anchor="middle">≥ 75 / ≥ 45</text><text class="sub" x="836.4" y="474.2" text-anchor="middle">keputusan_vote</text></g></a>
+<a href="#vote-warga"><g class="simpul aksi"><rect x="914.9" y="446.0" width="47.2" height="31.0" rx="6"/><text class="teks" x="938.5" y="466.2" text-anchor="middle">vote</text></g></a>
+<a href="#urutan-ambang"><g class="simpul ambang"><rect x="780.0" y="585.8" width="112.9" height="47.0" rx="6"/><text class="teks" x="836.4" y="606.0" text-anchor="middle">ancaman, ≥ 60</text><text class="sub" x="836.4" y="622.0" text-anchor="middle">pilih_gag</text></g></a>
+<a href="#gag"><g class="simpul aksi"><rect x="914.9" y="593.8" width="47.2" height="31.0" rx="6"/><text class="teks" x="938.5" y="614.0" text-anchor="middle">Gag</text></g></a>
+<a href="#urutan-ambang"><g class="simpul ambang"><rect x="780.0" y="39.0" width="112.9" height="47.0" rx="6"/><text class="teks" x="836.4" y="59.2" text-anchor="middle">tertinggi</text><text class="sub" x="836.4" y="75.2" text-anchor="middle">keputusan_aksi</text></g></a>
+<a href="#peek"><g class="simpul aksi"><rect x="914.9" y="47.0" width="47.2" height="31.0" rx="6"/><text class="teks" x="938.5" y="67.2" text-anchor="middle">Peek</text></g></a>
+</svg></div>
+<figcaption><span><span class="pohon-tanda bahan"></span>bahan mentah</span><span><span class="pohon-tanda tegas"></span>olahan tegas</span><span><span class="pohon-tanda f1"></span>[FUZZY 1]</span><span><span class="pohon-tanda f2"></span>[FUZZY 2]</span><span><span class="pohon-tanda ambang"></span>ambang dan aturan pilih</span><span><span class="pohon-tanda aksi"></span>tindakan</span><span class="kecil">Kotak bisa diklik ke penjelasannya.</span></figcaption>
+</figure>
+<!-- /gen -->
+<p>Sebagian tindakan tidak lewat [FUZZY 2]. Tindakan langsung dikirim begitu pemicunya ada, dan tindakan bernilai memakai rumus biasa:</p>
+<!-- gen:pohon:tanpa-fuzzy -->
+<figure class="pohon" id="pohon-tanpa-fuzzy">
+<div class="pohon-gulir"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 485 428" width="485" height="428" style="width:100%;max-width:485px;min-width:461px" role="group" aria-labelledby="judul-tanpa-fuzzy desk-tanpa-fuzzy">
+<title id="judul-tanpa-fuzzy">Cabang tanpa fuzzy: aksi langsung dan aksi bernilai tanpa sistem fuzzy</title>
+<desc id="desk-tanpa-fuzzy">chat_pasti dari hasil Peek Hitman; chat dari chat_pasti, bela_diri, jawab, calon_gali; vote_pasti dari hasil Peek Hitman; vote dari vote_pasti; bela_diri dari tuduhan baru ke bot; jawab dari pertanyaan ke bot; calon_gali dari kecurigaan; nilai_hostage dari ancaman, jejak_tuduhan; Hostage dari nilai_hostage; calon_guard dari terancam; Guard dari calon_guard.</desc>
+<defs><marker id="panah-tanpa-fuzzy" viewBox="0 0 8 8" refX="7.5" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path class="ujung" d="M0,0 L8,4 L0,8 z"/></marker></defs>
+<path class="sisi" d="M164.7,64.5 C175.7,64.5 175.7,90.5 186.7,90.5" marker-end="url(#panah-tanpa-fuzzy)"/>
+<path class="sisi" d="M385.6,90.5 C396.6,90.5 396.6,168.5 407.6,168.5" marker-end="url(#panah-tanpa-fuzzy)"/>
+<path class="sisi" d="M164.7,57.5 C175.7,57.5 175.7,31.5 186.7,31.5" marker-end="url(#panah-tanpa-fuzzy)"/>
+<path class="sisi" d="M385.6,31.5 C396.6,31.5 396.6,31.5 407.6,31.5" marker-end="url(#panah-tanpa-fuzzy)"/>
+<path class="sisi" d="M164.7,149.5 C175.7,149.5 175.7,149.5 186.7,149.5" marker-end="url(#panah-tanpa-fuzzy)"/>
+<path class="sisi" d="M385.6,149.5 C396.6,149.5 396.6,175.5 407.6,175.5" marker-end="url(#panah-tanpa-fuzzy)"/>
+<path class="sisi" d="M164.7,208.5 C175.7,208.5 175.7,208.5 186.7,208.5" marker-end="url(#panah-tanpa-fuzzy)"/>
+<path class="sisi" d="M385.6,208.5 C396.6,208.5 396.6,182.5 407.6,182.5" marker-end="url(#panah-tanpa-fuzzy)"/>
+<path class="sisi" d="M164.7,267.5 C175.7,267.5 175.7,267.5 186.7,267.5" marker-end="url(#panah-tanpa-fuzzy)"/>
+<path class="sisi" d="M385.6,267.5 C396.6,267.5 396.6,189.5 407.6,189.5" marker-end="url(#panah-tanpa-fuzzy)"/>
+<path class="sisi" d="M164.7,310.5 C175.7,310.5 175.7,328.5 186.7,328.5" marker-end="url(#panah-tanpa-fuzzy)"/>
+<path class="sisi" d="M164.7,353.5 C175.7,353.5 175.7,335.5 186.7,335.5" marker-end="url(#panah-tanpa-fuzzy)"/>
+<path class="sisi" d="M385.6,332.0 C396.6,332.0 396.6,332.0 407.6,332.0" marker-end="url(#panah-tanpa-fuzzy)"/>
+<path class="sisi" d="M164.7,396.5 C175.7,396.5 175.7,396.5 186.7,396.5" marker-end="url(#panah-tanpa-fuzzy)"/>
+<path class="sisi" d="M385.6,396.5 C396.6,396.5 396.6,396.5 407.6,396.5" marker-end="url(#panah-tanpa-fuzzy)"/>
+<a href="#peek"><g class="simpul bahan"><rect x="8.0" y="45.5" width="156.7" height="31.0" rx="6"/><text class="teks" x="86.3" y="65.8" text-anchor="middle">hasil Peek Hitman</text></g></a>
+<a href="#bela-diri"><g class="simpul bahan"><rect x="8.0" y="134.0" width="156.7" height="31.0" rx="6"/><text class="teks" x="86.3" y="154.2" text-anchor="middle">tuduhan baru ke bot</text></g></a>
+<a href="#jawab"><g class="simpul bahan"><rect x="8.0" y="193.0" width="156.7" height="31.0" rx="6"/><text class="teks" x="86.3" y="213.2" text-anchor="middle">pertanyaan ke bot</text></g></a>
+<a href="#kecurigaan"><g class="simpul f1"><rect x="8.0" y="252.0" width="156.7" height="31.0" rx="6"/><text class="kode" x="86.3" y="272.2" text-anchor="middle">kecurigaan</text></g></a>
+<a href="#ancaman"><g class="simpul f1"><rect x="8.0" y="295.0" width="156.7" height="31.0" rx="6"/><text class="kode" x="86.3" y="315.2" text-anchor="middle">ancaman</text></g></a>
+<a href="#hostage"><g class="simpul tegas"><rect x="8.0" y="338.0" width="156.7" height="31.0" rx="6"/><text class="kode" x="86.3" y="358.2" text-anchor="middle">jejak_tuduhan</text></g></a>
+<a href="#fitur-spy"><g class="simpul tegas"><rect x="8.0" y="381.0" width="156.7" height="31.0" rx="6"/><text class="kode" x="86.3" y="401.2" text-anchor="middle">terancam</text></g></a>
+<a href="#dua-jenis"><g class="simpul ambang"><rect x="186.7" y="67.0" width="198.9" height="47.0" rx="6"/><text class="kode" x="286.1" y="87.2" text-anchor="middle">chat_pasti</text><text class="sub" x="286.1" y="103.2" text-anchor="middle">langsung</text></g></a>
+<a href="#vote-warga"><g class="simpul ambang"><rect x="186.7" y="8.0" width="198.9" height="47.0" rx="6"/><text class="kode" x="286.1" y="28.2" text-anchor="middle">vote_pasti</text><text class="sub" x="286.1" y="44.2" text-anchor="middle">langsung</text></g></a>
+<a href="#bela-diri"><g class="simpul ambang"><rect x="186.7" y="126.0" width="198.9" height="47.0" rx="6"/><text class="kode" x="286.1" y="146.2" text-anchor="middle">bela_diri</text><text class="sub" x="286.1" y="162.2" text-anchor="middle">langsung</text></g></a>
+<a href="#jawab"><g class="simpul ambang"><rect x="186.7" y="185.0" width="198.9" height="47.0" rx="6"/><text class="kode" x="286.1" y="205.2" text-anchor="middle">jawab</text><text class="sub" x="286.1" y="221.2" text-anchor="middle">langsung</text></g></a>
+<a href="#tanya"><g class="simpul ambang"><rect x="186.7" y="244.0" width="198.9" height="47.0" rx="6"/><text class="kode" x="286.1" y="264.2" text-anchor="middle">calon_gali</text><text class="sub" x="286.1" y="280.2" text-anchor="middle">bila semua &lt; 40</text></g></a>
+<a href="#hostage"><g class="simpul tegas"><rect x="186.7" y="308.5" width="198.9" height="47.0" rx="6"/><text class="kode" x="286.1" y="328.7" text-anchor="middle">nilai_hostage</text><text class="sub" x="286.1" y="344.7" text-anchor="middle">ancaman × (1 − 0,5 × jejak)</text></g></a>
+<a href="#guard"><g class="simpul ambang"><rect x="186.7" y="373.0" width="198.9" height="47.0" rx="6"/><text class="kode" x="286.1" y="393.2" text-anchor="middle">calon_guard</text><text class="sub" x="286.1" y="409.2" text-anchor="middle">terancam tertinggi</text></g></a>
+<a href="#memilih"><g class="simpul aksi"><rect x="407.6" y="163.5" width="69.1" height="31.0" rx="6"/><text class="teks" x="442.2" y="183.8" text-anchor="middle">chat</text></g></a>
+<a href="#vote-warga"><g class="simpul aksi"><rect x="407.6" y="16.0" width="69.1" height="31.0" rx="6"/><text class="teks" x="442.2" y="36.2" text-anchor="middle">vote</text></g></a>
+<a href="#hostage"><g class="simpul aksi"><rect x="407.6" y="316.5" width="69.1" height="31.0" rx="6"/><text class="teks" x="442.2" y="336.7" text-anchor="middle">Hostage</text></g></a>
+<a href="#guard"><g class="simpul aksi"><rect x="407.6" y="381.0" width="69.1" height="31.0" rx="6"/><text class="teks" x="442.2" y="401.2" text-anchor="middle">Guard</text></g></a>
+</svg></div>
+<figcaption><span><span class="pohon-tanda bahan"></span>bahan mentah</span><span><span class="pohon-tanda tegas"></span>olahan tegas</span><span><span class="pohon-tanda f1"></span>[FUZZY 1]</span><span><span class="pohon-tanda ambang"></span>ambang dan aturan pilih</span><span><span class="pohon-tanda aksi"></span>tindakan</span><span class="kecil">Kotak bisa diklik ke penjelasannya.</span></figcaption>
+</figure>
+<!-- /gen -->
 <ul>
 <li><code>jejak_kedua</code> = nilai terbesar dari <code>ikut_salah_eksekusi</code> dan <code>memihak_hitman</code>, karena setiap sistem hanya punya dua input.</li>
 <!-- fase9: klaim dari pemain yang sudah terbukti Hitman dianggap pasti bohong -->
@@ -996,25 +1202,12 @@ kambing_hitam ← kambing          (kecurigaan_publik, dukungan_suara)</code></p
 <tr><td rowspan="3">Nilai tanpa fuzzy</td><td><code>hostage</code></td><td><code>nilai_hostage</code> = ancaman × (1 − 0,5 × jejak_tuduhan), tertinggi dipilih</td></tr>
 <tr><td><code>guard</code></td><td>Nilai = <code>terancam</code>, tertinggi di antara orang yang diyakini baik</td></tr>
 <tr><td>gali tersangka (<code>calon_gali</code>)</td><td>Cadangan tanpa nilai bila semua chat [FUZZY 2] di bawah 40</td></tr>
-<tr><td>Lewat [FUZZY 2]</td><td>tuduh, bela orang, tanya, ajak bicara, chat Hitman, vote warga, Gag, Peek</td><td>Pohon di bawah</td></tr>
+<tr><td>Lewat [FUZZY 2]</td><td>tuduh, bela orang, tanya, ajak bicara, chat Hitman, vote warga, Gag, Peek</td><td><a href="#fuzzy-1">Pohon ujung ke ujung</a></td></tr>
 </table></div>
 <p>Vote Hitman (<code>keputusan_vote_hitman</code>), pindah suara saat seri (<code>keputusan_pindah_vote</code>), dan vote paksa saat warga kritis (<code>pertahanan_suara</code>) juga memakai aturan berurutan tanpa fuzzy; rinciannya di <a href="#vote-hitman">bagian 5</a>.</p>
 
-<h3 id="fuzzy-2">Pohon [FUZZY 2]: menilai calon tindakan</h3>
-<pre><code>[FUZZY 2] satu nilai 0–100 per calon
-CHAT WARGA   tuduh          (kecurigaan, keunggulan)
-             bela_orang     (tekanan, kepercayaan)
-             ajak_bicara    (diam, kecurigaan)              → tanya_info pemain diam
-             tanya_info     (chat_membingungkan, chat_sepi)
-CHAT HITMAN  h_tuduh        (kambing_hitam, risiko_saya)
-             klaim_palsu    (risiko_saya, suara_saya)       → klaim Peek palsu
-             bela_orang     (tekanan, kepercayaan)          → membela rekan
-TRIBUNAL     ajak vote memakai tuduh (warga) atau h_tuduh (Hitman)
-VOTE WARGA   keyakinan_vote (kecurigaan, keunggulan)
-               → kesiapan_vote (keyakinan, warga_terdesak)
-AKSI         gag            (ancaman_sekarang, ancaman)     Hitman, siang
-             intip          (kecurigaan, kurang_info)       Stalker, Peek</code></pre>
-<p>Masukan yang bukan hasil [FUZZY 1], misalnya <code>keunggulan</code>, <code>kepercayaan</code>, dan <code>kurang_info</code>, dihitung saat bot menyusun calon. Rumusnya ada di bagian <strong>Hitungan masukan</strong> setiap sistem di bawah. Masukan yang dipakai beberapa sistem hanya dijelaskan di sistem pertama yang memakainya.</p>
+<h3 id="fuzzy-2">Masukan [FUZZY 2]</h3>
+<p>Setiap sistem [FUZZY 2] memberi satu nilai 0–100 per calon. Di Tribunal, ajak vote memakai <code>tuduh</code> untuk warga dan <code>h_tuduh</code> untuk Hitman. Masukan yang bukan hasil [FUZZY 1], misalnya <code>keunggulan</code>, <code>kepercayaan</code>, dan <code>kurang_info</code>, dihitung saat bot menyusun calon. Rumusnya ada di bagian <strong>Hitungan masukan</strong> setiap sistem di bawah. Masukan yang dipakai beberapa sistem hanya dijelaskan di sistem pertama yang memakainya.</p>
 
 <h3 id="kurva-output">Kurva output</h3>
 <p>Kurva input [FUZZY 2] sama dengan [FUZZY 1], jadi tabel derajatnya cukup dilihat di <a href="#kurva">bagian 6</a>. Kurva output berupa tiga segitiga pada sumbu 0–100 (<code>MF_OUTPUT</code>):</p>
@@ -1280,7 +1473,7 @@ AKSI         gag            (ancaman_sekarang, ancaman)     Hitman, siang
 <li><strong>Cek tabel aturan</strong> (<code>kambing_hitam</code> + <code>risiko_saya</code>): sedang + rendah → rendah 0,55; tinggi + rendah → sedang 0,45; sedang + sedang → sedang 0,33; tinggi + sedang → tinggi 0,33. Terkuat per kata: rendah 0,55, sedang 0,45, tinggi 0,33.</li>
 <li><strong>Hasil:</strong> 45,8, lolos ambang 40.</li>
 <!-- /gen -->
-<li><strong>Dikirim ke:</strong> <code>keputusan_chat</code>, sebagai <code>tuduh</code> jenis <code>pelintir_bukti</code> ke Eko, dengan ambang 40. <code>calon_tuduh_hitman</code> hanya membuat satu calon, yaitu jenis pertama yang cocok (serang korban Gag, balik tuduh, lalu pelintir bukti), jadi hanya calon itu yang dinilai. Di Tribunal, sistem ini juga menilai ajak vote Hitman.</li>
+<li><strong>Dikirim ke:</strong> <code>keputusan_chat</code>, sebagai <code>tuduh</code> jenis <code>pelintir_bukti</code> ke Eko, dengan ambang 40. Sejak perbaikan 7 November, <code>calon_tuduh_hitman</code> membuat satu calon untuk setiap jenis yang syaratnya cocok (serang korban Gag, balik tuduh, pelintir bukti), lalu semuanya dinilai <code>h_tuduh</code> dan yang tertinggi di atas ambang dipakai. Bila nilainya sama, urutan jenis tadi yang memutus. Sebelumnya hanya jenis pertama yang cocok yang dinilai, sehingga pelintir bukti ke kambing hitam kuat bisa tidak pernah terpilih. Di Tribunal, sistem ini juga menilai ajak vote Hitman.</li>
 </ol>
 <p><strong>Hitungan masukan:</strong></p>
 <ul>
