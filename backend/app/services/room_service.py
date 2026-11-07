@@ -22,7 +22,7 @@ import secrets
 import threading
 from app.config.database import SessionLocal
 from app.models import auth_queries
-from app.module.match_engine import Match, label_unik, phase_durations
+from app.game.match_engine import Match, label_unik, phase_durations
 from app.services.activity_service import activity, traced
 from app.services.persistence_service import PersistenceError, PersistenceService
 

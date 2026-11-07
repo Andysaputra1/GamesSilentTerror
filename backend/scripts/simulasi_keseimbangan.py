@@ -1,13 +1,12 @@
 """Simulasi keseimbangan komposisi role dengan aturan engine terbaru.
 
-Semua kursi bot otak Fuzzy hasil ekspor notebook label NLU sempurna dari rencana
+Semua kursi bot memakai otak Fuzzy di app/bot/fuzzy.py, label NLU sempurna dari rencana
 pengirim, LANGKAH keputusan per fase, engine Match asli. Angka lama di GAME_CONCEPT diukur dengan metode campuran.
 
 Pemakaian (dari folder backend, Python dengan numpy + pandas, mis. venv prethesis):
     python scripts/simulasi_keseimbangan.py . 200 6 "7:2/2/1" "8:2/2/1"
 """
 
-import importlib.util
 import math
 import os
 import random
@@ -17,22 +16,12 @@ from pathlib import Path
 
 BACKEND = Path(sys.argv[1]).resolve()
 sys.path.insert(0, str(BACKEND))
-from app.module import match_engine  # noqa: E402
+from app.bot import fuzzy as modul  # noqa: E402
+from app.bot import nlg  # noqa: E402  (hanya templat chat tim, tanpa LLM)
+from app.game import match_engine  # noqa: E402
 
 NAMA = ["NOX", "ECHO", "VEIL", "RAVEN", "ASH", "DUSK", "IRIS", "SAGE", "ONYX", "LARK"]
 RONDE_MAKS = 30
-
-
-def muat(nama):
-    berkas = BACKEND / "app" / "module" / "npc_brain" / "generated" / f"{nama}.py"
-    spec = importlib.util.spec_from_file_location(f"sim_{nama}", berkas)
-    modul = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(modul)
-    return modul
-
-
-modul = muat("otak_fuzzy")
-nlg = muat("nlg")  # templat chat tim, tanpa LLM
 # Paling banyak separuh core, supaya mesin tetap bisa dipakai. SIM_PROSES boleh menurunkannya lagi.
 PROSES = max(1, min(int(os.environ.get("SIM_PROSES", "64")), (os.cpu_count() or 2) // 2))
 

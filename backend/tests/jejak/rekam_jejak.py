@@ -31,12 +31,12 @@ from unittest.mock import patch
 BACKEND = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(BACKEND))
 
-from app.module import match_engine  # noqa: E402
-from app.module.npc_brain.generated import nlg, otak_fuzzy as fuzzy  # noqa: E402
-from app.module.npc_brain.runtime import BrainRuntime, NLUBersama  # noqa: E402
+from app.game import match_engine  # noqa: E402
+from app.bot import fuzzy, nlg  # noqa: E402
+from app.bot.runtime import BrainRuntime, NLUBersama  # noqa: E402
 from tests.nlu_palsu import NLUPalsu  # noqa: E402
 
-LETAK_ENGINE = "app.module.match_engine"
+LETAK_ENGINE = "app.game.match_engine"
 SIDIK = Path(__file__).with_name("sidik.json")
 NAMA_BOT = ["NOX", "ECHO", "VEIL", "RAVEN", "ASH", "DUSK", "IRIS", "SAGE", "ONYX", "LARK"]
 RONDE_MAKS = 30

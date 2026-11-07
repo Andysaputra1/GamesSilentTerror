@@ -3,7 +3,7 @@
 import unittest
 import unittest.mock
 
-from app.module.match_engine import (
+from app.game.match_engine import (
     PREPARATION_MAX_SECONDS,
     PREPARATION_MIN_SECONDS,
     PREPARATION_COUNTDOWN_SECONDS,
@@ -90,7 +90,7 @@ class PreparationTests(unittest.TestCase):
 
     def test_late_ai_countdown_never_exceeds_maximum_wait(self):
         self.match.mark_ai_ready(now=PREPARATION_MAX_SECONDS - 3)
-        with unittest.mock.patch("app.module.match_engine.time.time", return_value=PREPARATION_MAX_SECONDS - 3):
+        with unittest.mock.patch("app.game.match_engine.time.time", return_value=PREPARATION_MAX_SECONDS - 3):
             self.assertEqual(self.match.snapshot("alice")["preparation"]["starts_in"], 3)
         self.match.tick(PREPARATION_MAX_SECONDS)
         self.assertEqual(self.match.phase, "day")
@@ -106,7 +106,7 @@ class PreparationTests(unittest.TestCase):
     def test_unopened_cards_do_not_extend_the_shared_countdown(self):
         self.match.mark_ai_ready(now=2.0)
         self.match.tick(30.0)
-        with unittest.mock.patch("app.module.match_engine.time.time", return_value=30.0):
+        with unittest.mock.patch("app.game.match_engine.time.time", return_value=30.0):
             view = self.match.snapshot("alice")["preparation"]
         self.assertFalse(view["revealed"])
         self.assertEqual(view["starts_in"], 10)
@@ -120,7 +120,7 @@ class PreparationTests(unittest.TestCase):
         self.match.reveal_role("alice", now=3.0)
         self.match.reveal_role("bob", now=35.0)
         self.assertEqual(self.match.phase, "preparing")
-        with unittest.mock.patch("app.module.match_engine.time.time", return_value=35.0):
+        with unittest.mock.patch("app.game.match_engine.time.time", return_value=35.0):
             self.assertEqual(self.match.snapshot("bob")["preparation"]["starts_in"], 5)
         self.match.tick(40.0)
         self.assertEqual(self.match.phase, "day")

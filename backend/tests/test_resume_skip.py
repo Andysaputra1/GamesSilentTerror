@@ -7,7 +7,7 @@ from fastapi import FastAPI, Header
 from fastapi.testclient import TestClient
 from app.controllers.rooms import router
 from app.middleware.auth import require_authenticated_user
-from app.module.match_engine import Match
+from app.game.match_engine import Match
 from app.services.room_service import RoomService
 
 

@@ -64,7 +64,7 @@ class CheckerService:
     # RINGKASAN ROOM (panel): status pertandingan, komposisi role, dan identitas setiap bot.
     # Bot diambil dari pertandingan live, lalu dari penjelasan di jejak, lalu tabel match_bots (arsip).
     def ringkasan_room(self, code, traces=()):
-        from app.module.npc_brain.runtime import brain_runtime
+        from app.bot.runtime import brain_runtime
         from app.services.room_service import room_service
 
         ringkasan = {"kode": code, "status": "arsip", "fase": None, "ronde": None,

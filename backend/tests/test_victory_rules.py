@@ -3,7 +3,7 @@
 import random
 import unittest
 
-from app.module.match_engine import Match
+from app.game.match_engine import Match
 from app.services.room_service import RoomService
 
 

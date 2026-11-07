@@ -6,10 +6,10 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
 
-from app.module.match_engine import Match
-from app.module.npc_brain.generated import nlg, otak_fuzzy
-from app.module.npc_brain.penjelasan import jelaskan
-from app.module.npc_service import NPCService, pindahkan_vote
+from app.game.match_engine import Match
+from app.bot import fuzzy, nlg
+from app.bot.penjelasan import jelaskan
+from app.bot.bot_controller import NPCService, pindahkan_vote
 from app.services.room_service import RoomService
 from tests.test_npc_brain import runtime_siap
 
@@ -45,9 +45,9 @@ class VotePaksaTests(unittest.TestCase):
         game = tribunal()
         game.players["warga3"].alive = False
         game.players["warga2"].hostage, game.players["warga2"].hostage_round = True, 2
-        ingatan = otak_fuzzy.Ingatan("warga1")
+        ingatan = fuzzy.Ingatan("warga1")
         view = ingatan.sinkron_snapshot(game.snapshot("warga1"), detik)
-        return game, ingatan, view, otak_fuzzy.putuskan(ingatan, view)
+        return game, ingatan, view, fuzzy.putuskan(ingatan, view)
 
     def test_critical_citizen_votes_and_the_engine_accepts_it(self):
         game, _, _, hasil = self.langkah_kritis(60.0)
@@ -60,7 +60,7 @@ class VotePaksaTests(unittest.TestCase):
     def test_panel_explains_forced_vote(self):
         _, _, view, hasil = self.langkah_kritis(60.0)
         bot = SimpleNamespace(nama="warga1", metode="fuzzy", persona="santai", peran="civilian", langkah=1)
-        p = jelaskan(bot, otak_fuzzy, view, hasil)
+        p = jelaskan(bot, fuzzy, view, hasil)
         self.assertTrue(p["keputusan"]["vote"]["paksa"])
         self.assertIn("PAKSA_VOTE_KRITIS", p["penalaran"]["vote"]["catatan"])
 
@@ -74,11 +74,11 @@ class PindahSuaraOtakTests(unittest.TestCase):
     # warga3 pernah vote warga1, jadi menurut warga1 ia lebih dicurigai daripada warga2 yang sudah dipilihnya. Suara warga1 dan spy seri.
     def waktu_tambahan(self, suara_warga1="warga2"):
         game = tribunal()
-        ingatan = otak_fuzzy.Ingatan("warga1")
+        ingatan = fuzzy.Ingatan("warga1")
         view = ingatan.sinkron_snapshot(game.snapshot("warga1"), 1.0)
         ingatan.catat_vote(2, "warga3", "warga1")
         game.vote("warga1", suara_warga1)
-        ingatan.catat_vote_bot(view, otak_fuzzy.rencana_vote("vote", suara_warga1, ["pilihan awal"]))
+        ingatan.catat_vote_bot(view, fuzzy.rencana_vote("vote", suara_warga1, ["pilihan awal"]))
         game.vote("spy", "stalker")
         game.npc_decisions = {(3, "tribunal", nama) for nama in ENAM}
         game.tick(game.deadline)
@@ -87,7 +87,7 @@ class PindahSuaraOtakTests(unittest.TestCase):
 
     def langkah(self, game, ingatan):
         view = ingatan.sinkron_snapshot(game.snapshot("warga1"), game.deadline - 5)
-        return view, otak_fuzzy.putuskan(ingatan, view)
+        return view, fuzzy.putuskan(ingatan, view)
 
     def test_bot_moves_once_to_a_stronger_target(self):
         game, ingatan = self.waktu_tambahan()
@@ -118,7 +118,7 @@ class PindahSuaraOtakTests(unittest.TestCase):
         game, ingatan = self.waktu_tambahan()
         view, hasil = self.langkah(game, ingatan)
         bot = SimpleNamespace(nama="warga1", metode="fuzzy", persona="santai", peran="civilian", langkah=1)
-        p = jelaskan(bot, otak_fuzzy, view, hasil)
+        p = jelaskan(bot, fuzzy, view, hasil)
         self.assertTrue(p["keputusan"]["vote"]["pindah"])
         self.assertIn("dipindah", p["penalaran"]["vote"]["catatan"])
 
@@ -154,9 +154,9 @@ class KirimPindahTests(unittest.IsolatedAsyncioTestCase):
         self.rooms.start(self.room.code, "human")
         self.match = self.room.match
         self.service = NPCService(Mock(emit=AsyncMock()), runtime=self.runtime)
-        self.enterContext(patch("app.module.npc_service.room_service", self.rooms))
-        self.enterContext(patch("app.module.npc_service.PersistenceService"))
-        self.enterContext(patch("app.module.npc_service.survey_service"))
+        self.enterContext(patch("app.bot.bot_controller.room_service", self.rooms))
+        self.enterContext(patch("app.bot.bot_controller.PersistenceService"))
+        self.enterContext(patch("app.bot.bot_controller.survey_service"))
         await self.service.prepare(self.room.code, self.match)
         self.match.begin()
         self.match.round, self.match.phase = 2, "tribunal"

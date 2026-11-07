@@ -1,19 +1,18 @@
-"""Otak NPC hasil ekspor notebook: multi-bot melawan engine asli, NPCService, dan kesesuaian dengan notebook.
+"""Otak NPC di app/bot: multi-bot melawan engine asli dan NPCService.
 
 NLU memakai pengganti deterministik (tanpa IndoBERT) agar test cepat dan tidak butuh model.
 """
 
 import asyncio
 import contextlib
-import json
 import random
 import time
 import unittest
 from unittest.mock import AsyncMock, Mock, patch
 
-from app.module.match_engine import Match
-from app.module.npc_brain.runtime import BrainRuntime, NLUBersama
-from app.module.npc_service import LANTAI_MAKS, NPCService, catat_nlu
+from app.game.match_engine import Match
+from app.bot.runtime import BrainRuntime, NLUBersama
+from app.bot.bot_controller import LANTAI_MAKS, NPCService, catat_nlu
 from app.services.persistence_service import PersistenceError
 from app.services.room_service import RoomService
 from tests.nlu_palsu import NLUPalsu
@@ -51,17 +50,17 @@ class BrainRuntimeTests(unittest.TestCase):
         self.runtime.lupakan_kecuali(set())
         self.assertIsNone(self.runtime.otak_bot(match.id, "NOX"))
 
-    def test_removed_systems_and_action_stay_out_of_the_generated_modules(self):
-        from app.module.npc_brain.generated import nlg, otak_fuzzy
+    def test_removed_systems_and_action_stay_out_of_the_bot_modules(self):
+        from app.bot import fuzzy, nlg
 
-        self.assertEqual(len(otak_fuzzy.SEMUA_SISTEM), 21)
+        self.assertEqual(len(fuzzy.SEMUA_SISTEM), 21)
         dihapus = "bela_diri h_bela_diri jawab h_jawab info_sandera sandera lindung".split()
-        self.assertFalse(set(dihapus) & set(otak_fuzzy.SEMUA_SISTEM))
+        self.assertFalse(set(dihapus) & set(fuzzy.SEMUA_SISTEM))
         self.assertEqual(
-            otak_fuzzy.URUTAN_AKSI, ["bela_diri", "jawab", "bela_orang", "tuduh", "tanya_info"]
+            fuzzy.URUTAN_AKSI, ["bela_diri", "jawab", "bela_orang", "tuduh", "tanya_info"]
         )
-        self.assertEqual(set(otak_fuzzy.INTENT_AKSI), set(otak_fuzzy.URUTAN_AKSI))
-        self.assertLessEqual({"ajak_bicara", "klaim_palsu"}, set(otak_fuzzy.SEMUA_SISTEM))
+        self.assertEqual(set(fuzzy.INTENT_AKSI), set(fuzzy.URUTAN_AKSI))
+        self.assertLessEqual({"ajak_bicara", "klaim_palsu"}, set(fuzzy.SEMUA_SISTEM))
         lama = {"ungkap", "klaim_palsu", "info_sandera", "ajak_bicara"}
         self.assertFalse(lama & set(nlg.VARIASI))
         self.assertFalse(lama & set(nlg.MAKSUD_AKSI))
@@ -250,11 +249,11 @@ class NPCServiceBrainTests(unittest.IsolatedAsyncioTestCase):
         self.match = self.room.match
         self.sio = Mock(emit=AsyncMock())
         self.service = NPCService(self.sio, runtime=self.runtime)
-        self.enterContext(patch("app.module.npc_service.room_service", self.rooms))
+        self.enterContext(patch("app.bot.bot_controller.room_service", self.rooms))
         self.persistence = self.enterContext(
-            patch("app.module.npc_service.PersistenceService")
+            patch("app.bot.bot_controller.PersistenceService")
         ).return_value
-        self.survey = self.enterContext(patch("app.module.npc_service.survey_service"))
+        self.survey = self.enterContext(patch("app.bot.bot_controller.survey_service"))
 
     async def asyncTearDown(self):
         await self.service.close()
@@ -289,7 +288,7 @@ class NPCServiceBrainTests(unittest.IsolatedAsyncioTestCase):
         with self.rooms.lock:
             self.match.add_message("human", "Aku curiga NOX, dia Hitman. Ayo vote NOX!")
         self.match.deadline = time.time() + 60
-        with patch("app.module.npc_service.asyncio.sleep", AsyncMock()):
+        with patch("app.bot.bot_controller.asyncio.sleep", AsyncMock()):
             otak.sibuk = True
             await self.service.brain_turn(self.room.code, self.match, otak)
         self.assertFalse(otak.sibuk)
@@ -308,7 +307,7 @@ class NPCServiceBrainTests(unittest.IsolatedAsyncioTestCase):
         jumlah_pesan = len(self.match.messages)
         self.match.deadline = time.time() + 60
         self.persistence.record_bot_message.side_effect = PersistenceError("fixture")
-        with patch("app.module.npc_service.asyncio.sleep", AsyncMock()):
+        with patch("app.bot.bot_controller.asyncio.sleep", AsyncMock()):
             await self.service.brain_turn(self.room.code, self.match, otak)
         self.persistence.record_bot_message.assert_called_once()
         self.assertEqual(len(self.match.messages), jumlah_pesan)
@@ -396,7 +395,7 @@ class NPCServiceBrainTests(unittest.IsolatedAsyncioTestCase):
             self.match.add_message("human", "NOX dan ECHO mencurigakan, kalian Hitman. Vote NOX!")
         self.match.deadline = time.time() + 60
         nox, echo = (self.runtime.otak_bot(self.match.id, nama) for nama in ("NOX", "ECHO"))
-        with patch("app.module.npc_service.asyncio.sleep", AsyncMock()):
+        with patch("app.bot.bot_controller.asyncio.sleep", AsyncMock()):
             nox.sibuk = echo.sibuk = True
             await asyncio.gather(
                 self.service.brain_turn(self.room.code, self.match, nox),
@@ -411,7 +410,7 @@ class NPCServiceBrainTests(unittest.IsolatedAsyncioTestCase):
     async def test_scheduler_runs_brain_steps_for_every_live_bot(self):
         await self.service.prepare(self.room.code, self.match)
         self.match.begin(now=time.time() - 30)
-        with patch("app.module.npc_service.asyncio.sleep", AsyncMock()):
+        with patch("app.bot.bot_controller.asyncio.sleep", AsyncMock()):
             self.service.jalankan_bot_yang_sudah_waktunya()
             self.service.jalankan_bot_yang_sudah_waktunya()  # bot yang sibuk tidak dijadwalkan dua kali
             await asyncio.gather(*list(self.service.tasks))
@@ -451,7 +450,7 @@ class NPCServiceBrainTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(
             self.service._sudah_waktunya_melangkah(otak["NOX"], self.match, elapsed, sekarang, 0)
         )
-        with patch("app.module.npc_service.asyncio.sleep", AsyncMock()):
+        with patch("app.bot.bot_controller.asyncio.sleep", AsyncMock()):
             otak["NOX"].sibuk = True
             await self.service.brain_turn(self.room.code, self.match, otak["NOX"])
             self.assertFalse(otak["NOX"].segera)
@@ -478,7 +477,7 @@ class HostageResultTests(unittest.TestCase):
         game.act("spy", "guard", "civilian")
         game.resolve_night()
         game.round, game.phase = 2, "day"
-        M = importlib.import_module("app.module.npc_brain.generated.otak_fuzzy")
+        M = importlib.import_module("app.bot.fuzzy")
 
         def gagal_sandera(snapshot):
             ingatan = M.Ingatan("hitman")
@@ -510,7 +509,7 @@ class GagRuleTests(unittest.TestCase):
             player.role = name.rstrip("23")
         game.round, game.phase = 3, "day"
         game.deadline = game.durations["day"]
-        M = importlib.import_module("app.module.npc_brain.generated.otak_fuzzy")
+        M = importlib.import_module("app.bot.fuzzy")
         ingatan = M.Ingatan("hitman")
         snapshot = game.snapshot("hitman")
         snapshot["me"]["team_humans"] = list(rekan_manusia)
@@ -538,25 +537,3 @@ class GagRuleTests(unittest.TestCase):
         self.assertEqual(self.langkah_hitman(5.0, votes, manusia)[1]["action"], "wait")
         durasi = Match(["a", "b", "c", "d", "e", "f"], [], now=0).durations["day"]
         self.assertEqual(self.langkah_hitman(durasi * 0.60, votes, manusia)[1]["target"], "spy")
-
-
-class ExportFreshnessTests(unittest.TestCase):
-    def test_generated_modules_match_notebooks_when_available(self):
-        from pathlib import Path
-
-        from scripts.ekspor_otak_npc import DEFAULT_NOTEBOOK_DIR, TUJUAN, sidik_notebook
-
-        tercatat = {
-            b["modul"]: b["sidik"] for b in json.loads((TUJUAN / "SUMBER.json").read_text())
-        }
-        self.assertEqual(set(tercatat), {"otak_fuzzy", "nlg"})
-        # Kepala tiap modul harus cocok dengan SUMBER.json: ekspor parsial atau edit manual ketahuan
-        # walau notebook skripsi tidak tersedia di mesin ini.
-        for modul, sidik in tercatat.items():
-            kepala = (TUJUAN / f"{modul}.py").read_text(encoding="utf-8")[:600]
-            self.assertIn(f"Sidik  : {sidik}", kepala,
-                          f"{modul}.py tidak sama dengan SUMBER.json: ekspor ulang semua modul")  # fmt: skip
-        if not Path(DEFAULT_NOTEBOOK_DIR, "npc_fuzzy.ipynb").is_file():
-            self.skipTest("Notebook skripsi tidak tersedia di mesin ini.")
-        self.assertEqual(sidik_notebook(DEFAULT_NOTEBOOK_DIR), tercatat,
-                         "Notebook berubah: jalankan scripts/ekspor_otak_npc.py")  # fmt: skip

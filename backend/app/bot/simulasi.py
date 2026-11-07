@@ -9,9 +9,9 @@ import time
 from collections import OrderedDict
 
 from app.services.checker_service import jejak_baru
-from app.module.match_engine import Match, label_unik, snapshot_berlabel
-from app.module.npc_brain.runtime import brain_runtime
-from app.module.npc_service import (
+from app.game.match_engine import Match, label_unik, snapshot_berlabel
+from app.bot.runtime import brain_runtime
+from app.bot.bot_controller import (
     AKSI_RAHASIA, BATAS_LANGKAH_DETIK, isi_jejak, pindahkan_aksi_malam, pindahkan_vote, roster_label,
     tulis_kalimat, waktu_jejak,
 )  # fmt: skip

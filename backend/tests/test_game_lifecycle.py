@@ -23,7 +23,7 @@ class GameLifecycleTests(unittest.TestCase):
         ): SimpleNamespace(username=x_user)
         self.enterContext(patch("app.controllers.rooms.room_service", self.rooms))
         self.enterContext(patch("app.services.room_service.PersistenceService"))
-        self.enterContext(patch("app.module.match_engine.time.time", side_effect=lambda: self.now))
+        self.enterContext(patch("app.game.match_engine.time.time", side_effect=lambda: self.now))
         self.client = self.enterContext(TestClient(app))
 
     def create_match(self, count):

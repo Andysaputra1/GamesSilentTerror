@@ -8,7 +8,7 @@ pengujian yang memeriksa semua rencana berjalan di kasus bawaan saja.
 import re
 import unittest
 
-from app.module.npc_brain.generated.nlg import (
+from app.bot.nlg import (
     MAKSUD_AKSI,
     PERSONA,
     VARIASI,

@@ -12,7 +12,7 @@ import hashlib
 import json
 import unittest
 
-from app.module.npc_brain.generated.otak_fuzzy import (
+from app.bot.fuzzy import (
     INTENT_AKSI,
     Ingatan,
     URUTAN_FASE,

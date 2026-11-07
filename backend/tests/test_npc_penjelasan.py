@@ -17,8 +17,8 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.services.checker_service import CheckerService, checker_service
-from app.module.match_engine import Match
-from app.module.npc_brain.penjelasan import (
+from app.game.match_engine import Match
+from app.bot.penjelasan import (
     BATAS_BYTE,
     _sistem_fuzzy,
     batasi,
@@ -27,7 +27,7 @@ from app.module.npc_brain.penjelasan import (
     ringkas,
     ukuran,
 )
-from app.module.npc_service import NPCService
+from app.bot.bot_controller import NPCService
 from app.services.room_service import RoomService
 from tests.test_npc_brain import AKSI_RAHASIA, runtime_siap
 
@@ -274,7 +274,7 @@ class CheckerPenjelasanTests(unittest.TestCase):
         runtime.siapkan_pertandingan(room.match, room.code)
         with (
             patch("app.services.room_service.room_service", rooms),
-            patch("app.module.npc_brain.runtime.brain_runtime", runtime),
+            patch("app.bot.runtime.brain_runtime", runtime),
         ):
             live = CheckerService().ringkasan_room(room.code)
             # Jejak lama boleh memuat metode yang sudah diarsipkan.
@@ -307,11 +307,11 @@ class NPCServicePenjelasanTests(unittest.IsolatedAsyncioTestCase):
         self.rooms.start(self.room.code, "human")
         self.match = self.room.match
         self.service = NPCService(Mock(emit=AsyncMock()), runtime=self.runtime)
-        self.enterContext(patch("app.module.npc_service.room_service", self.rooms))
+        self.enterContext(patch("app.bot.bot_controller.room_service", self.rooms))
         self.persistence = self.enterContext(
-            patch("app.module.npc_service.PersistenceService")
+            patch("app.bot.bot_controller.PersistenceService")
         ).return_value
-        self.enterContext(patch("app.module.npc_service.survey_service"))
+        self.enterContext(patch("app.bot.bot_controller.survey_service"))
 
     async def asyncTearDown(self):
         await self.service.close()
@@ -324,7 +324,7 @@ class NPCServicePenjelasanTests(unittest.IsolatedAsyncioTestCase):
         with self.rooms.lock:
             self.match.add_message("human", "Aku curiga NOX, dia Hitman. Ayo vote NOX!")
         self.match.deadline = time.time() + 60
-        with patch("app.module.npc_service.asyncio.sleep", AsyncMock()):
+        with patch("app.bot.bot_controller.asyncio.sleep", AsyncMock()):
             otak.sibuk = True
             await self.service.brain_turn(self.room.code, self.match, otak)
         trace = checker_service.list(self.room.code, penjelasan=True)[0]

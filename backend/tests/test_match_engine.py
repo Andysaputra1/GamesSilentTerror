@@ -12,7 +12,7 @@ from app.controllers.rooms import router
 from app.middleware.auth import require_authenticated_user
 from app.sockets import chat
 from socket_palsu import socket_palsu
-from app.module.match_engine import KOMPOSISI_PERAN, Match, label_unik, snapshot_berlabel
+from app.game.match_engine import KOMPOSISI_PERAN, Match, label_unik, snapshot_berlabel
 from app.config.skins import ALL_SKINS
 from app.services.room_service import RoomService
 
@@ -825,7 +825,7 @@ class SocketGameTests(unittest.IsolatedAsyncioTestCase):
 class ChatOrderTests(unittest.TestCase):
     # Chat yang terbaca bot dalam satu langkah harus tetap kronologis (audit AI 1 Okt: ID UUID mengacak urutan).
     def test_bot_memory_keeps_chat_order_within_one_snapshot(self):
-        from app.module.npc_brain.generated import otak_fuzzy
+        from app.bot import fuzzy
 
         class NLUTiruan:
             ambang = 0.0
@@ -841,11 +841,11 @@ class ChatOrderTests(unittest.TestCase):
             match = Match(["Andi", "Budi", "Citra", "Dodi"], [])
             match.add_message("Andi", "Aku curiga sama Budi")
             match.add_message("Budi", "Justru Citra yang aneh")
-            ingatan = otak_fuzzy.Ingatan("Dodi")
+            ingatan = fuzzy.Ingatan("Dodi")
             view = ingatan.sinkron_snapshot(
                 match.snapshot("Dodi"), match.deadline - 60, NLUTiruan()
             )
-            tabel, _ = otak_fuzzy.hitung_bukti(ingatan, view)
+            tabel, _ = fuzzy.hitung_bukti(ingatan, view)
             budi = tabel[tabel["pemain"] == "Budi"].iloc[0]
             self.assertEqual(budi["alihkan_tuduhan"], 1.0)  # dituduh lalu hanya menuduh pihak ketiga
 
@@ -861,15 +861,15 @@ class ChatTimeTests(unittest.TestCase):
         self.assertEqual(match.snapshot("Citra")["messages"][1]["time"], 12.5)
 
     def test_bot_reads_server_time_and_keeps_order_on_equal_times(self):
-        from app.module.npc_brain.generated import otak_fuzzy
+        from app.bot import fuzzy
 
         match = Match(["Andi", "Budi", "Citra", "Dodi"], [], now=0.0)
         match.add_message("Andi", "Halo.", now=5.0)
         match.add_message("Budi", "Hai.", now=5.0)
-        ingatan = otak_fuzzy.Ingatan("Dodi")
+        ingatan = fuzzy.Ingatan("Dodi")
         ingatan.sinkron_snapshot(match.snapshot("Dodi"), 30.0)
         self.assertEqual([c["waktu"] for c in ingatan.chat], [5.0, 5.0])
-        self.assertEqual([c["pengirim"] for c in otak_fuzzy._chat_urut(ingatan)], ["Andi", "Budi"])
+        self.assertEqual([c["pengirim"] for c in fuzzy._chat_urut(ingatan)], ["Andi", "Budi"])
 
 
 class DisplayNameTests(unittest.TestCase):

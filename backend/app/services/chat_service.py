@@ -17,7 +17,7 @@ import logging
 from time import perf_counter
 from typing import Any
 
-from app.module.npc_service import catat_nlu
+from app.bot.bot_controller import catat_nlu
 from app.services.activity_service import activity
 from app.services.ai_diagnostics import measure
 from app.services.checker_service import checker_service

@@ -42,12 +42,12 @@ from app.config.settings import (
     PROJECT_DIR, settings,
 )  # fmt: skip
 from app.services.ai_config_service import ai_runtime
-from app.module.match_engine import phase_durations
-from app.module.npc_brain.penjelasan import jelaskan
+from app.game.match_engine import phase_durations
+from app.bot.penjelasan import jelaskan
 
 if TYPE_CHECKING:
     # Hanya untuk editor (Ctrl+klik). Saat program jalan modul ini dimuat di _muat, supaya server cepat nyala.
-    from app.module.npc_brain.generated import otak_fuzzy
+    from app.bot import fuzzy
 
 logger =logging.getLogger("shadow_heist.npc_brain")
 
@@ -55,7 +55,7 @@ logger =logging.getLogger("shadow_heist.npc_brain")
 warnings.filterwarnings("ignore", category=DeprecationWarning, module=r"skfuzzy(\..*)?")
 
 # Modul logika tiap metode; game sekarang hanya memakai fuzzy.
-METODE_MODUL = {"fuzzy": "otak_fuzzy"}
+METODE_MODUL = {"fuzzy": "fuzzy"}
 # Nama model di link LLM (Ollama/OpenAI), mis. qwen3:4b-instruct atau qwen3:14b.
 POLA_MODEL_TAUTAN = re.compile(
     r"[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9._-]+)*(?::[A-Za-z0-9._-]+)?"
@@ -372,8 +372,8 @@ class BrainRuntime:
         try:
             self._set(detail="Memuat logika fuzzy…", progres=0.1)
             for metode, nama in METODE_MODUL.items():
-                self.modul[metode] = importlib.import_module(f"app.module.npc_brain.generated.{nama}")
-            self.nlg = importlib.import_module("app.module.npc_brain.generated.nlg")
+                self.modul[metode] = importlib.import_module(f"app.bot.{nama}")
+            self.nlg = importlib.import_module("app.bot.nlg")
             self._set(detail="Memuat NLU IndoBERT (intent dan target)…", progres=0.35)
             if nlu is None:
                 # Tanpa IndoBERT otak dianggap gagal dimuat: bot memakai aksi cadangan engine.
@@ -513,10 +513,10 @@ class BrainRuntime:
     # selalu_jelaskan: simulasi panel ingin penjelasan juga untuk langkah diam; lapor(tahap) memberi tahu
     # simulasi tahap yang sedang berjalan (flowchart live).
     def langkah(self, bot: OtakBot, snapshot, sekarang, selalu_jelaskan=False, lapor=_tanpa_lapor):
-        # modul = generated/otak_fuzzy.py (dimuat di _muat), jadi modul.putuskan ada di file itu.
+        # modul = bot/fuzzy.py (dimuat di _muat), jadi modul.putuskan ada di file itu.
         modul = self.modul[bot.metode]
         if TYPE_CHECKING:
-            modul = otak_fuzzy
+            modul = fuzzy
         mulai, jumlah_chat_sebelumnya = time.perf_counter(), len(bot.ingatan.chat)
         lapor("nlu")
         view = bot.ingatan.sinkron_snapshot(snapshot, sekarang, self.nlu)

@@ -9,10 +9,10 @@ import time
 import unittest
 from unittest.mock import AsyncMock, Mock, patch
 
-from app.module.match_engine import Match, snapshot_berlabel
-from app.module.npc_brain.generated import nlg, otak_fuzzy
-from app.module.npc_brain.runtime import BrainRuntime, NLUBersama
-from app.module.npc_service import NPCService, pindahkan_aksi_malam, riwayat_nlu, tulis_kalimat_tim
+from app.game.match_engine import Match, snapshot_berlabel
+from app.bot import fuzzy, nlg
+from app.bot.runtime import BrainRuntime, NLUBersama
+from app.bot.bot_controller import NPCService, pindahkan_aksi_malam, riwayat_nlu, tulis_kalimat_tim
 from app.services.activity_service import activity
 from app.services.checker_service import checker_service
 from app.services.room_service import Room, RoomService
@@ -43,12 +43,12 @@ def malam(game, ronde=1):
 # Satu langkah keputusan bot seperti NPCService.brain_turn, tanpa jaringan.
 def langkah(game, ingatan, nama, sekarang):
     view = ingatan.sinkron_snapshot(snapshot_berlabel(game.snapshot(nama), game.labels), sekarang)
-    return view, otak_fuzzy.putuskan(ingatan, view)
+    return view, fuzzy.putuskan(ingatan, view)
 
 
 # Pilihan otak diterapkan ke engine seperti _kirim_vote_atau_aksi.
 def terapkan(game, nama, npc):
-    if npc["action"] in otak_fuzzy.AKSI_RAHASIA:
+    if npc["action"] in fuzzy.AKSI_RAHASIA:
         if npc.get("pindah"):
             pindahkan_aksi_malam(game, nama, npc["action"], npc["target"])
         else:
@@ -93,7 +93,7 @@ class BrainOnEngineTests(unittest.TestCase):
     def test_hitman_moves_exactly_at_the_lock(self):
         for cepat, batas in ((False, 15), (True, 10)):
             game = malam(pertandingan(["hitman"], lainnya("hitman"), quick=cepat))
-            ingatan = otak_fuzzy.Ingatan("hitman2", cepat=cepat)
+            ingatan = fuzzy.Ingatan("hitman2", cepat=cepat)
             mulai = game.deadline - game.durations["night"]
             _, h = langkah(game, ingatan, "hitman2", mulai + 1)
             terapkan(game, "hitman2", h["npc_decision"])
@@ -113,7 +113,7 @@ class BrainOnEngineTests(unittest.TestCase):
 
     def test_human_change_after_the_lock_wins_and_the_bot_stays(self):
         game = malam(pertandingan(["hitman"], lainnya("hitman")))
-        ingatan = otak_fuzzy.Ingatan("hitman2")
+        ingatan = fuzzy.Ingatan("hitman2")
         game.act("hitman", "hostage", "civilian")
         _, h = langkah(game, ingatan, "hitman2", game.deadline - 15)
         self.assertEqual(h["npc_decision"]["target"], "civilian")
@@ -128,7 +128,7 @@ class BrainOnEngineTests(unittest.TestCase):
 
     def test_human_spy_choosing_the_same_target_moves_the_bot(self):
         game = malam(pertandingan(["spy"], lainnya("spy")))
-        ingatan = otak_fuzzy.Ingatan("spy2")
+        ingatan = fuzzy.Ingatan("spy2")
         _, h = langkah(game, ingatan, "spy2", game.deadline - 25)
         terapkan(game, "spy2", h["npc_decision"])
         self.assertEqual(h["nlg_tim"]["pemicu"], "pilih_target")
@@ -149,7 +149,7 @@ class BrainOnEngineTests(unittest.TestCase):
 
     def test_spy_does_not_move_after_the_lock(self):
         game = malam(pertandingan(["spy"], lainnya("spy")))
-        ingatan = otak_fuzzy.Ingatan("spy2")
+        ingatan = fuzzy.Ingatan("spy2")
         _, h = langkah(game, ingatan, "spy2", game.deadline - 25)
         terapkan(game, "spy2", h["npc_decision"])
         game.act("spy", "guard", game.actions["spy2"]["target"])
@@ -159,7 +159,7 @@ class BrainOnEngineTests(unittest.TestCase):
 
     def test_two_bot_spies_do_not_share_a_target_and_stay_silent(self):
         game = malam(pertandingan([], DELAPAN))
-        otak = {n: otak_fuzzy.Ingatan(n) for n in ("spy", "spy2")}
+        otak = {n: fuzzy.Ingatan(n) for n in ("spy", "spy2")}
         for nama, ingatan in otak.items():
             _, h = langkah(game, ingatan, nama, game.deadline - 25)
             self.assertIsNone(h["nlg_tim"])
@@ -171,7 +171,7 @@ class BrainOnEngineTests(unittest.TestCase):
         game = malam(pertandingan([], DELAPAN))
         game.act("spy", "guard", "civilian")
         game.act("spy2", "guard", "civilian")
-        otak = {n: otak_fuzzy.Ingatan(n) for n in ("spy", "spy2")}
+        otak = {n: fuzzy.Ingatan(n) for n in ("spy", "spy2")}
         for nama, ingatan in otak.items():
             _, h = langkah(game, ingatan, nama, game.deadline - 25)
             terapkan(game, nama, h["npc_decision"])
@@ -181,7 +181,7 @@ class BrainOnEngineTests(unittest.TestCase):
     def test_guard_may_repeat_the_same_target(self):
         game = malam(pertandingan([], DELAPAN), ronde=2)
         game.players["spy"].last_guard, game.players["spy"].last_guard_round = "civilian", 1
-        ingatan = otak_fuzzy.Ingatan("spy")
+        ingatan = fuzzy.Ingatan("spy")
         ingatan.sinkron_snapshot(
             snapshot_berlabel(game.snapshot("spy"), game.labels), game.deadline - 29
         )
@@ -201,7 +201,7 @@ class BrainOnEngineTests(unittest.TestCase):
             for n in DELAPAN
             if n not in ("stalker", "hitman", "hitman2")
         ] + [{"round": 2, "name": n, "role": "civilian"} for n in ("hitman", "hitman2")]
-        _, h = langkah(game, otak_fuzzy.Ingatan("stalker"), "stalker", game.deadline - 25)
+        _, h = langkah(game, fuzzy.Ingatan("stalker"), "stalker", game.deadline - 25)
         self.assertEqual(h["npc_decision"]["action"], "peek")
         terapkan(game, "stalker", h["npc_decision"])
         self.assertIn("stalker", game.actions)
@@ -214,7 +214,7 @@ class BrainOnEngineTests(unittest.TestCase):
             {"round": 2, "name": "spy", "success": False},
             {"round": 3, "name": "spy2", "success": False},
         ]
-        _, h = langkah(game, otak_fuzzy.Ingatan("hitman"), "hitman", game.deadline - 25)
+        _, h = langkah(game, fuzzy.Ingatan("hitman"), "hitman", game.deadline - 25)
         self.assertEqual(h["pengetahuan"]["gagal_sandera"], {"spy": 2, "spy2": 1})
         self.assertEqual(h["npc_decision"]["action"], "hostage")
         self.assertNotEqual(h["npc_decision"]["target"], "spy")
@@ -228,7 +228,7 @@ class BrainOnEngineTests(unittest.TestCase):
             {"round": r, "name": nama, "success": False}
             for r, nama in enumerate(("spy", "spy", "spy2", "spy2"), 1)
         ]
-        _, h = langkah(game, otak_fuzzy.Ingatan("hitman"), "hitman", game.deadline - 25)
+        _, h = langkah(game, fuzzy.Ingatan("hitman"), "hitman", game.deadline - 25)
         self.assertNotIn(h["npc_decision"]["target"], ("spy", "spy2"))
         terapkan(game, "hitman", h["npc_decision"])
         game.act("spy", "guard", "spy2")
@@ -245,7 +245,7 @@ class BrainOnEngineTests(unittest.TestCase):
             for i, nama in enumerate(warga)
             for k in range(2)
         ]
-        _, h = langkah(game, otak_fuzzy.Ingatan("hitman"), "hitman", game.deadline - 25)
+        _, h = langkah(game, fuzzy.Ingatan("hitman"), "hitman", game.deadline - 25)
         self.assertEqual(set(h["pengetahuan"]["gagal_sandera"].values()), {2})
         self.assertEqual(h["npc_decision"]["action"], "hostage")
         terapkan(game, "hitman", h["npc_decision"])
@@ -254,7 +254,7 @@ class BrainOnEngineTests(unittest.TestCase):
     def test_hostage_and_peek_never_wait_while_the_engine_allows_them(self):
         for nama in ("hitman", "stalker", "spy"):
             game = malam(pertandingan([], DELAPAN))
-            _, h = langkah(game, otak_fuzzy.Ingatan(nama), nama, game.deadline - 25)
+            _, h = langkah(game, fuzzy.Ingatan(nama), nama, game.deadline - 25)
             self.assertNotEqual(h["npc_decision"]["action"], "wait", nama)
             terapkan(game, nama, h["npc_decision"])
             self.assertIn(nama, game.actions)
@@ -267,7 +267,7 @@ class TeamWriterTests(unittest.TestCase):
         hasil = nlg.tulis_chat_tim(p, ["NOX", "ECHO", "VEIL", "RAVEN"])
         self.assertEqual(hasil["sumber"], "templat")
         self.assertIn("ECHO", hasil["teks"])
-        self.assertNotIn("tim", otak_fuzzy.siapkan_nlg(otak_fuzzy.rencana_chat({"aksi": "jawab", "target": None, "alasan": []}),
+        self.assertNotIn("tim", fuzzy.siapkan_nlg(fuzzy.rencana_chat({"aksi": "jawab", "target": None, "alasan": []}),
                                                        {"saya": {"nama": "NOX"}}))  # fmt: skip
 
 
@@ -285,8 +285,8 @@ class NPCTeamChatTests(unittest.IsolatedAsyncioTestCase):
         self.rooms.rooms[self.room.code] = self.room
         self.sio = Mock(emit=AsyncMock())
         self.service = NPCService(self.sio, runtime=self.runtime)
-        self.enterContext(patch("app.module.npc_service.room_service", self.rooms))
-        self.persistence = self.enterContext(patch("app.module.npc_service.PersistenceService"))
+        self.enterContext(patch("app.bot.bot_controller.room_service", self.rooms))
+        self.persistence = self.enterContext(patch("app.bot.bot_controller.PersistenceService"))
         self.runtime.siapkan_pertandingan(self.game, self.room.code)
         self.otak = self.runtime.otak_bot(self.game.id, "hitman2")
 
@@ -388,7 +388,7 @@ class NPCTeamChatTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_rejected_choice_is_not_announced(self):
         keputusan = {"npc_decision": {"action": "hostage", "target": "hitman", "message": ""},
-                     "rencana_chat": otak_fuzzy.rencana_chat_tunggu("malam"), "nlg": None,
+                     "rencana_chat": fuzzy.rencana_chat_tunggu("malam"), "nlg": None,
                      "nlg_tim": {"pemicu": "pilih_target"}}  # fmt: skip
         with patch.object(self.runtime, "langkah", return_value=({"ronde": 1}, keputusan, {"roster": []})), \
                 patch.object(self.runtime, "tulis_tim") as tulis:  # fmt: skip

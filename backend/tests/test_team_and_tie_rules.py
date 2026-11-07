@@ -17,15 +17,15 @@ from app.controllers.rooms import router
 from app.middleware.auth import require_authenticated_user
 from app.services.activity_service import activity
 from app.services.checker_service import checker_service
-from app.module.match_engine import (
+from app.game.match_engine import (
     TEAM_CHAT_LIMIT,
     TRIBUNAL_EXTRA_QUICK_SECONDS,
     TRIBUNAL_EXTRA_SECONDS,
     Match,
     snapshot_berlabel,
 )
-from app.module.npc_brain.generated import otak_fuzzy
-from app.module.npc_service import NPCService, riwayat_nlu
+from app.bot import fuzzy
+from app.bot.bot_controller import NPCService, riwayat_nlu
 from app.services.room_service import Room, RoomService
 
 ENAM = ["hitman", "spy", "stalker", "civilian", "civilian2", "civilian3"]
@@ -188,7 +188,7 @@ class BrainExtraTimeTests(unittest.TestCase):
     def test_brains_keep_votes_without_a_stronger_target_in_extra_time(self):
         game = pertandingan([], ENAM, now=0.0)
         game.round, game.phase = 2, "tribunal"
-        otak = {nama: otak_fuzzy.Ingatan(nama) for nama in ENAM}
+        otak = {nama: fuzzy.Ingatan(nama) for nama in ENAM}
         for nama, ingatan in otak.items():
             ingatan.sinkron_snapshot(game.snapshot(nama), 1.0)
         game.vote("spy", "hitman")
@@ -199,8 +199,8 @@ class BrainExtraTimeTests(unittest.TestCase):
         sekarang = game.deadline - 5
         for nama, ingatan in otak.items():
             view = ingatan.sinkron_snapshot(game.snapshot(nama), sekarang)
-            self.assertEqual(otak_fuzzy.waktu_berjalan(ingatan, view), 1.0)
-            npc = otak_fuzzy.putuskan(ingatan, view)["npc_decision"]
+            self.assertEqual(fuzzy.waktu_berjalan(ingatan, view), 1.0)
+            npc = fuzzy.putuskan(ingatan, view)["npc_decision"]
             if nama in ("spy", "hitman"):
                 self.assertNotEqual(npc["action"], "vote", nama)
                 self.assertNotIn("pindah", npc)
@@ -216,14 +216,14 @@ class BrainExtraTimeTests(unittest.TestCase):
             game.npc_decisions = {(2, "tribunal", nama) for nama in ENAM}
             game.tick(game.deadline)
             self.assertTrue(game.tribunal_extra)
-            ingatan = otak_fuzzy.Ingatan("stalker", cepat=cepat)
+            ingatan = fuzzy.Ingatan("stalker", cepat=cepat)
             view = ingatan.sinkron_snapshot(game.snapshot("stalker"), game.deadline - 1)
             self.assertEqual(ingatan.mulai_fase[(2, "tribunal")], mulai)
             self.assertTrue(view["tribunal_tambahan"])
 
     def test_extra_time_in_brain_matches_engine(self):
-        self.assertEqual(otak_fuzzy.TAMBAHAN_TRIBUNAL, TRIBUNAL_EXTRA_SECONDS)
-        self.assertEqual(otak_fuzzy.TAMBAHAN_TRIBUNAL_CEPAT, TRIBUNAL_EXTRA_QUICK_SECONDS)
+        self.assertEqual(fuzzy.TAMBAHAN_TRIBUNAL, TRIBUNAL_EXTRA_SECONDS)
+        self.assertEqual(fuzzy.TAMBAHAN_TRIBUNAL_CEPAT, TRIBUNAL_EXTRA_QUICK_SECONDS)
 
 
 class SchedulerExtraTimeTests(unittest.IsolatedAsyncioTestCase):
@@ -247,7 +247,7 @@ class SchedulerExtraTimeTests(unittest.IsolatedAsyncioTestCase):
         game.tick(sekarang)
         self.assertTrue(game.tribunal_extra)
         with (
-            patch("app.module.npc_service.room_service", rooms),
+            patch("app.bot.bot_controller.room_service", rooms),
             patch.object(service, "_sudah_waktunya_melangkah", return_value=False) as jadwal,
         ):
             service.jalankan_bot_yang_sudah_waktunya()
@@ -417,7 +417,7 @@ class TeamChatTests(unittest.TestCase):
         self.assertEqual((game.messages, game.jumlah_pesan), ([], 0))
         nlu = Mock(ambang=0.0, common_words=frozenset())
         for bot in ("hitman2", "spy2", "civilian"):
-            ingatan = otak_fuzzy.Ingatan(bot)
+            ingatan = fuzzy.Ingatan(bot)
             ingatan.sinkron_snapshot(snapshot_berlabel(game.snapshot(bot), game.labels), 1.0, nlu)
             self.assertEqual(ingatan.chat, [])
             self.assertNotIn(RAHASIA_HITMAN, str(vars(ingatan)))
@@ -501,7 +501,7 @@ class TeamChatTests(unittest.TestCase):
     # Chat tim hanya ada di view bot: di ingatan.chat ia akan terbaca sebagai bukti publik.
     def test_team_messages_stay_out_of_bot_chat_memory(self):
         self.game.add_team_message("hitman2", RAHASIA_HITMAN)
-        ingatan = otak_fuzzy.Ingatan("hitman")
+        ingatan = fuzzy.Ingatan("hitman")
         view = ingatan.sinkron_snapshot(self.game.snapshot("hitman"), 1.0)
         self.assertEqual(ingatan.chat, [])
         self.assertEqual(view["saya"]["chat_tim"][0]["pengirim"], "hitman2")
@@ -608,7 +608,7 @@ class TeamChatEndpointTests(unittest.TestCase):
     def test_team_message_stays_out_of_activity_checker_nlu_and_database(self):
         with (
             patch("app.services.room_service.PersistenceService") as arsip,
-            patch("app.module.npc_service.PersistenceService") as arsip_npc,
+            patch("app.bot.bot_controller.PersistenceService") as arsip_npc,
         ):
             self.assertEqual(self.post("hitman").status_code, 200)
         arsip.assert_not_called()

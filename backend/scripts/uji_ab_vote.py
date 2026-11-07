@@ -1,6 +1,6 @@
 """Uji A/B kebijakan paksa vote saat warga kritis (PAKSA_VOTE_KRITIS) dengan aturan engine terbaru.
 
-Semua kursi bot memakai otak Fuzzy hasil ekspor notebook, komposisi engine, label NLU sempurna, LANGKAH keputusan
+Semua kursi bot memakai otak Fuzzy di app/bot/fuzzy.py, komposisi engine, label NLU sempurna, LANGKAH keputusan
 per fase, seed sama untuk kedua kebijakan. Keluaran: win rate warga ± CI95 dan akurasi vote warga (porsi suara warga
 yang mengenai Hitman). Dasar kebijakan di notebook (bagian Kebijakan Vote saat Bukti Lemah).
 
@@ -8,7 +8,6 @@ Pemakaian (dari folder backend, Python dengan numpy + pandas + skfuzzy, mis. ven
     python scripts/uji_ab_vote.py . 200 6 [jumlah_pemain=6]
 """
 
-import importlib.util
 import math
 import os
 import random
@@ -18,22 +17,13 @@ from pathlib import Path
 
 BACKEND = Path(sys.argv[1]).resolve()
 sys.path.insert(0, str(BACKEND))
-from app.module import match_engine  # noqa: E402
+from app.bot import fuzzy  # noqa: E402
+from app.bot import nlg as NLG  # noqa: E402  (hanya templat chat tim, tanpa LLM)
+from app.game import match_engine  # noqa: E402
 
 NAMA = ["NOX", "ECHO", "VEIL", "RAVEN", "ASH", "DUSK", "IRIS", "SAGE", "ONYX", "LARK"]
 RONDE_MAKS = 30
-
-
-def muat(nama):
-    berkas = BACKEND / "app" / "module" / "npc_brain" / "generated" / f"{nama}.py"
-    spec = importlib.util.spec_from_file_location(f"ab_{nama}", berkas)
-    modul = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(modul)
-    return modul
-
-
-MODUL = {"fuzzy": muat("otak_fuzzy")}
-NLG = muat("nlg")  # templat chat tim, tanpa LLM
+MODUL = {"fuzzy": fuzzy}
 # Paling banyak separuh core, supaya mesin tetap bisa dipakai. SIM_PROSES boleh menurunkannya lagi.
 PROSES = max(1, min(int(os.environ.get("SIM_PROSES", "64")), (os.cpu_count() or 2) // 2))
 

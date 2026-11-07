@@ -16,7 +16,7 @@ from app.controllers.panel import require_panel
 from app.middleware.auth_limits import limit_auth
 from app.middleware.safe_validation import SafeValidationRoute
 from app.services.persistence_service import PersistenceError
-from app.module.simulasi_service import simulasi_service
+from app.bot.simulasi import simulasi_service
 from app.services import panel_service
 
 router = APIRouter(tags=["panel-npc"], route_class=SafeValidationRoute)
@@ -117,26 +117,26 @@ def kode_alur(node: str, token=Depends(require_panel)):
 # KODE ALUR: sumber fungsi/konstanta diambil dari modul yang sedang berjalan (bukan salinan), lalu setiap baris
 # diberi penanda: parameter (baris def), output (return), komentar, dan baris inti beserta catatan singkat.
 # Hanya objek di daftar KODE_ALUR yang bisa dibaca; panel tidak dapat meminta modul atau nama lain.
-G = "app.module.npc_brain.generated."
-RT = "app.module.npc_brain.runtime"
+G = "app.bot."
+RT = "app.bot.runtime"
 
 # node flowchart → [(modul, nama bertitik, [(potongan teks baris inti, catatan)])]
 KODE_ALUR = {
     "input": [
-        ("app.module.simulasi_service", "Simulasi.kirim", [
+        ("app.bot.simulasi", "Simulasi.kirim", [
             ("can_chat(PEMAIN)", "izin chat diperiksa (siang/Tribunal, tidak dibungkam)"),
             ("m.add_message(PEMAIN", "pesan masuk chat pertandingan"),
             ("self._baca(PEMAIN", "langsung dibaca NLU IndoBERT"),
         ]),
-        ("app.module.match_engine", "Match.can_chat", []),
-        ("app.module.match_engine", "Match.add_message", [("06d", "ID diawali nomor urut agar chat tetap kronologis")]),
+        ("app.game.match_engine", "Match.can_chat", []),
+        ("app.game.match_engine", "Match.add_message", [("06d", "ID diawali nomor urut agar chat tetap kronologis")]),
     ],
     "nlu_pesan": [
         (RT, "BrainRuntime.baca_chat", [
             ("modul.anotasi_chat(", "fungsi anotasi yang sama dengan ingatan bot"),
             ("riwayat.append(chat)", "chat ini menjadi konteks chat berikutnya"),
         ]),
-        (G + "otak_fuzzy", "anotasi_chat", [
+        (G + "fuzzy", "anotasi_chat", [
             ("nlu.intent(", "Model 1: intent + keyakinan"),
             ("KONTEKS_MAKS", "maksimal 12 chat terakhir sebagai konteks"),
             ("nlu.target(", "Model 2: target, memakai intent dan konteks"),
@@ -179,7 +179,7 @@ KODE_ALUR = {
             ("jelaskan(bot", "penjelasan untuk panel"),
             ('keputusan["waktu"]', "lama tiap tahap dicatat"),
         ]),
-        (G + "otak_fuzzy", "Ingatan.sinkron_snapshot", [
+        (G + "fuzzy", "Ingatan.sinkron_snapshot", [
             ("self.catat_eksekusi(", "eksekusi Tribunal dicatat"),
             ("self.intel = ", "hasil Peek milik bot sendiri"),
             ("anotasi_chat(nlu, chat", "chat baru dibaca NLU"),
@@ -187,7 +187,7 @@ KODE_ALUR = {
         ]),
     ],
     "bukti": [
-        (G + "otak_fuzzy", "hitung_bukti", [
+        (G + "fuzzy", "hitung_bukti", [
             ('"tekanan": min(', "tekanan: tuduhan + vote ke pemain ini"),
             ('"dukungan": min(', "dukungan: pembelaan dari pemain lain"),
             ('"plin_plan": min(', "berganti sikap atau vote tidak sesuai ucapan"),
@@ -195,10 +195,10 @@ KODE_ALUR = {
             ('"memihak_hitman": ', "pernah membela pemain yang kini terbukti Hitman"),
             ('"diam": diam', "belum bicara di ronde ini"),
         ]),
-        (G + "otak_fuzzy", "pengetahuan_peran", []),
+        (G + "fuzzy", "pengetahuan_peran", []),
     ],
     "fl": [
-        (G + "otak_fuzzy", "putuskan", [
+        (G + "fuzzy", "putuskan", [
             ("hitung_bukti(ingatan, view)", "bukti tiap pemain"),
             ("nilai_kecurigaan(tabel)", "kecurigaan lewat hierarki fuzzy"),
             ("keputusan_pindah_vote(ctx)", "waktu tambahan seri: suara yang sudah ada dinilai ulang"),
@@ -211,79 +211,79 @@ KODE_ALUR = {
         ]),
     ],
     "fl_1": [
-        (G + "otak_fuzzy", "MF_INPUT", [("[0.2, 0.5, 0.8]", "titik fungsi keanggotaan tingkat sedang")]),
-        (G + "otak_fuzzy", "_mf", [("trapmf", "4 titik = trapesium, 3 titik = segitiga")]),
-        (G + "otak_fuzzy", "keanggotaan", [("interp_membership", "derajat x pada tiap tingkat")]),
+        (G + "fuzzy", "MF_INPUT", [("[0.2, 0.5, 0.8]", "titik fungsi keanggotaan tingkat sedang")]),
+        (G + "fuzzy", "_mf", [("trapmf", "4 titik = trapesium, 3 titik = segitiga")]),
+        (G + "fuzzy", "keanggotaan", [("interp_membership", "derajat x pada tiap tingkat")]),
     ],
     "fl_2": [
-        (G + "otak_fuzzy", "_bangun_sistem", [
+        (G + "fuzzy", "_bangun_sistem", [
             ("ctrl.Rule(a[x] & b[y]", "9 aturan JIKA–MAKA; & = DAN (min)"),
             ('defuzzify_method = "centroid"', "defuzzifikasi centroid"),
         ]),
-        (G + "otak_fuzzy", "aturan_aktif", [("min(derajat_a[x], derajat_b[y])", "kekuatan aturan = min derajat input")]),
+        (G + "fuzzy", "aturan_aktif", [("min(derajat_a[x], derajat_b[y])", "kekuatan aturan = min derajat input")]),
     ],
     "fl_3": [
-        (G + "otak_fuzzy", "fuzzy", [("_fuzzy_tersimpan(nama", "hasil disimpan per input (cache)")]),
-        (G + "otak_fuzzy", "_fuzzy_tersimpan", [("simulasi.compute()", "skfuzzy: agregasi max lalu centroid")]),
-        (G + "otak_fuzzy", "HIERARKI", [('("kecurigaan", "ucapan", "bukti_keras")', "sistem puncak: kecurigaan")]),
-        (G + "otak_fuzzy", "nilai_kecurigaan", [
+        (G + "fuzzy", "fuzzy", [("_fuzzy_tersimpan(nama", "hasil disimpan per input (cache)")]),
+        (G + "fuzzy", "_fuzzy_tersimpan", [("simulasi.compute()", "skfuzzy: agregasi max lalu centroid")]),
+        (G + "fuzzy", "HIERARKI", [('("kecurigaan", "ucapan", "bukti_keras")', "sistem puncak: kecurigaan")]),
+        (G + "fuzzy", "nilai_kecurigaan", [
             ("for sistem, x, y in HIERARKI", "sistem dihitung bertingkat"),
             ("fuzzy(sistem, nilai[x], nilai[y]) / 100", "keluaran 0–100 menjadi 0–1"),
             ('(1 - b["p_sandera"])', "nol bila diumumkan disandera"),
         ]),
     ],
     "fl_4": [
-        (G + "otak_fuzzy", "keputusan_chat", [
+        (G + "fuzzy", "keputusan_chat", [
             ('c["aksi"] in AKSI_REAKTIF', "bela diri dan jawab dibalas tanpa nilai"),
             ('c["skor"] = fuzzy(sistem', "prioritas tiap kandidat chat"),
             ("calon.sort(", "prioritas tertinggi di depan"),
             (">= AMBANG_CHAT", "mencapai ambang: dikirim"),
             ("calon_gali(ctx)", "di bawah ambang: gali tersangka sebagai cadangan"),
         ]),
-        (G + "otak_fuzzy", "AMBANG_CHAT", []),
-        (G + "otak_fuzzy", "keputusan_aksi", [
+        (G + "fuzzy", "AMBANG_CHAT", []),
+        (G + "fuzzy", "keputusan_aksi", [
             ('if "sistem" in c:', "Gag dan Peek dinilai sistem; Hostage dan Guard sudah membawa nilai"),
             ("pilih_gag(ctx, calon)", "Gag memakai aturan urutan sendiri"),
         ]),
-        (G + "otak_fuzzy", "pilih_gag", [
+        (G + "fuzzy", "pilih_gag", [
             ("BATAS_ANCAMAN_GAG", "ancaman tinggi tanpa rekan manusia: Gag sekarang"),
             ("GAG_WAJIB_FRAKSI", "sesudah 60% siang: Gag wajib"),
             ("AMBANG_GAG", "warga yang sudah bicara: nilai minimal"),
         ]),
     ],
     "keputusan": [
-        (G + "otak_fuzzy", "rencana_chat", []),
-        (G + "otak_fuzzy", "pertahanan_suara", [
+        (G + "fuzzy", "rencana_chat", []),
+        (G + "fuzzy", "pertahanan_suara", [
             ('["warga_terdesak"] < BATAS_WARGA_KRITIS', "hanya saat warga kritis"),
             ("hashlib.sha256(kunci)", "semua tersangka bernilai sama: acak stabil per bot dan ronde"),
         ]),
-        (G + "otak_fuzzy", "format_npc", [
+        (G + "fuzzy", "format_npc", [
             ('if rencana_a["aksi"] in AKSI_RAHASIA', "aksi rahasia diutamakan"),
             ('elif rencana_v["aksi"] == "vote"', "lalu vote"),
         ]),
-        (G + "otak_fuzzy", "siapkan_nlg", [
+        (G + "fuzzy", "siapkan_nlg", [
             ('if not rencana["kirim"]', "tidak chat: NLG tidak dijalankan"),
             ('"cadangan": templat_pesan(', "kalimat cadangan bila semua gagal"),
         ]),
-        (G + "otak_fuzzy", "siapkan_nlg_tim", [
+        (G + "fuzzy", "siapkan_nlg_tim", [
             ("MAKS_CHAT_TIM", "paling banyak 3 pesan tim per malam"),
             ('paket("ikut_manusia"', "Hitman memberi tahu ikut pilihan rekan manusia saat terkunci"),
         ]),
     ],
     "penjelasan": [
-        ("app.module.npc_brain.penjelasan", "jelaskan", [
+        ("app.bot.penjelasan", "jelaskan", [
             ("_penalaran(modul", "penalaran sesuai metode"),
             ("batasi(penjelasan)", "dibatasi 12 KB"),
         ]),
     ],
     "engine": [
-        ("app.module.simulasi_service", "Simulasi._langkah", [
+        ("app.bot.simulasi", "Simulasi._langkah", [
             ("m.vote(", "vote ke engine"),
             ("m.act(", "aksi rahasia ke engine"),
             ("except ValueError", "tidak sah: ditolak engine"),
         ]),
-        ("app.module.match_engine", "Match.vote", []),
-        ("app.module.match_engine", "Match.act", []),
+        ("app.game.match_engine", "Match.vote", []),
+        ("app.game.match_engine", "Match.act", []),
     ],
     "nlg_prompt": [
         (G + "nlg", "buat_prompt", [
@@ -331,7 +331,7 @@ KODE_ALUR = {
     ],
     "kirim": [
         (RT, "BrainRuntime.catat_chat", [("catat_aksi_bot", "ingatan: bot sudah bicara (jeda antar-chat)")]),
-        ("app.module.npc_service", "catat_nlu", [
+        ("app.bot.bot_controller", "catat_nlu", [
             ("runtime.baca_chat", "kalimat bot dibaca NLU"),
             ("tandai_dipanggil(", "bot yang dipanggil/dituduh melangkah segera"),
             ("record_nlu", "bacaan disimpan untuk riwayat chat"),
@@ -344,10 +344,10 @@ KODE_ALUR = {
         ("app.services.persistence_service", "PersistenceService.record_nlu", [
             ("set_message_nlu", "bacaan NLU untuk riwayat chat"),
         ]),
-        (G + "otak_fuzzy", "Ingatan.catat_aksi_bot", []),
+        (G + "fuzzy", "Ingatan.catat_aksi_bot", []),
     ],
     "output": [
-        ("app.module.npc_service", "isi_jejak", [
+        ("app.bot.bot_controller", "isi_jejak", [
             ("lengkapi_penjelasan(", "hasil engine dan NLG ditambahkan"),
             ("ringkas=ringkas_penjelasan", "ringkasan untuk item chat"),
         ]),
