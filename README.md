@@ -35,7 +35,7 @@ Semua AI ada di **otak bot** (NPC yang ikut bermain). Chat manusia hanya diotori
 | **Fuzzy Mamdani** | Penalaran bot: memilih tuduhan, pembelaan, vote, dan skill malam | Setiap langkah bot, untuk semua bot; metode tiap bot dicatat di tabel `match_bots` |
 | **NLG** (rantai penulis LLM atau templat) | Mengubah rencana bot menjadi kalimat | Saat bot memutuskan bicara. Jalur LLM yang gagal dilewati; tanpa jalur yang hidup, bot memakai templat |
 
-Game hanya memakai otak Fuzzy. Utility AI dan Behavior Tree diarsipkan di luar repo, di `../arsip_bt_utility_2026-11-03/` (isi dan cara menariknya kembali ada di README folder itu). Angka keseimbangan di `GAME_CONCEPT.md` diukur ulang dengan Fuzzy saja (6 November 2026): warga menang 46–59,5% untuk 4–10 pemain, dengan 10 pemain dekat batas atas target 40–60%.
+Game hanya memakai otak Fuzzy. Utility AI dan Behavior Tree diarsipkan di luar repo, di `../arsip_bt_utility_2026-11-03/` (isi dan cara menariknya kembali ada di README folder itu). Angka keseimbangan di `GAME_CONCEPT.md` diukur ulang dengan Fuzzy saja (7 November 2026): warga menang 46–60,5% untuk 4–10 pemain di 200 game; 7 pemain (60,5%) diukur ulang dengan 1000 game menjadi 55,1%, dan 10 pemain (59,5%) dekat batas atas target 40–60%.
 
 Kalimat bot diperiksa aturan lalu langsung dikirim; IndoBERT baru membacanya sesudah terkirim. Pembacaan ulang sebelum kirim diarsipkan di luar repo, di `../arsip_validasi_nlg_2026-11-04/` (alasan dan cara mengembalikannya ada di README folder itu).
 
