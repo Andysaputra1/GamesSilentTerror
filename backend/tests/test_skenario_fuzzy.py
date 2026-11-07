@@ -1695,6 +1695,26 @@ def skenario_fase9():
 
 SKENARIO += skenario_fase9()
 
+# Skenario perbaikan 7 November 2026 (nomor 600–699), di sel sendiri: semua jenis tuduh Hitman dinilai, malam klaim Peek yang
+# mungkin, dan klaim Peek yang tidak diulang di ronde yang sama.
+def skenario_perbaikan():
+    S = []
+    peek_budi = [ch(3, "day", 10, "Citra", "Aku Stalker, semalam aku peek Budi, dia Hitman.", "offend", ["Budi"])]
+    S.append(dict(nama="600 Korban Gag yang lemah tidak menutup pelintir bukti",
+                  cerita="Skenario 154 ditambah korban Gag tim Andi. Serang Andi hanya bernilai 15, pelintir ke kambing hitam Budi 50, jadi Budi yang dituduh.",
+                  ingatan=buat_ingatan(peek_budi, sampai=(3, "day"), peran="hitman"),
+                  view=buat_view(3, "day", 40, peran="hitman", next_gag=5, korban_gag_tim=["Andi"]),
+                  harapan={"chat": [("tuduh", "Budi")], "jenis": "pelintir_bukti"}))
+    S.append(dict(nama="601 Nilai tuduh sama: urutan jenis rancangan",
+                  cerita="Korban Gag tim juga kambing hitam teratas. Serang korban Gag dan pelintir bukti bernilai sama, jadi serang korban Gag dipilih.",
+                  ingatan=buat_ingatan(peek_budi, sampai=(3, "day"), peran="hitman"),
+                  view=buat_view(3, "day", 40, peran="hitman", next_gag=5, korban_gag_tim=["Budi"]),
+                  harapan={"chat": [("tuduh", "Budi")], "jenis": "serang_korban_gag", "pesan_bukan": ["gag"]}))
+    return S
+
+
+SKENARIO += skenario_perbaikan()
+
 # Membandingkan keputusan dengan harapan skenario; hasilnya daftar pelanggaran.
 def cek_harapan(hasil, harapan):
     rc, rv, ra, urutan = hasil["rencana_chat"], hasil["rencana_vote"], hasil["rencana_aksi"], hasil["urutan_tersangka"]
@@ -1781,8 +1801,8 @@ def cek_harapan(hasil, harapan):
 
 class SkenarioFuzzyTests(unittest.TestCase):
     def test_jumlah_skenario_sama_dengan_notebook(self):
-        self.assertEqual(len(SKENARIO), 320)
-        self.assertEqual(len({s["nama"] for s in SKENARIO}), 320)
+        self.assertEqual(len(SKENARIO), 322)
+        self.assertEqual(len({s["nama"] for s in SKENARIO}), 322)
 
     def test_semua_skenario_lulus(self):
         for s in SKENARIO:

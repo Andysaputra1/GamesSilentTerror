@@ -1443,8 +1443,12 @@ def _calon_chat_warga(ctx):
     tanya = calon_tanya_semua(ctx)
     return calon + [tanya] if tanya else calon
 
-# Satu kandidat tuduh Hitman, jenis pertama yang cocok: serang korban Gag tim, balik tuduh penuduh saat mulai dicurigai, lalu
-# pelintir bukti publik ke kambing hitam. Kalimat serang korban Gag tidak boleh menyebut Gag, karena warga tidak tahu siapa korbannya.
+# Kandidat tuduh Hitman, satu per jenis yang syaratnya cocok: serang korban Gag tim, balik tuduh penuduh saat mulai dicurigai, dan
+# pelintir bukti publik ke kambing hitam ≥ MIN_KAMBING_HITAM. Semuanya dinilai h_tuduh di keputusan_chat, jadi korban Gag yang lemah
+# tidak lagi menutup kambing hitam yang kuat; nilai sama diputus urutan jenis itu. Kalimat serang korban Gag tidak boleh menyebut
+# Gag, karena warga tidak tahu siapa korbannya.
+# Alur: 1 korban Gag tim pertama yang boleh dituduh -> 2 risiko >= 0,4: penuduh terkuat yang boleh dituduh -> 3 kambing hitam
+#       yang boleh dituduh -> 4 daftar calon (bisa kosong)
 def calon_tuduh_hitman(ctx, layak, kambing, alasan_kambing):
     ingatan, view, konteks, diri, bot = ctx["ingatan"], ctx["view"], ctx["konteks"], ctx["diri"], ctx["bot"]
 
@@ -1452,17 +1456,22 @@ def calon_tuduh_hitman(ctx, layak, kambing, alasan_kambing):
         return {"aksi": "tuduh", "jenis": jenis, "sistem": "h_tuduh", "target": r["pemain"], "alasan": alasan,
                 "relasi_tambahan": list(relasi), "input": {"kambing_hitam": float(r["kambing_hitam"]), "risiko_saya": diri["risiko_saya"]}}
 
-    for _, r in layak[layak["pemain"].isin(diri["korban_gag_tim"])].iterrows():
-        if boleh_tuduh(ingatan, view, konteks, r["pemain"]):
-            return calon(r, "serang_korban_gag", [f"{r['pemain']} dari tadi diam aja."])
+    def pertama_boleh(tabel):
+        return next((r for _, r in tabel.iterrows() if boleh_tuduh(ingatan, view, konteks, r["pemain"])), None)
+
+    hasil = []
+    r = pertama_boleh(layak[layak["pemain"].isin(diri["korban_gag_tim"])])
+    if r is not None:
+        hasil.append(calon(r, "serang_korban_gag", [f"{r['pemain']} dari tadi diam aja."]))
     if diri["risiko_saya"] >= RISIKO_SEDANG:
         penuduh = layak[layak["pemain"].isin(baris_pemain(ctx["publik"], bot)["rincian"]["penuduh"])]
-        for _, r in penuduh.sort_values(["menuduh_tim", "pemain"], ascending=[False, True]).iterrows():
-            if boleh_tuduh(ingatan, view, konteks, r["pemain"]):
-                return calon(r, "balik_tuduh", [f"{r['pemain']} nuduh aku tanpa bukti."], [{"pemain": bot, "relasi": "defend"}])
+        r = pertama_boleh(penuduh.sort_values(["menuduh_tim", "pemain"], ascending=[False, True]))
+        if r is not None:
+            hasil.append(calon(r, "balik_tuduh", [f"{r['pemain']} nuduh aku tanpa bukti."], [{"pemain": bot, "relasi": "defend"}]))
+    # kambing sudah disaring MIN_KAMBING_HITAM oleh pemanggil (None bila kambing hitam teratas di bawahnya).
     if kambing is not None and boleh_tuduh(ingatan, view, konteks, kambing["pemain"]):
-        return calon(kambing, "pelintir_bukti", alasan_kambing[:2])
-    return None
+        hasil.append(calon(kambing, "pelintir_bukti", alasan_kambing[:2]))
+    return hasil
 
 # Kandidat chat Hitman: bicara seperti warga dan memakai bukti publik saja.
 def _calon_chat_hitman(ctx):
@@ -1486,9 +1495,7 @@ def _calon_chat_hitman(ctx):
     if not izin["boleh_inisiatif"]:
         return calon
     disuarakan = konteks["sudah_disuarakan"]
-    tuduh = calon_tuduh_hitman(ctx, layak, kambing, alasan_kambing)
-    if tuduh:
-        calon.append(tuduh)
+    calon += calon_tuduh_hitman(ctx, layak, kambing, alasan_kambing)
     # Klaim palsu hanya sekali per game dan hanya saat Hitman sudah dicurigai.
     penuduh = fitur[fitur["menuduh_tim"] > 0].sort_values(["menuduh_tim", "pemain"], ascending=[False, True])
     if diri["risiko_saya"] >= RISIKO_SEDANG and len(penuduh) and not any(a.get("jenis") == "klaim_peek" for a in ingatan.aksi_bot):
