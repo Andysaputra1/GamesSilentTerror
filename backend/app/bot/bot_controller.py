@@ -38,7 +38,7 @@ from time import perf_counter
 from typing import TYPE_CHECKING
 
 from app.bot import nlg
-from app.bot.nlu import NLUBersama, NLUIndoBERT, baca_chat, baca_chat_baru, folder_model, teks_target
+from app.bot.nlu import NLUBersama, NLUIndoBERT, baca_chat, baca_chat_baru, folder_model
 from app.bot.penjelasan import jelaskan
 from app.bot.penjelasan import lengkapi as lengkapi_penjelasan
 from app.bot.penjelasan import ringkas as ringkas_penjelasan
@@ -96,6 +96,7 @@ class BrainRuntime:
     ditulis di thread terpisah (nlg-npc) supaya LLM tidak menahan keputusan bot lain.
     """
 
+    # Status awal sebelum otak dimuat; konfigurasi penulis dari .env sampai panel mengubahnya.
     def __init__(self):
         self.lock = threading.RLock()
         self.modul = {}
@@ -109,6 +110,7 @@ class BrainRuntime:
         self.eksekutor_keputusan = ThreadPoolExecutor(1, thread_name_prefix="otak-npc")
         self.eksekutor_nlg = ThreadPoolExecutor(3, thread_name_prefix="nlg-npc")
 
+    # Ubah status muat otak di bawah kunci.
     def _set(self, **nilai):
         with self.lock:
             self.status.update(nilai)
@@ -222,6 +224,7 @@ class BrainRuntime:
                 for b in otak.values()
             ]  # fmt: skip
 
+    # Otak satu bot di satu pertandingan; None bila otak belum atau gagal dimuat.
     def otak_bot(self, match_id, nama) -> OtakBot | None:
         with self.lock:
             return self.pertandingan.get(match_id, {}).get(nama)
@@ -254,9 +257,13 @@ class BrainRuntime:
         keputusan = modul.putuskan(bot.ingatan, view)
         selesai_logika = time.perf_counter()
         lapor("penjelasan")
+        # Target ditulis pendek untuk panel, mis. "NOX: offend (0.91)".
         keputusan["nlu_baru"] = [
             {"pengirim": c["pengirim"], "teks": c["teks"], "intent": c.get("intent"),
-             "confidence": c.get("conf_intent"), "target": teks_target(c.get("target"))}
+             "confidence": c.get("conf_intent"),
+             "target": [f"{t['pemain']}: {t['relasi']}"
+                        + (f" ({t['prob']:.2f})" if t.get("prob") is not None else "")
+                        for t in c.get("target") or []]}
             for c in bot.ingatan.chat[jumlah_chat_sebelumnya:]
         ]  # fmt: skip
         if (
@@ -322,6 +329,7 @@ class BrainRuntime:
     def catat_chat_tim(self, bot: OtakBot, view, rencana, terkirim):
         bot.ingatan.catat_chat_tim(view, rencana, terkirim)
 
+    # Server mati: hentikan thread keputusan dan penulis, lalu tutup koneksi rantai LLM.
     def tutup(self):
         self.eksekutor_keputusan.shutdown(wait=False, cancel_futures=True)
         self.eksekutor_nlg.shutdown(wait=False, cancel_futures=True)
@@ -343,6 +351,8 @@ def waktu_jejak(waktu, tulisan):
 
 
 # Isi jejak checker satu langkah otak; dipakai room asli (NPCService.brain_turn) dan simulasi panel.
+# Alur: 1 lengkapi penjelasan dengan hasil engine dan NLG -> 2 isi tahap, metode, persona, dan keputusan ringkas
+#       -> 3 ringkasan untuk daftar jejak
 def isi_jejak(trace, match, otak, npc, rencana, tulisan, penolakan, durasi_ms, ditunda, penjelasan,
               waktu, nlu_sumber, masukan_nlg=None, chat_tim=None):  # fmt: skip
     penjelasan = lengkapi_penjelasan(penjelasan, npc, rencana, tulisan, penolakan, ditunda,
@@ -390,6 +400,8 @@ def isi_jejak(trace, match, otak, npc, rencana, tulisan, penolakan, durasi_ms, d
 # rencana bot tidak hilang. Thread LLM yang tertinggal selesai sendiri; rantai penulis mencatat
 # hasilnya (mis. mengistirahatkan jalur yang lambat) untuk kalimat berikutnya.
 # lapor(tahap): simulasi panel memantau tahap NLG (nlg, llm, aturan).
+# Alur: 1 tulis di thread NLG dengan batas BATAS_TULIS_DETIK -> 2 lewat batas: templat di thread bawaan -> 3 catat
+#       percobaan LLM yang melewati batas
 async def tulis_kalimat(runtime, otak, payload, konteks, lapor=None):
     loop = asyncio.get_running_loop()
     tulis = runtime.tulis if lapor is None else partial(runtime.tulis, lapor=lapor)
@@ -411,6 +423,7 @@ async def tulis_kalimat(runtime, otak, payload, konteks, lapor=None):
 
 
 # Chat tim dengan batas waktu sisa malam: bila penulis LLM terlalu lama, kabar tetap sampai lewat templat.
+# Alur: 1 tulis di thread NLG dengan batas sisa malam -> 2 lewat batas: templat di thread bawaan
 async def tulis_kalimat_tim(runtime, otak, payload, roster, sisa_detik):
     loop = asyncio.get_running_loop()
     try:
@@ -433,18 +446,6 @@ riwayat_nlu: dict[str, list] = {}
 # Roster berlabel dengan urutan yang sama seperti snapshot bot (kunci memo NLU ikut sama).
 def roster_label(match):
     return [match.labels.get(nama, nama) for nama in match.players]
-
-
-# Pemicu cepat: bot yang dipanggil chat baru (target neutral, dari IndoBERT atau aturan nama) atau dituduhnya (target
-# offend) melangkah pada putaran jam berikutnya, tanpa menunggu NPC_STEP_SECONDS. Bacaan NLU yang dipakai sama dengan
-# bacaan bot (memo NLUBersama). Lantai bicara dan aturan chat otak (jatah, jeda, satu jawaban per panggilan) tetap
-# menentukan apakah bot benar-benar bicara.
-def tandai_dipanggil(runtime, match, pengirim, nlu):
-    for t in nlu.get("target", []):
-        if t["relasi"] in ("neutral", "offend") and t["pemain"] != pengirim:
-            otak = runtime.otak_bot(match.id, match.username(t["pemain"]))
-            if otak is not None:
-                otak.segera = True
 
 
 # Pencatat NLU: baca satu chat pertandingan dengan IndoBERT di thread keputusan (urut dengan langkah bot), simpan
@@ -470,7 +471,14 @@ async def catat_nlu(match, pengirim, teks, message_id=None, runtime=brain_runtim
     except Exception:
         logger.exception("NLU chat gagal dicatat.")
         return None
-    tandai_dipanggil(runtime, match, label, nlu)
+    # Pemicu cepat: bot yang dipanggil chat ini (target neutral, dari IndoBERT atau aturan nama) atau dituduhnya
+    # (target offend) melangkah pada putaran jam berikutnya, tanpa menunggu NPC_STEP_SECONDS. Lantai bicara dan aturan
+    # chat otak (jatah, jeda, satu jawaban per panggilan) tetap menentukan apakah bot benar-benar bicara.
+    for t in nlu.get("target", []):
+        if t["relasi"] in ("neutral", "offend") and t["pemain"] != label:
+            otak = runtime.otak_bot(match.id, match.username(t["pemain"]))
+            if otak is not None:
+                otak.segera = True
     if message_id is not None:
         try:
             await asyncio.to_thread(PersistenceService(room_code).record_nlu, message_id, nlu)
@@ -486,6 +494,7 @@ class NPCService:
     sama seperti pemain memakai service. Pengiriman ke room lewat emit_room di sockets/server.py.
     """
 
+    # broadcast = fungsi kirim ke room (emit_room); runtime boleh diganti otak tiruan di tes.
     def __init__(self, sio, *, broadcast=None, runtime=None):
         self.broadcast = broadcast or sio.emit
         self.tasks = set()

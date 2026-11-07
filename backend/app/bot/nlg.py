@@ -381,6 +381,8 @@ def kalimat_cadangan(p):
 
 # Semua kalimat templat yang mungkin, sudah diberi persona. Kalimat yang mirip dengan yang baru terdengar di room
 # diletakkan paling belakang dan tetap ikut dicoba, karena mengulang lebih baik daripada mengganti maksud rencana.
+# Alur: 1 isi tiap varian sesuai rencana -> 2 ubah kata ganti persona -> 3 yang mirip kalimat
+#       baru terdengar ditaruh paling belakang -> 4 tanpa varian: kalimat cadangan
 def kalimat_templat(p, persona, hindari=()):
     baru, ulang = [], []
     for pola in urutan_varian(p):
@@ -743,6 +745,33 @@ class PenulisTautan(PenulisHTTP):
             return self.gagal(f"akses link ditolak ({hasil}): periksa token/host header tunnel", permanen=True)
         return super().gagal_dari(hasil)
 
+    # Model yang diminta tidak ada di link: pakai model sekeluarga (mis. qwen3:8b), lalu model pertama.
+    def _pilih_model(self, protokol, daftar):
+        daftar = [m for m in daftar if m]
+        if not daftar:  # model mungkin masih diunduh (ollama-models): dicoba lagi setelah jeda
+            return self.gagal("belum ada model di link")[1]
+        self.protokol = protokol
+        if self.model not in daftar:
+            keluarga = [m for m in daftar if m.split(":")[0] == self.model.split(":")[0]]
+            self.model = (keluarga or daftar)[0]
+        return "ok"
+
+    # Ollama: daftar model /api/tags, atau /api/show bila tunnel hanya meneruskan chat/show; lalu OpenAI /v1/models.
+    def _cek(self):
+        data, hasil = self._minta("GET", f"{self.url}/api/tags", batas=BATAS_CEK_DETIK)
+        if isinstance(data, dict) and isinstance(data.get("models"), list):
+            return self._pilih_model("ollama", [m.get("name") or m.get("model") for m in data["models"]])
+        if hasil in ("timeout", "tidak terhubung", 401, 403):  # link mati/timeout atau akses ditolak
+            return self.gagal_dari(hasil)[1]
+        # Jawaban lain (404, 200 tanpa daftar model, bukan JSON): mungkin tunnel terbatas atau server OpenAI.
+        if self._minta("POST", f"{self.url}/api/show", batas=BATAS_CEK_DETIK, json={"model": self.model})[0] is not None:
+            self.protokol = "ollama"
+            return "ok"
+        data, _ = self._minta("GET", f"{self.url}/v1/models", batas=BATAS_CEK_DETIK)
+        if isinstance(data, dict) and isinstance(data.get("data"), list):
+            return self._pilih_model("openai", [m.get("id") for m in data["data"]])
+        return self.gagal(f"link belum menjawab sebagai Ollama/OpenAI ({hasil})")[1]
+
     def _tulis(self, sistem, pesan):
         if self.protokol is None:  # belum dicek: kenali protokol dulu
             self._cek()
@@ -761,33 +790,6 @@ class PenulisTautan(PenulisHTTP):
         if data.get("done_reason") == "length" or not teks:
             return None, data.get("done_reason") or "kosong"
         return self.berhasil(teks)
-
-    # Ollama: daftar model /api/tags, atau /api/show bila tunnel hanya meneruskan chat/show; lalu OpenAI /v1/models.
-    def _cek(self):
-        data, hasil = self._minta("GET", f"{self.url}/api/tags", batas=BATAS_CEK_DETIK)
-        if isinstance(data, dict) and isinstance(data.get("models"), list):
-            return self._pilih_model("ollama", [m.get("name") or m.get("model") for m in data["models"]])
-        if hasil in ("timeout", "tidak terhubung", 401, 403):  # link mati/timeout atau akses ditolak
-            return self.gagal_dari(hasil)[1]
-        # Jawaban lain (404, 200 tanpa daftar model, bukan JSON): mungkin tunnel terbatas atau server OpenAI.
-        if self._minta("POST", f"{self.url}/api/show", batas=BATAS_CEK_DETIK, json={"model": self.model})[0] is not None:
-            self.protokol = "ollama"
-            return "ok"
-        data, _ = self._minta("GET", f"{self.url}/v1/models", batas=BATAS_CEK_DETIK)
-        if isinstance(data, dict) and isinstance(data.get("data"), list):
-            return self._pilih_model("openai", [m.get("id") for m in data["data"]])
-        return self.gagal(f"link belum menjawab sebagai Ollama/OpenAI ({hasil})")[1]
-
-    # Model yang diminta tidak ada di link: pakai model sekeluarga (mis. qwen3:8b), lalu model pertama.
-    def _pilih_model(self, protokol, daftar):
-        daftar = [m for m in daftar if m]
-        if not daftar:  # model mungkin masih diunduh (ollama-models): dicoba lagi setelah jeda
-            return self.gagal("belum ada model di link")[1]
-        self.protokol = protokol
-        if self.model not in daftar:
-            keluarga = [m for m in daftar if m.split(":")[0] == self.model.split(":")[0]]
-            self.model = (keluarga or daftar)[0]
-        return "ok"
 
 class PenulisBerantai:
     """Rantai prioritas: jalur dicoba berurutan, yang mati/istirahat dilewati. Templat tetap cadangan di tulis_pesan."""
@@ -958,7 +960,7 @@ def data_jawab(p, persona):
 # Chat yang memicu rencana, supaya kalimat menanggapi kejadian nyata, bukan kalimat umum: bela diri → tuduhan dan suara
 # Tribunal ke pembicara; bela orang, tuduh, dan tanya → tuduhan dan suara ke target; tuduh dan tanya juga tuduhan dari target itu;
 # jawab → pertanyaan penanya.
-# Keluaran: (baris pemicu untuk prompt, nama yang boleh disebut walau bukan target: pengirim pemicu, pemilih, dan pada bela_orang
+# Hasilnya (baris pemicu untuk prompt, nama yang boleh disebut walau bukan target: pengirim pemicu, pemilih, dan pada bela_orang
 # juga sesama pembela target di chat terbaru).
 def pemicu(p, konteks):
     chat = konteks["chat_terbaru"][-JUMLAH_CHAT_KONTEKS:]
@@ -1127,6 +1129,8 @@ def fakta_disalin(teks, p, persona):
     return next((f for f in calon if kemiripan(teks, f) >= MIRIP_MAKS), None)
 
 # Rencana chat → kalimat akhir. Selalu mengembalikan kalimat, apa pun yang gagal.
+# Alur: 1 LLM paling banyak MAKS_PERCOBAAN_LLM kali: prompt, tulis, nilai aturan, mirip, salin fakta
+#       -> 2 templat: varian pertama yang lolos -> 3 cadangan: varian pertama
 def tulis_pesan(p, konteks, penulis=None, persona="santai", hindari=()):
     mulai, percobaan = perf_counter(), []
 
@@ -1205,9 +1209,11 @@ def kalimat_tim(p, persona):
 
 # Paket chat tim → kalimat akhir. Tanpa IndoBERT, karena chat tim tidak pernah menjadi bukti; pemeriksa aturan tetap berjalan. Keluaran
 # boleh kosong bila LLM menilai tidak perlu membalas. Hasilnya tidak memuat kalimat percobaan, supaya aman bila ikut tercatat.
-# Masukan : p = paket siapkan_nlg_tim, roster, penulis (None = templat), persona.
-# Keluaran: {teks, sumber, penulis, lolos_aturan, pelanggaran, persona, percobaan, detik}; teks "" berarti tidak ada pesan.
-# Dipakai oleh: BrainRuntime.tulis_tim → NPCService.
+# Menerima p = paket siapkan_nlg_tim, roster, penulis (None = templat), persona.
+# Hasilnya {teks, sumber, penulis, lolos_aturan, pelanggaran, persona, percobaan, detik}; teks "" berarti tidak ada pesan.
+# Dipanggil oleh BrainRuntime.tulis_tim → NPCService.
+# Alur: 1 LLM paling banyak MAKS_PERCOBAAN_LLM kali -> 2 templat tim yang lolos aturan -> 3 tidak ada
+#       yang lolos: kalimat kosong
 def tulis_chat_tim(p, roster, penulis=None, persona="santai"):
     mulai, percobaan, rencana = perf_counter(), [], rencana_periksa_tim(p)
     boleh = {p["pilihan_rekan"], p["target_saya"], *(m["pengirim"] for m in p["chat_tim"])} - {None}
@@ -1275,6 +1281,7 @@ def tanpa_lapor(tahap):
 class JamPenulis:
     """Penulis yang mencatat total lama panggilan LLM satu kalimat (satu objek per kalimat)."""
 
+    # Bungkus satu penulis untuk satu kalimat; detik = total lama panggilan LLM.
     def __init__(self, penulis, lapor=tanpa_lapor):
         self.penulis, self.detik, self.lapor = penulis, 0.0, lapor
 
@@ -1293,26 +1300,13 @@ class JamPenulis:
             self.lapor("aturan")  # kalimat diperiksa aturan, lalu ulang LLM atau templat bila ditolak
 
 
-# Daftar model di link LLM (Ollama /api/tags, atau OpenAI /v1/models) memakai klien penulis yang sama (token tunnel
-# ikut). Kosong bila link tidak menjawab.
-# Alur: 1 coba /api/tags (Ollama) -> 2 bukan Ollama: coba /v1/models -> 3 nama unik terurut
-def daftar_model_tautan(penulis, batas):
-    data, _ = penulis._minta("GET", f"{penulis.url}/api/tags", batas=batas)
-    if isinstance(data, dict) and isinstance(data.get("models"), list):
-        nama = [m.get("name") or m.get("model") for m in data["models"]]
-    else:
-        data, _ = penulis._minta("GET", f"{penulis.url}/v1/models", batas=batas)
-        ok = isinstance(data, dict) and isinstance(data.get("data"), list)
-        nama = [m.get("id") for m in data["data"]] if ok else []
-    return sorted({n for n in nama if isinstance(n, str) and n})
-
-
 class PenulisNPC:
     """Rantai penulis kalimat sesuai pengaturan panel: urutan jalur, model, cek tiap jalur, dan status untuk panel.
 
     Kunci (lock) dipinjam dari BrainRuntime supaya status otak dan status rantai selalu terbaca bersamaan.
     """
 
+    # Konfigurasi awal dari .env; rantai baru dibangun saat otak dimuat (segarkan).
     def __init__(self, lock):
         self.lock = lock
         self.konfigurasi = KonfigurasiNPC(
@@ -1330,39 +1324,37 @@ class PenulisNPC:
         # Model yang ada di link LLM (hasil cek terakhir), untuk pilihan model di panel.
         self.model_tautan_tersedia = []
 
-    # Status tiap jalur untuk panel: jalur aktif sesuai prioritas, lalu yang dinonaktifkan. Tanpa nilai key.
-    def _status_rantai(self, penulis, berikut):
-        anggota = {p.jalur: p for p in (penulis.daftar if penulis else [])}
-        urutan = self.konfigurasi.urutan_penulis
-        baris = []
-        for jalur in urutan + [j for j in JALUR_PENULIS if j not in urutan]:
-            p = anggota.get(jalur)
-            if self.konfigurasi.penulis == "templat" or jalur not in urutan:
-                keadaan, status = "nonaktif", "mode templat" if jalur in urutan else "dinonaktifkan"
-            elif p is None:
-                keadaan, status = "tidak_ada", self.keterangan.get(jalur, "belum dimuat")
-            elif not p.aktif:
-                keadaan, status = "ditolak", p.status
-            elif not p.siap():
-                keadaan, status = "istirahat", p.status
-            else:
-                keadaan, status = ("dipakai" if p is berikut else "siap"), p.status
-            # Penghitung panggilan/token berlaku sejak rantai terakhir dibangun (token cek ikut dihitung).
-            baris.append({
-                "jalur": jalur, "keadaan": keadaan, "status": status,
-                "model": p.model if p else None, "panggilan": p.panggilan if p else 0,
-                "token_masuk": p.token_masuk if p else 0, "token_keluar": p.token_keluar if p else 0,
-                "alamat": self.alamat_tautan if jalur == "tautan" else None,
-                "hasil_cek": getattr(p, "hasil_cek", None),
-            })  # fmt: skip
-        return baris
-
-    # Bagian penulis di ringkasan otak untuk panel dan layar persiapan.
+    # Bagian penulis di ringkasan otak untuk panel dan layar persiapan, termasuk status tiap jalur tanpa nilai key.
+    # Alur: 1 jalur yang menulis kalimat berikutnya -> 2 status tiap jalur: yang aktif sesuai prioritas, lalu yang
+    #       dinonaktifkan -> 3 ringkasan konfigurasi dan rantai
     def ringkasan(self):
         with self.lock:
             penulis = self.rantai if self.konfigurasi.penulis != "templat" else None
             # Jalur yang menulis kalimat berikutnya: yang pertama siap (tidak ditolak dan tidak istirahat).
             berikut = penulis.terdepan() if penulis else None
+            anggota = {p.jalur: p for p in (penulis.daftar if penulis else [])}
+            urutan = self.konfigurasi.urutan_penulis
+            rantai_penulis = []
+            for jalur in urutan + [j for j in JALUR_PENULIS if j not in urutan]:
+                p = anggota.get(jalur)
+                if self.konfigurasi.penulis == "templat" or jalur not in urutan:
+                    keadaan, status = "nonaktif", "mode templat" if jalur in urutan else "dinonaktifkan"
+                elif p is None:
+                    keadaan, status = "tidak_ada", self.keterangan.get(jalur, "belum dimuat")
+                elif not p.aktif:
+                    keadaan, status = "ditolak", p.status
+                elif not p.siap():
+                    keadaan, status = "istirahat", p.status
+                else:
+                    keadaan, status = ("dipakai" if p is berikut else "siap"), p.status
+                # Penghitung panggilan/token berlaku sejak rantai terakhir dibangun (token cek ikut dihitung).
+                rantai_penulis.append({
+                    "jalur": jalur, "keadaan": keadaan, "status": status,
+                    "model": p.model if p else None, "panggilan": p.panggilan if p else 0,
+                    "token_masuk": p.token_masuk if p else 0, "token_keluar": p.token_keluar if p else 0,
+                    "alamat": self.alamat_tautan if jalur == "tautan" else None,
+                    "hasil_cek": getattr(p, "hasil_cek", None),
+                })  # fmt: skip
             return {
                 "sedang_cek_penulis": self._cek_tertunda > 0,
                 "penulis_diminta": self.konfigurasi.penulis,
@@ -1374,47 +1366,13 @@ class PenulisNPC:
                 "model_tautan": self.konfigurasi.model_tautan,
                 "model_tautan_bawaan": ai_runtime.current().ollama_model,
                 "model_tautan_tersedia": list(self.model_tautan_tersedia),
-                "rantai_penulis": self._status_rantai(penulis, berikut),
+                "rantai_penulis": rantai_penulis,
             }
-
-    # Rantai sesuai urutan panel: key OpenRouter dan link LLM (Docker/tunnel) dari Konfigurasi AI panel. Jalur tanpa
-    # key/link dilewati; semua gagal → None (templat).
-    # Alur: 1 mode templat: tanpa rantai -> 2 baca key, link, model, token dari Konfigurasi AI -> 3 buat_rantai
-    def _buat_rantai(self):
-        self.keterangan = {}
-        if self.konfigurasi.penulis == "templat":
-            return None
-        config = ai_runtime.current()
-        link = (config.ollama_base_url or "").strip() or None
-        # Host dan asal link ditampilkan di panel: link bawaan .env (mis. localhost) mudah dikenali.
-        self.alamat_tautan = link and {
-            "host": urlsplit(link).netloc,
-            "sumber": "panel" if ai_runtime.diatur_panel("ollama_base_url") else ".env",
-        }
-        kunci = {
-            "openrouter": config.openrouter_api_key_value,
-            "tautan": link,
-        }
-        model = {
-            "openrouter": self.konfigurasi.model_openrouter or config.openrouter_model,
-            "tautan": self.konfigurasi.model_tautan or config.ollama_model,
-        }
-        # Token tanpa spasi; None jika tidak diatur.
-        token = config.ollama_tunnel_token
-        try:
-            rantai, self.keterangan = buat_rantai(
-                self.konfigurasi.urutan_penulis, kunci, model,
-                token_tautan=(token.get_secret_value().strip() or None) if token else None,
-            )  # fmt: skip
-        except Exception:
-            logger.exception("Rantai penulis gagal disiapkan; memakai templat.")
-            return None
-        return rantai
 
     # Hit provider langsung; link juga diuji menghasilkan jawaban setelah penemuan model. Hanya status yang dicatat,
     # tanpa key. Penghitung cek dinaikkan pemanggil (segarkan).
     # Alur: 1 tiap jalur: cek -> 2 link: minta satu jawaban uji -> 3 catat hasil cek -> 4 link: daftar modelnya
-    #       -> 5 selesai: turunkan penghitung cek
+    #       (Ollama /api/tags, lalu OpenAI /v1/models) -> 5 selesai: turunkan penghitung cek
     def _cek(self, penulis):
         try:
             with self._kunci_cek:
@@ -1434,10 +1392,19 @@ class PenulisNPC:
                         "detail": status,
                     }
                     hasil.append((p.jalur, status))
-                    if p.jalur == "tautan":
-                        self.model_tautan_tersedia = (
-                            daftar_model_tautan(p, BATAS_CEK_DETIK) if status == "ok" else []
-                        )
+                    if p.jalur == "tautan" and status != "ok":
+                        self.model_tautan_tersedia = []
+                    elif p.jalur == "tautan":
+                        # Daftar model di link memakai klien penulis yang sama (token tunnel ikut); kosong bila link
+                        # tidak menjawab.
+                        data, _ = p._minta("GET", f"{p.url}/api/tags", batas=BATAS_CEK_DETIK)
+                        if isinstance(data, dict) and isinstance(data.get("models"), list):
+                            nama = [m.get("name") or m.get("model") for m in data["models"]]
+                        else:
+                            data, _ = p._minta("GET", f"{p.url}/v1/models", batas=BATAS_CEK_DETIK)
+                            ok = isinstance(data, dict) and isinstance(data.get("data"), list)
+                            nama = [m.get("id") for m in data["data"]] if ok else []
+                        self.model_tautan_tersedia = sorted({n for n in nama if isinstance(n, str) and n})
                 logger.info("Cek penulis: %s", "; ".join(f"{j}={h}" for j, h in hasil))
         except Exception:
             logger.exception("Cek rantai penulis gagal.")
@@ -1445,14 +1412,43 @@ class PenulisNPC:
             with self.lock:
                 self._cek_tertunda -= 1
 
-    # Bangun ulang rantai (key/link/urutan terbaru) lalu cek semua jalurnya. latar=False (cek sinkron) hanya dipakai
-    # tes; panel membaca progres lewat polling.
-    # Alur: 1 ganti rantai lama dengan yang baru -> 2 tutup rantai lama sesudah kalimat yang sedang ditulis selesai
-    #       -> 3 cek rantai baru, di latar atau langsung
+    # Bangun ulang rantai sesuai urutan panel, dengan key OpenRouter dan link LLM (Docker/tunnel) terbaru dari
+    # Konfigurasi AI panel, lalu cek semua jalurnya. Jalur tanpa key/link dilewati; mode templat atau semua jalur gagal
+    # berarti tanpa rantai (templat). latar=False (cek sinkron) hanya dipakai tes; panel membaca progres lewat polling.
+    # Alur: 1 mode templat: tanpa rantai -> 2 baca key, link, model, token dari Konfigurasi AI -> 3 buat_rantai
+    #       -> 4 tutup rantai lama sesudah kalimat yang sedang ditulis selesai -> 5 cek rantai baru, di latar atau
+    #       langsung
     def segarkan(self, latar=True):
         with self.lock:
-            lama, self.rantai = self.rantai, self._buat_rantai()
-            rantai = self.rantai
+            lama, rantai = self.rantai, None
+            self.keterangan = {}
+            if self.konfigurasi.penulis != "templat":
+                config = ai_runtime.current()
+                link = (config.ollama_base_url or "").strip() or None
+                # Host dan asal link ditampilkan di panel: link bawaan .env (mis. localhost) mudah dikenali.
+                self.alamat_tautan = link and {
+                    "host": urlsplit(link).netloc,
+                    "sumber": "panel" if ai_runtime.diatur_panel("ollama_base_url") else ".env",
+                }
+                kunci = {
+                    "openrouter": config.openrouter_api_key_value,
+                    "tautan": link,
+                }
+                model = {
+                    "openrouter": self.konfigurasi.model_openrouter or config.openrouter_model,
+                    "tautan": self.konfigurasi.model_tautan or config.ollama_model,
+                }
+                # Token tanpa spasi; None jika tidak diatur.
+                token = config.ollama_tunnel_token
+                try:
+                    rantai, self.keterangan = buat_rantai(
+                        self.konfigurasi.urutan_penulis, kunci, model,
+                        token_tautan=(token.get_secret_value().strip() or None) if token else None,
+                    )  # fmt: skip
+                except Exception:
+                    logger.exception("Rantai penulis gagal disiapkan; memakai templat.")
+                    rantai = None
+            self.rantai = rantai
             if rantai is not None:
                 # Dinaikkan sebelum thread cek mulai agar ringkasan langsung "sedang dicek".
                 self._cek_tertunda += 1
@@ -1508,6 +1504,7 @@ class PenulisNPC:
         with self.lock:
             return self.rantai if pakai_llm and self.konfigurasi.penulis != "templat" else None
 
+    # Server mati: tutup koneksi rantai yang sedang dipakai.
     def tutup(self):
         if self.rantai is not None:
             self.rantai.tutup()

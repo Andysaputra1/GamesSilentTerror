@@ -136,6 +136,10 @@ def _baris(df):
     return [] if _kosong(df) else df.to_dict("records")
 
 
+def _sel(x):
+    return _ringkas_dict(x) if isinstance(x, dict) else x
+
+
 # DataFrame → {"kolom", "baris"} berisi kolom yang tersedia saja (toleran kolom hilang).
 def _tabel(rows, kolom, n=MAKS_BARIS):
     rows = list(rows)[:n]
@@ -143,10 +147,6 @@ def _tabel(rows, kolom, n=MAKS_BARIS):
     if not rows or not ada:
         return None
     return {"kolom": ada, "baris": [[_nilai(_sel(r.get(k))) for k in ada] for r in rows]}
-
-
-def _sel(x):
-    return _ringkas_dict(x) if isinstance(x, dict) else x
 
 
 # ---------------------------------------------------------------- bagian umum
@@ -464,6 +464,10 @@ def _pangkas(obj, n):
             _pangkas(nilai, n)
 
 
+def _minimal(bot, catatan):
+    return {"versi": VERSI, "bot": bot if isinstance(bot, dict) else {}, "catatan": catatan}
+
+
 # Pastikan penjelasan ≤ BATAS_BYTE: pangkas bertahap, lalu sisakan identitas, keputusan, dan narasi.
 def batasi(penjelasan):
     if ukuran(penjelasan) <= BATAS_BYTE:
@@ -487,10 +491,6 @@ def batasi(penjelasan):
             penjelasan.get("bot"), ["Penjelasan terlalu besar; hanya identitas yang disimpan."]
         )
     return penjelasan
-
-
-def _minimal(bot, catatan):
-    return {"versi": VERSI, "bot": bot if isinstance(bot, dict) else {}, "catatan": catatan}
 
 
 # ---------------------------------------------------------------- API publik
@@ -541,12 +541,6 @@ def _masukan(masukan):
     }  # fmt: skip
 
 
-# Ringkasan NLG untuk tab panel: kalimat akhir, asal kalimat, penulis LLM, dan hasil pemeriksa aturan;
-# selalu disertai masukan NLG bila otak merencanakan chat.
-def _nlg(tulisan, rencana, ditunda, masukan=None):
-    return {**_hasil_nlg(tulisan, rencana, ditunda), "masukan": _masukan(masukan)}
-
-
 def _hasil_nlg(tulisan, rencana, ditunda):
     rencana = rencana or {}
     if tulisan:
@@ -577,6 +571,12 @@ def _hasil_nlg(tulisan, rencana, ditunda):
             "keterangan": "Fase berganti atau bot tidak lagi boleh chat saat kalimat selesai ditulis.",
         }
     return {"status": "tidak ada chat", "keterangan": _nilai((rencana.get("alasan") or [None])[0])}
+
+
+# Ringkasan NLG untuk tab panel: kalimat akhir, asal kalimat, penulis LLM, dan hasil pemeriksa aturan;
+# selalu disertai masukan NLG bila otak merencanakan chat.
+def _nlg(tulisan, rencana, ditunda, masukan=None):
+    return {**_hasil_nlg(tulisan, rencana, ditunda), "masukan": _masukan(masukan)}
 
 
 def lengkapi(penjelasan, npc, rencana, tulisan, penolakan, ditunda=False, masukan=None):

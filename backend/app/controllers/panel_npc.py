@@ -338,7 +338,7 @@ KODE_ALUR = {
         (BOT, "BrainRuntime.catat_chat", [("catat_aksi_bot", "ingatan: bot sudah bicara (jeda antar-chat)")]),
         (BOT, "catat_nlu", [
             ("baca_chat,", "kalimat bot dibaca NLU"),
-            ("tandai_dipanggil(", "bot yang dipanggil/dituduh melangkah segera"),
+            ("otak.segera = True", "bot yang dipanggil/dituduh melangkah segera"),
             ("record_nlu", "bacaan disimpan untuk riwayat chat"),
         ]),
     ],

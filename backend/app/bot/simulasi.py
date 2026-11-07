@@ -26,6 +26,7 @@ MULAI_FASE = 2.0  # detik setelah fase mulai sebelum bot melangkah (sama dengan 
 
 
 class Simulasi:
+    # Satu pertandingan tiruan: admin sebagai satu-satunya manusia dan bot pilihan dengan otak masing-masing.
     def __init__(self, nama, jumlah_bot):
         bots = list(BOT_NAMES[:jumlah_bot])
         self.match = Match([PEMAIN], bots, now=0.0, labels=label_unik({PEMAIN: nama}, bots))
@@ -38,12 +39,14 @@ class Simulasi:
         # nama → tahap yang sedang dikerjakan (flowchart live di panel lewat polling).
         self.progres = {}
 
+    # Fungsi lapor(tahap) untuk satu pemain: mencatat tahap yang sedang dikerjakan untuk flowchart live.
     def _lapor(self, nama):
         def lapor(tahap):
             self.progres[nama] = {"tahap": tahap, "sejak": time.monotonic()}
 
         return lapor
 
+    # Tahap tiap pemain dan sudah berapa detik tahap itu berjalan.
     def lihat_progres(self):
         sekarang = time.monotonic()
         return {
@@ -51,6 +54,7 @@ class Simulasi:
             for nama, p in list(self.progres.items())
         }
 
+    # Keadaan pertandingan untuk panel: fase, waktu, dan kartu tiap pemain beserta metode dan persona bot.
     def ringkasan(self):
         m = self.match
         mulai = m.deadline - m.phase_length()
@@ -77,6 +81,7 @@ class Simulasi:
         self.events = baru
         return [{**jejak_baru(KODE, "SISTEM", teks), "stage": "sistem"} for teks in baru[j:]]
 
+    # Pencatat NLU simulasi: chat dibaca di thread keputusan, sama seperti catat_nlu di room asli.
     async def _baca(self, pengirim, teks):
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(
@@ -123,6 +128,9 @@ class Simulasi:
         lapor("selesai")
         return trace
 
+    # Satu putaran: jam maju, lalu semua bot hidup melangkah sekali berurutan menurut nama.
+    # Alur: 1 jam maju (paling jauh 1 detik sebelum deadline) -> 2 tandai bot menunggu -> 3 tiap bot: _langkah,
+    #       lalu pengumuman engine yang baru
     async def _putaran(self, detik):
         m = self.match
         # Bot tidak melangkah di detik terakhir fase (NPCService._sudah_waktunya_melangkah); waktu tidak melewati deadline.
@@ -139,6 +147,8 @@ class Simulasi:
                 jejak += [await self._langkah(self.otak[nama], jam_bot), *self._sistem()]
         return jejak
 
+    # Chat admin masuk pertandingan, dibaca NLU, lalu satu putaran bot.
+    # Alur: 1 cek izin chat -> 2 pesan masuk engine -> 3 NLU membaca pesan -> 4 satu putaran bot
     async def kirim(self, teks, detik):
         m = self.match
         if m.winner or not m.can_chat(PEMAIN):
@@ -154,6 +164,7 @@ class Simulasi:
         trace["timings"] = {"nlu_ms": trace["nlu"]["ms"]}
         return [trace, *await self._putaran(detik)]
 
+    # Satu putaran bot tanpa chat admin.
     async def jalan(self, detik):
         if self.match.winner:
             raise ValueError("Permainan sudah selesai.")
@@ -178,9 +189,12 @@ class Simulasi:
 
 
 class SimulasiService:
+    # Simulasi yang masih disimpan, terlama lebih dulu (paling banyak MAKS_SIMULASI).
     def __init__(self):
         self.simulasi: OrderedDict[str, Simulasi] = OrderedDict()
 
+    # Mulai simulasi baru; otak harus sudah siap.
+    # Alur: 1 otak belum siap: mulai memuat lalu tolak -> 2 buat simulasi -> 3 buang yang terlama -> 4 ringkasan awal
     def mulai(self, nama, jumlah_bot):
         if not brain_runtime.status["siap"]:
             brain_runtime.mulai_memuat()
@@ -206,6 +220,7 @@ class SimulasiService:
                 jejak = await sim.fase(detik)
         return {**sim.ringkasan(), "jejak": jejak}
 
+    # Progres simulasi yang sedang berjalan, untuk polling flowchart live di panel.
     def progres(self, sim_id):
         sim = self.simulasi.get(sim_id)
         if sim is None:

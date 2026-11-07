@@ -67,6 +67,8 @@ def _nama_cocok(word, name):
 
 
 # Mengganti nama pemain dan panggilannya dengan token peran agar model tidak menghafal nama.
+# Alur: 1 tiap kata: nama persis -> 2 kata ganti/istilah game/kata umum: biarkan -> 3 panggilan yang
+#       cocok dengan tepat satu pemain -> 4 ganti dengan token peran
 def samarkan_nama(text, daftar_pemain, kandidat, pengirim, common_words):
     lowered = {name.casefold(): name for name in daftar_pemain}
 
@@ -97,6 +99,8 @@ NAMA_KANONIK = (
 
 # Varian teks untuk Model 1: nama pemain dan panggilannya diganti nama yang dikenal model, dengan aturan
 # pencocokan yang sama seperti samarkan_nama. Tanpa nama pemain, teks dipakai apa adanya.
+# Alur: 1 urutan pemain yang disebut -> 2 tanpa nama: teks apa adanya -> 3 satu varian untuk tiap
+#       set NAMA_KANONIK
 def varian_nama_intent(text, daftar_pemain, common_words):
     lowered = {name.casefold(): name for name in daftar_pemain}
 
@@ -127,6 +131,8 @@ def varian_nama_intent(text, daftar_pemain, common_words):
 
 
 # Menyusun satu teks pasangan (pesan, kandidat) dari pesan utama, konteks, dan roster.
+# Alur: 1 konteks terbaru lebih dulu, nama disamarkan -> 2 pesan sekarang disamarkan -> 3 gabung
+#       dengan label intent
 def buat_teks_pasangan(pengirim, teks_chat, chat_sebelumnya, daftar_pemain, kandidat, common_words, label_intent=None):
 
     def peran(name):
@@ -181,6 +187,7 @@ class NLUIndoBERT:
 
     # Model 1: label intent dan confidence 0–1. Dengan roster, nama pemain diganti nama yang dikenal model
     # (varian_nama_intent) dan probabilitas ketiga varian dirata-ratakan.
+    # Alur: 1 varian nama -> 2 probabilitas tiap varian dirata-ratakan -> 3 kelas terbesar
     def intent(self, teks, daftar_pemain=()):
         config = self.intent_model.config
         varian = varian_nama_intent(teks, list(daftar_pemain), self.common_words) if daftar_pemain else [teks]
@@ -193,6 +200,8 @@ class NLUIndoBERT:
     # Model 2: relasi setiap pemain roster terhadap pesan ini: offend/defend (dituduh/dibela) atau neutral (diajak
     # bicara atau dibicarakan). Sama dengan gabung_target di nlu_target: pesan neutral boleh tanpa target, dan aturan
     # minimal satu target serta "tidak_diketahui" hanya untuk offend/defend.
+    # Alur: 1 satu teks pasangan per kandidat -> 2 relasi tiap kandidat -> 3.1 neutral: hanya relasi
+    #       neutral -> 3.2 offend/defend: aturan minimal satu target, lalu tidak_diketahui
     def target(self, pengirim, teks, konteks, daftar_pemain, label_intent):
         config = self.target_model.config
         labels = [config.id2label[i] for i in range(len(config.id2label))]
@@ -275,9 +284,11 @@ def folder_model(nilai, jenis) -> Path | None:
 # Aturan nama, sumber kedua target neutral: pemain roster yang disebut nama atau panggilannya di teks. Pencocokan sama
 # dengan samarkan_nama: nama persis, atau panggilan/akhiran (_nama_cocok) yang cocok dengan tepat satu pemain; kata
 # ganti, istilah game, dan kata umum (common_words) tidak pernah dianggap nama. Pengirim tidak dihitung.
-# Masukan : teks, daftar_pemain (roster), pengirim, common_words (pair_builder.json Model 2; kosong bila tidak ada).
-# Keluaran: daftar nama pemain yang disebut, urut kemunculan pertama.
-# Dipakai oleh: anotasi_chat (hanya untuk pesan neutral, jadi aturan ini tidak pernah membuat target offend/defend).
+# Menerima teks, daftar_pemain (roster), pengirim, common_words (pair_builder.json Model 2; kosong bila tidak ada).
+# Hasilnya daftar nama pemain yang disebut, urut kemunculan pertama.
+# Dipanggil oleh anotasi_chat (hanya untuk pesan neutral, jadi aturan ini tidak pernah membuat target offend/defend).
+# Alur: 1 tiap kata: nama persis atau panggilan unik -> 2 lewati kata ganti, istilah, kata umum,
+#       dan pengirim -> 3 nama unik sesuai urutan muncul
 def pemain_disebut(teks, daftar_pemain, pengirim, common_words):
     lowered = {name.casefold(): name for name in daftar_pemain}
     disebut = []
@@ -299,13 +310,15 @@ def pemain_disebut(teks, daftar_pemain, pengirim, common_words):
 
 # Persepsi: membaca satu chat dengan IndoBERT, Model 1 (intent) lalu Model 2 (target per pemain roster). Pesan neutral
 # juga mendapat target neutral dari aturan nama (pemain_disebut); target dari kedua sumber digabung per pemain.
-# Masukan : nlu = NLUIndoBERT (atau pembungkus dengan intent/target yang sama); chat = {id, ronde, fase, waktu,
-#           pengirim, teks}; riwayat = chat sebelumnya yang sudah beranotasi (12 terakhir menjadi konteks Model 2);
-#           daftar_pemain = roster.
-# Keluaran: chat yang sama + intent, conf_intent (0–1), dan target [{pemain, relasi, prob, sumber}].
-#           sumber = ["indobert"], ["nama"], atau keduanya. Hanya relasi offend/defend yang menjadi bukti (relasi_chat);
-#           target neutral menandai pemain yang diajak bicara (konteks "penanya").
-# Dipakai oleh: baca_chat_baru (setiap chat baru di ingatan bot) dan baca_chat (pencatat NLU pertandingan).
+# Menerima nlu = NLUIndoBERT (atau pembungkus dengan intent/target yang sama); chat = {id, ronde, fase, waktu,
+#   pengirim, teks}; riwayat = chat sebelumnya yang sudah beranotasi (12 terakhir menjadi konteks Model 2);
+#   daftar_pemain = roster.
+# Hasilnya chat yang sama + intent, conf_intent (0–1), dan target [{pemain, relasi, prob, sumber}].
+#   sumber = ["indobert"], ["nama"], atau keduanya. Hanya relasi offend/defend yang menjadi bukti (relasi_chat);
+#   target neutral menandai pemain yang diajak bicara (konteks "penanya").
+# Dipanggil oleh baca_chat_baru (setiap chat baru di ingatan bot) dan baca_chat (pencatat NLU pertandingan).
+# Alur: 1 Model 1: intent -> 2 konteks 12 chat terakhir -> 3 Model 2: target -> 4 pesan neutral:
+#       tambah target dari aturan nama
 def anotasi_chat(nlu, chat, riwayat, daftar_pemain):
     intent, confidence = nlu.intent(chat["teks"], daftar_pemain)
     konteks = [{
@@ -342,15 +355,6 @@ def baca_chat_baru(nlu, ingatan, roster, dari):
                 ingatan._id_chat.discard(chat["id"])
             del ingatan.chat[i:]
             raise
-
-
-# Target NLU menjadi teks pendek untuk panel, mis. "NOX: offend (0.91)".
-def teks_target(target):
-    return [
-        f"{t['pemain']}: {t['relasi']}"
-        + (f" ({t['prob']:.2f})" if t.get("prob") is not None else "")
-        for t in target or []
-    ]
 
 
 # Pencatat NLU: baca satu chat pertandingan seperti ingatan bot membacanya, dengan `riwayat` (milik pemanggil, urut
