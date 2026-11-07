@@ -274,7 +274,7 @@ class CheckerPenjelasanTests(unittest.TestCase):
         runtime.siapkan_pertandingan(room.match, room.code)
         with (
             patch("app.services.room_service.room_service", rooms),
-            patch("app.bot.runtime.brain_runtime", runtime),
+            patch("app.bot.bot_controller.brain_runtime", runtime),
         ):
             live = CheckerService().ringkasan_room(room.code)
             # Jejak lama boleh memuat metode yang sudah diarsipkan.

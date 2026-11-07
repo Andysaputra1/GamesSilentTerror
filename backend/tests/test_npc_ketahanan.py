@@ -10,8 +10,9 @@ import time
 import unittest
 from unittest.mock import AsyncMock, Mock, patch
 
-from app.bot import runtime as runtime_modul
-from app.bot.runtime import BrainRuntime, NLUBersama, folder_model
+from app.bot import bot_controller as runtime_modul
+from app.bot.bot_controller import BrainRuntime
+from app.bot.nlu import NLUBersama, folder_model
 from tests.nlu_palsu import NLUPalsu
 from app.bot.bot_controller import NPCService
 from app.services.room_service import RoomService
@@ -19,7 +20,7 @@ from app.services.room_service import RoomService
 
 def runtime_siap():
     runtime = BrainRuntime()
-    runtime.konfigurasi.penulis = "templat"
+    runtime.penulis_npc.konfigurasi.penulis = "templat"
     runtime.muat_sekarang(nlu=NLUBersama(NLUPalsu(r"curiga|vote"), "cadangan"))
     return runtime
 

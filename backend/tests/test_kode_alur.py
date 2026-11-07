@@ -33,7 +33,7 @@ class KodeAlurTests(unittest.TestCase):
 
     def test_parameter_output_dan_baris_inti_ditandai(self):
         langkah = kode_node("sinkron")[0]
-        self.assertEqual(langkah["nama"], "runtime.BrainRuntime.langkah")
+        self.assertEqual(langkah["nama"], "bot_controller.BrainRuntime.langkah")
         self.assertEqual([p["nama"] for p in langkah["parameter"]],
                          ["bot", "snapshot", "sekarang", "selalu_jelaskan", "lapor"])  # fmt: skip
         self.assertEqual(langkah["parameter"][3]["bawaan"], "False")

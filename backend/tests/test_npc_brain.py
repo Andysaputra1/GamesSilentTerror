@@ -11,7 +11,8 @@ import unittest
 from unittest.mock import AsyncMock, Mock, patch
 
 from app.game.match_engine import Match
-from app.bot.runtime import BrainRuntime, NLUBersama
+from app.bot.bot_controller import BrainRuntime
+from app.bot.nlu import NLUBersama, baca_chat
 from app.bot.bot_controller import LANTAI_MAKS, NPCService, catat_nlu
 from app.services.persistence_service import PersistenceError
 from app.services.room_service import RoomService
@@ -22,7 +23,7 @@ AKSI_RAHASIA = {"gag", "hostage", "guard", "peek"}
 
 def runtime_siap():
     runtime = BrainRuntime()
-    runtime.konfigurasi.penulis = "templat"
+    runtime.penulis_npc.konfigurasi.penulis = "templat"
     pola_offend = r"curiga|hitman|vote|mencurigakan"
     pola_defend = r"bukan hitman|jangan vote|jangan buru|disandera|percaya"
     runtime.muat_sekarang(nlu=NLUBersama(NLUPalsu(pola_offend, pola_defend), "cadangan"))
@@ -95,16 +96,16 @@ class BrainRuntimeTests(unittest.TestCase):
     def test_baca_chat_adds_neutral_targets_from_the_name_rule(self):
         # NLU palsu tidak memberi target untuk pesan neutral; aturan nama di anotasi_chat yang memberinya.
         roster = ["human", "NOX", "ECHO", "VEIL"]
-        sapa = self.runtime.baca_chat([], "human", "Vei, kamu semalam ngapain?", roster)
+        sapa = baca_chat(self.runtime.nlu, [], "human", "Vei, kamu semalam ngapain?", roster)
         self.assertEqual(sapa["intent"], "neutral")
         self.assertEqual(
             sapa["target"],
             [{"pemain": "VEIL", "relasi": "neutral", "prob": None, "sumber": ["nama"]}],
         )
-        semua = self.runtime.baca_chat([], "human", "Ada yang tau sisa waktu?", roster)
+        semua = baca_chat(self.runtime.nlu, [], "human", "Ada yang tau sisa waktu?", roster)
         self.assertEqual(semua["target"], [])
         # Aturan nama tidak pernah membuat target offend/defend: tuduhan tetap dari NLU (sumber cadangan).
-        tuduh = self.runtime.baca_chat([], "human", "Aku curiga NOX, vote NOX.", roster)
+        tuduh = baca_chat(self.runtime.nlu, [], "human", "Aku curiga NOX, vote NOX.", roster)
         self.assertEqual(
             [(t["pemain"], t["relasi"], t["sumber"]) for t in tuduh["target"]],
             [("NOX", "offend", ["cadangan"])],
@@ -114,14 +115,14 @@ class BrainRuntimeTests(unittest.TestCase):
     def test_baca_chat_keeps_at_most_twelve_previous_chats_as_context(self):
         roster, riwayat = ["human", "NOX", "ECHO", "VEIL"], []
         for i in range(14):
-            self.runtime.baca_chat(riwayat, "human", f"Chat ke-{i}, aku curiga NOX.", roster)
-        hasil = self.runtime.baca_chat(riwayat, "ECHO", "Aku bukan Hitman.", roster)
+            baca_chat(self.runtime.nlu, riwayat, "human", f"Chat ke-{i}, aku curiga NOX.", roster)
+        hasil = baca_chat(self.runtime.nlu, riwayat, "ECHO", "Aku bukan Hitman.", roster)
         self.assertEqual([c["teks"] for c in hasil["konteks"]],
                          [f"Chat ke-{i}, aku curiga NOX." for i in range(2, 14)])  # fmt: skip
         self.assertEqual(hasil["konteks"][-1]["intent"], "offend")
         self.assertEqual(hasil["konteks"][-1]["target"], [{"pemain": "NOX", "relasi": "offend"}])
         self.assertEqual(hasil["daftar_pemain"], roster)
-        self.assertEqual(self.runtime.baca_chat([], "human", "Halo.", roster)["konteks"], [])
+        self.assertEqual(baca_chat(self.runtime.nlu, [], "human", "Halo.", roster)["konteks"], [])
 
     # Konteks NLG dari langkah: 12 chat terakhir dan suara Tribunal. Prompt menampilkan tuduhan dan suara ke bot
     # sebagai pemicu, dan tidak lagi memuat contoh kalimat templat.

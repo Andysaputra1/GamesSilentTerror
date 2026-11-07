@@ -19,7 +19,7 @@ import logging
 
 from app.config.database import jalankan_transaksi
 from app.models import panel_queries
-from app.bot.runtime import brain_runtime
+from app.bot.bot_controller import brain_runtime
 
 BARIS_NPC = 2
 logger = logging.getLogger("shadow_heist.npc_config")

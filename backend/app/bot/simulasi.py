@@ -8,13 +8,13 @@ import asyncio
 import time
 from collections import OrderedDict
 
-from app.services.checker_service import jejak_baru
-from app.game.match_engine import Match, label_unik, snapshot_berlabel
-from app.bot.runtime import brain_runtime
 from app.bot.bot_controller import (
-    AKSI_RAHASIA, BATAS_LANGKAH_DETIK, isi_jejak, pindahkan_aksi_malam, pindahkan_vote, roster_label,
-    tulis_kalimat, waktu_jejak,
+    AKSI_RAHASIA, BATAS_LANGKAH_DETIK, brain_runtime, isi_jejak, pindahkan_aksi_malam, pindahkan_vote,
+    roster_label, tulis_kalimat, waktu_jejak,
 )  # fmt: skip
+from app.bot.nlu import baca_chat
+from app.game.match_engine import Match, label_unik, snapshot_berlabel
+from app.services.checker_service import jejak_baru
 from app.services.room_service import BOT_NAMES
 
 KODE = "SIMULASI"
@@ -78,7 +78,7 @@ class Simulasi:
     async def _baca(self, pengirim, teks):
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(
-            brain_runtime.eksekutor_keputusan, brain_runtime.baca_chat, self.riwayat,
+            brain_runtime.eksekutor_keputusan, baca_chat, brain_runtime.nlu, self.riwayat,
             self.match.labels[pengirim], teks, roster_label(self.match),
         )  # fmt: skip
 

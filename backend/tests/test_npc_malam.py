@@ -11,7 +11,8 @@ from unittest.mock import AsyncMock, Mock, patch
 
 from app.game.match_engine import Match, snapshot_berlabel
 from app.bot import fuzzy, nlg
-from app.bot.runtime import BrainRuntime, NLUBersama
+from app.bot.bot_controller import BrainRuntime
+from app.bot.nlu import NLUBersama
 from app.bot.bot_controller import NPCService, pindahkan_aksi_malam, riwayat_nlu, tulis_kalimat_tim
 from app.services.activity_service import activity
 from app.services.checker_service import checker_service
@@ -274,7 +275,7 @@ class TeamWriterTests(unittest.TestCase):
 class NPCTeamChatTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.runtime = BrainRuntime()
-        self.runtime.konfigurasi.penulis = "templat"
+        self.runtime.penulis_npc.konfigurasi.penulis = "templat"
         self.runtime.muat_sekarang(nlu=NLUBersama(NLUPalsu(r"curiga", r"bukan hitman"), "cadangan"))
         self.rooms = RoomService()
         self.game = pertandingan(["hitman"], lainnya("hitman"))

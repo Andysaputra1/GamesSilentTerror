@@ -19,10 +19,10 @@ from app.bot.fuzzy import (
     baris_pemain,
     bot_terkunci,
     durasi_fase,
-    pemain_disebut,
     seri_acak,
     putuskan,
 )
+from app.bot.nlu import pemain_disebut
 
 # fmt: off
 PEMAIN_DEMO = ["Nara", "Andi", "Budi", "Citra", "Dodi", "Eka"]

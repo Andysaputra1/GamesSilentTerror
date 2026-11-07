@@ -20,7 +20,8 @@ from urllib.parse import urlsplit
 from app.config.database import PersistenceError, jalankan_transaksi
 from app.config.settings import settings
 from app.models import panel_queries
-from app.bot.runtime import POLA_MODEL_TAUTAN, brain_runtime
+from app.bot.bot_controller import brain_runtime
+from app.bot.nlg import POLA_MODEL_TAUTAN
 from app.services.activity_service import activity
 from app.services.ai_config_service import ai_runtime, simpan_konfigurasi_ai
 from app.services.checker_service import checker_service
@@ -141,7 +142,7 @@ def config_view():
         # Pilihan model lokal: model ai-docker, model di link saat tes terakhir, dan yang aktif.
         "local_model": config.ollama_model,
         "local_models": sorted(
-            {*MODEL_LOKAL, *brain_runtime.model_tautan_tersedia, config.ollama_model}
+            {*MODEL_LOKAL, *brain_runtime.penulis_npc.model_tautan_tersedia, config.ollama_model}
         ),
         "token_source": (
             "panel"

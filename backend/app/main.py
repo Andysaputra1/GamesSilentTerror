@@ -5,7 +5,7 @@ Alurnya
 1. Memasang Socket.IO (dibuat di sockets/server.py, event-nya di sockets/chat.py)
 2. Membangun Server (Koneksi ke DB, Konfigurasi AI, Konfigurasi NPC, Memuat Otak AI, Menyalakan Jam (cek terus setiap 0.5 Detik))
 
-Jadinya AI Mulai Mikir dari Sini (isi pikirannya di module/npc_service.py)
+Jadinya AI Mulai Mikir dari Sini (isi pikirannya di bot/bot_controller.py)
 """
 
 from __future__ import annotations
@@ -22,9 +22,8 @@ from app.controllers.routes import api_router
 from app.middleware.cors import configure_cors
 from app.services.ai_config_service import muat_konfigurasi_ai
 from app.config.database import engine, database_is_ready
-from app.bot.runtime import brain_runtime
+from app.bot.bot_controller import brain_runtime, npc_service
 from app.services.npc_config_service import muat_konfigurasi_npc
-from app.bot.bot_controller import npc_service
 from app.services.persistence_service import PersistenceError
 from app.services.room_service import room_service
 # Cukup diimpor: chat.py mendaftarkan event connect, disconnect, dan send_chat ke sio.

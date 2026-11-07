@@ -117,8 +117,10 @@ def kode_alur(node: str, token=Depends(require_panel)):
 # KODE ALUR: sumber fungsi/konstanta diambil dari modul yang sedang berjalan (bukan salinan), lalu setiap baris
 # diberi penanda: parameter (baris def), output (return), komentar, dan baris inti beserta catatan singkat.
 # Hanya objek di daftar KODE_ALUR yang bisa dibaca; panel tidak dapat meminta modul atau nama lain.
-G = "app.bot."
-RT = "app.bot.runtime"
+BOT = "app.bot.bot_controller"
+NLU = "app.bot.nlu"
+FZ = "app.bot.fuzzy"
+NLG = "app.bot.nlg"
 
 # node flowchart → [(modul, nama bertitik, [(potongan teks baris inti, catatan)])]
 KODE_ALUR = {
@@ -132,11 +134,11 @@ KODE_ALUR = {
         ("app.game.match_engine", "Match.add_message", [("06d", "ID diawali nomor urut agar chat tetap kronologis")]),
     ],
     "nlu_pesan": [
-        (RT, "BrainRuntime.baca_chat", [
-            ("modul.anotasi_chat(", "fungsi anotasi yang sama dengan ingatan bot"),
+        (NLU, "baca_chat", [
+            ("anotasi_chat(nlu, {", "fungsi anotasi yang sama dengan ingatan bot"),
             ("riwayat.append(chat)", "chat ini menjadi konteks chat berikutnya"),
         ]),
-        (G + "fuzzy", "anotasi_chat", [
+        (NLU, "anotasi_chat", [
             ("nlu.intent(", "Model 1: intent + keyakinan"),
             ("KONTEKS_MAKS", "maksimal 12 chat terakhir sebagai konteks"),
             ("nlu.target(", "Model 2: target, memakai intent dan konteks"),
@@ -144,42 +146,42 @@ KODE_ALUR = {
         ]),
     ],
     "nlu_intent": [
-        (G + "nlg", "NLUIndoBERT.intent", [
+        (NLU, "NLUIndoBERT.intent", [
             ("varian_nama_intent(", "kalimat dibuat 3 varian nama"),
             (".mean(axis=0)", "probabilitas ketiga varian dirata-rata"),
             ("argmax()", "kelas terbesar menjadi intent"),
         ]),
-        (G + "nlg", "NLUIndoBERT._probabilitas", [("softmax", "logit model menjadi probabilitas 0–1")]),
-        (G + "nlg", "varian_nama_intent", [("NAMA_KANONIK", "nama pemain diganti nama yang dikenal model")]),
+        (NLU, "NLUIndoBERT._probabilitas", [("softmax", "logit model menjadi probabilitas 0–1")]),
+        (NLU, "varian_nama_intent", [("NAMA_KANONIK", "nama pemain diganti nama yang dikenal model")]),
     ],
     "nlu_target": [
-        (G + "nlg", "NLUIndoBERT.target", [
+        (NLU, "NLUIndoBERT.target", [
             ('label_intent == "neutral"', "pesan neutral: hanya relasi neutral (pemain yang diajak bicara), boleh kosong"),
             ("buat_teks_pasangan(", "satu teks pasangan untuk tiap kandidat"),
             ('relasi != "tidak_ada"', "kandidat berelasi offend/defend/neutral menjadi target"),
             ("self.ambang > 0", "aturan minimal satu target (offend/defend)"),
         ]),
-        (G + "nlg", "buat_teks_pasangan", [
+        (NLU, "buat_teks_pasangan", [
             ("reversed(chat_sebelumnya)", "konteks terbaru ditulis lebih dulu"),
             ("samarkan_nama(teks_chat", "nama disamarkan menjadi peran (kandidat/pengirim/pemain)"),
         ]),
     ],
     "nlu_memo": [
-        (RT, "NLUBersama._ingat", [
+        (NLU, "NLUBersama._ingat", [
             ("if kunci not in self._memo", "dihitung hanya bila belum ada di memo"),
             ("copy.deepcopy", "tiap bot mendapat salinan sendiri"),
         ]),
-        (RT, "NLUBersama.intent", [('("intent", teks, daftar)', "kunci memo: teks + daftar pemain")]),
-        (RT, "NLUBersama.target", [("json.dumps(konteks", "konteks chat ikut menjadi kunci memo")]),
+        (NLU, "NLUBersama.intent", [('("intent", teks, daftar)', "kunci memo: teks + daftar pemain")]),
+        (NLU, "NLUBersama.target", [("json.dumps(konteks", "konteks chat ikut menjadi kunci memo")]),
     ],
     "sinkron": [
-        (RT, "BrainRuntime.langkah", [
+        (BOT, "BrainRuntime.langkah", [
             ("sinkron_snapshot(", "ingatan diperbarui (NLU chat baru di sini)"),
             ("modul.putuskan(", "logika metode bot"),
             ("jelaskan(bot", "penjelasan untuk panel"),
             ('keputusan["waktu"]', "lama tiap tahap dicatat"),
         ]),
-        (G + "fuzzy", "Ingatan.sinkron_snapshot", [
+        (FZ, "Ingatan.sinkron_snapshot", [
             ("self.catat_eksekusi(", "eksekusi Tribunal dicatat"),
             ("self.intel = ", "hasil Peek milik bot sendiri"),
             ("anotasi_chat(nlu, chat", "chat baru dibaca NLU"),
@@ -187,7 +189,7 @@ KODE_ALUR = {
         ]),
     ],
     "bukti": [
-        (G + "fuzzy", "hitung_bukti", [
+        (FZ, "hitung_bukti", [
             ('"tekanan": min(', "tekanan: tuduhan + vote ke pemain ini"),
             ('"dukungan": min(', "dukungan: pembelaan dari pemain lain"),
             ('"plin_plan": min(', "berganti sikap atau vote tidak sesuai ucapan"),
@@ -195,10 +197,10 @@ KODE_ALUR = {
             ('"memihak_hitman": ', "pernah membela pemain yang kini terbukti Hitman"),
             ('"diam": diam', "belum bicara di ronde ini"),
         ]),
-        (G + "fuzzy", "pengetahuan_peran", []),
+        (FZ, "pengetahuan_peran", []),
     ],
     "fl": [
-        (G + "fuzzy", "putuskan", [
+        (FZ, "putuskan", [
             ("hitung_bukti(ingatan, view)", "bukti tiap pemain"),
             ("nilai_kecurigaan(tabel)", "kecurigaan lewat hierarki fuzzy"),
             ("keputusan_pindah_vote(ctx)", "waktu tambahan seri: suara yang sudah ada dinilai ulang"),
@@ -211,61 +213,61 @@ KODE_ALUR = {
         ]),
     ],
     "fl_1": [
-        (G + "fuzzy", "MF_INPUT", [("[0.2, 0.5, 0.8]", "titik fungsi keanggotaan tingkat sedang")]),
-        (G + "fuzzy", "_mf", [("trapmf", "4 titik = trapesium, 3 titik = segitiga")]),
-        (G + "fuzzy", "keanggotaan", [("interp_membership", "derajat x pada tiap tingkat")]),
+        (FZ, "MF_INPUT", [("[0.2, 0.5, 0.8]", "titik fungsi keanggotaan tingkat sedang")]),
+        (FZ, "_mf", [("trapmf", "4 titik = trapesium, 3 titik = segitiga")]),
+        (FZ, "keanggotaan", [("interp_membership", "derajat x pada tiap tingkat")]),
     ],
     "fl_2": [
-        (G + "fuzzy", "_bangun_sistem", [
+        (FZ, "_bangun_sistem", [
             ("ctrl.Rule(a[x] & b[y]", "9 aturan JIKA–MAKA; & = DAN (min)"),
             ('defuzzify_method = "centroid"', "defuzzifikasi centroid"),
         ]),
-        (G + "fuzzy", "aturan_aktif", [("min(derajat_a[x], derajat_b[y])", "kekuatan aturan = min derajat input")]),
+        (FZ, "aturan_aktif", [("min(derajat_a[x], derajat_b[y])", "kekuatan aturan = min derajat input")]),
     ],
     "fl_3": [
-        (G + "fuzzy", "fuzzy", [("_fuzzy_tersimpan(nama", "hasil disimpan per input (cache)")]),
-        (G + "fuzzy", "_fuzzy_tersimpan", [("simulasi.compute()", "skfuzzy: agregasi max lalu centroid")]),
-        (G + "fuzzy", "HIERARKI", [('("kecurigaan", "ucapan", "bukti_keras")', "sistem puncak: kecurigaan")]),
-        (G + "fuzzy", "nilai_kecurigaan", [
+        (FZ, "fuzzy", [("_fuzzy_tersimpan(nama", "hasil disimpan per input (cache)")]),
+        (FZ, "_fuzzy_tersimpan", [("simulasi.compute()", "skfuzzy: agregasi max lalu centroid")]),
+        (FZ, "HIERARKI", [('("kecurigaan", "ucapan", "bukti_keras")', "sistem puncak: kecurigaan")]),
+        (FZ, "nilai_kecurigaan", [
             ("for sistem, x, y in HIERARKI", "sistem dihitung bertingkat"),
             ("fuzzy(sistem, nilai[x], nilai[y]) / 100", "keluaran 0–100 menjadi 0–1"),
             ('(1 - b["p_sandera"])', "nol bila diumumkan disandera"),
         ]),
     ],
     "fl_4": [
-        (G + "fuzzy", "keputusan_chat", [
+        (FZ, "keputusan_chat", [
             ('c["aksi"] in AKSI_REAKTIF', "bela diri dan jawab dibalas tanpa nilai"),
             ('c["skor"] = fuzzy(sistem', "prioritas tiap kandidat chat"),
             ("calon.sort(", "prioritas tertinggi di depan"),
             (">= AMBANG_CHAT", "mencapai ambang: dikirim"),
             ("calon_gali(ctx)", "di bawah ambang: gali tersangka sebagai cadangan"),
         ]),
-        (G + "fuzzy", "AMBANG_CHAT", []),
-        (G + "fuzzy", "keputusan_aksi", [
+        (FZ, "AMBANG_CHAT", []),
+        (FZ, "keputusan_aksi", [
             ('if "sistem" in c:', "Gag dan Peek dinilai sistem; Hostage dan Guard sudah membawa nilai"),
             ("pilih_gag(ctx, calon)", "Gag memakai aturan urutan sendiri"),
         ]),
-        (G + "fuzzy", "pilih_gag", [
+        (FZ, "pilih_gag", [
             ("BATAS_ANCAMAN_GAG", "ancaman tinggi tanpa rekan manusia: Gag sekarang"),
             ("GAG_WAJIB_FRAKSI", "sesudah 60% siang: Gag wajib"),
             ("AMBANG_GAG", "warga yang sudah bicara: nilai minimal"),
         ]),
     ],
     "keputusan": [
-        (G + "fuzzy", "rencana_chat", []),
-        (G + "fuzzy", "pertahanan_suara", [
+        (FZ, "rencana_chat", []),
+        (FZ, "pertahanan_suara", [
             ('["warga_terdesak"] < BATAS_WARGA_KRITIS', "hanya saat warga kritis"),
             ("hashlib.sha256(kunci)", "semua tersangka bernilai sama: acak stabil per bot dan ronde"),
         ]),
-        (G + "fuzzy", "format_npc", [
+        (FZ, "format_npc", [
             ('if rencana_a["aksi"] in AKSI_RAHASIA', "aksi rahasia diutamakan"),
             ('elif rencana_v["aksi"] == "vote"', "lalu vote"),
         ]),
-        (G + "fuzzy", "siapkan_nlg", [
+        (FZ, "siapkan_nlg", [
             ('if not rencana["kirim"]', "tidak chat: NLG tidak dijalankan"),
             ('"cadangan": templat_pesan(', "kalimat cadangan bila semua gagal"),
         ]),
-        (G + "fuzzy", "siapkan_nlg_tim", [
+        (FZ, "siapkan_nlg_tim", [
             ("MAKS_CHAT_TIM", "paling banyak 3 pesan tim per malam"),
             ('paket("ikut_manusia"', "Hitman memberi tahu ikut pilihan rekan manusia saat terkunci"),
         ]),
@@ -286,7 +288,7 @@ KODE_ALUR = {
         ("app.game.match_engine", "Match.act", []),
     ],
     "nlg_prompt": [
-        (G + "nlg", "buat_prompt", [
+        (NLG, "buat_prompt", [
             ("aturan_klaim = (", "aturan klaim role"),
             ("Aturan menulis:", "batasan untuk LLM"),
             ("maksud = MAKSUD_AKSI", "maksud rencana"),
@@ -296,18 +298,18 @@ KODE_ALUR = {
         ]),
     ],
     "nlg_llm": [
-        (G + "nlg", "PenulisBerantai.tulis", [
+        (NLG, "PenulisBerantai.tulis", [
             ("if not p.siap()", "jalur yang sedang istirahat dilewati"),
             ("p.tulis(sistem, pesan)", "panggil LLM jalur ini"),
             ("alasan.append", "gagal: coba jalur berikutnya"),
         ]),
-        (RT, "_JamPenulis.tulis", [
+        (NLG, "JamPenulis.tulis", [
             ('self.lapor("llm")', "flowchart: bot sedang di tahap LLM"),
             ("self.detik +=", "lama panggilan LLM dicatat"),
         ]),
     ],
     "nlg_cek": [
-        (G + "nlg", "tulis_pesan", [
+        (NLG, "tulis_pesan", [
             ("for ke in range(1, MAKS_PERCOBAAN_LLM + 1)", "maksimal 2 percobaan LLM"),
             ("nilai_kalimat(bersihkan(", "kalimat dibersihkan lalu dinilai"),
             ("kalimat_mirip(nilai[", "parafrase tipis kalimat yang baru terdengar ditolak"),
@@ -315,24 +317,24 @@ KODE_ALUR = {
             ('alasan_tolak = ", ".join', "alasan ditolak dikirim ke percobaan berikutnya"),
             ("# 2) Templat bervariasi.", "LLM gagal: templat"),
         ]),
-        (G + "nlg", "nilai_kalimat", [("periksa_aturan(", "cek aturan")]),
-        (G + "nlg", "periksa_aturan", [
+        (NLG, "nilai_kalimat", [("periksa_aturan(", "cek aturan")]),
+        (NLG, "periksa_aturan", [
             ('"menyebut_ai"', "tidak boleh mengaku AI"),
             ('"klaim_tak_direncanakan"', "tidak boleh mengaku role tanpa rencana"),
             ('"target_hilang"', "target rencana harus disebut"),
         ]),
     ],
     "nlg_templat": [
-        (G + "nlg", "kalimat_templat", [
+        (NLG, "kalimat_templat", [
             ("kalimat_mirip(teks, hindari)", "kalimat yang mirip dengan yang baru terdengar dipakai paling akhir"),
             ("urutan_varian(p)", "varian sesuai rencana"),
             ("ubah_kata_ganti(teks, persona)", "gaya bahasa persona"),
         ]),
     ],
     "kirim": [
-        (RT, "BrainRuntime.catat_chat", [("catat_aksi_bot", "ingatan: bot sudah bicara (jeda antar-chat)")]),
-        ("app.bot.bot_controller", "catat_nlu", [
-            ("runtime.baca_chat", "kalimat bot dibaca NLU"),
+        (BOT, "BrainRuntime.catat_chat", [("catat_aksi_bot", "ingatan: bot sudah bicara (jeda antar-chat)")]),
+        (BOT, "catat_nlu", [
+            ("baca_chat,", "kalimat bot dibaca NLU"),
             ("tandai_dipanggil(", "bot yang dipanggil/dituduh melangkah segera"),
             ("record_nlu", "bacaan disimpan untuk riwayat chat"),
         ]),
@@ -344,10 +346,10 @@ KODE_ALUR = {
         ("app.services.persistence_service", "PersistenceService.record_nlu", [
             ("set_message_nlu", "bacaan NLU untuk riwayat chat"),
         ]),
-        (G + "fuzzy", "Ingatan.catat_aksi_bot", []),
+        (FZ, "Ingatan.catat_aksi_bot", []),
     ],
     "output": [
-        ("app.bot.bot_controller", "isi_jejak", [
+        (BOT, "isi_jejak", [
             ("lengkapi_penjelasan(", "hasil engine dan NLG ditambahkan"),
             ("ringkas=ringkas_penjelasan", "ringkasan untuk item chat"),
         ]),

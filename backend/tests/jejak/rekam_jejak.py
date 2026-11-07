@@ -33,7 +33,8 @@ sys.path.insert(0, str(BACKEND))
 
 from app.game import match_engine  # noqa: E402
 from app.bot import fuzzy, nlg  # noqa: E402
-from app.bot.runtime import BrainRuntime, NLUBersama  # noqa: E402
+from app.bot.bot_controller import BrainRuntime  # noqa: E402
+from app.bot.nlu import NLUBersama, baca_chat  # noqa: E402
 from tests.nlu_palsu import NLUPalsu  # noqa: E402
 
 LETAK_ENGINE = "app.game.match_engine"
@@ -177,7 +178,7 @@ def game_putuskan(argumen):
 # Runtime otak dengan NLU tiruan dan penulis templat, seperti runtime_siap di tes.
 def runtime_tiruan():
     runtime = BrainRuntime()
-    runtime.konfigurasi.penulis = "templat"
+    runtime.penulis_npc.konfigurasi.penulis = "templat"
     runtime.muat_sekarang(nlu=NLUBersama(NLUPalsu(POLA_OFFEND, POLA_DEFEND), "cadangan"))
     return runtime
 
@@ -185,7 +186,7 @@ def runtime_tiruan():
 # Bacaan pencatat NLU untuk satu chat pertandingan, seperti catat_nlu di NPCService.
 def baca_pencatat(runtime, riwayat, match, pengirim, teks):
     roster = [match.labels.get(n, n) for n in match.players]
-    return runtime.baca_chat(riwayat, match.labels.get(pengirim, pengirim), teks, roster)
+    return baca_chat(runtime.nlu, riwayat, match.labels.get(pengirim, pengirim), teks, roster)
 
 
 # Bagian c: satu game lewat BrainRuntime.langkah dengan satu manusia yang diam dan sesekali chat.

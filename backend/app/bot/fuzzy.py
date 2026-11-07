@@ -1,15 +1,12 @@
-"""FILE INI DIHASILKAN OTOMATIS oleh scripts/ekspor_otak_npc.py. JANGAN DIEDIT MANUAL.
+"""Otak Fuzzy Mamdani bot: dari snapshot dan ingatan sampai keputusan chat, vote, aksi malam, dan paket kalimat.
 
-Sumber : npc_fuzzy.ipynb
-Sidik  : 2a47dea58821c4ec
-Dibuat : 2026-11-06 07:20 UTC
-
-Perubahan logika bot dilakukan di notebook skripsi, dijalankan ulang sampai semua
-skenario/pengujian lulus, lalu diekspor ulang dengan skrip ini.
+Kode di sini adalah sumber logika bot di game dan boleh diubah langsung. Notebook skripsi npc_fuzzy.ipynb hanya untuk
+laporan; bila logika di sini berubah, notebook ikut diperbarui supaya skripsi tetap menggambarkan game. Patokan
+perilakunya adalah tests/test_skenario_fuzzy.py (320 skenario) dan sidik di tests/jejak/sidik.json.
 
 Alurnya
-1. Ingatan.sinkron_snapshot mencatat snapshot privat bot (chat baru dibaca anotasi_chat) dan memberi view
-2. putuskan dipanggil game sekali tiap langkah bot:
+1. Ingatan.sinkron_snapshot mencatat snapshot privat bot dan memberi view (chat baru dibaca anotasi_chat dari nlu.py)
+2. putuskan dipanggil sekali tiap langkah bot:
    2.1 hitung_bukti: tabel bukti per pemain dan konteks permainan
    2.2 pengetahuan_peran: fakta pasti menurut role
    2.3 Warga: nilai_kecurigaan lalu terapkan_pengetahuan; Spy juga fitur_lindung
@@ -20,34 +17,28 @@ Alurnya
    2.7 Aksi rahasia: keputusan_aksi
    2.8 Keluaran: format_npc untuk engine, siapkan_nlg untuk penulis kalimat, dan siapkan_nlg_tim untuk chat tim
 """
-# ruff: noqa
-# fmt: off
 
 import hashlib
-
 import math
-
 import re
-
+import warnings
 from collections import Counter, defaultdict
-
 from dataclasses import dataclass, field
-
 from functools import lru_cache
 
 import numpy as np
-
 import pandas as pd
-
 import skfuzzy as fuzz
-
 from skfuzzy import control as ctrl
+
+from app.bot.nlu import anotasi_chat
+
+# scikit-fuzzy memanggil np.maximum dengan argumen ketiga posisional; peringatannya tidak memengaruhi hasil.
+warnings.filterwarnings("ignore", category=DeprecationWarning, module=r"skfuzzy(\..*)?")
 
 PERAN = ("civilian", "spy", "stalker", "hitman")
 
 MIN_CONF_INTENT = 0.60
-
-KONTEKS_MAKS = 12
 
 PELURUHAN = 0.70
 
@@ -152,77 +143,6 @@ def waktu_berjalan(ingatan, view):
     if mulai is None or view["fase"] not in view["durasi"]:
         return 0.0
     return float(np.clip((view["waktu"] - mulai) / view["durasi"][view["fase"]], 0, 1))
-
-KATA_GANTI = {
-    "aku", "saya", "gw", "gue", "gua", "dia", "kamu", "kau", "lu", "lo", "elu",
-    "anda", "mereka", "kalian", "kita", "kami", "semua", "si",
-}
-
-ISTILAH_GAME = {"hitman", "spy", "stalker", "civilian", "hostage", "gag", "order", "guard", "peek", "vote"}
-
-AKHIRAN_NAMA = ("nya", "lah", "kah", "pun", "mu", "ku")
-
-# Mengenali potongan nama (Dika untuk Andika) atau nama berakhiran (Budinya, Andyy); hasil disimpan agar cepat.
-@lru_cache(maxsize=None)
-def _nama_cocok(word, name):
-    w, n = word.casefold(), name.casefold()
-    if len(w) < 3:
-        return False
-    if w in n:
-        return True
-    sisa = w[len(n):] if w.startswith(n) else None
-    return sisa is not None and (sisa in AKHIRAN_NAMA or set(sisa) == {n[-1]})
-
-# Aturan nama, sumber kedua target neutral: pemain roster yang disebut nama atau panggilannya di teks. Pencocokan sama
-# dengan samarkan_nama: nama persis, atau panggilan/akhiran (_nama_cocok) yang cocok dengan tepat satu pemain; kata
-# ganti, istilah game, dan kata umum (common_words) tidak pernah dianggap nama. Pengirim tidak dihitung.
-# Masukan : teks, daftar_pemain (roster), pengirim, common_words (pair_builder.json Model 2; kosong bila tidak ada).
-# Keluaran: daftar nama pemain yang disebut, urut kemunculan pertama.
-# Dipakai oleh: anotasi_chat (hanya untuk pesan neutral, jadi aturan ini tidak pernah membuat target offend/defend).
-def pemain_disebut(teks, daftar_pemain, pengirim, common_words):
-    lowered = {name.casefold(): name for name in daftar_pemain}
-    disebut = []
-    for word in re.findall(r"\w+", teks):
-        key = word.casefold()
-        if key in lowered:
-            nama = lowered[key]
-        elif key in KATA_GANTI or key in ISTILAH_GAME or key in common_words:
-            continue
-        else:
-            matches = [name for name in daftar_pemain if _nama_cocok(word, name)]
-            if len(matches) != 1:
-                continue
-            nama = matches[0]
-        if nama != pengirim and nama not in disebut:
-            disebut.append(nama)
-    return disebut
-
-# Persepsi: membaca satu chat dengan IndoBERT, Model 1 (intent) lalu Model 2 (target per pemain roster). Pesan neutral
-# juga mendapat target neutral dari aturan nama (pemain_disebut); target dari kedua sumber digabung per pemain.
-# Masukan : nlu = NLUIndoBERT (atau pembungkus dengan intent/target yang sama); chat = {id, ronde, fase, waktu,
-#           pengirim, teks}; riwayat = chat sebelumnya yang sudah beranotasi (12 terakhir menjadi konteks Model 2);
-#           daftar_pemain = roster.
-# Keluaran: chat yang sama + intent, conf_intent (0–1), dan target [{pemain, relasi, prob, sumber}].
-#           sumber = ["indobert"], ["nama"], atau keduanya. Hanya relasi offend/defend yang menjadi bukti (relasi_chat);
-#           target neutral menandai pemain yang diajak bicara (konteks "penanya").
-# Dipakai oleh: Ingatan.sinkron_snapshot (setiap chat baru).
-def anotasi_chat(nlu, chat, riwayat, daftar_pemain):
-    intent, confidence = nlu.intent(chat["teks"], daftar_pemain)
-    konteks = [{
-        "pengirim": c["pengirim"], "teks_chat": c["teks"], "label_intent": c.get("intent") or "neutral",
-        "target": [{"pemain": t["pemain"], "relasi": t["relasi"]} for t in c.get("target", [])],
-    } for c in riwayat[-KONTEKS_MAKS:]]
-    sumber_model = getattr(nlu, "sumber", "indobert")  # pembungkus NLU cadangan di backend menamai sumbernya sendiri
-    target = [{**t, "sumber": [sumber_model]}
-              for t in nlu.target(chat["pengirim"], chat["teks"], konteks, daftar_pemain, intent)]
-    if intent == "neutral":
-        for nama in pemain_disebut(chat["teks"], daftar_pemain, chat["pengirim"], getattr(nlu, "common_words", ())):
-            sama = next((t for t in target if t["pemain"] == nama), None)
-            if sama is None:
-                target.append({"pemain": nama, "relasi": "neutral", "prob": None, "sumber": ["nama"]})
-            else:
-                sama["sumber"].append("nama")
-    return {**chat, "intent": intent, "conf_intent": confidence, "target": target}
 
 # Pilihan terbanyak; seri dimenangkan pilihan yang paling awal (aturan Hostage Syndicate di engine).
 def pilihan_terbanyak(pilihan):
@@ -1544,7 +1464,7 @@ def calon_tuduh_hitman(ctx, layak, kambing, alasan_kambing):
 
 # Kandidat chat Hitman: bicara seperti warga dan memakai bukti publik saja.
 def _calon_chat_hitman(ctx):
-    konteks, ingatan, view, izin, bot = ctx["konteks"], ctx["ingatan"], ctx["view"], ctx["izin"], ctx["bot"]
+    konteks, ingatan, view, izin = ctx["konteks"], ctx["ingatan"], ctx["view"], ctx["izin"]
     fitur, diri, publik = ctx["fitur_hitman"], ctx["diri"], ctx["publik"]
     layak = _kambing_layak(fitur)
     kambing = layak.iloc[0] if len(layak) and layak.iloc[0]["kambing_hitam"] >= MIN_KAMBING_HITAM else None
