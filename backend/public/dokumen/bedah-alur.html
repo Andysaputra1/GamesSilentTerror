@@ -115,16 +115,16 @@ td code { white-space: nowrap; overflow-wrap: break-word; }
 <header class="kepala-halaman">
 <h1>Bedah Alur Silent Terror</h1>
 <p class="pembuka">Alur backend dari <code>main.py</code> sampai ujung tiap fungsi. Tiap bagian berisi gunanya, alurnya, kodenya, dan hal yang tidak terlihat dari kode.</p>
-<p class="ringkas"><span>✅ <b>12</b> sudah dibahas</span><span><b>27</b> belum dibahas</span><span><b>4</b> nanti, menunggu rombak otak bot</span></p>
-<p class="sumber">Kode dibaca langsung dari commit <code>388733f</code>, dibangun 2026-11-07 17:58. Bagian yang belum dibahas boleh dibaca lebih dulu, tapi belum kita periksa bersama.</p>
+<p class="ringkas"><span>✅ <b>12</b> sudah dibahas</span><span><b>31</b> belum dibahas</span><span><b>0</b> nanti, menunggu rombak otak bot</span></p>
+<p class="sumber">Kode dibaca langsung dari commit <code>cbf576a</code>, dibangun 2026-11-07 19:18. Bagian yang belum dibahas boleh dibaca lebih dulu, tapi belum kita periksa bersama.</p>
 </header>
 <div class="kerangka">
-<nav class="samping" aria-label="Daftar bagian"><details id="t-daftar" open><summary>Daftar bagian</summary><ul><li><a href="#t-alur-besar"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav">Alur utama main.<wbr>py</span></a></li><li><a href="#t-konek-socket"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">1</span>[KONEK SOCKET]</span></a><ul><li><a href="#t-allowed-origins"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">1.1</span>settings.<wbr>allowed_origins</span></a></li><li><a href="#t-sio-dan-sockets"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">1.2</span>sio dan sockets</span></a></li><li><a href="#t-connect"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">1.3</span>connect</span></a><ul><li><a href="#t-cek-token"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">1.3.1</span>auth_service.<wbr>check_user_by_token</span></a><ul><li><a href="#t-session-local"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">1.3.1.1</span>SessionLocal</span></a><ul><li><a href="#t-database-url"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">1.3.1.1.1</span>settings.<wbr>sqlalchemy_database_url</span></a></li></ul></li><li><a href="#t-query-token"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">1.3.1.2</span>auth_queries.<wbr>account_by_token</span></a></li></ul></li><li><a href="#t-room-get"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">1.3.2</span>room_service.<wbr>get</span></a></li></ul></li><li><a href="#t-disconnect"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">1.4</span>disconnect</span></a></li><li><a href="#t-send-chat"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">1.5</span>send_chat</span></a><ul><li><a href="#t-kirim-chat-pemain"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">1.5.1</span>chat_service.<wbr>kirim_chat_pemain</span></a><ul><li><a href="#t-verifikasi-socket"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">1.5.1.1</span>verifikasi_socket</span></a></li><li><a href="#t-match-tick"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">1.5.1.2</span>Match.<wbr>tick</span></a></li><li><a href="#t-match-can-chat"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">1.5.1.3</span>Match.<wbr>can_chat</span></a></li><li><a href="#t-activity-record"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">1.5.1.4</span>activity.<wbr>record</span></a></li><li><a href="#t-checker-begin"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">1.5.1.5</span>checker_service.<wbr>begin</span></a></li><li><a href="#t-measure"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">1.5.1.6</span>measure</span></a></li><li><a href="#t-record-player-message"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">1.5.1.7</span>PersistenceService.<wbr>record_player_message</span></a><ul><li><a href="#t-transaksi-game"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">1.5.1.7.1</span>database.<wbr>jalankan_transaksi</span></a></li><li><a href="#t-game-queries"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">1.5.1.7.2</span>game_queries</span></a></li></ul></li><li><a href="#t-add-message"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">1.5.1.8</span>Match.<wbr>add_message</span></a></li><li><a href="#t-emit-room"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">1.5.1.9</span>emit_room</span></a></li><li><a href="#t-catat-nlu"><span class="m m-nanti" title="nanti"></span><span class="label-nav"><span class="no">1.5.1.10</span>catat_nlu<span class="tag-nanti">nanti</span></span></a></li><li><a href="#t-record-trace"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">1.5.1.11</span>PersistenceService.<wbr>record_trace</span></a></li></ul></li></ul></li></ul></li><li><a href="#t-siapkan-bot"><span class="m m-nanti" title="nanti"></span><span class="label-nav"><span class="no">2</span>[SIAPKAN BOT NPC]<span class="tag-nanti">nanti</span></span></a></li><li><a href="#t-setup-logger"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">3</span>[SETUP LOGGER]</span></a></li><li><a href="#t-konek-api"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">4</span>[KONEK API]</span></a></li><li><a href="#t-cors"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">5</span>[CORS]</span></a></li><li><a href="#t-routes"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">6</span>[ROUTES CONTROLLER]</span></a><ul><li><a href="#t-panel-service"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">6.1</span>panel_service</span></a></li><li><a href="#t-buat-room-terarsip"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">6.2</span>room_service.<wbr>buat_room_terarsip</span></a></li></ul></li><li><a href="#t-gabung"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">7</span>[GABUNG API + SOCKET]</span></a></li><li><a href="#t-server-nyala"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">8</span>[SERVER NYALA]</span></a><ul><li><a href="#t-database-is-ready"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">8.1</span>database_is_ready</span></a></li><li><a href="#t-muat-ai"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">8.2</span>muat_konfigurasi_ai</span></a></li><li><a href="#t-muat-npc"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">8.3</span>muat_konfigurasi_npc</span></a></li><li><a href="#t-mulai-memuat"><span class="m m-nanti" title="nanti"></span><span class="label-nav"><span class="no">8.4</span>brain_runtime.<wbr>mulai_memuat<span class="tag-nanti">nanti</span></span></a></li><li><a href="#t-game-clock"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">8.5</span>game_clock</span></a><ul><li><a href="#t-perbarui-fase"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">8.5.1</span>room_service.<wbr>perbarui_fase_semua_room</span></a></li><li><a href="#t-jalankan-bot"><span class="m m-nanti" title="nanti"></span><span class="label-nav"><span class="no">8.5.2</span>npc_service.<wbr>jalankan_bot_yang_sudah_waktunya<span class="tag-nanti">nanti</span></span></a></li></ul></li></ul></li><li><a href="#t-server-mati"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">9</span>[SERVER MATI]</span></a></li></ul></details></nav>
+<nav class="samping" aria-label="Daftar bagian"><details id="t-daftar" open><summary>Daftar bagian</summary><ul><li><a href="#t-alur-besar"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav">Alur utama main.<wbr>py</span></a></li><li><a href="#t-konek-socket"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">1</span>[KONEK SOCKET]</span></a><ul><li><a href="#t-allowed-origins"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">1.1</span>settings.<wbr>allowed_origins</span></a></li><li><a href="#t-sio-dan-sockets"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">1.2</span>sio dan sockets</span></a></li><li><a href="#t-connect"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">1.3</span>connect</span></a><ul><li><a href="#t-cek-token"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">1.3.1</span>auth_service.<wbr>check_user_by_token</span></a><ul><li><a href="#t-session-local"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">1.3.1.1</span>SessionLocal</span></a><ul><li><a href="#t-database-url"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">1.3.1.1.1</span>settings.<wbr>sqlalchemy_database_url</span></a></li></ul></li><li><a href="#t-query-token"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">1.3.1.2</span>auth_queries.<wbr>account_by_token</span></a></li></ul></li><li><a href="#t-room-get"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">1.3.2</span>room_service.<wbr>get</span></a></li></ul></li><li><a href="#t-disconnect"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">1.4</span>disconnect</span></a></li><li><a href="#t-send-chat"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">1.5</span>send_chat</span></a><ul><li><a href="#t-kirim-chat-pemain"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">1.5.1</span>chat_service.<wbr>kirim_chat_pemain</span></a><ul><li><a href="#t-verifikasi-socket"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">1.5.1.1</span>verifikasi_socket</span></a></li><li><a href="#t-match-tick"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">1.5.1.2</span>Match.<wbr>tick</span></a></li><li><a href="#t-match-can-chat"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">1.5.1.3</span>Match.<wbr>can_chat</span></a></li><li><a href="#t-activity-record"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">1.5.1.4</span>activity.<wbr>record</span></a></li><li><a href="#t-checker-begin"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">1.5.1.5</span>checker_service.<wbr>begin</span></a></li><li><a href="#t-measure"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">1.5.1.6</span>measure</span></a></li><li><a href="#t-record-player-message"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">1.5.1.7</span>PersistenceService.<wbr>record_player_message</span></a><ul><li><a href="#t-transaksi-game"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">1.5.1.7.1</span>database.<wbr>jalankan_transaksi</span></a></li><li><a href="#t-game-queries"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">1.5.1.7.2</span>game_queries</span></a></li></ul></li><li><a href="#t-add-message"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">1.5.1.8</span>Match.<wbr>add_message</span></a></li><li><a href="#t-emit-room"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">1.5.1.9</span>emit_room</span></a></li><li><a href="#t-catat-nlu"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">1.5.1.10</span>catat_nlu</span></a></li><li><a href="#t-record-trace"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">1.5.1.11</span>PersistenceService.<wbr>record_trace</span></a></li></ul></li></ul></li></ul></li><li><a href="#t-siapkan-bot"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">2</span>[SIAPKAN BOT NPC]</span></a></li><li><a href="#t-setup-logger"><span class="m m-dibahas" title="✅ sudah dibahas">✅</span><span class="label-nav"><span class="no">3</span>[SETUP LOGGER]</span></a></li><li><a href="#t-konek-api"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">4</span>[KONEK API]</span></a></li><li><a href="#t-cors"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">5</span>[CORS]</span></a></li><li><a href="#t-routes"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">6</span>[ROUTES CONTROLLER]</span></a><ul><li><a href="#t-panel-service"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">6.1</span>panel_service</span></a></li><li><a href="#t-buat-room-terarsip"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">6.2</span>room_service.<wbr>buat_room_terarsip</span></a></li></ul></li><li><a href="#t-gabung"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">7</span>[GABUNG API + SOCKET]</span></a></li><li><a href="#t-server-nyala"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">8</span>[SERVER NYALA]</span></a><ul><li><a href="#t-database-is-ready"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">8.1</span>database_is_ready</span></a></li><li><a href="#t-muat-ai"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">8.2</span>muat_konfigurasi_ai</span></a></li><li><a href="#t-muat-npc"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">8.3</span>muat_konfigurasi_npc</span></a></li><li><a href="#t-mulai-memuat"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">8.4</span>brain_runtime.<wbr>mulai_memuat</span></a></li><li><a href="#t-game-clock"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">8.5</span>game_clock</span></a><ul><li><a href="#t-perbarui-fase"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">8.5.1</span>room_service.<wbr>perbarui_fase_semua_room</span></a></li><li><a href="#t-jalankan-bot"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">8.5.2</span>npc_service.<wbr>jalankan_bot_yang_sudah_waktunya</span></a></li></ul></li></ul></li><li><a href="#t-server-mati"><span class="m m-belum" title="belum dibahas"></span><span class="label-nav"><span class="no">9</span>[SERVER MATI]</span></a></li></ul></details></nav>
 <main>
 <section class="bagian k0" id="t-alur-besar">
 <p class="jalur"><span>Alur utama main.py</span></p>
 <h2 class="judul"><span class="nama">Alur utama main.py</span><span class="status s-dibahas">✅ sudah dibahas</span></h2>
-<p class="guna"><code>backend/app/main.py</code> adalah titik masuk backend. File ini tidak merakit bagian-bagian: <code>sio</code> dibuat di <code>sockets/server.py</code>, event-nya didaftarkan <code>sockets/chat.py</code>, dan pengatur bot dibuat di <code>module/npc_service.py</code>. <code>main.py</code> cukup mengimpor semuanya, memasang <code>sio</code> ke aplikasi, lalu menyalakan jam permainan.</p>
+<p class="guna"><code>backend/app/main.py</code> adalah titik masuk backend. File ini tidak merakit bagian-bagian: <code>sio</code> dibuat di <code>sockets/server.py</code>, event-nya didaftarkan <code>sockets/chat.py</code>, dan pengatur bot dibuat di <code>bot/bot_controller.py</code>. <code>main.py</code> cukup mengimpor semuanya, memasang <code>sio</code> ke aplikasi, lalu menyalakan jam permainan.</p>
 <p class="label">Alur</p>
 <pre class="alur" tabindex="0"><a class="ref tahap" href="#t-konek-socket">[KONEK SOCKET]</a> <span class="panah">-&gt;</span> <a class="ref tahap" href="#t-siapkan-bot">[SIAPKAN BOT NPC]</a> <span class="panah">-&gt;</span> <a class="ref tahap" href="#t-setup-logger">[SETUP LOGGER]</a> <span class="panah">-&gt;</span> <a class="ref tahap" href="#t-konek-api">[KONEK API]</a> <span class="panah">-&gt;</span> <a class="ref tahap" href="#t-cors">[CORS]</a>
   <span class="panah">-&gt;</span> <a class="ref tahap" href="#t-routes">[ROUTES CONTROLLER]</a> <span class="panah">-&gt;</span> <a class="ref tahap" href="#t-gabung">[GABUNG API + SOCKET]</a> <span class="panah">-&gt;</span> <a class="ref tahap" href="#t-server-nyala">[SERVER NYALA]</a> <span class="panah">-&gt;</span> <a class="ref tahap" href="#t-server-mati">[SERVER MATI]</a></pre>
@@ -147,16 +147,16 @@ Waktu 2, saat pemain main (berulang):
   Pemain kirim chat   <span class="panah">-&gt;</span> <a class="ref" href="#t-send-chat">[[send_chat]]</a>   serahkan ke chat_service, kirim penolakannya kalau ada
   Browser terputus    <span class="panah">-&gt;</span> <a class="ref" href="#t-disconnect">[[disconnect]]</a>  hapus catatan socket</pre>
 <p class="label">Kode</p>
-<figure class="blok-kode"><figcaption><code>backend/app/main.py:30-32</code></figcaption><pre class="kode" tabindex="0"><span class="ln">30</span><span class="c"># Cukup diimpor: chat.py mendaftarkan event connect, disconnect, dan send_chat ke sio.</span>
-<span class="ln">31</span><span class="k">from</span> app.sockets <span class="k">import</span> chat  <span class="c"># noqa: F401</span>
-<span class="ln">32</span><span class="k">from</span> app.sockets.server <span class="k">import</span> sio</pre></figure>
+<figure class="blok-kode"><figcaption><code>backend/app/main.py:29-31</code></figcaption><pre class="kode" tabindex="0"><span class="ln">29</span><span class="c"># Cukup diimpor: chat.py mendaftarkan event connect, disconnect, dan send_chat ke sio.</span>
+<span class="ln">30</span><span class="k">from</span> app.sockets <span class="k">import</span> chat  <span class="c"># noqa: F401</span>
+<span class="ln">31</span><span class="k">from</span> app.sockets.server <span class="k">import</span> sio</pre></figure>
 <figure class="blok-kode"><figcaption><code>backend/app/sockets/chat.py:65-67</code></figcaption><pre class="kode" tabindex="0"><span class="ln">65</span>sio.on(<span class="s">"connect"</span>, connect)
 <span class="ln">66</span>sio.on(<span class="s">"disconnect"</span>, disconnect)
 <span class="ln">67</span>sio.on(<span class="s">"send_chat"</span>, send_chat)</pre></figure>
 <div class="tabel" tabindex="0"><table><caption>Yang dipakai dari <code>sio</code> (server Socket.IO)</caption><thead><tr><th scope="col">Pemanggilan</th><th scope="col">Gunanya</th></tr></thead><tbody><tr><td><code>sio.on("connect", fungsi)</code></td><td>Mendaftarkan fungsi untuk sebuah event</td></tr><tr><td><code>sio.enter_room(sid, "ABC")</code></td><td>Memasukkan satu sambungan ke kanal room</td></tr><tr><td><code>sio.leave_room(sid, "ABC")</code></td><td>Mengeluarkan sambungan dari kanal room</td></tr><tr><td><code>sio.emit("receive_chat", data, to="ABC")</code></td><td>Mengirim pesan ke semua sambungan di room itu</td></tr><tr><td><code>sio.emit("system_alert", data, to=sid)</code></td><td>Mengirim pesan ke satu sambungan saja</td></tr></tbody></table></div>
 <div class="tabel" tabindex="0"><table><caption>Contoh: pemain bernama Budi</caption><thead><tr><th scope="col">Kejadian</th><th scope="col">Yang terjadi di server</th></tr></thead><tbody><tr><td>Budi membuka game</td><td><a class="ref" href="#t-connect">[[connect]]</a> mengecek token dan room ABC, mencatat sambungan <code>s1</code> = Budi, lalu memasukkan <code>s1</code> ke kanal ABC</td></tr><tr><td>Budi mengirim "halo"</td><td><a class="ref" href="#t-send-chat">[[send_chat]]</a> meneruskannya ke <a class="ref" href="#t-kirim-chat-pemain">[[chat_service.kirim_chat_pemain]]</a>, yang melihat catatan <code>s1</code>, menyimpan pesan, lalu mengirimnya ke semua orang di kanal ABC</td></tr><tr><td>Budi menutup tab</td><td><a class="ref" href="#t-disconnect">[[disconnect]]</a> menghapus catatan <code>s1</code>. Budi tetap anggota room ABC dan bisa menyambung lagi</td></tr></tbody></table></div>
 <p class="label">Yang tidak terlihat dari kode</p>
-<ul class="catatan"><li><code>sio</code> sudah dibuat sebelum baris <code>from app.sockets import chat</code> jalan, karena <code>controllers/routes.py</code> di baris yang lebih awal ikut mengimpor <code>module/npc_service.py</code>, dan file itu mengimpor <code>sockets/server.py</code>.</li><li><code>async_mode="asgi"</code> membuat server ini bisa digabung dengan FastAPI di <a class="ref tahap" href="#t-gabung">[GABUNG API + SOCKET]</a>.</li><li>Chat bot tidak lewat <a class="ref" href="#t-send-chat">[[send_chat]]</a>. Bot hanya memakai <a class="ref" href="#t-emit-room">[[emit_room]]</a> untuk mengirim pesannya ke room.</li><li>NLU, Fuzzy, dan NLG tidak tahu soal socket. Socket dipakai untuk event dari browser dan pengiriman ke room saja.</li></ul>
+<ul class="catatan"><li><code>sio</code> sudah dibuat sebelum baris <code>from app.sockets import chat</code> jalan, karena <code>controllers/routes.py</code> di baris yang lebih awal ikut mengimpor <code>bot/bot_controller.py</code>, dan file itu mengimpor <code>sockets/server.py</code>.</li><li><code>async_mode="asgi"</code> membuat server ini bisa digabung dengan FastAPI di <a class="ref tahap" href="#t-gabung">[GABUNG API + SOCKET]</a>.</li><li>Chat bot tidak lewat <a class="ref" href="#t-send-chat">[[send_chat]]</a>. Bot hanya memakai <a class="ref" href="#t-emit-room">[[emit_room]]</a> untuk mengirim pesannya ke room.</li><li>NLU, Fuzzy, dan NLG tidak tahu soal socket. Socket dipakai untuk event dari browser dan pengiriman ke room saja.</li></ul>
 <aside class="temuan"><span class="label-temuan">Sudah digabung</span> <code>register_socket_handlers</code> sudah lama dihapus. Pendaftaran event kini ada di bagian bawah <code>sockets/chat.py</code>.</aside>
 </section>
 <section class="bagian k1" id="t-allowed-origins">
@@ -193,7 +193,7 @@ Waktu 2, saat pemain main (berulang):
 <span class="ln">24</span><span class="c"># `sid` = nomor sambungan, dibuat Socket.IO.</span>
 <span class="ln">25</span>sockets: dict[str, dict[str, str]] = {}</pre></figure>
 <figure class="blok-kode"><figcaption>Isi <code>sockets</code> sesudah pemain tersambung</figcaption><pre class="kode tanpa-nomor" tabindex="0">{<span class="s">"s1"</span>: {<span class="s">"username"</span>: <span class="s">"budi"</span>, <span class="s">"token"</span>: <span class="s">"..."</span>, <span class="s">"room"</span>: <span class="s">"ABC"</span>}}</pre></figure>
-<div class="tabel" tabindex="0"><table><caption>Yang dipakai file lain dari <code>sockets/server.py</code></caption><thead><tr><th scope="col">Nama</th><th scope="col">Dipakai oleh</th><th scope="col">Gunanya</th></tr></thead><tbody><tr><td><code>sio</code></td><td><code>sockets/chat.py</code>, <code>main.py</code>, <code>module/npc_service.py</code></td><td>Mendaftarkan event, memasang ke aplikasi, mengirim pesan</td></tr><tr><td><code>sockets</code></td><td><code>sockets/chat.py</code></td><td>Diisi <a class="ref" href="#t-connect">[[connect]]</a>, dihapus <a class="ref" href="#t-disconnect">[[disconnect]]</a></td></tr><tr><td><a class="ref" href="#t-verifikasi-socket">[[verifikasi_socket]]</a></td><td><code>services/chat_service.py</code>, <a class="ref" href="#t-emit-room">[[emit_room]]</a></td><td>Mengecek sambungan masih sah</td></tr><tr><td><a class="ref" href="#t-emit-room">[[emit_room]]</a></td><td><code>services/chat_service.py</code>, <code>NPCService</code></td><td>Mengirim pesan ke satu room</td></tr></tbody></table></div>
+<div class="tabel" tabindex="0"><table><caption>Yang dipakai file lain dari <code>sockets/server.py</code></caption><thead><tr><th scope="col">Nama</th><th scope="col">Dipakai oleh</th><th scope="col">Gunanya</th></tr></thead><tbody><tr><td><code>sio</code></td><td><code>sockets/chat.py</code>, <code>main.py</code>, <code>bot/bot_controller.py</code></td><td>Mendaftarkan event, memasang ke aplikasi, mengirim pesan</td></tr><tr><td><code>sockets</code></td><td><code>sockets/chat.py</code></td><td>Diisi <a class="ref" href="#t-connect">[[connect]]</a>, dihapus <a class="ref" href="#t-disconnect">[[disconnect]]</a></td></tr><tr><td><a class="ref" href="#t-verifikasi-socket">[[verifikasi_socket]]</a></td><td><code>services/chat_service.py</code>, <a class="ref" href="#t-emit-room">[[emit_room]]</a></td><td>Mengecek sambungan masih sah</td></tr><tr><td><a class="ref" href="#t-emit-room">[[emit_room]]</a></td><td><code>services/chat_service.py</code>, <code>NPCService</code></td><td>Mengirim pesan ke satu room</td></tr></tbody></table></div>
 <p class="label">Yang tidak terlihat dari kode</p>
 <ul class="catatan"><li><code>sio</code> mengurus sambungan dan pengirimannya. <code>sockets/chat.py</code> memutuskan apa yang dilakukan saat event masuk.</li><li><code>sockets</code> hanya ada di memori, jadi restart server mengosongkannya.</li></ul>
 <aside class="temuan"><span class="label-temuan">Sudah digabung</span> Tiga catatan terpisah (<code>socket_players</code>, <code>socket_rooms</code>, <code>socket_tokens</code>) kini satu <code>sockets</code>.</aside>
@@ -410,18 +410,18 @@ Saat SessionLocal() dipanggil (tiap kali butuh):
        <span class="cabang">\&gt;</span> tidak, masih lobby: ValueError ("Gabung ke ruangan ini terlebih dahulu.")
   <span class="panah">-&gt;</span> kembalikan room</pre>
 <p class="label">Kode</p>
-<figure class="blok-kode"><figcaption><code>backend/app/services/room_service.py:80-91</code></figcaption><pre class="kode" tabindex="0"><span class="ln">80</span><span class="c"># Mengambil room dari kodenya, sekaligus memastikan pemain itu anggotanya.</span>
-<span class="ln">81</span><span class="c"># Room hanya ada di memori: tidak ada query DB di sini, dan semua room hilang saat server restart.</span>
-<span class="ln">82</span><span class="k">def</span> <span class="f">get</span>(self, code: str, username: str) -&gt; Room:
-<span class="ln">83</span>    <span class="k">with</span> self.lock:
-<span class="ln">84</span>        room = self.rooms.get(code.strip().upper())
-<span class="ln">85</span>        <span class="k">if</span> room <span class="k">is</span> <span class="k">None</span>:
-<span class="ln">86</span>            <span class="k">raise</span> ValueError(<span class="s">"Ruangan tidak ditemukan atau server sudah dimulai ulang."</span>)
-<span class="ln">87</span>        <span class="k">if</span> username <span class="k">not</span> <span class="k">in</span> room.members:
-<span class="ln">88</span>            <span class="k">if</span> room.match <span class="k">is</span> <span class="k">not</span> <span class="k">None</span>:
-<span class="ln">89</span>                <span class="k">raise</span> ValueError(<span class="s">"Pertandingan sudah dimulai; tunggu ruangan baru."</span>)
-<span class="ln">90</span>            <span class="k">raise</span> ValueError(<span class="s">"Gabung ke ruangan ini terlebih dahulu."</span>)
-<span class="ln">91</span>        <span class="k">return</span> room</pre></figure>
+<figure class="blok-kode"><figcaption><code>backend/app/services/room_service.py:133-144</code></figcaption><pre class="kode" tabindex="0"><span class="ln">133</span><span class="c"># Mengambil room dari kodenya, sekaligus memastikan pemain itu anggotanya.</span>
+<span class="ln">134</span><span class="c"># Room hanya ada di memori: tidak ada query DB di sini, dan semua room hilang saat server restart.</span>
+<span class="ln">135</span><span class="k">def</span> <span class="f">get</span>(self, code: str, username: str) -&gt; Room:
+<span class="ln">136</span>    <span class="k">with</span> self.lock:
+<span class="ln">137</span>        room = self.rooms.get(code.strip().upper())
+<span class="ln">138</span>        <span class="k">if</span> room <span class="k">is</span> <span class="k">None</span>:
+<span class="ln">139</span>            <span class="k">raise</span> ValueError(<span class="s">"Ruangan tidak ditemukan atau server sudah dimulai ulang."</span>)
+<span class="ln">140</span>        <span class="k">if</span> username <span class="k">not</span> <span class="k">in</span> room.members:
+<span class="ln">141</span>            <span class="k">if</span> room.match <span class="k">is</span> <span class="k">not</span> <span class="k">None</span>:
+<span class="ln">142</span>                <span class="k">raise</span> ValueError(<span class="s">"Pertandingan sudah dimulai; tunggu ruangan baru."</span>)
+<span class="ln">143</span>            <span class="k">raise</span> ValueError(<span class="s">"Gabung ke ruangan ini terlebih dahulu."</span>)
+<span class="ln">144</span>        <span class="k">return</span> room</pre></figure>
 <p class="label">Yang tidak terlihat dari kode</p>
 <ul class="catatan"><li>Room hanya ada di memori, tidak ada query DB di sini. Restart server menghapus semua room aktif, karena itu pesannya menyebut server dimulai ulang.</li><li><code>lock</code> adalah <code>RLock</code> yang sama untuk semua room. <code>RLock</code> boleh dikunci ulang oleh thread yang sama, jadi fungsi ini aman dipanggil dari dalam blok yang sudah memegang lock, seperti di <a class="ref" href="#t-kirim-chat-pemain">[[chat_service.kirim_chat_pemain]]</a>.</li></ul>
 </section>
@@ -676,7 +676,7 @@ Saat SessionLocal() dipanggil (tiap kali butuh):
        malam <span class="panah">-&gt;</span> hitung aksi malam <span class="panah">-&gt;</span> ronde naik <span class="panah">-&gt;</span> siang
   <span class="panah">-&gt;</span> belum ada pemenang: atur deadline fase baru</pre>
 <p class="label">Kode</p>
-<figure class="blok-kode"><figcaption><code>backend/app/module/match_engine.py:723-775</code></figcaption><pre class="kode" tabindex="0"><span class="ln">723</span><span class="c"># TIMER SERVER: maju satu fase saat deadline; tetap berjalan walaupun semua tab ditutup.</span>
+<figure class="blok-kode"><figcaption><code>backend/app/game/match_engine.py:723-775</code></figcaption><pre class="kode" tabindex="0"><span class="ln">723</span><span class="c"># TIMER SERVER: maju satu fase saat deadline; tetap berjalan walaupun semua tab ditutup.</span>
 <span class="ln">724</span><span class="k">def</span> <span class="f">tick</span>(self, now=<span class="k">None</span>):
 <span class="ln">725</span>    now = time.time() <span class="k">if</span> now <span class="k">is</span> <span class="k">None</span> <span class="k">else</span> now
 <span class="ln">726</span>    <span class="k">if</span> self.phase == <span class="s">"preparing"</span>:
@@ -730,7 +730,7 @@ Saat SessionLocal() dipanggil (tiap kali butuh):
 <span class="ln">774</span>        self.deadline = now + self.durations[self.phase]
 <span class="ln">775</span>    self.events = self.events[-<span class="n">40</span>:]</pre></figure>
 <p class="label">Yang tidak terlihat dari kode</p>
-<ul class="catatan"><li>Ronde 1 langsung dari siang ke malam karena belum ada bahan untuk vote.</li><li>Aturan vote dan aksi malam ada di <code>resolve_votes</code> dan <code>resolve_night</code>. Keduanya belum dibedah di halaman ini.</li><li><code>run_bots</code> termasuk jalur bot, jadi ikut dibedah nanti.</li></ul>
+<ul class="catatan"><li>Ronde 1 langsung dari siang ke malam karena belum ada bahan untuk vote.</li><li>Aturan vote dan aksi malam ada di <code>resolve_votes</code> dan <code>resolve_night</code>. Keduanya belum dibedah di halaman ini.</li><li><code>run_bots</code> adalah aksi cadangan engine: hanya bot yang belum diputuskan otaknya di fase itu yang dijalankan di sini. Bot normal melangkah lewat <a class="ref" href="#t-jalankan-bot">[[npc_service.jalankan_bot_yang_sudah_waktunya]]</a>.</li></ul>
 </section>
 <section class="bagian k2" id="t-match-can-chat">
 <p class="jalur"><span>main.py</span> <span class="sep">/</span> <a href="#t-konek-socket">[KONEK SOCKET]</a> <span class="sep">/</span> <a href="#t-send-chat">send_chat</a> <span class="sep">/</span> <a href="#t-kirim-chat-pemain">chat_service.kirim_chat_pemain</a> <span class="sep">/</span> <span>Match.can_chat</span></p>
@@ -744,7 +744,7 @@ Saat SessionLocal() dipanggil (tiap kali butuh):
   <span class="panah">-&gt;</span> tidak kena Gag
   <span class="panah">-&gt;</span> fase sekarang siang atau Tribunal</pre>
 <p class="label">Kode</p>
-<figure class="blok-kode"><figcaption><code>backend/app/module/match_engine.py:315-324</code></figcaption><pre class="kode" tabindex="0"><span class="ln">315</span><span class="c"># VALIDASI CHAT: Gag/Hostage/kematian dan fase malam ditegakkan di backend.</span>
+<figure class="blok-kode"><figcaption><code>backend/app/game/match_engine.py:315-324</code></figcaption><pre class="kode" tabindex="0"><span class="ln">315</span><span class="c"># VALIDASI CHAT: Gag/Hostage/kematian dan fase malam ditegakkan di backend.</span>
 <span class="ln">316</span><span class="k">def</span> <span class="f">can_chat</span>(self, name):
 <span class="ln">317</span>    pemain = self.players.get(name)
 <span class="ln">318</span>    <span class="k">return</span> bool(
@@ -1042,7 +1042,7 @@ set_message_context   lengkapi pesan dengan id pertandingan, ronde, dan fase</pr
   <span class="panah">-&gt;</span> pertahankan 100 pesan terakhir
   <span class="panah">-&gt;</span> kembalikan pesan, untuk disiarkan</pre>
 <p class="label">Kode</p>
-<figure class="blok-kode"><figcaption><code>backend/app/module/match_engine.py:777-791</code></figcaption><pre class="kode" tabindex="0"><span class="ln">777</span><span class="c"># PESAN PUBLIK: hanya dipanggil setelah pemeriksaan can_chat; ID mencegah duplikasi saat reconnect.</span>
+<figure class="blok-kode"><figcaption><code>backend/app/game/match_engine.py:777-791</code></figcaption><pre class="kode" tabindex="0"><span class="ln">777</span><span class="c"># PESAN PUBLIK: hanya dipanggil setelah pemeriksaan can_chat; ID mencegah duplikasi saat reconnect.</span>
 <span class="ln">778</span><span class="c"># now hanya diisi simulasi yang memakai jam buatan.</span>
 <span class="ln">779</span><span class="k">def</span> <span class="f">add_message</span>(self, sender, message, now=<span class="k">None</span>):
 <span class="ln">780</span>    <span class="c"># ID diawali nomor urut: otak bot mengurutkan chat dengan waktu lalu ID, jadi chat dengan</span>
@@ -1091,8 +1091,53 @@ set_message_context   lengkapi pesan dengan id pertandingan, ronde, dan fase</pr
 </section>
 <section class="bagian k2" id="t-catat-nlu">
 <p class="jalur"><span>main.py</span> <span class="sep">/</span> <a href="#t-konek-socket">[KONEK SOCKET]</a> <span class="sep">/</span> <a href="#t-send-chat">send_chat</a> <span class="sep">/</span> <a href="#t-kirim-chat-pemain">chat_service.kirim_chat_pemain</a> <span class="sep">/</span> <span>catat_nlu</span></p>
-<h4 class="judul"><span class="no">1.5.1.10</span><span class="nama">catat_nlu</span><span class="status s-nanti">nanti</span></h4>
-<p class="guna">IndoBERT membaca pesan sekali untuk checker dan riwayat chat, dan hasilnya disimpan supaya bot tidak menghitung ulang. Dibedah nanti, karena rombak otak bot masih berjalan.</p>
+<h4 class="judul"><span class="no">1.5.1.10</span><span class="nama">catat_nlu</span><span class="status s-belum">belum dibahas</span></h4>
+<p class="guna">IndoBERT membaca pesan sekali untuk checker dan riwayat chat, dan hasilnya disimpan supaya bot tidak menghitung ulang.</p>
+<p class="label">Alur</p>
+<pre class="alur" tabindex="0">Otak bot belum siap: selesai, kembalikan None
+  <span class="panah">-&gt;</span> IndoBERT membaca chat di thread keputusan, urut dengan langkah bot
+  <span class="panah">-&gt;</span> bangunkan bot yang dipanggil atau dituduh, supaya ia segera melangkah
+  <span class="panah">-&gt;</span> simpan bacaan (intent dan target) ke pesan di MySQL</pre>
+<p class="label">Kode</p>
+<figure class="blok-kode"><figcaption><code>backend/app/bot/bot_controller.py:451-487</code></figcaption><pre class="kode" tabindex="0"><span class="ln">451</span><span class="c"># Pencatat NLU: baca satu chat pertandingan dengan IndoBERT di thread keputusan (urut dengan langkah bot), simpan</span>
+<span class="ln">452</span><span class="c"># bacaannya ke riwayat chat, dan kembalikan hasilnya (None bila otak belum siap atau gagal). Dipakai chat manusia</span>
+<span class="ln">453</span><span class="c"># (services/chat_service.py) dan chat bot (brain_turn).</span>
+<span class="ln">454</span><span class="c"># Alur: 1 otak belum siap: None -&gt; 2 nlu.baca_chat di thread keputusan -&gt; 3 bangunkan bot yang dipanggil/dituduh</span>
+<span class="ln">455</span><span class="c">#       -&gt; 4 simpan bacaan ke pesan di MySQL</span>
+<span class="ln">456</span><span class="k">async</span> <span class="k">def</span> <span class="f">catat_nlu</span>(match, pengirim, teks, message_id=<span class="k">None</span>, runtime=brain_runtime, room_code=<span class="k">None</span>):
+<span class="ln">457</span>    <span class="k">if</span> runtime.nlu <span class="k">is</span> <span class="k">None</span> <span class="k">or</span> <span class="k">not</span> runtime.modul:
+<span class="ln">458</span>        <span class="k">return</span> <span class="k">None</span>
+<span class="ln">459</span>    riwayat = riwayat_nlu.setdefault(match.id, [])
+<span class="ln">460</span>    label = match.labels.get(pengirim, pengirim)
+<span class="ln">461</span>    <span class="k">try</span>:
+<span class="ln">462</span>        nlu = <span class="k">await</span> asyncio.get_running_loop().run_in_executor(
+<span class="ln">463</span>            runtime.eksekutor_keputusan,
+<span class="ln">464</span>            baca_chat,
+<span class="ln">465</span>            runtime.nlu,
+<span class="ln">466</span>            riwayat,
+<span class="ln">467</span>            label,
+<span class="ln">468</span>            teks,
+<span class="ln">469</span>            roster_label(match),
+<span class="ln">470</span>        )
+<span class="ln">471</span>    <span class="k">except</span> Exception:
+<span class="ln">472</span>        logger.exception(<span class="s">"NLU chat gagal dicatat."</span>)
+<span class="ln">473</span>        <span class="k">return</span> <span class="k">None</span>
+<span class="ln">474</span>    <span class="c"># Pemicu cepat: bot yang dipanggil chat ini (target neutral, dari IndoBERT atau aturan nama) atau dituduhnya</span>
+<span class="ln">475</span>    <span class="c"># (target offend) melangkah pada putaran jam berikutnya, tanpa menunggu NPC_STEP_SECONDS. Lantai bicara dan aturan</span>
+<span class="ln">476</span>    <span class="c"># chat otak (jatah, jeda, satu jawaban per panggilan) tetap menentukan apakah bot benar-benar bicara.</span>
+<span class="ln">477</span>    <span class="k">for</span> t <span class="k">in</span> nlu.get(<span class="s">"target"</span>, []):
+<span class="ln">478</span>        <span class="k">if</span> t[<span class="s">"relasi"</span>] <span class="k">in</span> (<span class="s">"neutral"</span>, <span class="s">"offend"</span>) <span class="k">and</span> t[<span class="s">"pemain"</span>] != label:
+<span class="ln">479</span>            otak = runtime.otak_bot(match.id, match.username(t[<span class="s">"pemain"</span>]))
+<span class="ln">480</span>            <span class="k">if</span> otak <span class="k">is</span> <span class="k">not</span> <span class="k">None</span>:
+<span class="ln">481</span>                otak.segera = <span class="k">True</span>
+<span class="ln">482</span>    <span class="k">if</span> message_id <span class="k">is</span> <span class="k">not</span> <span class="k">None</span>:
+<span class="ln">483</span>        <span class="k">try</span>:
+<span class="ln">484</span>            <span class="k">await</span> asyncio.to_thread(PersistenceService(room_code).record_nlu, message_id, nlu)
+<span class="ln">485</span>        <span class="k">except</span> PersistenceError:
+<span class="ln">486</span>            logger.warning(<span class="s">"Bacaan NLU tidak tersimpan (migrasi V9?)."</span>)
+<span class="ln">487</span>    <span class="k">return</span> nlu</pre></figure>
+<p class="label">Yang tidak terlihat dari kode</p>
+<ul class="catatan"><li>Dipakai chat manusia lewat <a class="ref" href="#t-kirim-chat-pemain">[[chat_service.kirim_chat_pemain]]</a> dan chat bot, jadi satu chat dibaca satu kali saja.</li><li>Isi pikirannya (NLU, [FUZZY 1], [FUZZY 2], NLG) dibedah di dokumen Cara Kerja Bot, menu panel 08, jadi di sini cukup jalurnya.</li></ul>
 </section>
 <section class="bagian k2" id="t-record-trace">
 <p class="jalur"><span>main.py</span> <span class="sep">/</span> <a href="#t-konek-socket">[KONEK SOCKET]</a> <span class="sep">/</span> <a href="#t-send-chat">send_chat</a> <span class="sep">/</span> <a href="#t-kirim-chat-pemain">chat_service.kirim_chat_pemain</a> <span class="sep">/</span> <span>PersistenceService.record_trace</span></p>
@@ -1116,10 +1161,12 @@ set_message_context   lengkapi pesan dengan id pertandingan, ronde, dan fase</pr
 </section>
 <section class="bagian k0" id="t-siapkan-bot">
 <p class="jalur"><span>main.py</span> <span class="sep">/</span> <span>[SIAPKAN BOT NPC]</span></p>
-<h2 class="judul"><span class="no">2</span><span class="nama">[SIAPKAN BOT NPC]</span><span class="status s-nanti">nanti</span></h2>
-<p class="guna">Membuat pengatur bot dan memberinya <a class="ref" href="#t-emit-room">[[emit_room]]</a>, supaya chat bot sampai ke room. Terjadi saat <code>module/npc_service.py</code> diimpor, bukan di <code>main.py</code>. Dibedah nanti, karena rombak otak bot masih berjalan.</p>
+<h2 class="judul"><span class="no">2</span><span class="nama">[SIAPKAN BOT NPC]</span><span class="status s-belum">belum dibahas</span></h2>
+<p class="guna">Membuat pengatur bot dan memberinya <a class="ref" href="#t-emit-room">[[emit_room]]</a>, supaya chat bot sampai ke room. Terjadi saat <code>bot/bot_controller.py</code> diimpor, bukan di <code>main.py</code>.</p>
 <p class="label">Kode</p>
-<figure class="blok-kode"><figcaption><code>backend/app/module/npc_service.py:570</code></figcaption><pre class="kode" tabindex="0"><span class="ln">570</span>npc_service = NPCService(sio, broadcast=emit_room)</pre></figure>
+<figure class="blok-kode"><figcaption><code>backend/app/bot/bot_controller.py:780</code></figcaption><pre class="kode" tabindex="0"><span class="ln">780</span>npc_service = NPCService(sio, broadcast=emit_room)</pre></figure>
+<p class="label">Yang tidak terlihat dari kode</p>
+<ul class="catatan"><li>Bot diperlakukan seperti pemain tanpa browser: vote, aksi, dan chatnya lewat <code>services/room_service.py</code>, bukan langsung ke engine.</li></ul>
 </section>
 <section class="bagian k0" id="t-setup-logger">
 <p class="jalur"><span>main.py</span> <span class="sep">/</span> <span>[SETUP LOGGER]</span></p>
@@ -1129,9 +1176,9 @@ set_message_context   lengkapi pesan dengan id pertandingan, ronde, dan fase</pr
 <pre class="alur" tabindex="0">Atur level log ke INFO, jadi pesan INFO, WARNING, dan ERROR tampil
   <span class="panah">-&gt;</span> ambil pencatat bernama "shadow_heist"</pre>
 <p class="label">Kode</p>
-<figure class="blok-kode"><figcaption><code>backend/app/main.py:84-86</code></figcaption><pre class="kode" tabindex="0"><span class="ln">84</span><span class="c"># Menyiapkan pencatat log. File lain memakai anak dari nama ini (mis. shadow_heist.database), jadi pesannya ikut aturan yang sama.</span>
-<span class="ln">85</span>logging.basicConfig(level=logging.INFO)
-<span class="ln">86</span>logger = logging.getLogger(<span class="s">"shadow_heist"</span>)</pre></figure>
+<figure class="blok-kode"><figcaption><code>backend/app/main.py:83-85</code></figcaption><pre class="kode" tabindex="0"><span class="ln">83</span><span class="c"># Menyiapkan pencatat log. File lain memakai anak dari nama ini (mis. shadow_heist.database), jadi pesannya ikut aturan yang sama.</span>
+<span class="ln">84</span>logging.basicConfig(level=logging.INFO)
+<span class="ln">85</span>logger = logging.getLogger(<span class="s">"shadow_heist"</span>)</pre></figure>
 <p class="label">Yang tidak terlihat dari kode</p>
 <ul class="catatan"><li><code>shadow_heist</code> adalah induknya. File lain memakai anak dari nama itu, misalnya <code>shadow_heist.socket</code> di <code>sockets/server.py</code>, jadi pesannya ikut aturan yang sama.</li></ul>
 </section>
@@ -1143,9 +1190,9 @@ set_message_context   lengkapi pesan dengan id pertandingan, ronde, dan fase</pr
 <pre class="alur" tabindex="0">Buat aplikasi FastAPI dengan nama dari settings
   <span class="panah">-&gt;</span> pasang lifespan, tapi belum dijalankan</pre>
 <p class="label">Kode</p>
-<figure class="blok-kode"><figcaption><code>backend/app/main.py:88-90</code></figcaption><pre class="kode" tabindex="0"><span class="ln">88</span><span class="c"># Bangun FastAPI dan daftarkan lifespan(Koneksi ke DB, Konfigurasi AI, Konfigurasi NPC, Memuat Otak AI, Menyalakan Jam (cek terus setiap 0.5 Detik)).</span>
-<span class="ln">89</span><span class="c"># Lifespan baru jalan saat Uvicorn menyalakan server.</span>
-<span class="ln">90</span>app = FastAPI(title=settings.app_name, lifespan=lifespan)</pre></figure>
+<figure class="blok-kode"><figcaption><code>backend/app/main.py:87-89</code></figcaption><pre class="kode" tabindex="0"><span class="ln">87</span><span class="c"># Bangun FastAPI dan daftarkan lifespan(Koneksi ke DB, Konfigurasi AI, Konfigurasi NPC, Memuat Otak AI, Menyalakan Jam (cek terus setiap 0.5 Detik)).</span>
+<span class="ln">88</span><span class="c"># Lifespan baru jalan saat Uvicorn menyalakan server.</span>
+<span class="ln">89</span>app = FastAPI(title=settings.app_name, lifespan=lifespan)</pre></figure>
 <p class="label">Yang tidak terlihat dari kode</p>
 <ul class="catatan"><li><code>lifespan</code> baru jalan saat Uvicorn menyalakan server. Isinya ada di <a class="ref tahap" href="#t-server-nyala">[SERVER NYALA]</a> dan <a class="ref tahap" href="#t-server-mati">[SERVER MATI]</a>.</li></ul>
 </section>
@@ -1158,7 +1205,7 @@ set_message_context   lengkapi pesan dengan id pertandingan, ronde, dan fase</pr
   <span class="panah">-&gt;</span> <a class="ref" href="#t-allowed-origins">[[settings.allowed_origins]]</a>  alamat web yang diizinkan
   <span class="panah">-&gt;</span> izinkan kredensial, method GET POST PUT DELETE OPTIONS, dan semua header</pre>
 <p class="label">Kode</p>
-<figure class="blok-kode"><figcaption><code>backend/app/main.py:92</code></figcaption><pre class="kode" tabindex="0"><span class="ln">92</span>configure_cors(app)</pre></figure>
+<figure class="blok-kode"><figcaption><code>backend/app/main.py:91</code></figcaption><pre class="kode" tabindex="0"><span class="ln">91</span>configure_cors(app)</pre></figure>
 <figure class="blok-kode"><figcaption><code>backend/app/middleware/cors.py:9-18</code></figcaption><pre class="kode" tabindex="0"><span class="ln">9</span><span class="c"># Pasang kebijakan origin, method, dan header untuk request lintas origin dari browser.</span>
 <span class="ln">10</span><span class="k">def</span> <span class="f">configure_cors</span>(app: FastAPI) -&gt; <span class="k">None</span>:
 <span class="ln">11</span>    app.add_middleware(
@@ -1182,7 +1229,7 @@ set_message_context   lengkapi pesan dengan id pertandingan, ronde, dan fase</pr
   <span class="panah">-&gt;</span> controllers/routes.py sudah menggabungkan 7 router jadi satu api_router
   <span class="panah">-&gt;</span> tiap router punya file sendiri di controllers/</pre>
 <p class="label">Kode</p>
-<figure class="blok-kode"><figcaption><code>backend/app/main.py:93</code></figcaption><pre class="kode" tabindex="0"><span class="ln">93</span>app.include_router(api_router)</pre></figure>
+<figure class="blok-kode"><figcaption><code>backend/app/main.py:92</code></figcaption><pre class="kode" tabindex="0"><span class="ln">92</span>app.include_router(api_router)</pre></figure>
 <figure class="blok-kode"><figcaption><code>backend/app/controllers/routes.py:13-21</code></figcaption><pre class="kode" tabindex="0"><span class="ln">13</span>api_router = APIRouter()
 <span class="ln">14</span>api_router.include_router(health_router)
 <span class="ln">15</span>api_router.include_router(auth_router)
@@ -1230,18 +1277,18 @@ set_message_context   lengkapi pesan dengan id pertandingan, ronde, dan fase</pr
 <span class="ln">32</span>        <span class="k">raise</span> HTTPException(<span class="n">503</span>, str(error)) <span class="k">from</span> error
 <span class="ln">33</span>    <span class="k">except</span> FilterRiwayatSalah <span class="k">as</span> error:
 <span class="ln">34</span>        <span class="k">raise</span> HTTPException(<span class="n">422</span>, str(error)) <span class="k">from</span> error</pre></figure>
-<figure class="blok-kode"><figcaption><code>backend/app/services/panel_service.py:73-81</code></figcaption><pre class="kode" tabindex="0"><span class="ln">73</span><span class="c"># Validasi hash token, kedaluwarsa, dan versi kredensial panel.</span>
-<span class="ln">74</span><span class="k">def</span> <span class="f">sesi_berlaku</span>(token):
-<span class="ln">75</span>    <span class="k">return</span> bool(
-<span class="ln">76</span>        transaction(
-<span class="ln">77</span>            <span class="k">lambda</span> database: panel_queries.valid_panel_session(
-<span class="ln">78</span>                database, digest(token), credential_version()
-<span class="ln">79</span>            )
-<span class="ln">80</span>        )
-<span class="ln">81</span>    )</pre></figure>
-<figure class="blok-kode"><figcaption><code>backend/app/services/panel_service.py:50-52</code></figcaption><pre class="kode" tabindex="0"><span class="ln">50</span><span class="c"># Transaksi panel memakai satu pesan gagal, yang diteruskan controller sebagai HTTP 503.</span>
-<span class="ln">51</span><span class="k">def</span> <span class="f">transaction</span>(operasi):
-<span class="ln">52</span>    <span class="k">return</span> jalankan_transaksi(operasi, PESAN_PANEL)</pre></figure>
+<figure class="blok-kode"><figcaption><code>backend/app/services/panel_service.py:74-82</code></figcaption><pre class="kode" tabindex="0"><span class="ln">74</span><span class="c"># Validasi hash token, kedaluwarsa, dan versi kredensial panel.</span>
+<span class="ln">75</span><span class="k">def</span> <span class="f">sesi_berlaku</span>(token):
+<span class="ln">76</span>    <span class="k">return</span> bool(
+<span class="ln">77</span>        transaction(
+<span class="ln">78</span>            <span class="k">lambda</span> database: panel_queries.valid_panel_session(
+<span class="ln">79</span>                database, digest(token), credential_version()
+<span class="ln">80</span>            )
+<span class="ln">81</span>        )
+<span class="ln">82</span>    )</pre></figure>
+<figure class="blok-kode"><figcaption><code>backend/app/services/panel_service.py:51-53</code></figcaption><pre class="kode" tabindex="0"><span class="ln">51</span><span class="c"># Transaksi panel memakai satu pesan gagal, yang diteruskan controller sebagai HTTP 503.</span>
+<span class="ln">52</span><span class="k">def</span> <span class="f">transaction</span>(operasi):
+<span class="ln">53</span>    <span class="k">return</span> jalankan_transaksi(operasi, PESAN_PANEL)</pre></figure>
 <figure class="blok-kode"><figcaption><code>backend/app/models/panel_queries.py:6-14</code></figcaption><pre class="kode" tabindex="0"><span class="ln">6</span><span class="c"># Hash token sesi panel bila masih berlaku dan cocok dengan versi kredensial; kosong bila tidak.</span>
 <span class="ln">7</span><span class="k">def</span> <span class="f">valid_panel_session</span>(database, token_hash, credential_version):
 <span class="ln">8</span>    <span class="k">return</span> database.execute(
@@ -1286,20 +1333,20 @@ set_message_context   lengkapi pesan dengan id pertandingan, ronde, dan fase</pr
 <span class="ln">165</span>        <span class="k">raise</span> HTTPException(status_code=<span class="n">400</span>, detail=str(error)) <span class="k">from</span> error
 <span class="ln">166</span>    <span class="k">except</span> RoomBelumTersimpan <span class="k">as</span> error:
 <span class="ln">167</span>        <span class="k">raise</span> HTTPException(status_code=<span class="n">503</span>, detail=str(error)) <span class="k">from</span> error</pre></figure>
-<figure class="blok-kode"><figcaption><code>backend/app/services/room_service.py:181-194</code></figcaption><pre class="kode" tabindex="0"><span class="ln">181</span><span class="c"># Buat ruangan yang sudah tercatat di arsip. Gagal mencatat berarti ruangannya tidak jadi dibuat.</span>
-<span class="ln">182</span><span class="k">def</span> <span class="f">buat_room_terarsip</span>(self, username, capacity=<span class="n">6</span>):
-<span class="ln">183</span>    <span class="k">with</span> self.lock:
-<span class="ln">184</span>        <span class="c"># Kode acak bisa sudah terpakai di arsip lama: buang room itu lalu coba kode lain.</span>
-<span class="ln">185</span>        <span class="k">for</span> _ <span class="k">in</span> range(<span class="n">10</span>):
-<span class="ln">186</span>            room = self.create(username, capacity=capacity)
-<span class="ln">187</span>            <span class="k">try</span>:
-<span class="ln">188</span>                <span class="k">if</span> PersistenceService(room.code).archive_new_room(username):
-<span class="ln">189</span>                    <span class="k">return</span> room
-<span class="ln">190</span>            <span class="k">except</span> PersistenceError <span class="k">as</span> error:
-<span class="ln">191</span>                self.rooms.pop(room.code, <span class="k">None</span>)
-<span class="ln">192</span>                <span class="k">raise</span> RoomBelumTersimpan(<span class="s">"Ruangan gagal disimpan. Coba lagi."</span>) <span class="k">from</span> error
-<span class="ln">193</span>            self.rooms.pop(room.code, <span class="k">None</span>)
-<span class="ln">194</span>        <span class="k">raise</span> RoomBelumTersimpan(<span class="s">"Kode ruangan belum tersedia. Coba lagi."</span>)</pre></figure>
+<figure class="blok-kode"><figcaption><code>backend/app/services/room_service.py:234-247</code></figcaption><pre class="kode" tabindex="0"><span class="ln">234</span><span class="c"># Buat ruangan yang sudah tercatat di arsip. Gagal mencatat berarti ruangannya tidak jadi dibuat.</span>
+<span class="ln">235</span><span class="k">def</span> <span class="f">buat_room_terarsip</span>(self, username, capacity=<span class="n">6</span>):
+<span class="ln">236</span>    <span class="k">with</span> self.lock:
+<span class="ln">237</span>        <span class="c"># Kode acak bisa sudah terpakai di arsip lama: buang room itu lalu coba kode lain.</span>
+<span class="ln">238</span>        <span class="k">for</span> _ <span class="k">in</span> range(<span class="n">10</span>):
+<span class="ln">239</span>            room = self.create(username, capacity=capacity)
+<span class="ln">240</span>            <span class="k">try</span>:
+<span class="ln">241</span>                <span class="k">if</span> PersistenceService(room.code).archive_new_room(username):
+<span class="ln">242</span>                    <span class="k">return</span> room
+<span class="ln">243</span>            <span class="k">except</span> PersistenceError <span class="k">as</span> error:
+<span class="ln">244</span>                self.rooms.pop(room.code, <span class="k">None</span>)
+<span class="ln">245</span>                <span class="k">raise</span> RoomBelumTersimpan(<span class="s">"Ruangan gagal disimpan. Coba lagi."</span>) <span class="k">from</span> error
+<span class="ln">246</span>            self.rooms.pop(room.code, <span class="k">None</span>)
+<span class="ln">247</span>        <span class="k">raise</span> RoomBelumTersimpan(<span class="s">"Kode ruangan belum tersedia. Coba lagi."</span>)</pre></figure>
 <figure class="blok-kode"><figcaption><code>backend/app/services/persistence_service.py:50-60</code></figcaption><pre class="kode" tabindex="0"><span class="ln">50</span><span class="c"># Arsipkan ruangan baru beserta pemiliknya sebelum dipakai bermain.</span>
 <span class="ln">51</span><span class="k">def</span> <span class="f">archive_new_room</span>(self, username):
 <span class="ln">52</span>    <span class="c"># Simpan ruangan dan pemiliknya dalam satu transaksi agar arsip tidak setengah jadi.</span>
@@ -1323,9 +1370,9 @@ set_message_context   lengkapi pesan dengan id pertandingan, ronde, dan fase</pr
   <span class="panah">-&gt;</span> permintaan ke /socket.io/: ditangani Socket.IO
   <span class="panah">-&gt;</span> selain itu: diteruskan ke FastAPI</pre>
 <p class="label">Kode</p>
-<figure class="blok-kode"><figcaption><code>backend/app/main.py:95-97</code></figcaption><pre class="kode" tabindex="0"><span class="ln">95</span><span class="c"># Socket.IO: jalur yang tetap terbuka antara server dan browser, jadi server bisa mengirim chat kapan saja.</span>
-<span class="ln">96</span><span class="c"># Di sini hanya persiapan: connect, disconnect, dan send_chat baru jalan saat ada pemain.</span>
-<span class="ln">97</span>asgi_app = socketio.ASGIApp(sio, other_asgi_app=app)</pre></figure>
+<figure class="blok-kode"><figcaption><code>backend/app/main.py:94-96</code></figcaption><pre class="kode" tabindex="0"><span class="ln">94</span><span class="c"># Socket.IO: jalur yang tetap terbuka antara server dan browser, jadi server bisa mengirim chat kapan saja.</span>
+<span class="ln">95</span><span class="c"># Di sini hanya persiapan: connect, disconnect, dan send_chat baru jalan saat ada pemain.</span>
+<span class="ln">96</span>asgi_app = socketio.ASGIApp(sio, other_asgi_app=app)</pre></figure>
 <p class="label">Yang tidak terlihat dari kode</p>
 <ul class="catatan"><li><code>backend/Dockerfile:17</code> menjalankan <code>app.main:asgi_app</code>. Jadi yang dijalankan variabel ini, bukan <code>app</code>.</li></ul>
 </section>
@@ -1345,30 +1392,30 @@ set_message_context   lengkapi pesan dengan id pertandingan, ronde, dan fase</pr
   <span class="panah">-&gt;</span> <a class="ref" href="#t-game-clock">[[game_clock]]</a>  nyalakan jam sebagai tugas latar
   <span class="panah">-&gt;</span> yield: server mulai melayani pemain</pre>
 <p class="label">Kode</p>
-<figure class="blok-kode"><figcaption><code>backend/app/main.py:50-73</code></figcaption><pre class="kode" tabindex="0"><span class="ln">50</span><span class="k">if</span> database_is_ready():
-<span class="ln">51</span>    logger.info(<span class="s">"Koneksi MySQL siap."</span>)
-<span class="ln">52</span>    <span class="k">try</span>:
-<span class="ln">53</span>        <span class="c"># API key, token, dan link LLM yang disimpan lewat panel dibaca dari DB ke memori,</span>
-<span class="ln">54</span>        <span class="c"># supaya tidak hilang saat server restart.</span>
-<span class="ln">55</span>        muat_konfigurasi_ai()
-<span class="ln">56</span>    <span class="k">except</span> PersistenceError <span class="k">as</span> error:
-<span class="ln">57</span>        logger.error(<span class="s">"Konfigurasi AI panel gagal dimuat; memakai .env: %s"</span>, error)
-<span class="ln">58</span>    <span class="k">try</span>:
-<span class="ln">59</span>        <span class="c"># Pengaturan Otak NPC dari panel (penulis kalimat dan model) dibaca dari DB ke otak bot.</span>
-<span class="ln">60</span>        muat_konfigurasi_npc()
-<span class="ln">61</span>    <span class="k">except</span> PersistenceError <span class="k">as</span> error:
-<span class="ln">62</span>        logger.warning(<span class="s">"Konfigurasi Otak NPC panel gagal dimuat; memakai .env: %s"</span>, error)
-<span class="ln">63</span><span class="k">else</span>:
-<span class="ln">64</span>    logger.error(<span class="s">"Koneksi awal MySQL gagal."</span>)
+<figure class="blok-kode"><figcaption><code>backend/app/main.py:49-72</code></figcaption><pre class="kode" tabindex="0"><span class="ln">49</span><span class="k">if</span> database_is_ready():
+<span class="ln">50</span>    logger.info(<span class="s">"Koneksi MySQL siap."</span>)
+<span class="ln">51</span>    <span class="k">try</span>:
+<span class="ln">52</span>        <span class="c"># API key, token, dan link LLM yang disimpan lewat panel dibaca dari DB ke memori,</span>
+<span class="ln">53</span>        <span class="c"># supaya tidak hilang saat server restart.</span>
+<span class="ln">54</span>        muat_konfigurasi_ai()
+<span class="ln">55</span>    <span class="k">except</span> PersistenceError <span class="k">as</span> error:
+<span class="ln">56</span>        logger.error(<span class="s">"Konfigurasi AI panel gagal dimuat; memakai .env: %s"</span>, error)
+<span class="ln">57</span>    <span class="k">try</span>:
+<span class="ln">58</span>        <span class="c"># Pengaturan Otak NPC dari panel (penulis kalimat dan model) dibaca dari DB ke otak bot.</span>
+<span class="ln">59</span>        muat_konfigurasi_npc()
+<span class="ln">60</span>    <span class="k">except</span> PersistenceError <span class="k">as</span> error:
+<span class="ln">61</span>        logger.warning(<span class="s">"Konfigurasi Otak NPC panel gagal dimuat; memakai .env: %s"</span>, error)
+<span class="ln">62</span><span class="k">else</span>:
+<span class="ln">63</span>    logger.error(<span class="s">"Koneksi awal MySQL gagal."</span>)
+<span class="ln">64</span>
 <span class="ln">65</span>
-<span class="ln">66</span>
-<span class="ln">67</span><span class="c"># memasukan Indobert, Fuzzy , NLG </span>
-<span class="ln">68</span>brain_runtime.mulai_memuat()
-<span class="ln">69</span>
-<span class="ln">70</span><span class="c"># Jam jalan sebagai tugas latar, supaya tetap berdetak sambil server melayani pemain.</span>
-<span class="ln">71</span>clock = asyncio.create_task(game_clock())
-<span class="ln">72</span><span class="k">try</span>:
-<span class="ln">73</span>    <span class="k">yield</span></pre></figure>
+<span class="ln">66</span><span class="c"># memasukan Indobert, Fuzzy , NLG </span>
+<span class="ln">67</span>brain_runtime.mulai_memuat()
+<span class="ln">68</span>
+<span class="ln">69</span><span class="c"># Jam jalan sebagai tugas latar, supaya tetap berdetak sambil server melayani pemain.</span>
+<span class="ln">70</span>clock = asyncio.create_task(game_clock())
+<span class="ln">71</span><span class="k">try</span>:
+<span class="ln">72</span>    <span class="k">yield</span></pre></figure>
 <p class="label">Yang tidak terlihat dari kode</p>
 <ul class="catatan"><li><code>yield</code> membagi <code>lifespan</code> jadi dua. Sebelum <code>yield</code> jalan saat server nyala, dan blok <code>finally</code> jalan saat server mati.</li><li><code>try/finally</code> memastikan pembersihan di <a class="ref tahap" href="#t-server-mati">[SERVER MATI]</a> tetap jalan walau server berhenti karena error.</li><li><code>create_task</code> membuat jam tetap berdetak sambil server melayani pemain. Hasilnya disimpan di <code>clock</code> supaya bisa dibatalkan saat server mati.</li></ul>
 </section>
@@ -1488,13 +1535,41 @@ set_message_context   lengkapi pesan dengan id pertandingan, ronde, dan fase</pr
 <span class="ln">44</span>        <span class="k">except</span> ValueError:
 <span class="ln">45</span>            logger.warning(<span class="s">"Konfigurasi NPC tersimpan tidak valid; memakai nilai .env."</span>)</pre></figure>
 <p class="label">Yang tidak terlihat dari kode</p>
-<ul class="catatan"><li>Harus dipanggil sebelum <a class="ref" href="#t-mulai-memuat">[[brain_runtime.mulai_memuat]]</a>, karena rantai penulis baru dibangun saat otak dimuat.</li><li>Baris id=2 terpisah dari id=1, karena id=1 ditulis ulang utuh oleh <code>simpan_konfigurasi_ai</code>.</li><li><code>brain_runtime.atur</code> ada di jalur otak bot, jadi dibedah nanti.</li></ul>
+<ul class="catatan"><li>Harus dipanggil sebelum <a class="ref" href="#t-mulai-memuat">[[brain_runtime.mulai_memuat]]</a>, karena rantai penulis baru dibangun saat otak dimuat.</li><li>Baris id=2 terpisah dari id=1, karena id=1 ditulis ulang utuh oleh <code>simpan_konfigurasi_ai</code>.</li><li><code>brain_runtime.atur</code> (di <code>bot/bot_controller.py</code>) memeriksa nilainya dulu, lalu membangun ulang rantai penulis bila ada yang berubah.</li></ul>
 <aside class="temuan"><span class="label-temuan">Sudah beres</span> Nama fungsi ini dan <code>simpan_konfigurasi_ai</code> kini senada dengan <a class="ref" href="#t-muat-ai">[[muat_konfigurasi_ai]]</a>.</aside>
 </section>
 <section class="bagian k1" id="t-mulai-memuat">
 <p class="jalur"><span>main.py</span> <span class="sep">/</span> <a href="#t-server-nyala">[SERVER NYALA]</a> <span class="sep">/</span> <span>brain_runtime.mulai_memuat</span></p>
-<h3 class="judul"><span class="no">8.4</span><span class="nama">brain_runtime.mulai_memuat</span><span class="status s-nanti">nanti</span></h3>
-<p class="guna">Memuat IndoBERT, otak fuzzy, dan NLG. Dibedah nanti, karena rombak otak bot masih berjalan.</p>
+<h3 class="judul"><span class="no">8.4</span><span class="nama">brain_runtime.mulai_memuat</span><span class="status s-belum">belum dibahas</span></h3>
+<p class="guna">Memuat IndoBERT, otak fuzzy, dan NLG di thread latar, supaya server langsung bisa melayani pemain.</p>
+<p class="label">Alur</p>
+<pre class="alur" tabindex="0">Sudah siap atau sedang dimuat: selesai
+  <span class="cabang">\&gt;</span> baru saja gagal: tunggu jeda dulu sebelum mencoba lagi
+  <span class="panah">-&gt;</span> jalankan pemuatan di thread latar</pre>
+<p class="label">Kode</p>
+<figure class="blok-kode"><figcaption><code>backend/app/bot/bot_controller.py:168-188</code></figcaption><pre class="kode" tabindex="0"><span class="ln">168</span><span class="c"># Saat server nyala: muat otak di thread latar agar server langsung melayani request.</span>
+<span class="ln">169</span><span class="c"># Alur: 1 sudah siap atau sedang dimuat: selesai -&gt; 2 baru gagal (&lt; JEDA_MUAT_ULANG_DETIK): selesai</span>
+<span class="ln">170</span><span class="c">#       -&gt; 3 jalankan _muat di thread latar</span>
+<span class="ln">171</span><span class="k">def</span> <span class="f">mulai_memuat</span>(self):
+<span class="ln">172</span>    <span class="k">with</span> self.lock:
+<span class="ln">173</span>        <span class="c"># Sudah dimuat (termasuk lewat muat_sekarang) atau sedang dimuat: jangan memuat ulang,</span>
+<span class="ln">174</span>        <span class="c"># karena pemuatan ulang di latar mengganti NLU dan modul yang sedang dipakai bot.</span>
+<span class="ln">175</span>        <span class="k">if</span> self.status[<span class="s">"siap"</span>] <span class="k">or</span> (self._thread <span class="k">is</span> <span class="k">not</span> <span class="k">None</span> <span class="k">and</span> self._thread.is_alive()):
+<span class="ln">176</span>            <span class="k">return</span>
+<span class="ln">177</span>        <span class="c"># Pemuatan yang gagal dicoba lagi (mis. saat pertandingan berikutnya disiapkan), paling</span>
+<span class="ln">178</span>        <span class="c"># cepat setelah jeda agar kegagalan permanen tidak memuat ulang di setiap persiapan.</span>
+<span class="ln">179</span>        <span class="k">if</span> (
+<span class="ln">180</span>            self._gagal_pada <span class="k">is</span> <span class="k">not</span> <span class="k">None</span>
+<span class="ln">181</span>            <span class="k">and</span> time.monotonic() - self._gagal_pada &lt; JEDA_MUAT_ULANG_DETIK
+<span class="ln">182</span>        ):
+<span class="ln">183</span>            <span class="k">return</span>
+<span class="ln">184</span>        self.status.update(gagal=<span class="k">False</span>, detail=<span class="s">"Memuat otak NPC…"</span>, progres=<span class="n">0.0</span>)
+<span class="ln">185</span>        self._thread = threading.Thread(
+<span class="ln">186</span>            target=self._muat, daemon=<span class="k">True</span>, name=<span class="s">"muat-otak-npc"</span>
+<span class="ln">187</span>        )
+<span class="ln">188</span>        self._thread.start()</pre></figure>
+<p class="label">Yang tidak terlihat dari kode</p>
+<ul class="catatan"><li>Selama otak belum siap, bot memakai aksi cadangan engine.</li></ul>
 </section>
 <section class="bagian k1" id="t-game-clock">
 <p class="jalur"><span>main.py</span> <span class="sep">/</span> <a href="#t-server-nyala">[SERVER NYALA]</a> <span class="sep">/</span> <span>game_clock</span></p>
@@ -1507,18 +1582,18 @@ set_message_context   lengkapi pesan dengan id pertandingan, ronde, dan fase</pr
        <span class="cabang">\&gt;</span> ada error: catat di log, putaran berikutnya tetap jalan
   <span class="panah">-&gt;</span> tunggu 0,5 detik</pre>
 <p class="label">Kode</p>
-<figure class="blok-kode"><figcaption><code>backend/app/main.py:36-47</code></figcaption><pre class="kode" tabindex="0"><span class="ln">36</span><span class="c"># setiap 0.5 detik jalankan pengcekan fase dan bot</span>
-<span class="ln">37</span><span class="k">async</span> <span class="k">def</span> <span class="f">game_clock</span>():
-<span class="ln">38</span>    <span class="k">while</span> <span class="k">True</span>:
-<span class="ln">39</span>        <span class="k">try</span>:
-<span class="ln">40</span>            <span class="c"># ganti fase yang waktunya habis</span>
-<span class="ln">41</span>            room_service.perbarui_fase_semua_room()
-<span class="ln">42</span>            <span class="c"># jalankan bot yang sudah waktunya</span>
-<span class="ln">43</span>            npc_service.jalankan_bot_yang_sudah_waktunya()
-<span class="ln">44</span>        <span class="k">except</span> Exception:
-<span class="ln">45</span>            logger.exception(<span class="s">"Satu putaran jam permainan gagal."</span>)
-<span class="ln">46</span>        <span class="c"># tunggu 0,5 detik</span>
-<span class="ln">47</span>        <span class="k">await</span> asyncio.sleep(<span class="n">0.5</span>)</pre></figure>
+<figure class="blok-kode"><figcaption><code>backend/app/main.py:35-46</code></figcaption><pre class="kode" tabindex="0"><span class="ln">35</span><span class="c"># setiap 0.5 detik jalankan pengcekan fase dan bot</span>
+<span class="ln">36</span><span class="k">async</span> <span class="k">def</span> <span class="f">game_clock</span>():
+<span class="ln">37</span>    <span class="k">while</span> <span class="k">True</span>:
+<span class="ln">38</span>        <span class="k">try</span>:
+<span class="ln">39</span>            <span class="c"># ganti fase yang waktunya habis</span>
+<span class="ln">40</span>            room_service.perbarui_fase_semua_room()
+<span class="ln">41</span>            <span class="c"># jalankan bot yang sudah waktunya</span>
+<span class="ln">42</span>            npc_service.jalankan_bot_yang_sudah_waktunya()
+<span class="ln">43</span>        <span class="k">except</span> Exception:
+<span class="ln">44</span>            logger.exception(<span class="s">"Satu putaran jam permainan gagal."</span>)
+<span class="ln">45</span>        <span class="c"># tunggu 0,5 detik</span>
+<span class="ln">46</span>        <span class="k">await</span> asyncio.sleep(<span class="n">0.5</span>)</pre></figure>
 <p class="label">Yang tidak terlihat dari kode</p>
 <ul class="catatan"><li><code>asyncio.sleep</code> melepas giliran, jadi server bisa melayani pemain di antara dua detak.</li></ul>
 </section>
@@ -1535,53 +1610,100 @@ set_message_context   lengkapi pesan dengan id pertandingan, ronde, dan fase</pr
             <span class="cabang">\&gt;</span> error: catat di log, lanjut ke room berikutnya
        <span class="panah">-&gt;</span> fase atau ronde berubah: <a class="ref" href="#t-activity-record">[[activity.record]]</a></pre>
 <p class="label">Kode</p>
-<figure class="blok-kode"><figcaption><code>backend/app/services/room_service.py:424-450</code></figcaption><pre class="kode" tabindex="0"><span class="ln">424</span><span class="c"># JAM: dipanggil tiap 0,5 detik oleh game_clock, bukan oleh request browser. Untuk tiap room,</span>
-<span class="ln">425</span><span class="c"># panggil Match.tick(): kalau waktu fase habis, fase berganti. Pergantian fase dicatat untuk panel.</span>
-<span class="ln">426</span><span class="k">def</span> <span class="f">perbarui_fase_semua_room</span>(self):
-<span class="ln">427</span>    <span class="k">with</span> self.lock:
-<span class="ln">428</span>        <span class="k">for</span> room <span class="k">in</span> self.rooms.values():
-<span class="ln">429</span>            pertandingan = room.match
-<span class="ln">430</span>            <span class="k">if</span> <span class="k">not</span> pertandingan:
-<span class="ln">431</span>                <span class="k">continue</span>
-<span class="ln">432</span>            fase_sebelum, ronde_sebelum = pertandingan.phase, pertandingan.round
-<span class="ln">433</span>            <span class="k">try</span>:
-<span class="ln">434</span>                pertandingan.tick()
-<span class="ln">435</span>                self._catat_peserta_pertandingan_selesai(room)
-<span class="ln">436</span>            <span class="k">except</span> Exception:
-<span class="ln">437</span>                <span class="c"># Satu pertandingan rusak tidak boleh menghentikan timer room lain.</span>
-<span class="ln">438</span>                logger.exception(<span class="s">"Timer room %s gagal."</span>, room.code)
-<span class="ln">439</span>                <span class="k">continue</span>
-<span class="ln">440</span>            <span class="k">if</span> (fase_sebelum, ronde_sebelum) != (pertandingan.phase, pertandingan.round):
-<span class="ln">441</span>                activity.record(
-<span class="ln">442</span>                    room.code,
-<span class="ln">443</span>                    <span class="s">"Match.tick"</span>,
-<span class="ln">444</span>                    {<span class="s">"phase_before"</span>: fase_sebelum, <span class="s">"round_before"</span>: ronde_sebelum},
-<span class="ln">445</span>                    result={
-<span class="ln">446</span>                        <span class="s">"phase"</span>: pertandingan.phase,
-<span class="ln">447</span>                        <span class="s">"round"</span>: pertandingan.round,
-<span class="ln">448</span>                        <span class="s">"winner"</span>: pertandingan.winner,
-<span class="ln">449</span>                    },
-<span class="ln">450</span>                )</pre></figure>
-<figure class="blok-kode"><figcaption><code>backend/app/services/room_service.py:108-120</code></figcaption><pre class="kode" tabindex="0"><span class="ln">108</span><span class="c"># Pertandingan yang baru selesai (lewat timer atau pemain keluar): peserta manusianya dicatat sekali ke</span>
-<span class="ln">109</span><span class="c"># arsip survei di thread latar, jadi jam permainan tidak menunggu database.</span>
-<span class="ln">110</span><span class="k">def</span> <span class="f">_catat_peserta_pertandingan_selesai</span>(self, room):
-<span class="ln">111</span>    <span class="k">if</span> room.peserta_tercatat <span class="k">or</span> <span class="k">not</span> room.match <span class="k">or</span> <span class="k">not</span> room.match.winner:
-<span class="ln">112</span>        <span class="k">return</span>
-<span class="ln">113</span>    room.peserta_tercatat = <span class="k">True</span>
-<span class="ln">114</span>    <span class="c"># Impor lambat: survey_service mengimpor modul ini.</span>
-<span class="ln">115</span>    <span class="k">from</span> app.services.survey_service <span class="k">import</span> survey_service
-<span class="ln">116</span>
-<span class="ln">117</span>    baris_peserta = survey_service.baris_peserta(room)
-<span class="ln">118</span>    threading.Thread(
-<span class="ln">119</span>        target=survey_service.catat_peserta, args=(baris_peserta,), daemon=<span class="k">True</span>
-<span class="ln">120</span>    ).start()</pre></figure>
+<figure class="blok-kode"><figcaption><code>backend/app/services/room_service.py:590-616</code></figcaption><pre class="kode" tabindex="0"><span class="ln">590</span><span class="c"># JAM: dipanggil tiap 0,5 detik oleh game_clock, bukan oleh request browser. Untuk tiap room,</span>
+<span class="ln">591</span><span class="c"># panggil Match.tick(): kalau waktu fase habis, fase berganti. Pergantian fase dicatat untuk panel.</span>
+<span class="ln">592</span><span class="k">def</span> <span class="f">perbarui_fase_semua_room</span>(self):
+<span class="ln">593</span>    <span class="k">with</span> self.lock:
+<span class="ln">594</span>        <span class="k">for</span> room <span class="k">in</span> self.rooms.values():
+<span class="ln">595</span>            pertandingan = room.match
+<span class="ln">596</span>            <span class="k">if</span> <span class="k">not</span> pertandingan:
+<span class="ln">597</span>                <span class="k">continue</span>
+<span class="ln">598</span>            fase_sebelum, ronde_sebelum = pertandingan.phase, pertandingan.round
+<span class="ln">599</span>            <span class="k">try</span>:
+<span class="ln">600</span>                pertandingan.tick()
+<span class="ln">601</span>                self._catat_peserta_pertandingan_selesai(room)
+<span class="ln">602</span>            <span class="k">except</span> Exception:
+<span class="ln">603</span>                <span class="c"># Satu pertandingan rusak tidak boleh menghentikan timer room lain.</span>
+<span class="ln">604</span>                logger.exception(<span class="s">"Timer room %s gagal."</span>, room.code)
+<span class="ln">605</span>                <span class="k">continue</span>
+<span class="ln">606</span>            <span class="k">if</span> (fase_sebelum, ronde_sebelum) != (pertandingan.phase, pertandingan.round):
+<span class="ln">607</span>                activity.record(
+<span class="ln">608</span>                    room.code,
+<span class="ln">609</span>                    <span class="s">"Match.tick"</span>,
+<span class="ln">610</span>                    {<span class="s">"phase_before"</span>: fase_sebelum, <span class="s">"round_before"</span>: ronde_sebelum},
+<span class="ln">611</span>                    result={
+<span class="ln">612</span>                        <span class="s">"phase"</span>: pertandingan.phase,
+<span class="ln">613</span>                        <span class="s">"round"</span>: pertandingan.round,
+<span class="ln">614</span>                        <span class="s">"winner"</span>: pertandingan.winner,
+<span class="ln">615</span>                    },
+<span class="ln">616</span>                )</pre></figure>
+<figure class="blok-kode"><figcaption><code>backend/app/services/room_service.py:161-173</code></figcaption><pre class="kode" tabindex="0"><span class="ln">161</span><span class="c"># Pertandingan yang baru selesai (lewat timer atau pemain keluar): peserta manusianya dicatat sekali ke</span>
+<span class="ln">162</span><span class="c"># arsip survei di thread latar, jadi jam permainan tidak menunggu database.</span>
+<span class="ln">163</span><span class="k">def</span> <span class="f">_catat_peserta_pertandingan_selesai</span>(self, room):
+<span class="ln">164</span>    <span class="k">if</span> room.peserta_tercatat <span class="k">or</span> <span class="k">not</span> room.match <span class="k">or</span> <span class="k">not</span> room.match.winner:
+<span class="ln">165</span>        <span class="k">return</span>
+<span class="ln">166</span>    room.peserta_tercatat = <span class="k">True</span>
+<span class="ln">167</span>    <span class="c"># Impor lambat: survey_service mengimpor modul ini.</span>
+<span class="ln">168</span>    <span class="k">from</span> app.services.survey_service <span class="k">import</span> survey_service
+<span class="ln">169</span>
+<span class="ln">170</span>    baris_peserta = survey_service.baris_peserta(room)
+<span class="ln">171</span>    threading.Thread(
+<span class="ln">172</span>        target=survey_service.catat_peserta, args=(baris_peserta,), daemon=<span class="k">True</span>
+<span class="ln">173</span>    ).start()</pre></figure>
 <p class="label">Yang tidak terlihat dari kode</p>
 <ul class="catatan"><li>Satu pertandingan yang rusak tidak boleh menghentikan timer room lain, karena itu <code>except Exception</code> ada di dalam perulangan.</li><li>Peserta dicatat di thread latar, supaya jam permainan tidak menunggu database.</li></ul>
 </section>
 <section class="bagian k2" id="t-jalankan-bot">
 <p class="jalur"><span>main.py</span> <span class="sep">/</span> <a href="#t-server-nyala">[SERVER NYALA]</a> <span class="sep">/</span> <a href="#t-game-clock">game_clock</a> <span class="sep">/</span> <span>npc_service.jalankan_bot_yang_sudah_waktunya</span></p>
-<h4 class="judul"><span class="no">8.5.2</span><span class="nama">npc_service.jalankan_bot_yang_sudah_waktunya</span><span class="status s-nanti">nanti</span></h4>
-<p class="guna">Menjalankan bot yang sudah waktunya melangkah. Dari sinilah bot mulai berpikir. Dibedah nanti, karena rombak otak bot masih berjalan.</p>
+<h4 class="judul"><span class="no">8.5.2</span><span class="nama">npc_service.jalankan_bot_yang_sudah_waktunya</span><span class="status s-belum">belum dibahas</span></h4>
+<p class="guna">Menjalankan bot yang sudah waktunya melangkah. Dari sinilah bot mulai berpikir.</p>
+<p class="label">Alur</p>
+<pre class="alur" tabindex="0">Cari pertandingan yang masih berjalan
+  <span class="panah">-&gt;</span> buang data pertandingan yang sudah selesai
+  <span class="panah">-&gt;</span> persiapan: siapkan otak bot sekali
+       <span class="cabang">\&gt;</span> fase berjalan: jalankan satu langkah untuk tiap bot yang sudah waktunya</pre>
+<p class="label">Kode</p>
+<figure class="blok-kode"><figcaption><code>backend/app/bot/bot_controller.py:733-771</code></figcaption><pre class="kode" tabindex="0"><span class="ln">733</span><span class="c"># Dipanggil jam permainan tiap 0,5 detik: menyuruh bot yang sudah waktunya melangkah, tanpa menunggu manusia</span>
+<span class="ln">734</span><span class="c"># mengirim chat.</span>
+<span class="ln">735</span><span class="c"># Alur: 1 cari pertandingan yang masih berjalan -&gt; 2 buang data pertandingan yang sudah selesai -&gt; 3.1 persiapan:</span>
+<span class="ln">736</span><span class="c">#       siapkan otak bot sekali -&gt; 3.2 fase berjalan: jalankan brain_turn untuk bot yang sudah waktunya</span>
+<span class="ln">737</span><span class="k">def</span> <span class="f">jalankan_bot_yang_sudah_waktunya</span>(self):
+<span class="ln">738</span>    waktu_sekarang = time.time()
+<span class="ln">739</span>    <span class="k">with</span> room_service.lock:
+<span class="ln">740</span>        id_pertandingan_aktif = {
+<span class="ln">741</span>            r.match.id <span class="k">for</span> r <span class="k">in</span> room_service.rooms.values() <span class="k">if</span> r.match <span class="k">and</span> <span class="k">not</span> r.match.winner
+<span class="ln">742</span>        }
+<span class="ln">743</span>
+<span class="ln">744</span>        <span class="c"># Data pertandingan yang sudah selesai dibuang, supaya memori server tidak penuh.</span>
+<span class="ln">745</span>        self.preparing &amp;= id_pertandingan_aktif
+<span class="ln">746</span>        self.lantai = {m: bot <span class="k">for</span> m, bot <span class="k">in</span> self.lantai.items() <span class="k">if</span> m <span class="k">in</span> id_pertandingan_aktif}
+<span class="ln">747</span>        <span class="k">for</span> match_id <span class="k">in</span> [m <span class="k">for</span> m <span class="k">in</span> riwayat_nlu <span class="k">if</span> m <span class="k">not</span> <span class="k">in</span> id_pertandingan_aktif]:
+<span class="ln">748</span>            <span class="k">del</span> riwayat_nlu[match_id]
+<span class="ln">749</span>        self.runtime.lupakan_kecuali(id_pertandingan_aktif)
+<span class="ln">750</span>
+<span class="ln">751</span>        <span class="k">for</span> room <span class="k">in</span> list(room_service.rooms.values()):
+<span class="ln">752</span>            match = room.match
+<span class="ln">753</span>            <span class="k">if</span> <span class="k">not</span> match <span class="k">or</span> match.winner <span class="k">or</span> <span class="k">not</span> match.ai_controlled:
+<span class="ln">754</span>                <span class="k">continue</span>  <span class="c"># belum ada game, sudah selesai, atau bukan game ber-AI</span>
+<span class="ln">755</span>            <span class="k">if</span> match.phase == <span class="s">"preparing"</span>:
+<span class="ln">756</span>                <span class="c"># Layar persiapan: muat otak dan siapkan ingatan bot sekali per pertandingan.</span>
+<span class="ln">757</span>                <span class="k">if</span> match.id <span class="k">not</span> <span class="k">in</span> self.preparing:
+<span class="ln">758</span>                    self.preparing.add(match.id)
+<span class="ln">759</span>                    self._spawn(self.prepare(room.code, match))
+<span class="ln">760</span>                <span class="k">continue</span>
+<span class="ln">761</span>            lama_fase_berjalan = match.phase_length() - (match.deadline - waktu_sekarang)
+<span class="ln">762</span>            nama_bot_hidup = sorted(p.name <span class="k">for</span> p <span class="k">in</span> match.players.values() <span class="k">if</span> p.bot <span class="k">and</span> p.alive)
+<span class="ln">763</span>            <span class="k">for</span> urutan, nama <span class="k">in</span> enumerate(nama_bot_hidup):
+<span class="ln">764</span>                otak = self.runtime.otak_bot(match.id, nama)
+<span class="ln">765</span>                <span class="k">if</span> otak <span class="k">is</span> <span class="k">None</span>:
+<span class="ln">766</span>                    <span class="k">continue</span>  <span class="c"># otak gagal dimuat: engine mengisi aksi cadangan di deadline</span>
+<span class="ln">767</span>                <span class="k">if</span> <span class="k">not</span> otak.sibuk <span class="k">and</span> self._sudah_waktunya_melangkah(
+<span class="ln">768</span>                    otak, match, lama_fase_berjalan, waktu_sekarang, urutan
+<span class="ln">769</span>                ):
+<span class="ln">770</span>                    otak.sibuk = <span class="k">True</span>
+<span class="ln">771</span>                    self._spawn(self.brain_turn(room.code, match, otak))</pre></figure>
+<p class="label">Yang tidak terlihat dari kode</p>
+<ul class="catatan"><li>Isi pikirannya (NLU, [FUZZY 1], [FUZZY 2], NLG) dibedah di dokumen Cara Kerja Bot, menu panel 08, jadi di sini cukup jalurnya.</li></ul>
 </section>
 <section class="bagian k0" id="t-server-mati">
 <p class="jalur"><span>main.py</span> <span class="sep">/</span> <span>[SERVER MATI]</span></p>
@@ -1590,18 +1712,18 @@ set_message_context   lengkapi pesan dengan id pertandingan, ronde, dan fase</pr
 <p class="label">Alur</p>
 <pre class="alur" tabindex="0">Uvicorn mematikan server
   <span class="panah">-&gt;</span> batalkan jam, tunggu sampai benar-benar berhenti
-  <span class="panah">-&gt;</span> npc_service.close  batalkan giliran bot yang masih jalan <span class="tag-nanti">nanti</span>
-  <span class="panah">-&gt;</span> brain_runtime.tutup  tutup thread otak <span class="tag-nanti">nanti</span>
+  <span class="panah">-&gt;</span> npc_service.close  batalkan giliran bot yang masih jalan
+  <span class="panah">-&gt;</span> brain_runtime.tutup  tutup thread otak
   <span class="panah">-&gt;</span> engine.dispose()  tutup semua koneksi MySQL di pool</pre>
 <p class="label">Kode</p>
-<figure class="blok-kode"><figcaption><code>backend/app/main.py:74-81</code></figcaption><pre class="kode" tabindex="0"><span class="ln">74</span><span class="k">finally</span>:
-<span class="ln">75</span>    <span class="c"># Server mati: hentikan jam, batalkan giliran bot yang masih jalan, tutup thread otak, tutup koneksi MySQL.</span>
-<span class="ln">76</span>    clock.cancel()
-<span class="ln">77</span>    <span class="k">with</span> suppress(asyncio.CancelledError):
-<span class="ln">78</span>        <span class="k">await</span> clock
-<span class="ln">79</span>    <span class="k">await</span> npc_service.close()
-<span class="ln">80</span>    brain_runtime.tutup()
-<span class="ln">81</span>    engine.dispose()</pre></figure>
+<figure class="blok-kode"><figcaption><code>backend/app/main.py:73-80</code></figcaption><pre class="kode" tabindex="0"><span class="ln">73</span><span class="k">finally</span>:
+<span class="ln">74</span>    <span class="c"># Server mati: hentikan jam, batalkan giliran bot yang masih jalan, tutup thread otak, tutup koneksi MySQL.</span>
+<span class="ln">75</span>    clock.cancel()
+<span class="ln">76</span>    <span class="k">with</span> suppress(asyncio.CancelledError):
+<span class="ln">77</span>        <span class="k">await</span> clock
+<span class="ln">78</span>    <span class="k">await</span> npc_service.close()
+<span class="ln">79</span>    brain_runtime.tutup()
+<span class="ln">80</span>    engine.dispose()</pre></figure>
 <p class="label">Yang tidak terlihat dari kode</p>
 <ul class="catatan"><li>Menunggu tugas yang dibatalkan memang melempar <code>CancelledError</code>, jadi <code>suppress</code> mengabaikannya.</li></ul>
 </section>
