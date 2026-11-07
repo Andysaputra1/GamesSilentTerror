@@ -52,7 +52,7 @@ li { margin: .25em 0; }
 <body>
 <main>
 <h1>Bedah Otak Fuzzy</h1>
-<p class="kecil">Catatan pembahasan otak bot, disusun 3 November 2026 dan dicocokkan dengan kode otak baru, termasuk dua aturan Fase 9, pada 7 November 2026. Sumber rinci: <code>plan/ide-rombak.md</code> dan <code>plan/daftar-tindakan.md</code>. Rencana kerja: <code>plan/plan05.md</code>. Kode: <code>backend/app/module/npc_brain/generated/otak_fuzzy.py</code> dan <code>nlg.py</code>, hasil ekspor notebook <code>npc_fuzzy.ipynb</code> dan <code>npc_nlg.ipynb</code>.</p>
+<p class="kecil">Catatan pembahasan otak bot, disusun 3 November 2026 dan dicocokkan dengan kode otak baru, termasuk dua aturan Fase 9, pada 7 November 2026. Sumber rinci: <code>plan/ide-rombak.md</code> dan <code>plan/daftar-tindakan.md</code>. Rencana kerja: <code>plan/plan05.md</code>. Kode: <code>backend/app/bot/fuzzy.py</code>, <code>nlu.py</code>, dan <code>nlg.py</code>, yang diedit langsung; notebook <code>npc_fuzzy.ipynb</code> dan <code>npc_nlg.ipynb</code> sekarang laporan skripsi. Bukti logikanya sama: <code>backend/tests/jejak/sidik.json</code> dan skenario di <code>backend/tests/test_skenario_fuzzy.py</code>.</p>
 
 <div class="kotak">
 <p><strong>Keadaan sekarang</strong></p>
@@ -60,8 +60,7 @@ li { margin: .25em 0; }
 <li><strong>Rancangan dari pembedahan sudah terpasang.</strong> Fase 1–8 <code>plan/plan05.md</code> mengganti otak bot: 21 sistem Mamdani (dulu 28), tujuh tindakan siang, aturan bersama untuk memilih jenis tindakan, dan nama bukti baru. Nama fungsi di kode ditulis di bawah judul tiap tindakan.</li>
 <!-- fase9: dua perubahan Fase 9 di bawah ditulis untuk keadaan sesudah Fase 9 masuk; periksa terhadap kode -->
 <li><strong>Fase 9</strong> (ukur dan setel) menambah dua aturan yang sudah terpasang: seri nilai calon Hostage diacak stabil per bot dan ronde (<code>seri_acak</code>), dan klaim dari pemain yang sudah terbukti Hitman dianggap pasti bohong (<code>_klaim_peran</code>). Sesudah keduanya, warga menang 46–59,5% di 4–10 pemain dan komposisi tidak berubah (lihat <a href="#metode">bagian 10</a>).</li>
-<!-- fase9: ubah butir ini sesudah otak baru dideploy -->
-<li><strong>Belum dipakai di game produksi.</strong> Otak baru masuk <code>main</code> dan VM sesudah Fase 9 lulus dan pemilik proyek mengizinkan deploy. Fase 10 (pengayaan data IndoBERT, dilatih pemilik proyek) dan pembekuan menyusul.</li>
+<li><strong>Sudah aktif di game produksi.</strong> Otak baru berjalan di VM sejak 7 November 2026 (commit <code>e2cb307</code>), dengan model penulis kalimat <code>google/gemini-2.5-flash</code>. Fase 10 (pengayaan data IndoBERT, dilatih pemilik proyek) dan pembekuan menyusul.</li>
 <li><strong>Aturan game baru sudah live di backend</strong> (commit <code>2d0e9b9</code>): Guard boleh ke target yang sama berturut-turut, vote seri menambah waktu sekali, rekan Spy saling tahu, chat tim malam, dan seri Hostage manusia lawan bot memakai pilihan manusia. Otak baru memakai semua aturan ini.</li>
 <li><strong>Game hanya memakai Fuzzy</strong> (commit <code>1f11806</code>), dan label metode sudah dihapus dari layar pemain (commit <code>a51be3f</code>). Keduanya sudah di <code>main</code> dan VM. Behavior Tree dan Utility AI diarsipkan di <code>a_skripsi/arsip_bt_utility_2026-11-03/</code>, dan skripsi tidak lagi membandingkan metode.</li>
 </ul>
@@ -562,7 +561,7 @@ menuduh_orang_baik ────┐                          │
 klaim_role_bermasalah ─┘</code></pre>
 <p><strong>Kenapa dipasangkan:</strong> satu sistem dengan 8 input membutuhkan 3⁸ = 6.561 aturan, sedangkan 7 sistem dua input hanya 63 aturan. Bukti dipasangkan menurut kesamaan makna. Pembagian ini pilihan perancang dan belum dibandingkan dengan pasangan lain.</p>
 
-<h3>Kurva rendah, sedang, tinggi</h3>
+<h3 id="kurva">Kurva rendah, sedang, tinggi</h3>
 <div class="tabel"><table>
 <tr><th>Kata</th><th>Mulai</th><th>Penuh</th><th>Hilang</th></tr>
 <tr><td>rendah</td><td>0</td><td>0–0,2</td><td>0,5</td></tr>
@@ -961,7 +960,8 @@ mengaku_role_penting + kredibilitas  → ancaman_peran ───┘</code></pre>
 <p><strong>Dihapus:</strong> <code>kepercayaan</code>. Yakin orang baik sudah diperiksa di <a href="#guard">aturan Guard</a>.</p>
 
 <h2 id="sistem">9. Fuzzy lanjutan: dari penilaian pemain ke tindakan</h2>
-<p><span class="b k">terpasang</span> Bahasan 6 November. Fuzzy dipakai dua kali dalam satu langkah bot. <strong>[FUZZY 1]</strong> menilai pemain: kecurigaan untuk warga (bagian 6), ancaman dan kambing hitam untuk Hitman (bagian 7). Sesudah itu bot menyusun calon tindakan dengan aturan biasa (bagian 5). Sebagian calon langsung dipakai tanpa fuzzy, dan sisanya dinilai lagi oleh <strong>[FUZZY 2]</strong>. Kedua tahap memakai kurva dan aturan Mamdani yang sama: kurva input rendah [0, 0, 0,2, 0,5], sedang [0,2, 0,5, 0,8], tinggi [0,5, 0,8, 1, 1]; kurva output bertitik tengah 15, 50, dan 85; hasilnya titik berat (centroid) 0–100. Tabel derajatnya ada di <a href="#kecurigaan">bagian 6</a>.</p>
+<p><span class="b k">terpasang</span> Bahasan 6 November. Fuzzy dipakai dua kali dalam satu langkah bot. <strong>[FUZZY 1]</strong> menilai pemain: kecurigaan untuk warga (bagian 6), ancaman dan kambing hitam untuk Hitman (bagian 7). Sesudah itu bot menyusun calon tindakan dengan aturan biasa (bagian 5). Sebagian calon langsung dipakai tanpa fuzzy, dan sisanya dinilai lagi oleh <strong>[FUZZY 2]</strong>. Kedua tahap memakai kurva dan aturan Mamdani yang sama: kurva input rendah [0, 0, 0,2, 0,5], sedang [0,2, 0,5, 0,8], tinggi [0,5, 0,8, 1, 1]; kurva output bertitik tengah 15, 50, dan 85; hasilnya titik berat (centroid) 0–100. Tabel derajat kurva input ada di <a href="#kurva">bagian 6</a>, dan kurva output di <a href="#kurva-output">bawah</a>.</p>
+<p>Setiap sistem [FUZZY 2] dijelaskan dengan format bagian 6: arti, cerita, hitungan, tabel aturan, dan contoh hasil. Tabel aturan, angka contoh, dan hasilnya diisi skrip pembangun dokumen dari kode otak, jadi ikut berubah bila kodenya berubah.</p>
 <p class="kecil">Kode: <code>SISTEM_KECURIGAAN</code> (7) dan <code>SISTEM_ANCAMAN</code> (4) untuk [FUZZY 1], <code>SISTEM_KEPUTUSAN</code> (10) untuk [FUZZY 2]; <code>nilai_kecurigaan</code>, <code>nilai_ancaman</code>, <code>keputusan_chat</code>, <code>keputusan_vote</code>, <code>keputusan_aksi</code>. Kode lama punya 28 sistem; rombak menghapus <code>bela_diri</code>, <code>h_bela_diri</code>, <code>jawab</code>, <code>h_jawab</code>, <code>info_sandera</code>, <code>sandera</code>, dan <code>lindung</code>.</p>
 
 <h3 id="fuzzy-1">Pohon [FUZZY 1]: menilai pemain</h3>
@@ -1014,14 +1014,405 @@ VOTE WARGA   keyakinan_vote (kecurigaan, keunggulan)
                → kesiapan_vote (keyakinan, warga_terdesak)
 AKSI         gag            (ancaman_sekarang, ancaman)     Hitman, siang
              intip          (kecurigaan, kurang_info)       Stalker, Peek</code></pre>
-<p><strong>Nilai turunan</strong> yang hanya dihitung saat menyusun calon:</p>
+<p>Masukan yang bukan hasil [FUZZY 1], misalnya <code>keunggulan</code>, <code>kepercayaan</code>, dan <code>kurang_info</code>, dihitung saat bot menyusun calon. Rumusnya ada di bagian <strong>Hitungan masukan</strong> setiap sistem di bawah. Masukan yang dipakai beberapa sistem hanya dijelaskan di sistem pertama yang memakainya.</p>
+
+<h3 id="kurva-output">Kurva output</h3>
+<p>Kurva input [FUZZY 2] sama dengan [FUZZY 1], jadi tabel derajatnya cukup dilihat di <a href="#kurva">bagian 6</a>. Kurva output berupa tiga segitiga pada sumbu 0–100 (<code>MF_OUTPUT</code>):</p>
+<!-- gen:kurva-output -->
 <div class="tabel"><table>
-<tr><th>Nilai</th><th>Rumus</th><th>Dipakai</th></tr>
-<tr><td><code>keunggulan</code></td><td>(kecurigaan tersangka #1 − #2) ÷ 0,30, dipotong 0–1; 1 bila calonnya tunggal. Untuk vote, dihitung ulang di antara calon yang layak di-vote saja</td><td><code>tuduh</code>, <code>keyakinan_vote</code></td></tr>
-<tr><td><code>kepercayaan</code></td><td>Warga: 1 bila pasti bersih, selain itu 0,7 × (1 − kecurigaan). Hitman membela rekan: 1 − kecurigaan publik rekan</td><td><code>bela_orang</code></td></tr>
-<tr><td><code>kurang_info</code></td><td>1 − <code>volume_info</code>; 1 untuk pengaku Spy atau Civilian yang kecurigaannya ≥ 0,40, karena klaim itu hanya bisa dibuktikan lewat Peek</td><td><code>intip</code></td></tr>
-<tr><td><code>risiko_saya</code>, <code>suara_saya</code></td><td>Kecurigaan publik Hitman sendiri dan porsi suara Tribunal ke dirinya</td><td><code>h_tuduh</code>, <code>klaim_palsu</code></td></tr>
+<tr><th>Kata</th><th>Mulai (0)</th><th>Puncak (1)</th><th>Hilang (0)</th><th>Luas bila dipotong setinggi h</th></tr>
+<tr><td>rendah</td><td>0</td><td>15</td><td>30</td><td>30 × h × (2 − h) ÷ 2 = 30h − 15h²</td></tr>
+<tr><td>sedang</td><td>35</td><td>50</td><td>65</td><td>30 × h × (2 − h) ÷ 2 = 30h − 15h²</td></tr>
+<tr><td>tinggi</td><td>70</td><td>85</td><td>100</td><td>30 × h × (2 − h) ÷ 2 = 30h − 15h²</td></tr>
 </table></div>
+<!-- /gen -->
+<p>Ketiga segitiga tidak saling menyentuh: ada celah 30–35 dan 65–70. Akibatnya, bila hanya satu kata keluaran yang menyala, hasilnya tepat di puncak kata itu, dan setiap hasil berada di antara 15 dan 85. Segitiganya juga simetris, jadi titik berat setiap potongan tetap di puncaknya. Karena itu centroid bisa dihitung dengan tangan, seperti contoh kipas di <a href="#konsep">bagian 2</a>.</p>
+
+<h3 id="centroid">Contoh centroid langkah demi langkah</h3>
+<p>Contoh ini memakai masukan cerita <a href="#f2-tuduh"><code>tuduh</code></a> di bawah. Blok sistem lain hanya menulis derajat, aturan yang menyala, potongan terkuat, dan hasilnya, karena langkah 3–5 selalu sama.</p>
+<!-- gen:centroid -->
+<p><strong>1. Derajat masukan.</strong> <code>kecurigaan</code> 0,62: sedang 0,60 dan tinggi 0,40. <code>keunggulan</code> 0,60: sedang 0,67 dan tinggi 0,33.</p>
+<p><strong>2. Kekuatan tiap aturan</strong> = derajat terkecil dari kedua masukan, karena JIKA … DAN … berarti minimum. Aturan berkekuatan 0 tidak ditulis.</p>
+<div class="tabel"><table>
+<tr><th><code>kecurigaan</code></th><th><code>keunggulan</code></th><th>Maka</th><th>Kekuatan</th></tr>
+<tr><td>sedang</td><td>sedang</td><td>sedang</td><td>min(0,60; 0,67) = 0,60</td></tr>
+<tr><td>sedang</td><td>tinggi</td><td>sedang</td><td>min(0,60; 0,33) = 0,33</td></tr>
+<tr><td>tinggi</td><td>sedang</td><td>tinggi</td><td>min(0,40; 0,67) = 0,40</td></tr>
+<tr><td>tinggi</td><td>tinggi</td><td>tinggi</td><td>min(0,40; 0,33) = 0,33</td></tr>
+</table></div>
+<p><strong>3. Gabung per kata keluaran</strong>, ambil yang terkuat (maksimum): rendah 0 (tidak ada aturan); sedang 0,60 (maks dari 0,60; 0,33); tinggi 0,40 (maks dari 0,40; 0,33).</p>
+<p><strong>4. Potong kurva output</strong> setinggi angka langkah 3, lalu hitung luas potongannya. Karena segitiganya simetris, titik berat setiap potongan tetap di puncaknya.</p>
+<div class="tabel"><table>
+<tr><th>Kata</th><th>Tinggi potong h</th><th>Luas</th><th>Titik tengah</th><th>Luas × titik tengah</th></tr>
+<tr><td>rendah</td><td>0</td><td>0</td><td>15</td><td>0</td></tr>
+<tr><td>sedang</td><td>0,60</td><td>12,60</td><td>50</td><td>630</td></tr>
+<tr><td>tinggi</td><td>0,40</td><td>9,60</td><td>85</td><td>816</td></tr>
+</table></div>
+<p><strong>5. Titik berat</strong> = jumlah (luas × titik tengah) ÷ jumlah luas = 1446 ÷ 22,20 = <strong>65,1</strong>. Program (<code>fuzzy</code>, scikit-fuzzy pada sumbu 0–100 dengan 201 titik) memberi 65,1.</p>
+<!-- /gen -->
+
+<h3 id="f2-tuduh"><code>tuduh</code></h3>
+<p><strong>Arti:</strong> seberapa layak bot warga menuduh tersangka teratas sekarang. Nilainya naik bila tersangka itu cukup dicurigai dan satu nama jelas unggul dari yang lain. Bila dua nama sama-sama dicurigai, bot belum menunjuk salah satunya.</p>
+<p><strong>Cerita:</strong> Dodi, bot Civilian, sedang di siang ronde 3. Menurut [FUZZY 1], Budi tersangka teratas dan Citra kedua. Budi punya alasan curiga selain banyak dituduh, dan Dodi belum menuduhnya di fase ini.</p>
+<ol>
+<!-- gen:contoh:tuduh -->
+<li><strong>Hitung angka:</strong> <code>kecurigaan</code> Budi 0,62 dan Citra 0,44 (hasil [FUZZY 1]). <code>keunggulan</code> = (0,62 − 0,44) ÷ 0,30 = 0,60.</li>
+<li><strong>Ubah jadi kata:</strong> <code>kecurigaan</code> 0,62: sedang 0,60 dan tinggi 0,40; <code>keunggulan</code> 0,60: sedang 0,67 dan tinggi 0,33.</li>
+<li><strong>Cek tabel aturan</strong> (<code>kecurigaan</code> + <code>keunggulan</code>): sedang + sedang → sedang 0,60; tinggi + sedang → tinggi 0,40; sedang + tinggi → sedang 0,33; tinggi + tinggi → tinggi 0,33. Terkuat per kata: sedang 0,60, tinggi 0,40.</li>
+<li><strong>Hasil:</strong> 65,1, lolos ambang 40.</li>
+<!-- /gen -->
+<li><strong>Dikirim ke:</strong> <code>keputusan_chat</code>, sebagai <code>tuduh</code> jenis <code>alasan_curiga</code> ke Budi dengan paling banyak 2 alasan. Nilai ini bersaing dengan calon chat inisiatif lain; yang tertinggi dikirim bila ≥ 40 (<code>AMBANG_CHAT</code>). Di Tribunal, sistem yang sama menilai ajak vote ke target vote bot (<code>calon_ajak_vote</code>).</li>
+</ol>
+<p><strong>Hitungan masukan:</strong></p>
+<ul>
+<li><code>kecurigaan</code>: nilai akhir <a href="#kecurigaan">bagian 6</a> untuk tersangka teratas, sesudah fakta menimpa. Calon <code>tuduh</code> baru dibuat bila nilainya ≥ 0,40.</li>
+<li><code>keunggulan</code> (<code>keunggulan_skor</code>): semua pemain hidup selain bot diurutkan menurut kecurigaan, dan seri diputus <code>bukti_total</code> lalu nama. keunggulan = (kecurigaan #1 − kecurigaan #2) ÷ 0,30, dipotong 0–1. Selisih 0,30 atau lebih berarti unggul penuh, dan calon tunggal bernilai 1. Untuk ajak vote, #1 adalah target vote bot dan #2 pemain lain yang paling dicurigai, jadi target yang bukan tersangka teratas mendapat 0.</li>
+</ul>
+<!-- gen:aturan:tuduh -->
+<div class="tabel"><table>
+<tr><th><code>kecurigaan</code> ↓ / <code>keunggulan</code> →</th><th>rendah</th><th>sedang</th><th>tinggi</th></tr>
+<tr><th>rendah</th><td>rendah</td><td>rendah</td><td>rendah</td></tr>
+<tr><th>sedang</th><td>rendah</td><td>sedang</td><td>sedang</td></tr>
+<tr><th>tinggi</th><td>sedang</td><td>tinggi</td><td>tinggi</td></tr>
+</table></div>
+<!-- /gen -->
+<!-- gen:hasil:tuduh -->
+<div class="tabel"><table>
+<tr><th><code>kecurigaan</code></th><th><code>keunggulan</code></th><th><code>tuduh</code></th><th>Artinya</th></tr>
+<tr><td>0,40</td><td>1</td><td>36,5</td><td>tepat di batas tuduh, satu-satunya tersangka; di bawah ambang 40</td></tr>
+<tr><td>0,50</td><td>0</td><td>15</td><td>dua tersangka sama kuat; di bawah ambang 40</td></tr>
+<tr><td>0,50</td><td>1</td><td>50</td><td>kecurigaan sedang, jelas unggul; lolos ambang 40</td></tr>
+<tr><td>0,70</td><td>0,30</td><td>50</td><td>cukup tinggi, unggul tipis; lolos ambang 40</td></tr>
+<tr><td>0,85</td><td>1</td><td>85</td><td>sangat dicurigai dan jelas unggul; lolos ambang 40</td></tr>
+</table></div>
+<!-- /gen -->
+<p>Baris pertama adalah K22 di <a href="#daftar">bagian 11</a>: tersangka tepat di batas tuduh 0,40 masih di bawah ambang chat, walau ia satu-satunya tersangka. Ini sengaja dibiarkan.</p>
+
+<h3 id="f2-bela-orang"><code>bela_orang</code></h3>
+<p><strong>Arti:</strong> seberapa perlu bot membela pemain yang sedang ditekan. Nilainya hanya tinggi bila tekanan ke pemain itu cukup besar dan bot sangat percaya padanya.</p>
+<p><strong>Cerita:</strong> room 7 pemain, semua hidup dan tidak ada yang disandera. Di siang ronde 2, Andi dan Budi menuduh Eko. Dodi, bot Civilian, hampir tidak mencurigai Eko dan belum membelanya di fase ini.</p>
+<ol>
+<!-- gen:contoh:bela_orang -->
+<li><strong>Hitung angka:</strong> <code>tekanan</code> Eko = 2 ÷ 5 = 0,40, karena 5 pemain selain Eko dan Dodi bisa bersuara. Kecurigaan Eko menurut Dodi 0,15, jadi <code>kepercayaan</code> = 0,7 × (1 − 0,15) = 0,595.</li>
+<li><strong>Ubah jadi kata:</strong> <code>tekanan</code> 0,40: rendah 0,33 dan sedang 0,67; <code>kepercayaan</code> 0,595: sedang 0,68 dan tinggi 0,32.</li>
+<li><strong>Cek tabel aturan</strong> (<code>tekanan</code> + <code>kepercayaan</code>): sedang + sedang → rendah 0,67; rendah + sedang → rendah 0,33; rendah + tinggi → rendah 0,32; sedang + tinggi → tinggi 0,32. Terkuat per kata: rendah 0,67, tinggi 0,32.</li>
+<li><strong>Hasil:</strong> 41,2, lolos ambang 40.</li>
+<!-- /gen -->
+<li><strong>Dikirim ke:</strong> <code>keputusan_chat</code>, sebagai <code>bela_orang</code> ke Eko. Jenisnya dipilih <code>jenis_bela_orang</code> (<a href="#bela-orang">bagian 5</a>), lalu nilai ini bersaing dengan calon inisiatif lain dengan ambang 40. Bot Hitman memakai sistem yang sama untuk membela rekan.</li>
+</ol>
+<p><strong>Hitungan masukan:</strong></p>
+<ul>
+<li><code>tekanan</code>: rumus <a href="#sentimen">bagian 6</a>. Bot warga memakai tabel pribadinya, dan bot Hitman tabel publik.</li>
+<li><code>kepercayaan</code>: bot warga memberi 1 bila pemain itu pasti orang baik (<a href="#pengetahuan">bagian 8</a>), selain itu 0,7 × (1 − kecurigaan). Bot Hitman yang membela rekan memakai 1 − kecurigaan publik rekan itu. Calon baru dibuat bila tekanan ≥ 0,25 dan kepercayaan ≥ 0,5; syarat lainnya di bagian 5.</li>
+</ul>
+<!-- gen:aturan:bela_orang -->
+<div class="tabel"><table>
+<tr><th><code>tekanan</code> ↓ / <code>kepercayaan</code> →</th><th>rendah</th><th>sedang</th><th>tinggi</th></tr>
+<tr><th>rendah</th><td>rendah</td><td>rendah</td><td>rendah</td></tr>
+<tr><th>sedang</th><td>rendah</td><td>rendah</td><td>tinggi</td></tr>
+<tr><th>tinggi</th><td>rendah</td><td>sedang</td><td>tinggi</td></tr>
+</table></div>
+<!-- /gen -->
+<!-- gen:hasil:bela_orang -->
+<div class="tabel"><table>
+<tr><th><code>tekanan</code></th><th><code>kepercayaan</code></th><th><code>bela_orang</code></th><th>Artinya</th></tr>
+<tr><td>0,25</td><td>0,70</td><td>32,9</td><td>baru sedikit yang menuduh, tidak dicurigai bot; di bawah ambang 40</td></tr>
+<tr><td>0,40</td><td>1</td><td>58,1</td><td>seperti cerita, tetapi Eko pasti baik; lolos ambang 40</td></tr>
+<tr><td>0,60</td><td>0,595</td><td>43,7</td><td>lebih banyak penuduh; lolos ambang 40</td></tr>
+<tr><td>0,80</td><td>0,70</td><td>71,5</td><td>hampir semua menuduh, tidak dicurigai bot; lolos ambang 40</td></tr>
+<tr><td>0,80</td><td>1</td><td>85</td><td>hampir semua menuduh pemain yang pasti baik; lolos ambang 40</td></tr>
+</table></div>
+<!-- /gen -->
+<p>Pemain yang belum pasti baik paling tinggi mendapat kepercayaan 0,7, yaitu saat kecurigaannya 0. Jadi pembelaan untuk dia lebih lemah daripada pembelaan untuk pemain yang pasti baik pada tekanan yang sama.</p>
+
+<h3 id="f2-ajak-bicara"><code>ajak_bicara</code></h3>
+<p><strong>Arti:</strong> seberapa perlu bot memanggil satu pemain yang belum bicara di ronde ini. Bot memanggil pemain yang sudah lama diam dan juga agak dicurigai, supaya ia menjelaskan diri.</p>
+<p><strong>Cerita:</strong> room 7 pemain, siang ronde 2 sudah berjalan 42 detik. Pemain lain sudah mengirim 5 chat di ronde ini, tetapi Fani belum bicara sama sekali. Fani dituduh kemarin, jadi bot agak mencurigainya.</p>
+<ol>
+<!-- gen:contoh:ajak_bicara -->
+<li><strong>Hitung angka:</strong> Siang 7 pemain berlangsung 140 detik, jadi <code>diam</code> Fani = 42 ÷ (0,35 × 140) = 0,857. Sudah ada 5 chat ronde ini, jadi <code>chat_sepi</code> = 0 dan obrolan terhitung ramai. <code>kecurigaan</code> Fani 0,47 (hasil [FUZZY 1]).</li>
+<li><strong>Ubah jadi kata:</strong> <code>diam</code> 0,857: tinggi penuh; <code>kecurigaan</code> 0,47: rendah 0,10 dan sedang 0,90.</li>
+<li><strong>Cek tabel aturan</strong> (<code>diam</code> + <code>kecurigaan</code>): tinggi + sedang → sedang 0,90; tinggi + rendah → rendah 0,10. Terkuat per kata: rendah 0,10, sedang 0,90.</li>
+<li><strong>Hasil:</strong> 44,4, lolos ambang 40.</li>
+<!-- /gen -->
+<li><strong>Dikirim ke:</strong> <code>keputusan_chat</code>, sebagai <code>tanya_info</code> jenis <code>pemain_diam</code> ke Fani, misalnya "Fani, pendapatmu gimana?", dengan ambang 40. Calon ini hanya dibuat di siang, saat obrolan ramai (<code>chat_sepi</code> = 0) atau ruangan hening sesudah ada chat.</li>
+</ol>
+<p><strong>Hitungan masukan:</strong></p>
+<ul>
+<li><code>diam</code>: 0 bila pemain itu sudah chat di ronde ini, siang maupun Tribunal. Selain itu, detik sejak siang ronde ini mulai ÷ (0,35 × durasi siang), dipotong 0–1 (<code>DIAM_FRAKSI</code>). Durasi siang mode standar = 20 detik × jumlah pemain awal (<code>durasi_fase</code>), jadi di room 7 pemain diam menjadi penuh sesudah 49 detik. Calon dibuat bila diam ≥ 0,5.</li>
+<li><code>kecurigaan</code>: <a href="#kecurigaan">bagian 6</a>. Bot Hitman memakai kecurigaan publik.</li>
+</ul>
+<!-- gen:aturan:ajak_bicara -->
+<div class="tabel"><table>
+<tr><th><code>diam</code> ↓ / <code>kecurigaan</code> →</th><th>rendah</th><th>sedang</th><th>tinggi</th></tr>
+<tr><th>rendah</th><td>rendah</td><td>rendah</td><td>rendah</td></tr>
+<tr><th>sedang</th><td>rendah</td><td>rendah</td><td>sedang</td></tr>
+<tr><th>tinggi</th><td>rendah</td><td>sedang</td><td>sedang</td></tr>
+</table></div>
+<!-- /gen -->
+<!-- gen:hasil:ajak_bicara -->
+<div class="tabel"><table>
+<tr><th><code>diam</code></th><th><code>kecurigaan</code></th><th><code>ajak_bicara</code></th><th>Artinya</th></tr>
+<tr><td>0,50</td><td>0,15</td><td>15</td><td>baru setengah jalan diam, tidak dicurigai; di bawah ambang 40</td></tr>
+<tr><td>1</td><td>0,30</td><td>28,5</td><td>lama diam, sedikit dicurigai; di bawah ambang 40</td></tr>
+<tr><td>0,60</td><td>0,60</td><td>28,5</td><td>agak lama diam, cukup dicurigai; di bawah ambang 40</td></tr>
+<tr><td>1</td><td>0,50</td><td>50</td><td>lama diam, dicurigai sedang; lolos ambang 40</td></tr>
+<tr><td>1</td><td>0,85</td><td>50</td><td>lama diam, sangat dicurigai; lolos ambang 40</td></tr>
+</table></div>
+<!-- /gen -->
+<p>Tabel ini tidak punya keluaran tinggi, jadi nilainya paling tinggi 50. Pemain diam yang tidak dicurigai selalu bernilai 15, jadi ajakan bicara praktis hanya untuk pemain diam yang agak dicurigai.</p>
+
+<h3 id="f2-tanya-info"><code>tanya_info</code></h3>
+<p><strong>Arti:</strong> seberapa perlu bot bertanya ke semua pemain. Nilainya naik bila chat ronde ini membingungkan atau masih sepi, dan paling tinggi bila keduanya terjadi.</p>
+<p><strong>Cerita:</strong> room 7 pemain, siang ronde 2. Baru ada satu chat dari pemain lain, "hmm gimana ya", dan IndoBERT hanya yakin 0,45 pada label intent-nya. Sesudah itu ruangan diam 30 detik. Tidak ada klaim role yang bentrok.</p>
+<ol>
+<!-- gen:contoh:tanya_info -->
+<li><strong>Hitung angka:</strong> <code>chat_membingungkan</code> = 1 ÷ 1 = 1, karena keyakinan intent chat itu 0,45, di bawah 0,60. <code>chat_sepi</code> = 1 − 1 ÷ 4 = 0,75. 30 detik tanpa chat sudah melewati ambang hening maks(15; 0,20 × 140) = 28 detik, jadi jenisnya <code>ruangan_hening</code>.</li>
+<li><strong>Ubah jadi kata:</strong> <code>chat_membingungkan</code> 1: tinggi penuh; <code>chat_sepi</code> 0,75: sedang 0,17 dan tinggi 0,83.</li>
+<li><strong>Cek tabel aturan</strong> (<code>chat_membingungkan</code> + <code>chat_sepi</code>): tinggi + tinggi → tinggi 0,83; tinggi + sedang → sedang 0,17. Terkuat per kata: sedang 0,17, tinggi 0,83.</li>
+<li><strong>Hasil:</strong> 76,6, lolos ambang 40.</li>
+<!-- /gen -->
+<li><strong>Dikirim ke:</strong> <code>keputusan_chat</code>, sebagai <code>tanya_info</code> ke semua pemain, dengan ambang 40. Jenisnya dipilih <code>calon_tanya_semua</code>: klaim bentrok lebih dulu, lalu ruangan hening, lalu pertanyaan umum. Bentuk ini paling banyak sekali per fase, dan di Tribunal hanya klaim bentrok.</li>
+</ol>
+<p><strong>Hitungan masukan:</strong> keduanya dihitung dari chat ronde ini, siang dan Tribunal, yang dikirim pemain selain bot.</p>
+<ul>
+<li><code>chat_membingungkan</code>: sebuah chat tidak jelas bila <code>conf_intent</code> &lt; 0,60, atau bila terbaca offend atau defend tanpa target. Nilainya = chat tidak jelas ÷ semua chat itu, dan 0 bila belum ada chat. Bila ada klaim role bentrok yang bot belum tahu siapa pembohongnya, nilainya paling rendah 0,8.</li>
+<li><code>chat_sepi</code>: 1 − (jumlah chat itu ÷ 4), paling rendah 0 (<code>MIN_PESAN_INFO</code>). Empat chat atau lebih berarti obrolan sudah cukup ramai.</li>
+<li>Ruangan hening bukan masukan fuzzy, hanya penentu jenis: tidak ada chat dari siapa pun selama 20% durasi fase, paling sedikit 15 detik.</li>
+</ul>
+<!-- gen:aturan:tanya_info -->
+<div class="tabel"><table>
+<tr><th><code>chat_membingungkan</code> ↓ / <code>chat_sepi</code> →</th><th>rendah</th><th>sedang</th><th>tinggi</th></tr>
+<tr><th>rendah</th><td>rendah</td><td>rendah</td><td>sedang</td></tr>
+<tr><th>sedang</th><td>rendah</td><td>sedang</td><td>sedang</td></tr>
+<tr><th>tinggi</th><td>sedang</td><td>sedang</td><td>tinggi</td></tr>
+</table></div>
+<!-- /gen -->
+<!-- gen:hasil:tanya_info -->
+<div class="tabel"><table>
+<tr><th><code>chat_membingungkan</code></th><th><code>chat_sepi</code></th><th><code>tanya_info</code></th><th>Artinya</th></tr>
+<tr><td>0</td><td>0</td><td>15</td><td>ramai dan jelas; di bawah ambang 40</td></tr>
+<tr><td>0</td><td>0,75</td><td>41,6</td><td>baru satu chat, jelas; lolos ambang 40</td></tr>
+<tr><td>0</td><td>1</td><td>50</td><td>belum ada chat; lolos ambang 40</td></tr>
+<tr><td>0,50</td><td>0,50</td><td>50</td><td>dua chat, satu tidak jelas; lolos ambang 40</td></tr>
+<tr><td>0,80</td><td>0</td><td>50</td><td>klaim bentrok di obrolan ramai; lolos ambang 40</td></tr>
+<tr><td>0,80</td><td>0,50</td><td>50</td><td>klaim bentrok, baru dua chat; lolos ambang 40</td></tr>
+</table></div>
+<!-- /gen -->
+<p>Klaim bentrok membuat <code>chat_membingungkan</code> paling rendah 0,8, jadi nilainya paling rendah 50 dan selalu lolos ambang.</p>
+
+<h3 id="f2-keyakinan-vote"><code>keyakinan_vote</code></h3>
+<p><strong>Arti:</strong> seberapa yakin bot warga pada calon vote teratas. Tabel aturannya sama dengan <a href="#f2-tuduh"><code>tuduh</code></a>, tetapi hasilnya tidak langsung dipakai: hasil ÷ 100 menjadi masukan <code>keyakinan</code> untuk <code>kesiapan_vote</code>.</p>
+<p><strong>Cerita:</strong> Tribunal ronde 2 di room 7 pemain. Sesudah diskusi siang, Citra hampir sama mencurigakannya dengan Budi. Keduanya bukan korban Hostage dan bukan pemain yang pasti baik.</p>
+<ol>
+<!-- gen:contoh:keyakinan_vote -->
+<li><strong>Hitung angka:</strong> <code>kecurigaan</code> Budi 0,62 dan Citra 0,56 (hasil [FUZZY 1]). <code>keunggulan</code> = (0,62 − 0,56) ÷ 0,30 = 0,20.</li>
+<li><strong>Ubah jadi kata:</strong> <code>kecurigaan</code> 0,62: sedang 0,60 dan tinggi 0,40; <code>keunggulan</code> 0,20: rendah penuh.</li>
+<li><strong>Cek tabel aturan</strong> (<code>kecurigaan</code> + <code>keunggulan</code>): sedang + rendah → rendah 0,60; tinggi + rendah → sedang 0,40. Terkuat per kata: rendah 0,60, sedang 0,40.</li>
+<li><strong>Hasil:</strong> 30,1, jadi <code>keyakinan</code> 0,30.</li>
+<!-- /gen -->
+<li><strong>Dikirim ke:</strong> <a href="#f2-kesiapan-vote"><code>kesiapan_vote</code></a>, sebagai <code>keyakinan</code>.</li>
+</ol>
+<p><strong>Hitungan masukan:</strong> <code>kecurigaan</code> dan <code>keunggulan</code> sama dengan <a href="#f2-tuduh"><code>tuduh</code></a>, tetapi hanya di antara calon yang layak di-vote: bukan korban Hostage (<code>p_sandera</code> &lt; 0,7) dan bukan pemain pasti baik. Keunggulan dihitung ulang di antara calon layak saja, supaya pemain yang dicoret tidak menutupi selisihnya.</p>
+<!-- gen:aturan:keyakinan_vote -->
+<div class="tabel"><table>
+<tr><th><code>kecurigaan</code> ↓ / <code>keunggulan</code> →</th><th>rendah</th><th>sedang</th><th>tinggi</th></tr>
+<tr><th>rendah</th><td>rendah</td><td>rendah</td><td>rendah</td></tr>
+<tr><th>sedang</th><td>rendah</td><td>sedang</td><td>sedang</td></tr>
+<tr><th>tinggi</th><td>sedang</td><td>tinggi</td><td>tinggi</td></tr>
+</table></div>
+<!-- /gen -->
+<!-- gen:hasil:keyakinan_vote -->
+<div class="tabel"><table>
+<tr><th><code>kecurigaan</code></th><th><code>keunggulan</code></th><th><code>keyakinan_vote</code></th><th>Artinya</th></tr>
+<tr><td>0,45</td><td>1</td><td>41,6</td><td>calon tunggal, kecurigaan sedang; jadi <code>keyakinan</code> 0,42</td></tr>
+<tr><td>0,62</td><td>0,60</td><td>65,1</td><td>angka cerita tuduh; jadi <code>keyakinan</code> 0,65</td></tr>
+<tr><td>0,70</td><td>0</td><td>36,5</td><td>dua calon sama kuat; jadi <code>keyakinan</code> 0,37</td></tr>
+<tr><td>0,85</td><td>1</td><td>85</td><td>sangat dicurigai dan jelas unggul; jadi <code>keyakinan</code> 0,85</td></tr>
+</table></div>
+<!-- /gen -->
+
+<h3 id="f2-kesiapan-vote"><code>kesiapan_vote</code></h3>
+<p><strong>Arti:</strong> seberapa siap bot mengunci vote. Keyakinan yang sama membuat bot lebih berani saat warga terdesak, karena satu eksekusi yang terlewat bisa membuat Hitman menang.</p>
+<p><strong>Cerita:</strong> lanjutan cerita <code>keyakinan_vote</code> di Tribunal yang sama. Malam pertama Andi disandera, jadi dari 7 pemain yang hidup ada 2 Hitman dan 1 korban Hostage.</p>
+<ol>
+<!-- gen:contoh:kesiapan_vote -->
+<li><strong>Hitung angka:</strong> <code>keyakinan</code> = 30,1 ÷ 100 = 0,301. Warga bebas = 7 − 2 − 1 = 4, jadi <code>warga_terdesak</code> = (5 − (4 − 2)) ÷ 4 = 0,75.</li>
+<li><strong>Ubah jadi kata:</strong> <code>keyakinan</code> 0,301: rendah 0,66 dan sedang 0,34; <code>warga_terdesak</code> 0,75: sedang 0,17 dan tinggi 0,83.</li>
+<li><strong>Cek tabel aturan</strong> (<code>keyakinan</code> + <code>warga_terdesak</code>): rendah + tinggi → sedang 0,66; sedang + tinggi → tinggi 0,34; rendah + sedang → rendah 0,17; sedang + sedang → sedang 0,17. Terkuat per kata: rendah 0,17, sedang 0,66, tinggi 0,34.</li>
+<li><strong>Hasil:</strong> 55,1, ≥ 45: vote sesudah separuh Tribunal.</li>
+<!-- /gen -->
+<li><strong>Dikirim ke:</strong> <code>keputusan_vote</code>. Nilai ≥ 75 (<code>VOTE_LANGSUNG</code>) berarti vote sekarang, dan ≥ 45 (<code>AMBANG_VOTE</code>) berarti vote sesudah separuh Tribunal (<code>VOTE_TUNGGU_FRAKSI</code>). Di bawahnya bot menunggu selama paruh awal, lalu ikut pemimpin suara atau abstain (<a href="#vote-warga">bagian 5</a>). Abstain saat <code>warga_terdesak</code> ≥ 0,75 diganti <code>pertahanan_suara</code> menjadi paksa vote.</li>
+</ol>
+<p><strong>Hitungan masukan:</strong></p>
+<ul>
+<li><code>keyakinan</code>: hasil <code>keyakinan_vote</code> ÷ 100.</li>
+<li><code>warga_terdesak</code> (<a href="#konteks">bagian 8</a>): (5 − (warga bebas − Hitman hidup)) ÷ 4, dipotong 0–1. Warga bebas = pemain hidup − Hitman hidup − korban Hostage. Bot warga membaca jumlah Hitman hidup dari pengumuman engine di room ≥ 2 Hitman; tanpa pengumuman, dari komposisi dikurangi Hitman hasil Peek yang sudah tersingkir. Di awal game nilainya 0,75 untuk 4 pemain, 0,5 untuk 7 pemain, dan 0 untuk 10 pemain.</li>
+</ul>
+<!-- gen:aturan:kesiapan_vote -->
+<div class="tabel"><table>
+<tr><th><code>keyakinan</code> ↓ / <code>warga_terdesak</code> →</th><th>rendah</th><th>sedang</th><th>tinggi</th></tr>
+<tr><th>rendah</th><td>rendah</td><td>rendah</td><td>sedang</td></tr>
+<tr><th>sedang</th><td>sedang</td><td>sedang</td><td>tinggi</td></tr>
+<tr><th>tinggi</th><td>tinggi</td><td>tinggi</td><td>tinggi</td></tr>
+</table></div>
+<!-- /gen -->
+<!-- gen:hasil:kesiapan_vote -->
+<div class="tabel"><table>
+<tr><th><code>keyakinan</code></th><th><code>warga_terdesak</code></th><th><code>kesiapan_vote</code></th><th>Artinya</th></tr>
+<tr><td>0,30</td><td>0</td><td>28,5</td><td>ragu, 10 pemain di awal; di bawah 45: belum vote</td></tr>
+<tr><td>0,30</td><td>0,50</td><td>28,5</td><td>ragu, 7 pemain tanpa korban; di bawah 45: belum vote</td></tr>
+<tr><td>0,30</td><td>1</td><td>63,5</td><td>ragu, warga bebas tinggal unggul 1; ≥ 45: vote sesudah separuh Tribunal</td></tr>
+<tr><td>0,65</td><td>0</td><td>67,5</td><td>cukup yakin, 10 pemain di awal; ≥ 45: vote sesudah separuh Tribunal</td></tr>
+<tr><td>0,65</td><td>0,50</td><td>67,5</td><td>cukup yakin, 7 pemain tanpa korban; ≥ 45: vote sesudah separuh Tribunal</td></tr>
+<tr><td>0,85</td><td>0</td><td>85</td><td>sangat yakin; ≥ 75: langsung vote</td></tr>
+</table></div>
+<!-- /gen -->
+<p>Bandingkan baris dengan keyakinan 0,30: keyakinan yang sama bisa berakhir belum vote atau vote, tergantung <code>warga_terdesak</code>.</p>
+
+<h3 id="f2-h-tuduh"><code>h_tuduh</code></h3>
+<p><strong>Arti:</strong> seberapa perlu bot Hitman menuduh seorang warga. Nilainya naik bila target enak dijadikan kambing hitam, dan naik lagi bila Hitman sendiri mulai dicurigai, karena menuduh orang lain mengalihkan perhatian dari dirinya.</p>
+<p><strong>Cerita:</strong> Gita, bot Hitman, sedang di siang ronde 3. Tidak ada korban Gag tim ronde ini, dan Gita belum banyak dicurigai, jadi jenis yang cocok adalah pelintir bukti publik. Kambing hitam teratasnya Eko, yang sudah cukup dicurigai meja tetapi belum di-vote.</p>
+<ol>
+<!-- gen:contoh:h_tuduh -->
+<li><strong>Hitung angka:</strong> <code>kambing_hitam</code> Eko = sistem <code>kambing</code> dari kecurigaan publik 0,60 tanpa suara = 0,635, di atas 0,40. <code>risiko_saya</code> Gita 0,30 (kecurigaan publiknya).</li>
+<li><strong>Ubah jadi kata:</strong> <code>kambing_hitam</code> 0,635: sedang 0,55 dan tinggi 0,45; <code>risiko_saya</code> 0,30: rendah 0,67 dan sedang 0,33.</li>
+<li><strong>Cek tabel aturan</strong> (<code>kambing_hitam</code> + <code>risiko_saya</code>): sedang + rendah → rendah 0,55; tinggi + rendah → sedang 0,45; sedang + sedang → sedang 0,33; tinggi + sedang → tinggi 0,33. Terkuat per kata: rendah 0,55, sedang 0,45, tinggi 0,33.</li>
+<li><strong>Hasil:</strong> 45,8, lolos ambang 40.</li>
+<!-- /gen -->
+<li><strong>Dikirim ke:</strong> <code>keputusan_chat</code>, sebagai <code>tuduh</code> jenis <code>pelintir_bukti</code> ke Eko, dengan ambang 40. <code>calon_tuduh_hitman</code> hanya membuat satu calon, yaitu jenis pertama yang cocok (serang korban Gag, balik tuduh, lalu pelintir bukti), jadi hanya calon itu yang dinilai. Di Tribunal, sistem ini juga menilai ajak vote Hitman.</li>
+</ol>
+<p><strong>Hitungan masukan:</strong></p>
+<ul>
+<li><code>kambing_hitam</code>: <a href="#kambing">bagian 7</a>. Untuk serang korban Gag dan balik tuduh, nilai target itu tetap dipakai walau di bawah 0,40.</li>
+<li><code>risiko_saya</code>: kecurigaan bot Hitman itu sendiri di tabel publik, yaitu pohon bagian 6 yang dihitung dari sudut pandang pengamat netral: tanpa pengetahuan pribadi, dan semua pemain selain dia ikut dihitung di tekanan.</li>
+</ul>
+<!-- gen:aturan:h_tuduh -->
+<div class="tabel"><table>
+<tr><th><code>kambing_hitam</code> ↓ / <code>risiko_saya</code> →</th><th>rendah</th><th>sedang</th><th>tinggi</th></tr>
+<tr><th>rendah</th><td>rendah</td><td>rendah</td><td>sedang</td></tr>
+<tr><th>sedang</th><td>rendah</td><td>sedang</td><td>tinggi</td></tr>
+<tr><th>tinggi</th><td>sedang</td><td>tinggi</td><td>tinggi</td></tr>
+</table></div>
+<!-- /gen -->
+<!-- gen:hasil:h_tuduh -->
+<div class="tabel"><table>
+<tr><th><code>kambing_hitam</code></th><th><code>risiko_saya</code></th><th><code>h_tuduh</code></th><th>Artinya</th></tr>
+<tr><td>0,15</td><td>0,30</td><td>15</td><td>korban Gag yang tidak dicurigai meja, Hitman aman; di bawah ambang 40</td></tr>
+<tr><td>0,15</td><td>0,70</td><td>36,5</td><td>balik tuduh penuduh yang dipercaya, Hitman terdesak; di bawah ambang 40</td></tr>
+<tr><td>0,50</td><td>0,15</td><td>15</td><td>kambing hitam sedang, Hitman aman; di bawah ambang 40</td></tr>
+<tr><td>0,85</td><td>0,15</td><td>50</td><td>kambing hitam kuat, Hitman aman; lolos ambang 40</td></tr>
+<tr><td>0,85</td><td>0,70</td><td>85</td><td>kambing hitam kuat, Hitman terdesak; lolos ambang 40</td></tr>
+</table></div>
+<!-- /gen -->
+
+<h3 id="f2-klaim-palsu"><code>klaim_palsu</code></h3>
+<p><strong>Arti:</strong> seberapa perlu bot Hitman memakai langkah terakhir: mengaku Stalker dan menyebut penuduhnya Hitman. Nilainya hanya naik bila Hitman sudah dicurigai dan suara Tribunal mengarah kepadanya.</p>
+<p><strong>Cerita:</strong> Tribunal ronde 2. Gita, bot Hitman, sudah dicurigai banyak orang dan sudah membela diri di Tribunal ini. Dari 5 suara yang masuk, 3 ke Gita. Andi penuduh terkuatnya, dan Gita belum pernah mengaku Peek.</p>
+<ol>
+<!-- gen:contoh:klaim_palsu -->
+<li><strong>Hitung angka:</strong> <code>risiko_saya</code> Gita 0,72 (kecurigaan publiknya). <code>suara_saya</code> = 3 ÷ 5 = 0,60.</li>
+<li><strong>Ubah jadi kata:</strong> <code>risiko_saya</code> 0,72: sedang 0,27 dan tinggi 0,73; <code>suara_saya</code> 0,60: sedang 0,67 dan tinggi 0,33.</li>
+<li><strong>Cek tabel aturan</strong> (<code>risiko_saya</code> + <code>suara_saya</code>): tinggi + sedang → sedang 0,67; tinggi + tinggi → tinggi 0,33; sedang + sedang → rendah 0,27; sedang + tinggi → sedang 0,27. Terkuat per kata: rendah 0,27, sedang 0,67, tinggi 0,33.</li>
+<li><strong>Hasil:</strong> 51,7, lolos ambang 40.</li>
+<!-- /gen -->
+<li><strong>Dikirim ke:</strong> <code>keputusan_chat</code>, sebagai <code>tuduh</code> jenis <code>klaim_peek</code> ke Andi, dengan ambang 40. Calon ini hanya dibuat sekali per game, bila <code>risiko_saya</code> ≥ 0,40 dan ada warga yang pernah menuduh tim.</li>
+</ol>
+<p><strong>Hitungan masukan:</strong></p>
+<ul>
+<li><code>risiko_saya</code>: sama dengan <a href="#f2-h-tuduh"><code>h_tuduh</code></a>.</li>
+<li><code>suara_saya</code>: suara Tribunal ke bot ÷ semua suara yang sudah masuk (<code>porsi_suara</code>). Di luar Tribunal belum ada suara, jadi nilainya 0.</li>
+</ul>
+<!-- gen:aturan:klaim_palsu -->
+<div class="tabel"><table>
+<tr><th><code>risiko_saya</code> ↓ / <code>suara_saya</code> →</th><th>rendah</th><th>sedang</th><th>tinggi</th></tr>
+<tr><th>rendah</th><td>rendah</td><td>rendah</td><td>rendah</td></tr>
+<tr><th>sedang</th><td>rendah</td><td>rendah</td><td>sedang</td></tr>
+<tr><th>tinggi</th><td>rendah</td><td>sedang</td><td>tinggi</td></tr>
+</table></div>
+<!-- /gen -->
+<!-- gen:hasil:klaim_palsu -->
+<div class="tabel"><table>
+<tr><th><code>risiko_saya</code></th><th><code>suara_saya</code></th><th><code>klaim_palsu</code></th><th>Artinya</th></tr>
+<tr><td>0,85</td><td>0</td><td>15</td><td>siang: belum ada suara; di bawah ambang 40</td></tr>
+<tr><td>0,60</td><td>0,40</td><td>28,5</td><td>cukup dicurigai, sebagian suara; di bawah ambang 40</td></tr>
+<tr><td>0,85</td><td>0,30</td><td>28,5</td><td>sangat dicurigai, sedikit suara; di bawah ambang 40</td></tr>
+<tr><td>0,85</td><td>0,60</td><td>63,5</td><td>sangat dicurigai, mayoritas suara; lolos ambang 40</td></tr>
+<tr><td>0,85</td><td>1</td><td>85</td><td>semua suara ke Hitman; lolos ambang 40</td></tr>
+</table></div>
+<!-- /gen -->
+<p>Tanpa suara, nilainya selalu 15. Jadi klaim Peek palsu praktis hanya muncul di Tribunal, saat suara sudah mengarah ke Hitman.</p>
+
+<h3 id="f2-gag"><code>gag</code></h3>
+<p><strong>Arti:</strong> seberapa perlu bot Hitman membungkam seorang warga sekarang. Nilainya naik bila warga itu berbahaya hari ini, misalnya baru menuduh tim atau baru bicara dengan klaim role penting, dan juga berbahaya secara umum.</p>
+<p><strong>Cerita:</strong> Gita, bot Hitman tanpa rekan manusia, sedang di siang ronde 2. Andi, warga yang sama dengan contoh <a href="#ancaman">bagian 7</a>, sudah mengaku Stalker dan pagi ini menuduh Gita. Fani mengaku Spy kemarin dan hari ini belum bicara. Keduanya punya ancaman yang sama.</p>
+<ol>
+<!-- gen:contoh:gag -->
+<li><strong>Hitung angka:</strong> <code>ancaman_sekarang</code> Andi = 0,5 (satu chat menuduh Gita hari ini) + 0,5 × 1 (pengaku Stalker yang sudah bicara di fase ini) = 1. Fani belum bicara dan belum menuduh hari ini, jadi 0. <code>ancaman</code> Andi 0,85 dan Fani 0,85 (tabel bagian 7).</li>
+<li><strong>Ubah jadi kata:</strong> Andi: <code>ancaman_sekarang</code> 1: tinggi penuh; <code>ancaman</code> 0,85: tinggi penuh. Fani: <code>ancaman_sekarang</code> 0: rendah penuh; <code>ancaman</code> 0,85: tinggi penuh.</li>
+<li><strong>Cek tabel aturan</strong> (<code>ancaman_sekarang</code> + <code>ancaman</code>): Andi: tinggi + tinggi → tinggi 1. Fani: rendah + tinggi → rendah 1.</li>
+<li><strong>Hasil:</strong> Andi: 85, ≥ 60; Fani: 15, di bawah 60.</li>
+<!-- /gen -->
+<li><strong>Dikirim ke:</strong> <code>keputusan_aksi</code>, lalu <code>pilih_gag</code>. Calon diurutkan menurut <code>ancaman</code>, lalu nilai <code>gag</code>, lalu nama. Jadi nilai ini yang menentukan bila ancamannya sama, seperti Andi dan Fani. Cara pakainya di <a href="#gag">bagian 5</a>: ancaman ≥ 0,7 tanpa rekan manusia langsung dibungkam; sebelum 60% siang, warga yang sudah bicara dengan nilai ≥ 60 (<code>AMBANG_GAG</code>); mulai 60% siang, Gag wajib dipakai.</li>
+</ol>
+<p><strong>Hitungan masukan:</strong></p>
+<ul>
+<li><code>ancaman_sekarang</code>: tuduhan warga itu ke tim di ronde ini, tanpa peluruhan: chat menuduh bot 0,5, chat menuduh rekan 0,25, vote ke bot 1, dan vote ke rekan 0,5. Bila ia sudah chat di fase ini, ditambah 0,5 × <code>mengaku_role_penting</code>. Nilainya paling tinggi 1. Saat siang belum ada vote ronde ini, jadi isinya chat siang ini saja.</li>
+<li><code>ancaman</code>: <a href="#ancaman">bagian 7</a>.</li>
+</ul>
+<!-- gen:aturan:gag -->
+<div class="tabel"><table>
+<tr><th><code>ancaman_sekarang</code> ↓ / <code>ancaman</code> →</th><th>rendah</th><th>sedang</th><th>tinggi</th></tr>
+<tr><th>rendah</th><td>rendah</td><td>rendah</td><td>rendah</td></tr>
+<tr><th>sedang</th><td>rendah</td><td>sedang</td><td>tinggi</td></tr>
+<tr><th>tinggi</th><td>sedang</td><td>tinggi</td><td>tinggi</td></tr>
+</table></div>
+<!-- /gen -->
+<!-- gen:hasil:gag -->
+<div class="tabel"><table>
+<tr><th><code>ancaman_sekarang</code></th><th><code>ancaman</code></th><th><code>gag</code></th><th>Artinya</th></tr>
+<tr><td>0,25</td><td>0,85</td><td>31,7</td><td>pengaku Spy yang sudah bicara hari ini, tanpa menuduh; di bawah 60</td></tr>
+<tr><td>0,50</td><td>0,50</td><td>50</td><td>sekali menuduh hari ini, ancaman sedang; di bawah 60</td></tr>
+<tr><td>0,50</td><td>0,65</td><td>67,5</td><td>sekali menuduh hari ini, ancaman cukup; ≥ 60</td></tr>
+<tr><td>0,50</td><td>0,85</td><td>85</td><td>sekali menuduh hari ini, ancaman tinggi; ≥ 60</td></tr>
+</table></div>
+<!-- /gen -->
+
+<h3 id="f2-intip"><code>intip</code></h3>
+<p><strong>Arti:</strong> seberapa berguna Peek ke seorang pemain. Nilainya naik bila pemain itu dicurigai, dan naik lagi bila info tentangnya masih sedikit, karena Peek memberi kepastian yang tidak bisa didapat dari chat.</p>
+<p><strong>Cerita:</strong> Hana, bot Stalker, sedang di malam ronde 3. Budi paling dicurigai, tetapi sudah 6 kali terlibat chat bukti dan vote. Citra lebih sedikit dicurigai, tetapi mengaku Spy, dan klaim itu hanya bisa dibuktikan lewat Peek.</p>
+<ol>
+<!-- gen:contoh:intip -->
+<li><strong>Hitung angka:</strong> <code>kecurigaan</code> Budi 0,50 dan Citra 0,42 (hasil [FUZZY 1]). Budi punya 6 info, jadi <code>kurang_info</code> = e^(−6 ÷ 4) = 0,223. Citra mengaku Spy dan kecurigaannya ≥ 0,40, jadi <code>kurang_info</code> 1.</li>
+<li><strong>Ubah jadi kata:</strong> Budi: <code>kecurigaan</code> 0,50: sedang penuh; <code>kurang_info</code> 0,223: rendah 0,92 dan sedang 0,08. Citra: <code>kecurigaan</code> 0,42: rendah 0,27 dan sedang 0,73; <code>kurang_info</code> 1: tinggi penuh.</li>
+<li><strong>Cek tabel aturan</strong> (<code>kecurigaan</code> + <code>kurang_info</code>): Budi: sedang + rendah → sedang 0,92; sedang + sedang → sedang 0,08. Terkuat per kata: sedang 0,92. Citra: sedang + tinggi → tinggi 0,73; rendah + tinggi → sedang 0,27. Terkuat per kata: sedang 0,27, tinggi 0,73.</li>
+<li><strong>Hasil:</strong> Budi: 50; Citra: 73,4.</li>
+<!-- /gen -->
+<li><strong>Dikirim ke:</strong> <code>keputusan_aksi</code>. Calon dengan nilai tertinggi dipakai tanpa ambang, jadi Hana Peek Citra. Seri diputus kecurigaan, lalu nama. Calon hanya pemain yang belum di-Peek, belum pasti baik, dan bukan korban Hostage; bila semua terlewat, pemain hidup mana pun.</li>
+</ol>
+<p><strong>Hitungan masukan:</strong></p>
+<ul>
+<li><code>kecurigaan</code>: <a href="#kecurigaan">bagian 6</a>, dari tabel pribadi Stalker.</li>
+<li><code>kurang_info</code> = 1 − <code>volume_info</code>, dengan <code>volume_info</code> = 1 − e^(−<code>n_info</code> ÷ 4). <code>n_info</code> = jumlah chat bukti (offend atau defend yang jelas dan punya target) yang dikirim atau menyasar pemain itu, ditambah vote oleh atau ke dia, dari semua ronde tanpa peluruhan. Jadi kurang_info = e^(−n_info ÷ 4): tanpa info 1, 4 info 0,37, dan 8 info 0,14. Pengaku Spy atau Civilian, menurut pola kata kapan pun, yang kecurigaannya ≥ 0,40 mendapat kurang_info 1.</li>
+</ul>
+<!-- gen:aturan:intip -->
+<div class="tabel"><table>
+<tr><th><code>kecurigaan</code> ↓ / <code>kurang_info</code> →</th><th>rendah</th><th>sedang</th><th>tinggi</th></tr>
+<tr><th>rendah</th><td>rendah</td><td>rendah</td><td>sedang</td></tr>
+<tr><th>sedang</th><td>sedang</td><td>sedang</td><td>tinggi</td></tr>
+<tr><th>tinggi</th><td>tinggi</td><td>tinggi</td><td>tinggi</td></tr>
+</table></div>
+<!-- /gen -->
+<!-- gen:hasil:intip -->
+<div class="tabel"><table>
+<tr><th><code>kecurigaan</code></th><th><code>kurang_info</code></th><th><code>intip</code></th><th>Artinya</th></tr>
+<tr><td>0,15</td><td>0,05</td><td>15</td><td>tidak dicurigai, sudah banyak info</td></tr>
+<tr><td>0,20</td><td>0,78</td><td>46</td><td>sedikit dicurigai, baru 1 info</td></tr>
+<tr><td>0,42</td><td>0,37</td><td>37,3</td><td>seperti Citra tanpa klaim, 4 info</td></tr>
+<tr><td>0,50</td><td>1</td><td>85</td><td>dicurigai sedang, belum ada info</td></tr>
+<tr><td>0,85</td><td>0,22</td><td>85</td><td>sangat dicurigai, banyak info</td></tr>
+</table></div>
+<!-- /gen -->
 
 <h3 id="urutan-ambang">Urutan dan ambang</h3>
 <div class="tabel"><table>
