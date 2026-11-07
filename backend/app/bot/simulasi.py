@@ -2,6 +2,9 @@
 sama seperti room asli, tanpa room, socket, maupun database. Waktu permainan maju per putaran: setiap
 putaran semua bot hidup melangkah sekali, berurutan, sehingga bot berikutnya membaca chat bot sebelumnya
 (seperti lantai bicara di room asli). Jejaknya berbentuk sama dengan jejak checker.
+
+Simulasi memegang Match tiruannya sendiri (tidak ada di room_service), jadi jam, chat, dan tanda keputusan bot diatur
+langsung di sini. Vote dan aksi malam memakai terapkan_pilihan_bot yang sama dengan room asli.
 """
 
 import asyncio
@@ -9,13 +12,12 @@ import time
 from collections import OrderedDict
 
 from app.bot.bot_controller import (
-    AKSI_RAHASIA, BATAS_LANGKAH_DETIK, brain_runtime, isi_jejak, pindahkan_aksi_malam, pindahkan_vote,
-    roster_label, tulis_kalimat, waktu_jejak,
+    BATAS_LANGKAH_DETIK, brain_runtime, isi_jejak, roster_label, tulis_kalimat, waktu_jejak,
 )  # fmt: skip
 from app.bot.nlu import baca_chat
 from app.game.match_engine import Match, label_unik, snapshot_berlabel
 from app.services.checker_service import jejak_baru
-from app.services.room_service import BOT_NAMES
+from app.services.room_service import BOT_NAMES, terapkan_pilihan_bot
 
 KODE = "SIMULASI"
 PEMAIN = "sim_pemain"  # username admin di engine; tampil dengan nama pilihan admin
@@ -99,17 +101,9 @@ class Simulasi:
         penolakan = tulisan = nlu = None
         lapor("engine")
         try:
+            terapkan_pilihan_bot(m, otak.nama, npc)
             if npc["action"] == "vote":
-                if npc.get("pindah"):
-                    pindahkan_vote(m, otak.nama, m.username(npc["target"]))
-                else:
-                    m.vote(otak.nama, m.username(npc["target"]))
                 brain_runtime.catat_vote(otak, view, hasil["rencana_vote"])
-            elif npc["action"] in AKSI_RAHASIA:
-                if npc.get("pindah"):
-                    pindahkan_aksi_malam(m, otak.nama, npc["action"], m.username(npc["target"]))
-                else:
-                    m.act(otak.nama, npc["action"], m.username(npc["target"]))
         except ValueError as error:
             penolakan = str(error)
         if hasil["nlg"] is not None:

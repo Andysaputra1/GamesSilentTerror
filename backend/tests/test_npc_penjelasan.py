@@ -29,6 +29,7 @@ from app.bot.penjelasan import (
 )
 from app.bot.bot_controller import NPCService
 from app.services.room_service import RoomService
+from tests.arsip_palsu import arsip_bot_palsu
 from tests.test_npc_brain import AKSI_RAHASIA, runtime_siap
 
 
@@ -308,9 +309,7 @@ class NPCServicePenjelasanTests(unittest.IsolatedAsyncioTestCase):
         self.match = self.room.match
         self.service = NPCService(Mock(emit=AsyncMock()), runtime=self.runtime)
         self.enterContext(patch("app.bot.bot_controller.room_service", self.rooms))
-        self.persistence = self.enterContext(
-            patch("app.bot.bot_controller.PersistenceService")
-        ).return_value
+        self.persistence = self.enterContext(arsip_bot_palsu()).return_value
         self.enterContext(patch("app.bot.bot_controller.survey_service"))
 
     async def asyncTearDown(self):

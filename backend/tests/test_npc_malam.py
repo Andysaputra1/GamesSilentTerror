@@ -13,10 +13,12 @@ from app.game.match_engine import Match, snapshot_berlabel
 from app.bot import fuzzy, nlg
 from app.bot.bot_controller import BrainRuntime
 from app.bot.nlu import NLUBersama
-from app.bot.bot_controller import NPCService, pindahkan_aksi_malam, riwayat_nlu, tulis_kalimat_tim
+from app.bot.bot_controller import NPCService, riwayat_nlu, tulis_kalimat_tim
+from app.services.room_service import pindahkan_aksi_malam
 from app.services.activity_service import activity
 from app.services.checker_service import checker_service
 from app.services.room_service import Room, RoomService
+from tests.arsip_palsu import arsip_bot_palsu
 from tests.nlu_palsu import NLUPalsu
 
 DELAPAN = ["hitman", "hitman2", "spy", "spy2", "stalker", "civilian", "civilian2", "civilian3"]
@@ -287,7 +289,7 @@ class NPCTeamChatTests(unittest.IsolatedAsyncioTestCase):
         self.sio = Mock(emit=AsyncMock())
         self.service = NPCService(self.sio, runtime=self.runtime)
         self.enterContext(patch("app.bot.bot_controller.room_service", self.rooms))
-        self.persistence = self.enterContext(patch("app.bot.bot_controller.PersistenceService"))
+        self.persistence = self.enterContext(arsip_bot_palsu())
         self.runtime.siapkan_pertandingan(self.game, self.room.code)
         self.otak = self.runtime.otak_bot(self.game.id, "hitman2")
 

@@ -16,6 +16,7 @@ from app.bot.bot_controller import LANTAI_MAKS, BrainRuntime, NPCService, catat_
 from app.bot.nlu import NLUBersama, baca_chat, baca_chat_baru
 from app.services.persistence_service import PersistenceError
 from app.services.room_service import RoomService
+from tests.arsip_palsu import arsip_bot_palsu
 from tests.nlu_palsu import NLUPalsu
 
 AKSI_RAHASIA = {"gag", "hostage", "guard", "peek"}
@@ -271,9 +272,7 @@ class NPCServiceBrainTests(unittest.IsolatedAsyncioTestCase):
         self.sio = Mock(emit=AsyncMock())
         self.service = NPCService(self.sio, runtime=self.runtime)
         self.enterContext(patch("app.bot.bot_controller.room_service", self.rooms))
-        self.persistence = self.enterContext(
-            patch("app.bot.bot_controller.PersistenceService")
-        ).return_value
+        self.persistence = self.enterContext(arsip_bot_palsu()).return_value
         self.survey = self.enterContext(patch("app.bot.bot_controller.survey_service"))
 
     async def asyncTearDown(self):

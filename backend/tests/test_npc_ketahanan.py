@@ -13,6 +13,7 @@ from unittest.mock import AsyncMock, Mock, patch
 from app.bot import bot_controller as runtime_modul
 from app.bot.bot_controller import BrainRuntime
 from app.bot.nlu import NLUBersama, folder_model
+from tests.arsip_palsu import arsip_bot_palsu
 from tests.nlu_palsu import NLUPalsu
 from app.bot.bot_controller import NPCService
 from app.services.room_service import RoomService
@@ -35,9 +36,7 @@ class BrainTurnKetahananTests(unittest.IsolatedAsyncioTestCase):
         self.match = self.room.match
         self.service = NPCService(Mock(emit=AsyncMock()), runtime=self.runtime)
         self.enterContext(patch("app.bot.bot_controller.room_service", self.rooms))
-        self.persistence = self.enterContext(
-            patch("app.bot.bot_controller.PersistenceService")
-        ).return_value
+        self.persistence = self.enterContext(arsip_bot_palsu()).return_value
         self.enterContext(patch("app.bot.bot_controller.survey_service"))
         await self.service.prepare(self.room.code, self.match)
         self.match.begin()

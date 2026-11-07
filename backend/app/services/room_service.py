@@ -9,6 +9,12 @@ Alurnya saat pemain bertindak (play, skip, cancel_vote, cancel_action, team_chat
 2. Cocokkan token fase. Kalau berbeda, klik itu basi dari tab lain atau ronde sebelumnya, jadi ditolak
 3. Teruskan ke Match dan kembalikan state terbaru
 
+Alurnya saat bot bertindak (dipanggil bot/bot_controller.py; bot adalah pemain tanpa browser)
+1. progres_persiapan_ai dan ai_siap: layar persiapan mengikuti pemuatan otak bot
+2. lihat_untuk_bot: snapshot milik bot dan token fase yang ia lihat
+3. pilihan_bot, chat_tim_bot, chat_bot: tindakan diterapkan hanya bila fase yang dilihat bot belum berganti
+4. Status di kartu bot (tahap I/L/O dan awan berpikir) juga diubah lewat sini
+
 Alurnya tiap detak jam (perbarui_fase_semua_room, dipanggil main.py tiap 0,5 detik)
 1. Untuk tiap room yang bertanding, panggil Match.tick: kalau waktu fase habis, fase berganti
 2. Pertandingan yang baru selesai: peserta manusianya dicatat sekali ke arsip survei lewat thread latar
@@ -20,9 +26,10 @@ import logging
 from dataclasses import dataclass, field
 import secrets
 import threading
+import time
 from app.config.database import SessionLocal
 from app.models import auth_queries
-from app.game.match_engine import Match, label_unik, phase_durations
+from app.game.match_engine import Match, label_unik, phase_durations, snapshot_berlabel
 from app.services.activity_service import activity, traced
 from app.services.persistence_service import PersistenceError, PersistenceService
 
@@ -30,6 +37,52 @@ logger = logging.getLogger("shadow_heist.rooms")
 
 # Nama NPC; juga dicadangkan agar tidak bisa dipakai sebagai username akun.
 BOT_NAMES = ("NOX", "ECHO", "VEIL", "RAVEN", "ASH", "DUSK", "IRIS", "SAGE", "ONYX", "LARK")
+
+
+# Aksi rahasia yang bisa dipilih otak bot lewat Match.act.
+AKSI_RAHASIA = {"gag", "hostage", "guard", "peek"}
+
+
+# Pindah pilihan malam: batal lalu pilih ulang, dalam lock pemanggil. Bila pilihan baru ditolak engine, pilihan lama
+# kembali utuh beserta urutannya, dan penolakan diteruskan ke pemanggil.
+def pindahkan_aksi_malam(match, nama, kemampuan, target):
+    sebelum = dict(match.actions)
+    match.cancel_action(nama)
+    try:
+        match.act(nama, kemampuan, target)
+    except ValueError:
+        match.actions = sebelum
+        raise
+
+
+# Pindah suara saat waktu tambahan. Pemanggil memegang kunci room. Bila suara baru ditolak, suara lama dikembalikan,
+# supaya bot tidak kehilangan suaranya.
+def pindahkan_vote(match, nama, target):
+    lama = match.votes.get(nama)
+    match.cancel_vote(nama)
+    try:
+        match.vote(nama, target)
+    except ValueError:
+        match.vote(nama, lama)
+        raise
+
+
+# Vote atau aksi rahasia keputusan bot ke engine; target keputusan berupa label dan diubah ke username. Dipakai room
+# asli (RoomService.pilihan_bot) dan simulasi panel. Pemanggil memegang kunci. ValueError = ditolak engine.
+# Alur: 1 vote: pindah suara atau vote baru -> 2 aksi rahasia: pindah pilihan atau aksi baru -> 3 lainnya: tidak ada
+def terapkan_pilihan_bot(match, nama, keputusan):
+    if keputusan["action"] == "vote":
+        if keputusan.get("pindah"):
+            pindahkan_vote(match, nama, match.username(keputusan["target"]))
+        else:
+            match.vote(nama, match.username(keputusan["target"]))
+    elif keputusan["action"] in AKSI_RAHASIA:
+        aksi = keputusan["action"]
+        target = match.username(keputusan["target"])
+        if keputusan.get("pindah"):
+            pindahkan_aksi_malam(match, nama, aksi, target)
+        else:
+            match.act(nama, aksi, target)
 
 
 class RoomBelumTersimpan(RuntimeError):
@@ -420,6 +473,119 @@ class RoomService:
             else:
                 pertandingan.vote(username, target)
             return self.state(code, username)
+
+    # Keputusan bot masih berlaku bila room, pertandingan, dan fasenya sama dengan saat bot melihat, dan deadline belum
+    # lewat. Berbeda dengan token fase pemain, tick tidak dipanggil di sini: jam permainan yang memajukan fase.
+    # Dipanggil di dalam lock oleh pemanggilnya.
+    def _keputusan_bot_berlaku(self, code, match, token):
+        room = self.rooms.get(code)
+        return bool(
+            room
+            and room.match is match
+            and not match.winner
+            and token == (match.id, match.round, match.phase)
+            and time.time() < match.deadline
+        )
+
+    # Layar persiapan mengikuti progres pemuatan otak bot. Hasil False bila pertandingan sudah selesai.
+    def progres_persiapan_ai(self, match, detail, progres):
+        with self.lock:
+            if match.winner:
+                return False
+            match.update_preparation(detail=detail, progress=progres)
+            return True
+
+    # Otak bot siap atau gagal dimuat: ronde 1 boleh mulai (bot tanpa otak memakai aksi cadangan engine).
+    def ai_siap(self, match, detail):
+        with self.lock:
+            match.mark_ai_ready(detail=detail)
+
+    # Bot melihat permainan: token fase, snapshot berlabel miliknya, dan id chat terakhir yang ia lihat. None bila bot
+    # tidak bisa melangkah: room atau pertandingan berganti, permainan selesai, masih persiapan, atau bot tersingkir.
+    def lihat_untuk_bot(self, code, match, nama):
+        with self.lock:
+            room = self.rooms.get(code)
+            if (
+                not room
+                or room.match is not match
+                or match.winner
+                or match.phase == "preparing"
+                or not match.players[nama].alive
+            ):
+                return None
+            token = (match.id, match.round, match.phase)
+            snapshot = snapshot_berlabel(match.snapshot(nama), match.labels)
+            id_chat_terakhir = match.messages[-1]["id"] if match.messages else None
+            # Huruf kecil di kartu bot untuk pemantauan: I terima input, L logika, O output.
+            match.bot_tahap[nama] = "I"
+            return token, snapshot, id_chat_terakhir
+
+    # Tahap langkah bot di kartu pemantauan (I input, L logika, O output).
+    def tandai_tahap_bot(self, match, nama, tahap):
+        with self.lock:
+            match.bot_tahap[nama] = tahap
+
+    # Vote atau aksi rahasia keputusan bot diterapkan segera. Hasil: (masih berlaku, pesan penolakan engine atau None).
+    # Alur: 1 fase sudah berganti: buang -> 2 tandai bot sudah memutuskan fase ini -> 3 terapkan ke engine
+    #                                                                              \> 3.2 ditolak engine: kembalikan alasannya
+    def pilihan_bot(self, code, match, token, nama, keputusan):
+        with self.lock:
+            if not self._keputusan_bot_berlaku(code, match, token):
+                return False, None
+            # Otak sudah memutuskan fase ini: tunggu/abstain miliknya dihormati, bukan diganti aksi acak engine. Ditandai
+            # setelah keputusan ada, sehingga langkah yang error/timeout sebelum pernah memutuskan apa pun tetap mendapat
+            # aksi cadangan engine di akhir fase.
+            match.npc_decisions.add((token[1], token[2], nama))
+            try:
+                terapkan_pilihan_bot(match, nama, keputusan)
+            except ValueError as error:
+                return True, str(error)
+            return True, None
+
+    # Chat tim bot: rahasia, jadi tanpa database, siaran, NLU, atau @traced (lihat team_chat). Penerima membacanya lewat
+    # snapshot. Hasil: True bila pesan masuk kanal tim.
+    def chat_tim_bot(self, code, match, token, nama, teks):
+        with self.lock:
+            if teks and self._keputusan_bot_berlaku(code, match, token) and match.can_team_chat(nama):
+                match.add_team_message(nama, teks)
+                return True
+            return False
+
+    # Bot mulai menyusun kalimat: pemain melihat awan berpikir di kartunya selama kalimat disusun.
+    def mulai_berpikir_bot(self, match, nama):
+        with self.lock:
+            match.bot_berpikir.add(nama)
+
+    # Chat publik bot disimpan lalu masuk pertandingan, hanya bila fase masih sama dan bot masih boleh bicara. Pesan yang
+    # gagal disimpan tidak masuk pertandingan, jadi tidak pernah disiarkan. Hasil: (pesan, id pesan) atau (None, None).
+    # Alur: 1 cek fase dan izin chat -> 2 simpan ke MySQL -> 3 masuk chat pertandingan -> 4 awan berpikir hilang
+    #                                   \> 2.2 gagal simpan: catat di log, tidak dikirim
+    def chat_bot(self, code, match, token, nama, teks):
+        with self.lock:
+            if not (teks and self._keputusan_bot_berlaku(code, match, token) and match.can_chat(nama)):
+                return None, None
+            try:
+                id_pesan = PersistenceService(code).record_bot_message(
+                    username=nama,
+                    message=teks,
+                    context={"match_id": match.id, "round_number": match.round,
+                             "phase": match.phase},
+                )  # fmt: skip
+            except PersistenceError:
+                logger.warning("Chat bot %s tidak tersimpan; tidak disiarkan.", nama)
+                return None, None
+            pesan = match.add_message(nama, teks)
+            # Kalimat sudah tampil; awan berpikir hilang bersama pesan.
+            match.bot_berpikir.discard(nama)
+            return pesan, id_pesan
+
+    # Langkah bot selesai, juga saat error: awan berpikir hilang. Tahap L menjadi O hanya bila langkah berhasil;
+    # langkah yang gagal atau timeout tetap di L agar terlihat macet sampai langkah berikutnya.
+    def selesai_langkah_bot(self, match, nama, gagal):
+        with self.lock:
+            match.bot_berpikir.discard(nama)
+            if not gagal and match.bot_tahap.get(nama) == "L":
+                match.bot_tahap[nama] = "O"
 
     # JAM: dipanggil tiap 0,5 detik oleh game_clock, bukan oleh request browser. Untuk tiap room,
     # panggil Match.tick(): kalau waktu fase habis, fase berganti. Pergantian fase dicatat untuk panel.

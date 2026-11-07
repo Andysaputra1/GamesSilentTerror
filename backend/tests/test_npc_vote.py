@@ -9,8 +9,10 @@ from unittest.mock import AsyncMock, Mock, patch
 from app.game.match_engine import Match
 from app.bot import fuzzy, nlg
 from app.bot.penjelasan import jelaskan
-from app.bot.bot_controller import NPCService, pindahkan_vote
+from app.bot.bot_controller import NPCService
+from app.services.room_service import pindahkan_vote
 from app.services.room_service import RoomService
+from tests.arsip_palsu import arsip_bot_palsu
 from tests.test_npc_brain import runtime_siap
 
 ENAM = ["hitman", "spy", "stalker", "warga1", "warga2", "warga3"]
@@ -155,7 +157,7 @@ class KirimPindahTests(unittest.IsolatedAsyncioTestCase):
         self.match = self.room.match
         self.service = NPCService(Mock(emit=AsyncMock()), runtime=self.runtime)
         self.enterContext(patch("app.bot.bot_controller.room_service", self.rooms))
-        self.enterContext(patch("app.bot.bot_controller.PersistenceService"))
+        self.enterContext(arsip_bot_palsu())
         self.enterContext(patch("app.bot.bot_controller.survey_service"))
         await self.service.prepare(self.room.code, self.match)
         self.match.begin()

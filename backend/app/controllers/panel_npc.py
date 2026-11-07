@@ -280,9 +280,12 @@ KODE_ALUR = {
     ],
     "engine": [
         ("app.bot.simulasi", "Simulasi._langkah", [
-            ("m.vote(", "vote ke engine"),
-            ("m.act(", "aksi rahasia ke engine"),
+            ("terapkan_pilihan_bot(m", "vote atau aksi rahasia ke engine, jalur yang sama dengan room asli"),
             ("except ValueError", "tidak sah: ditolak engine"),
+        ]),
+        ("app.services.room_service", "terapkan_pilihan_bot", [
+            ("pindahkan_vote(", "waktu tambahan: suara lama dikembalikan bila suara baru ditolak"),
+            ("pindahkan_aksi_malam(", "pindah target malam: pilihan lama kembali bila yang baru ditolak"),
         ]),
         ("app.game.match_engine", "Match.vote", []),
         ("app.game.match_engine", "Match.act", []),
