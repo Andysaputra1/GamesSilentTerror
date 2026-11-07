@@ -32,7 +32,7 @@ BACKEND = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(BACKEND))
 
 from app.game import match_engine  # noqa: E402
-from app.bot import fuzzy, nlg  # noqa: E402
+from app.bot import fuzzy_1, fuzzy_2, nlg  # noqa: E402
 from app.bot.bot_controller import BrainRuntime  # noqa: E402
 from app.bot.nlu import NLUBersama, baca_chat  # noqa: E402
 from tests.nlu_palsu import NLUPalsu  # noqa: E402
@@ -115,7 +115,7 @@ def game_putuskan(argumen):
         rng = random.Random(seed)
         nama = NAMA_BOT[:jumlah]
         match = match_engine.Match([], nama, rng=random.Random(rng.random()), now=0.0)
-        otak = {n: fuzzy.Ingatan(n) for n in nama}
+        otak = {n: fuzzy_1.Ingatan(n) for n in nama}
         riwayat = {n: [] for n in nama}
         label, jejak_a, jejak_b, t = {}, [], [], 0.0
         while match.phase != "finished" and match.round <= RONDE_MAKS:
@@ -131,7 +131,7 @@ def game_putuskan(argumen):
                         if "intent" not in c:
                             intent, target = label.get(c["id"], ("neutral", []))
                             c.update(intent=intent, conf_intent=0.95, target=target)
-                    hasil = fuzzy.putuskan(ingatan, view)
+                    hasil = fuzzy_2.putuskan(ingatan, view)
                     jejak_a.append(baris(jumlah, seed, ronde, fase, k, n, view, hasil))
                     npc, rc = hasil["npc_decision"], hasil["rencana_chat"]
                     persona = nlg.persona_bot(n, nama)
@@ -154,7 +154,7 @@ def game_putuskan(argumen):
                                 match.cancel_vote(n)
                             match.vote(n, npc["target"])
                             ingatan.catat_vote_bot(view, hasil["rencana_vote"])
-                        elif npc["action"] in fuzzy.AKSI_RAHASIA:
+                        elif npc["action"] in fuzzy_2.AKSI_RAHASIA:
                             if npc.get("pindah"):
                                 match.cancel_action(n)
                             match.act(n, npc["action"], npc["target"])
@@ -228,7 +228,7 @@ def game_langkah(argumen):
                                 match.cancel_vote(n)
                             match.vote(n, match.username(npc["target"]))
                             runtime.catat_vote(bot, view, keputusan["rencana_vote"])
-                        elif npc["action"] in fuzzy.AKSI_RAHASIA:
+                        elif npc["action"] in fuzzy_2.AKSI_RAHASIA:
                             if npc.get("pindah"):
                                 match.cancel_action(n)
                             match.act(n, npc["action"], match.username(npc["target"]))

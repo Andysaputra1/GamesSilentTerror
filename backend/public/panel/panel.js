@@ -1346,7 +1346,7 @@ const ALUR_AI = {
   fl: {
     metode: 'fuzzy',
     judul: 'FL · Fuzzy Mamdani',
-    kode: 'fuzzy.putuskan',
+    kode: 'fuzzy_2.putuskan',
     tujuan: 'Menalar dengan aturan bahasa manusia (rendah/sedang/tinggi).',
     proses:
       'Bukti → sistem fuzzy bertingkat → kecurigaan. Chat yang dinilai, vote, Gag, dan Peek diberi prioritas 0–100. Bela diri dan jawab dikirim tanpa nilai; Hostage dan Guard memakai nilai 0–1 tanpa fuzzy.',

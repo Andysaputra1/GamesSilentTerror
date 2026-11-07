@@ -245,8 +245,19 @@ def _keputusan(hasil):
 
 
 # ---------------------------------------------------------------- penalaran per metode
+# Modul otak yang dibaca penjelasan: satu modul, atau beberapa modul berurutan. Otak Fuzzy memakai dua: fuzzy_1 (mesin
+# Mamdani: SEMUA_SISTEM, keanggotaan, aturan_aktif, HIERARKI) dan fuzzy_2 (ambang keputusan).
+def _modul_otak(modul):
+    return modul if isinstance(modul, tuple) else (modul,)
+
+
+# Nilai satu nama dari modul otak pertama yang memilikinya, selain itu bawaan.
+def _dari(modul, nama, bawaan=None):
+    return next((getattr(m, nama) for m in _modul_otak(modul) if hasattr(m, nama)), bawaan)
+
+
 def _sistem_fuzzy(modul, aksi, peran):
-    semua = getattr(modul, "SEMUA_SISTEM", {})
+    semua = _dari(modul, "SEMUA_SISTEM", {})
     # h_tuduh satu-satunya sistem chat yang namanya berbeda dari aksi.
     sistem = "h_tuduh" if peran == "hitman" and aksi == "tuduh" else SISTEM_AKSI.get(aksi, aksi)
     return sistem if sistem in semua else None
@@ -254,7 +265,7 @@ def _sistem_fuzzy(modul, aksi, peran):
 
 # Satu sistem Mamdani: derajat keanggotaan input, aturan yang menyala, dan keluaran defuzzifikasi.
 def _detail_fuzzy(modul, sistem, nilai_input, keluaran):
-    spesifikasi = getattr(modul, "SEMUA_SISTEM", {}).get(sistem)
+    spesifikasi = _dari(modul, "SEMUA_SISTEM", {}).get(sistem)
     if spesifikasi is None:
         return None
     a, b = spesifikasi["input"]
@@ -262,8 +273,8 @@ def _detail_fuzzy(modul, sistem, nilai_input, keluaran):
     if x is None or y is None:
         return {"nama": sistem, "arti": spesifikasi.get("arti"), "keluaran": _nilai(keluaran),
                 "catatan": "Nilai input tidak tercatat."}  # fmt: skip
-    derajat = getattr(modul, "keanggotaan", None)
-    aktif = getattr(modul, "aturan_aktif", None)
+    derajat = _dari(modul, "keanggotaan")
+    aktif = _dari(modul, "aturan_aktif")
     aturan = _baris(aktif(sistem, x, y)) if aktif else []
     return {
         "nama": sistem,
@@ -280,7 +291,9 @@ def _detail_fuzzy(modul, sistem, nilai_input, keluaran):
 # Ambang yang dipakai metode: [nama konstanta notebook, nilai, arti].
 def _ambang(modul, daftar):
     return [
-        [nama, _nilai(getattr(modul, nama)), arti] for nama, arti in daftar if hasattr(modul, nama)
+        [nama, _nilai(_dari(modul, nama)), arti]
+        for nama, arti in daftar
+        if any(hasattr(m, nama) for m in _modul_otak(modul))
     ]
 
 
@@ -418,7 +431,7 @@ def _blok_kecurigaan(modul, metode, hasil, peran):
             "hasil": f"kecurigaan akhir {_fmt(r.get('kecurigaan'))}"}  # fmt: skip
     if r.get("fakta"):
         blok["hasil"] += f" ({r['fakta']})"
-    hierarki = getattr(modul, "HIERARKI", [])
+    hierarki = _dari(modul, "HIERARKI", [])
     blok["hierarki"] = {
         "kolom": ["sistem", "input 1", "nilai 1", "input 2", "nilai 2", "keluaran"],
         "baris": [[s, x, _nilai(r.get(x)), y, _nilai(r.get(y)),
@@ -495,7 +508,10 @@ def batasi(penjelasan):
 
 # ---------------------------------------------------------------- API publik
 def jelaskan(bot, modul, view, hasil):
-    """Ringkas hasil putuskan() satu langkah bot; tidak pernah melempar error ke game."""
+    """Ringkas hasil putuskan() satu langkah bot; tidak pernah melempar error ke game.
+
+    modul = modul otak bot: (fuzzy_1, fuzzy_2) dari BrainRuntime, atau satu modul tiruan di tes.
+    """
     try:
         identitas = _identitas(bot, view)
     except Exception as error:

@@ -45,9 +45,9 @@ class KodeAlurTests(unittest.TestCase):
         nama = {p["nama"]: p for p in kode_node("fl_3")}
         self.assertIn(
             "simulasi.compute()",
-            " ".join(b["teks"] for b in nama["fuzzy._fuzzy_tersimpan"]["baris"]),
+            " ".join(b["teks"] for b in nama["fuzzy_1._fuzzy_tersimpan"]["baris"]),
         )
-        self.assertTrue(nama["fuzzy.HIERARKI"]["konstanta"])
+        self.assertTrue(nama["fuzzy_1.HIERARKI"]["konstanta"])
         with self.assertRaises(KeyError):
             kode_node("os.system")
 

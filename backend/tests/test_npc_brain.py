@@ -11,7 +11,7 @@ import unittest
 from unittest.mock import AsyncMock, Mock, patch
 
 from app.game.match_engine import Match
-from app.bot import fuzzy
+from app.bot import fuzzy_1
 from app.bot.bot_controller import LANTAI_MAKS, BrainRuntime, NPCService, catat_nlu
 from app.bot.nlu import NLUBersama, baca_chat, baca_chat_baru
 from app.services.persistence_service import PersistenceError
@@ -53,16 +53,16 @@ class BrainRuntimeTests(unittest.TestCase):
         self.assertIsNone(self.runtime.otak_bot(match.id, "NOX"))
 
     def test_removed_systems_and_action_stay_out_of_the_bot_modules(self):
-        from app.bot import fuzzy, nlg
+        from app.bot import fuzzy_2, nlg
 
-        self.assertEqual(len(fuzzy.SEMUA_SISTEM), 21)
+        self.assertEqual(len(fuzzy_1.SEMUA_SISTEM), 21)
         dihapus = "bela_diri h_bela_diri jawab h_jawab info_sandera sandera lindung".split()
-        self.assertFalse(set(dihapus) & set(fuzzy.SEMUA_SISTEM))
+        self.assertFalse(set(dihapus) & set(fuzzy_1.SEMUA_SISTEM))
         self.assertEqual(
-            fuzzy.URUTAN_AKSI, ["bela_diri", "jawab", "bela_orang", "tuduh", "tanya_info"]
+            fuzzy_2.URUTAN_AKSI, ["bela_diri", "jawab", "bela_orang", "tuduh", "tanya_info"]
         )
-        self.assertEqual(set(fuzzy.INTENT_AKSI), set(fuzzy.URUTAN_AKSI))
-        self.assertLessEqual({"ajak_bicara", "klaim_palsu"}, set(fuzzy.SEMUA_SISTEM))
+        self.assertEqual(set(fuzzy_2.INTENT_AKSI), set(fuzzy_2.URUTAN_AKSI))
+        self.assertLessEqual({"ajak_bicara", "klaim_palsu"}, set(fuzzy_1.SEMUA_SISTEM))
         lama = {"ungkap", "klaim_palsu", "info_sandera", "ajak_bicara"}
         self.assertFalse(lama & set(nlg.VARIASI))
         self.assertFalse(lama & set(nlg.MAKSUD_AKSI))
@@ -131,7 +131,7 @@ class BrainRuntimeTests(unittest.TestCase):
         match = Match(["human"], ["NOX", "ECHO", "VEIL"], now=0.0)
         for teks in ("Aku curiga ECHO.", "Halo semua.", "Vote ECHO aja."):
             match.add_message("human", teks, now=1.0)
-        ingatan = fuzzy.Ingatan("NOX")
+        ingatan = fuzzy_1.Ingatan("NOX")
         roster = list(match.players)
         gagal = Mock(side_effect=[("offend", 0.9), RuntimeError("model rusak")])
         nlu = NLUBersama(Mock(intent=gagal, target=Mock(return_value=[])), "palsu")
@@ -247,7 +247,7 @@ class BrainRuntimeTests(unittest.TestCase):
     def test_each_bot_is_decided_only_by_its_labelled_method(self):
         dipanggil = {}
         with contextlib.ExitStack() as tumpukan:
-            for metode, modul in self.runtime.modul.items():
+            for metode, (_, modul) in self.runtime.modul.items():
                 for nama_fungsi in ("keputusan_chat", "keputusan_vote", "keputusan_aksi"):
 
                     def rekam(ctx, *args, _asli=getattr(modul, nama_fungsi), _metode=metode):
@@ -497,7 +497,7 @@ class HostageResultTests(unittest.TestCase):
         game.act("spy", "guard", "civilian")
         game.resolve_night()
         game.round, game.phase = 2, "day"
-        M = importlib.import_module("app.bot.fuzzy")
+        M = importlib.import_module("app.bot.fuzzy_1")
 
         def gagal_sandera(snapshot):
             ingatan = M.Ingatan("hitman")
@@ -529,15 +529,15 @@ class GagRuleTests(unittest.TestCase):
             player.role = name.rstrip("23")
         game.round, game.phase = 3, "day"
         game.deadline = game.durations["day"]
-        M = importlib.import_module("app.bot.fuzzy")
-        ingatan = M.Ingatan("hitman")
+        M1, M2 = (importlib.import_module(f"app.bot.{n}") for n in ("fuzzy_1", "fuzzy_2"))
+        ingatan = M1.Ingatan("hitman")
         snapshot = game.snapshot("hitman")
         snapshot["me"]["team_humans"] = list(rekan_manusia)
         ingatan.sinkron_snapshot(snapshot, 0.0)
         for pemilih, target in votes:
             ingatan.catat_vote(2, pemilih, target)
         view = ingatan.sinkron_snapshot(snapshot, detik)
-        return game, M.putuskan(ingatan, view)["npc_decision"]
+        return game, M2.putuskan(ingatan, view)["npc_decision"]
 
     def test_high_threat_is_gagged_early_even_before_speaking(self):
         game, npc = self.langkah_hitman(5.0, votes=[("spy", "hitman")])

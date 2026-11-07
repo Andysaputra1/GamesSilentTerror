@@ -18,7 +18,7 @@ from pydantic import SecretStr
 from app.config.settings import Settings
 from app.controllers.panel import require_panel
 from app.game.match_engine import Match
-from app.bot import fuzzy, nlg
+from app.bot import fuzzy_1, fuzzy_2, nlg
 from app.bot.bot_controller import BrainRuntime, OtakBot
 from app.bot.nlg import JALUR_PENULIS, PenulisNPC
 from app.bot.nlu import NLUBersama
@@ -207,7 +207,7 @@ def bot_terdesak(bot):
         pemain.role = ENAM[nama]
     game.round, game.phase = 3, "tribunal"
     game.deadline = float(game.durations["tribunal"])
-    ingatan = fuzzy.Ingatan(bot)
+    ingatan = fuzzy_1.Ingatan(bot)
     for nama in [n for n in ENAM if n != bot][:2]:
         game.vote(nama, bot)
         game.add_message(nama, f"{bot} aneh dari tadi.", now=1.0)
@@ -224,12 +224,12 @@ class PublicPromptRoleTests(unittest.TestCase):
 
     # Rencana yang sama memberi payload dan prompt yang sama untuk keempat role.
     def test_prompt_is_identical_for_every_true_role(self):
-        rencana = fuzzy.rencana_chat({"aksi": "tuduh", "jenis": "alasan_curiga", "target": "DUSK",
+        rencana = fuzzy_2.rencana_chat({"aksi": "tuduh", "jenis": "alasan_curiga", "target": "DUSK",
                                            "alasan": ["Ucapan dan vote DUSK tidak konsisten."]})  # fmt: skip
         hasil = set()
         for bot in ("NOX", "ECHO", "VEIL", "RAVEN"):
             _, view = bot_terdesak(bot)
-            payload = {**fuzzy.siapkan_nlg(rencana, view), "pembicara": "RAVEN"}
+            payload = {**fuzzy_2.siapkan_nlg(rencana, view), "pembicara": "RAVEN"}
             hasil.add(nlg.buat_prompt(payload, self.KONTEKS, "santai"))
         self.assertEqual(len(hasil), 1)
 
@@ -238,7 +238,7 @@ class PublicPromptRoleTests(unittest.TestCase):
         for bot in ("NOX", "ECHO", "VEIL", "RAVEN"):
             with self.subTest(bot=bot):
                 ingatan, view = bot_terdesak(bot)
-                payload = fuzzy.putuskan(ingatan, view)["nlg"]
+                payload = fuzzy_2.putuskan(ingatan, view)["nlg"]
                 self.assertIsNotNone(payload)
                 self.assertFalse({"peran", "role", "tim", "klaim"} & set(payload))
                 self.assertNotEqual(payload["role_diakui"], "hitman")
@@ -263,7 +263,7 @@ class OpenedRoleTests(unittest.TestCase):
     def rencana_spy(self):
         ingatan, view = bot_terdesak("ECHO")
         view["saya"]["last_guard"] = "ASH"
-        return fuzzy.putuskan(ingatan, view)["nlg"]
+        return fuzzy_2.putuskan(ingatan, view)["nlg"]
 
     # Rencana D29 di uji model: dulu klaim Spy selalu ditolak pemeriksa, jadi semua model jatuh ke templat.
     def test_spy_opening_role_with_guard_evidence_passes_end_to_end(self):
@@ -276,7 +276,7 @@ class OpenedRoleTests(unittest.TestCase):
         # Tanpa LLM, templat tetap membuka role dan aksi yang sama.
         tulisan = self.tulis(payload)
         self.assertEqual(tulisan["sumber"], "templat")
-        self.assertRegex(tulisan["teks"], f"(?i){fuzzy.POLA_KLAIM['spy']}")
+        self.assertRegex(tulisan["teks"], f"(?i){fuzzy_1.POLA_KLAIM['spy']}")
         self.assertIn("ASH", tulisan["teks"])
 
     def test_writer_rejects_claims_outside_the_plan(self):
@@ -306,7 +306,7 @@ class OpenedRoleTests(unittest.TestCase):
             for persona in nlg.PERSONA:
                 for teks in nlg.kalimat_templat(p, persona):
                     with self.subTest(teks=teks):
-                        self.assertRegex(teks, f"(?i){fuzzy.POLA_KLAIM[p['role_diakui']]}")
+                        self.assertRegex(teks, f"(?i){fuzzy_1.POLA_KLAIM[p['role_diakui']]}")
                         self.assertEqual(nlg.periksa_aturan(teks, p, list(ENAM)), [])
                         self.assertEqual(nlg.klaim_diri(teks.casefold()), {p["role_diakui"]})
 
@@ -316,7 +316,7 @@ class TemplateCoverageTests(unittest.TestCase):
     def test_every_plan_kind_has_templates_and_intent(self):
         self.assertEqual(set(nlg.MAKSUD_AKSI), set(nlg.VARIASI))
         jenis = {k.split("/")[1] for k in nlg.VARIASI}
-        self.assertEqual(set(fuzzy.INTENT_JENIS) - jenis, {"pelintir_bukti"})
+        self.assertEqual(set(fuzzy_2.INTENT_JENIS) - jenis, {"pelintir_bukti"})
         self.assertTrue(all(len(v) >= 3 for v in nlg.VARIASI.values()))
         self.assertTrue(all(len(v) >= 5 for isi in nlg.TEMPLAT_TIM.values() for v in isi.values()))
 

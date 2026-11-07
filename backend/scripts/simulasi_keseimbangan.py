@@ -1,6 +1,6 @@
 """Simulasi keseimbangan komposisi role dengan aturan engine terbaru.
 
-Semua kursi bot memakai otak Fuzzy di app/bot/fuzzy.py, label NLU sempurna dari rencana
+Semua kursi bot memakai otak Fuzzy di app/bot/fuzzy_1.py dan fuzzy_2.py, label NLU sempurna dari rencana
 pengirim, LANGKAH keputusan per fase, engine Match asli. Angka lama di GAME_CONCEPT diukur dengan metode campuran.
 
 Pemakaian (dari folder backend, dengan dependensi backend di requirements.txt; app/bot/nlg.py membaca pengaturan app):
@@ -16,7 +16,7 @@ from pathlib import Path
 
 BACKEND = Path(sys.argv[1]).resolve()
 sys.path.insert(0, str(BACKEND))
-from app.bot import fuzzy as modul  # noqa: E402
+from app.bot import fuzzy_1, fuzzy_2  # noqa: E402
 from app.bot import nlg  # noqa: E402  (hanya templat chat tim, tanpa LLM)
 from app.game import match_engine  # noqa: E402
 
@@ -42,7 +42,7 @@ def satu_game(argumen):
     nama = NAMA[:jumlah]
     match = match_engine.Match([], nama, rng=random.Random(rng.random()), now=0.0)
     match.npc_decisions = set()
-    otak = {n: modul.Ingatan(n) for n in nama}
+    otak = {n: fuzzy_1.Ingatan(n) for n in nama}
     label, ilegal, t = {}, 0, 0.0
     while match.phase != "finished" and match.round <= RONDE_MAKS:
         # Dari deadline, bukan durasi tetap: suara seri menambah waktu Tribunal yang lebih pendek dari satu fase.
@@ -60,7 +60,7 @@ def satu_game(argumen):
                     if "intent" not in c:
                         intent, target = label.get(c["id"], ("neutral", []))
                         c.update(intent=intent, conf_intent=0.95, target=target)
-                hasil = modul.putuskan(ingatan, view)
+                hasil = fuzzy_2.putuskan(ingatan, view)
                 npc, rc = hasil["npc_decision"], hasil["rencana_chat"]
                 try:
                     if rc["kirim"]:
@@ -74,7 +74,7 @@ def satu_game(argumen):
                             match.cancel_vote(n)
                         match.vote(n, npc["target"])
                         ingatan.catat_vote_bot(view, hasil["rencana_vote"])
-                    elif npc["action"] in modul.AKSI_RAHASIA:
+                    elif npc["action"] in fuzzy_2.AKSI_RAHASIA:
                         if npc.get("pindah"):
                             match.cancel_action(n)
                         match.act(n, npc["action"], npc["target"])

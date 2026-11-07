@@ -2,7 +2,8 @@
 Pengendali bot: urutan satu langkah setiap bot, dari jam permainan sampai vote, aksi malam, dan chat terkirim.
 
 Bot diperlakukan seperti pemain tanpa browser. Otak bersama (BrainRuntime) memuat NLU (nlu.py), logika Fuzzy
-(fuzzy.py), dan penulis kalimat (nlg.py), lalu menyimpan ingatan dan persona tiap bot per pertandingan.
+(fuzzy_1.py menilai pemain, fuzzy_2.py memilih tindakan), dan penulis kalimat (nlg.py), lalu menyimpan ingatan dan
+persona tiap bot per pertandingan.
 
 Alurnya
 1. Saat server nyala, main.py memanggil brain_runtime.mulai_memuat: fuzzy, IndoBERT, lalu rantai penulis dimuat di latar
@@ -52,13 +53,14 @@ from app.sockets.server import emit_room, sio
 
 if TYPE_CHECKING:
     # Hanya untuk editor (Ctrl+klik). Saat program jalan modul ini dimuat di _muat, supaya server cepat nyala.
-    from app.bot import fuzzy
+    from app.bot import fuzzy_1, fuzzy_2
 
 logger = logging.getLogger("shadow_heist.npc")
 logger_otak = logging.getLogger("shadow_heist.npc_brain")
 
-# Modul logika tiap metode; game sekarang hanya memakai fuzzy (bot/fuzzy.py).
-METODE_MODUL = {"fuzzy": "fuzzy"}
+# Modul logika tiap metode: (penilai, pemutus). Game sekarang hanya memakai fuzzy: fuzzy_1 menilai pemain (Ingatan dan
+# mesin Mamdani), fuzzy_2 memilih tindakan (putuskan) dan mengimpor fuzzy_1.
+METODE_MODUL = {"fuzzy": ("fuzzy_1", "fuzzy_2")}
 # Pemuatan otak yang gagal dicoba ulang paling cepat setelah jeda ini (detik).
 JEDA_MUAT_ULANG_DETIK = 60
 # Batas waktu keputusan otak dan penulisan kalimat (termasuk rantai LLM) agar bot tidak menggantung.
@@ -138,7 +140,7 @@ class BrainRuntime:
         try:
             self._set(detail="Memuat logika fuzzy…", progres=0.1)
             for metode, nama in METODE_MODUL.items():
-                self.modul[metode] = importlib.import_module(f"app.bot.{nama}")
+                self.modul[metode] = tuple(importlib.import_module(f"app.bot.{n}") for n in nama)
             self.nlg = nlg
             self._set(detail="Memuat NLU IndoBERT (intent dan target)…", progres=0.35)
             if nlu is None:
@@ -206,7 +208,7 @@ class BrainRuntime:
         otak = {}
         for nama in bots:
             persona = self.nlg.persona_bot(nama, bots) if self.nlg else "santai"
-            ingatan = self.modul["fuzzy"].Ingatan(nama, cepat=cepat)
+            ingatan = self.modul["fuzzy"][0].Ingatan(nama, cepat=cepat)
             otak[nama] = OtakBot(nama, "fuzzy", persona, match.players[nama].role, ingatan)
         return otak
 
@@ -244,10 +246,11 @@ class BrainRuntime:
     # Alur: 1 sinkron snapshot -> 2 NLU membaca chat baru -> 3 putuskan -> 4 chat yang baru dibaca -> 5 penjelasan
     #       -> 6 lama tiap tahap -> 7 konteks NLG
     def langkah(self, bot: OtakBot, snapshot, sekarang, selalu_jelaskan=False, lapor=nlg.tanpa_lapor):
-        # modul = bot/fuzzy.py (dimuat di _muat), jadi modul.putuskan ada di file itu.
-        modul = self.modul[bot.metode]
+        # penilai = bot/fuzzy_1.py, modul = bot/fuzzy_2.py (dimuat di _muat); modul.putuskan ada di fuzzy_2.
+        # Penjelasan panel membaca keduanya: mesin Mamdani di fuzzy_1, ambang keputusan di fuzzy_2.
+        penilai, modul = self.modul[bot.metode]
         if TYPE_CHECKING:
-            modul = fuzzy
+            penilai, modul = fuzzy_1, fuzzy_2
         mulai, jumlah_chat_sebelumnya = time.perf_counter(), len(bot.ingatan.chat)
         lapor("nlu")
         view = bot.ingatan.sinkron_snapshot(snapshot, sekarang)
@@ -272,7 +275,7 @@ class BrainRuntime:
             or keputusan.get("nlg_tim") is not None
             or keputusan["npc_decision"]["action"] != "wait"
         ):
-            keputusan["penjelasan"] = jelaskan(bot, modul, view, keputusan)
+            keputusan["penjelasan"] = jelaskan(bot, (penilai, modul), view, keputusan)
         keputusan["waktu"] = {
             "nlu_ms": round((selesai_nlu - mulai) * 1000, 1),
             "logika_ms": round((selesai_logika - selesai_nlu) * 1000, 1),

@@ -1,8 +1,8 @@
 """Uji A/B kebijakan paksa vote saat warga kritis (PAKSA_VOTE_KRITIS) dengan aturan engine terbaru.
 
-Semua kursi bot memakai otak Fuzzy di app/bot/fuzzy.py, komposisi engine, label NLU sempurna, LANGKAH keputusan
-per fase, seed sama untuk kedua kebijakan. Keluaran: win rate warga ± CI95 dan akurasi vote warga (porsi suara warga
-yang mengenai Hitman). Dasar kebijakan di notebook (bagian Kebijakan Vote saat Bukti Lemah).
+Semua kursi bot memakai otak Fuzzy di app/bot/fuzzy_1.py dan fuzzy_2.py, komposisi engine, label NLU sempurna,
+LANGKAH keputusan per fase, seed sama untuk kedua kebijakan. Keluaran: win rate warga ± CI95 dan akurasi vote warga
+(porsi suara warga yang mengenai Hitman). Dasar kebijakan di notebook (bagian Kebijakan Vote saat Bukti Lemah).
 
 Pemakaian (dari folder backend, dengan dependensi backend di requirements.txt; app/bot/nlg.py membaca pengaturan app):
     python scripts/uji_ab_vote.py . 200 6 [jumlah_pemain=6]
@@ -17,13 +17,14 @@ from pathlib import Path
 
 BACKEND = Path(sys.argv[1]).resolve()
 sys.path.insert(0, str(BACKEND))
-from app.bot import fuzzy  # noqa: E402
+from app.bot import fuzzy_1, fuzzy_2  # noqa: E402
 from app.bot import nlg as NLG  # noqa: E402  (hanya templat chat tim, tanpa LLM)
 from app.game import match_engine  # noqa: E402
 
 NAMA = ["NOX", "ECHO", "VEIL", "RAVEN", "ASH", "DUSK", "IRIS", "SAGE", "ONYX", "LARK"]
 RONDE_MAKS = 30
-MODUL = {"fuzzy": fuzzy}
+# Modul tiap metode: (penilai yang memegang Ingatan, pemutus yang memegang putuskan dan PAKSA_VOTE_KRITIS).
+MODUL = {"fuzzy": (fuzzy_1, fuzzy_2)}
 # Paling banyak separuh core, supaya mesin tetap bisa dipakai. SIM_PROSES boleh menurunkannya lagi.
 PROSES = max(1, min(int(os.environ.get("SIM_PROSES", "64")), (os.cpu_count() or 2) // 2))
 
@@ -39,13 +40,13 @@ def label_rencana(rencana):
 
 def satu_game(argumen):
     metode, paksa, jumlah, seed, langkah = argumen
-    modul = MODUL[metode]
+    penilai, modul = MODUL[metode]
     modul.PAKSA_VOTE_KRITIS = paksa
     rng = random.Random(seed)
     nama = NAMA[:jumlah]
     match = match_engine.Match([], nama, rng=random.Random(rng.random()), now=0.0)
     match.npc_decisions = set()
-    otak = {n: modul.Ingatan(n) for n in nama}
+    otak = {n: penilai.Ingatan(n) for n in nama}
     label, ilegal, t = {}, 0, 0.0
     suara_warga = suara_tepat = 0
     while match.phase != "finished" and match.round <= RONDE_MAKS:

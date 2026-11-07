@@ -45,7 +45,8 @@ backend/
     bot/                        # Bot NPC; berpikir saja, tanpa SQL, bertindak lewat services/room_service.py
       bot_controller.py         # Urutan satu langkah bot (NPCService) dan otak bersama (BrainRuntime)
       nlu.py                    # IndoBERT membaca chat, aturan nama, memo bersama, pencatat NLU
-      fuzzy.py                  # Ingatan bot dan keputusan Fuzzy Mamdani (putuskan)
+      fuzzy_1.py                # [FUZZY 1] menilai pemain: mesin Mamdani, Ingatan, kecurigaan, ancaman
+      fuzzy_2.py                # [FUZZY 2] memilih tindakan per sesi lalu putuskan; mengimpor fuzzy_1
       nlg.py                    # Kalimat: LLM atau templat, pemeriksa aturan, rantai penulis panel
       penjelasan.py             # Penjelasan keputusan bot untuk checker panel
       simulasi.py               # Simulasi panel dengan otak yang sama
