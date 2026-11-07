@@ -295,7 +295,7 @@ const METODE_LABEL = {
 const METODE_SINGKAT = { fuzzy: 'FL', utility: 'UA', bt: 'BT', llm: 'LLM' };
 const METODE_CARA = {
   fuzzy:
-    'Setiap nilai 0–1 difuzzifikasi menjadi rendah/sedang/tinggi. Aturan JIKA–MAKA menyala dengan kekuatan min(derajat input), keluaran digabung (max) lalu didefuzzifikasi centroid menjadi 0–100 dan dibandingkan ambang.',
+    'Setiap nilai 0–1 difuzzifikasi menjadi rendah/sedang/tinggi. Aturan JIKA–MAKA menyala dengan kekuatan min(derajat input), keluaran digabung (max) lalu didefuzzifikasi centroid menjadi 0–100 dan dibandingkan ambang. Bela diri dan jawab dikirim tanpa nilai; Hostage dan Guard memakai nilai 0–1 tanpa sistem fuzzy.',
   utility:
     'Setiap pilihan diberi pertimbangan 0–1 lewat kurva. Utilitas = bobot × Π(n + (1 − n)(1 − 1/k)n) (kompensasi IAUS, k = jumlah pertimbangan). Pilihan terbesar dipakai bila melewati ambang atau utilitas diam.',
   bt: 'Pohon dibaca dari atas. Selector mencoba cabang berurutan dan berhenti di cabang pertama yang berhasil; Sequence berhenti di syarat pertama yang gagal. Aksi pada cabang yang berhasil menjadi keputusan.',
@@ -324,8 +324,7 @@ const PARAMETER = {
   kecurigaan: 'Seberapa kuat pemain dianggap Hitman (0–1), hasil akhir metode.',
   tekanan:
     'Tuduhan dan vote ke pemain ini dari yang masih bisa bersuara, dibagi jumlah mereka (hidup, tidak disandera); meluruh per ronde.',
-  dukungan:
-    'Pembelaan dari yang masih bisa bersuara, termasuk klaim bersih dari pengaku Stalker.',
+  dukungan: 'Pembelaan dari yang masih bisa bersuara, termasuk klaim bersih dari pengaku Stalker.',
   plin_plan: 'Berganti sikap ke target yang sama, atau vote tidak sesuai ucapannya.',
   alihkan_tuduhan:
     'Balasan pertama sesudah dituduh: menuduh orang lain 1, membela diri sekaligus menuduh 0,5, hanya membela 0; dirata-ratakan per balasan.',
@@ -335,14 +334,31 @@ const PARAMETER = {
     'Ikut mendorong eksekusi warga: vote, ikut menuduh, atau penuduh pertama, dikali kepastian korban warga (1 bila game berlanjut di room satu Hitman atau jumlah Hitman yang diumumkan tetap; selain itu 1 − k/(N − 1)). Tidak dihitung bila korban diketahui Hitman.',
   memihak_hitman:
     'Pernah membela pemain yang kini terbukti Hitman; rendah bila hanya mengulang klaim bersih pengaku Stalker lain.',
-  jejak_kedua: 'Nilai terbesar dari ikut_salah_eksekusi dan memihak_hitman, input kedua sistem jejak.',
+  jejak_kedua:
+    'Nilai terbesar dari ikut_salah_eksekusi dan memihak_hitman, input kedua sistem jejak.',
   menuduh_orang_baik: 'Menuduh atau vote pemain yang pasti orang baik menurut bot.',
   klaim_role_bermasalah:
     'Klaim role bermasalah: pasti bohong 1; klaim terbukti salah atau disebut Hitman oleh pengaku tunggal 0,8; bentrok 0,6.',
   p_sandera: 'Korban Hostage yang diumumkan server (1) atau bukan (0); korban pasti bukan Hitman.',
   diam: 'Belum bicara di ronde ini (0–1 menurut waktu yang lewat).',
+  sentimen_sosial: 'Fuzzy: kecurigaan dari tekanan dan dukungan (0–1).',
+  perilaku_mencurigakan: 'Fuzzy: kecurigaan dari plin plan dan alihkan tuduhan (0–1).',
+  jejak: 'Fuzzy: jejak aksi Hitman dari penuduh dibungkam dan jejak kedua (0–1).',
+  kejanggalan: 'Fuzzy: kejanggalan dari menuduh orang baik dan klaim role bermasalah (0–1).',
+  ucapan: 'Fuzzy: gabungan bukti lunak, sentimen sosial dan perilaku mencurigakan (0–1).',
+  bukti_keras: 'Fuzzy: gabungan bukti keras, jejak dan kejanggalan (0–1).',
   warga_terdesak: 'Makin sedikit warga bebas, makin mendesak (0–1).',
   waktu_berjalan: 'Bagian fase yang sudah berjalan (0–1).',
+  chat_membingungkan:
+    'Porsi chat ronde ini yang tidak jelas; minimal 0,8 bila ada klaim role yang bentrok.',
+  chat_sepi: 'Makin sedikit chat ronde ini, makin tinggi (0 bila sudah ramai).',
+  ruangan_hening: 'Tidak ada chat di fase ini selama sekitar 20% durasi fase (minimal 15 detik).',
+  bot_dituduh_baru:
+    'Penuduh baru sesudah chat terakhir bot, ditambah pemilih Tribunal ke bot; pemicu bela diri.',
+  penanya: 'Pengirim chat neutral terbaru yang menyebut bot dan belum dibalas; pemicu jawab.',
+  sudah_disuarakan:
+    'Jumlah pemain lain yang sudah menuduh atau membela tiap pemain di fase ini (anti-gema).',
+  klaim_bentrok: 'Pengaku role yang bentrok, dan bot belum tahu siapa yang bohong.',
   keunggulan: 'Selisih kecurigaan tersangka teratas dari tersangka kedua (0–1).',
   keyakinan: 'Fuzzy vote: keyakinan pada kandidat teratas (0–1).',
   kesiapan: 'Fuzzy vote: kesiapan mengunci vote (0–100) dari keyakinan dan warga terdesak.',
@@ -352,11 +368,30 @@ const PARAMETER = {
   poin: 'Behavior Tree: jumlah poin bendera merah yang aktif; kecurigaan = poin / 5.',
   bendera: 'Behavior Tree: bendera merah aktif bila nilai bukti ≥ ambangnya.',
   ancaman: 'Hitman: seberapa berbahaya pemain (menuduh, berpengaruh, mengaku role penting).',
+  ancaman_langsung: 'Hitman: ancaman dari menuduh tim dan pengaruh (0–1).',
+  ancaman_peran: 'Hitman: ancaman dari mengaku role penting dan kredibilitas (0–1).',
+  menuduh_tim:
+    'Hitman: tuduhan pemain ini ke Hitman ini (chat 0,5, vote 1) dan ke rekan (separuhnya), meluruh per ronde.',
+  pengaruh: 'Seberapa sering tuduhan pemain ini diikuti pemain lain pada ronde yang sama (0–1).',
+  mengaku_role_penting: 'Hitman: mengaku Stalker 1 (0,7 bila bentrok), mengaku Spy 0,5.',
+  kecurigaan_publik:
+    'Kecurigaan pemain ini menurut pengamat netral, tanpa pengetahuan pribadi (0–1).',
+  kredibilitas: 'Hitman: 1 − kecurigaan publik.',
+  dukungan_suara: 'Hitman: porsi suara Tribunal yang mengarah ke pemain ini.',
+  ancaman_sekarang:
+    'Hitman: tuduhan ronde ini, ditambah 0,5 × mengaku role penting bila pemain ini bicara di fase ini; bahan Gag.',
   kambing_hitam: 'Hitman: seberapa mudah pemain dijadikan tersangka oleh warga.',
   jejak_tuduhan:
     'Hitman: seberapa jelas pemain ini menuduh Syndicate, makin sedikit orang yang dituduhnya makin tinggi. Nilai Hostage = ancaman × (1 − 0,5 × jejak_tuduhan).',
   terancam: 'Spy: seberapa mungkin pemain diincar Hitman malam ini; menjadi nilai Guard.',
+  menuduh_tersangka:
+    'Spy: jumlah kecurigaan orang yang dituduh atau di-vote pemain ini, meluruh per ronde.',
+  mengaku_stalker: 'Spy: pemain ini mengaku Stalker 0,9 (0,5 bila bentrok, 0 bila pasti bohong).',
   kepercayaan: 'Input bela orang: seberapa bisa dipercaya (1 = pasti bersih).',
+  tidak_dijaga:
+    'Jejak lama: kepastian target tidak dijaga Spy malam itu (1 pasti, 0,5 tidak tahu). Sekarang tidak dipakai.',
+  menuduh_saya:
+    'Jejak lama: tuduhan pemain ini ke Hitman ini saja (chat 0,5, vote 0,8). Sekarang menuduh tim, yang juga menghitung tuduhan ke rekan.',
 };
 // Nama lama tetap dikenali karena jejak lama di checker_traces masih memakainya.
 for (const [lama, baru] of Object.entries({
@@ -368,6 +403,14 @@ for (const [lama, baru] of Object.entries({
   klaim: 'klaim_role_bermasalah',
   urgensi: 'warga_terdesak',
   porsi_fase: 'waktu_berjalan',
+  sosial: 'sentimen_sosial',
+  perilaku: 'perilaku_mencurigakan',
+  pribadi: 'kejanggalan',
+  klaim_peran: 'mengaku_role_penting',
+  klaim_stalker: 'mengaku_stalker',
+  ketidakjelasan: 'chat_membingungkan',
+  sedikit_info: 'chat_sepi',
+  hening: 'ruangan_hening',
 })) {
   PARAMETER[lama] = `Nama lama ${baru.replaceAll('_', ' ')}. ${PARAMETER[baru]}`;
 }
@@ -1286,7 +1329,7 @@ const ALUR_AI = {
     kode: 'Ingatan.sinkron_snapshot (+ anotasi_chat untuk chat baru)',
     tujuan: 'Menyamakan memori bot dengan keadaan permainan yang ia lihat.',
     proses:
-      'Snapshot privat bot dibaca: chat baru (diberi NLU), vote, eksekusi, hasil Peek, Gag, fase, dan waktu.',
+      'Snapshot privat bot dibaca: chat baru (diberi NLU), vote, eksekusi, pemain keluar, korban Hostage yang diumumkan, hasil Peek, Gag, pilihan malam rekan, fase, dan waktu. Chat tim hanya masuk view, tidak pernah menjadi bukti.',
     keluaran: 'view: ronde, fase, pemain hidup, izin chat/vote/aksi milik bot.',
     alasan: 'Bot hanya tahu yang boleh dilihat role-nya; role lawan tidak pernah bocor.',
   },
@@ -1345,17 +1388,18 @@ const ALUR_AI = {
     kode: 'keputusan_chat · keputusan_vote · keputusan_aksi',
     tujuan: 'Memutuskan bertindak atau menunggu.',
     proses:
-      'Prioritas terbaik dibandingkan AMBANG_CHAT dan VOTE_LANGSUNG/AMBANG_VOTE. Bela diri dan jawab tidak melewati ambang, dan gali tersangka menjadi cadangan saat semua chat di bawah ambang. Gag selalu terpakai: ancaman tinggi langsung, nilai ≥ AMBANG_GAG sebelum 60% siang, dan wajib sesudahnya. Hostage, Guard, dan Peek selalu memakai target terbaik.',
+      'Prioritas terbaik dibandingkan AMBANG_CHAT dan VOTE_LANGSUNG/AMBANG_VOTE. Bela diri dan jawab tidak melewati ambang, dan gali tersangka menjadi cadangan saat semua chat di bawah ambang. Saat waktu tambahan seri, suara yang sudah ada dinilai ulang sekali (keputusan_pindah_vote). Gag selalu terpakai: ancaman tinggi langsung, nilai ≥ AMBANG_GAG sebelum 60% siang, dan wajib sesudahnya. Hostage, Guard, dan Peek selalu memakai target terbaik.',
     keluaran: 'Rencana chat, vote, dan aksi rahasia.',
     alasan: 'Bot tidak menuduh tanpa bukti yang cukup.',
   },
   keputusan: {
     judul: 'Keputusan langkah ini',
-    kode: 'rencana_chat · rencana_vote · pertahanan_suara · format_npc · siapkan_nlg',
+    kode: 'rencana_chat · pertahanan_suara · format_npc · siapkan_nlg · siapkan_nlg_tim',
     tujuan: 'Menyatukan hasil metode menjadi satu keputusan.',
     proses:
-      'Rencana chat (intent + target), vote, dan aksi rahasia digabung; vote dijaga agar tidak memecah suara.',
-    keluaran: 'npc_decision {action, target} dan rencana kalimat untuk NLG.',
+      'Rencana chat (aksi, jenis, intent, target), vote, dan aksi rahasia digabung. Saat warga kritis, abstain diganti vote ke tersangka teratas yang layak. Malam hari, bot dengan rekan manusia juga menyiapkan paket chat tim.',
+    keluaran:
+      'npc_decision {action, target}, rencana kalimat untuk NLG, dan paket chat tim bila ada.',
     alasan:
       'Format keputusan terpisah dari penalaran, jadi engine dan NLG tidak perlu tahu metodenya.',
   },
