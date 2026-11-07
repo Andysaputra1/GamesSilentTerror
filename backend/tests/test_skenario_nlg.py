@@ -103,6 +103,9 @@ KASUS_BAWAAN = [
     kasus("B36 ajak menyatukan", "civilian", payload("tuduh", "offend", "Budi", ["Ucapan dan vote Budi tidak konsisten."], jenis="ajak_menyatukan")),
     kasus("B37 jelaskan vote", "civilian", payload("tuduh", "offend", "Budi", ["Ucapan dan vote Budi tidak konsisten."], jenis="jelaskan_vote")),
     kasus("B38 gali tersangka", "civilian", payload("tanya_info", "neutral", "Budi", ["Budi menjawab tuduhan dengan mengalihkan ke pemain lain."], jenis="gali_tersangka")),
+    # Peek yang bukan malam terakhir disebut nomor rondenya, bukan "semalam" (npc_fuzzy waktu_peek).
+    kasus("B39 hasil Peek malam lama", "stalker", payload("tuduh", "offend", "Budi", ["Aku Stalker, di malam ronde 1 aku peek Budi: dia Hitman."], "stalker", "di malam ronde 1 peek Budi, dia Hitman", jenis="hasil_peek")),
+    kasus("B40 klaim palsu malam lama", "hitman", payload("tuduh", "offend", "Andi", ["Aku Stalker, di malam ronde 1 aku peek Andi, dia Hitman."], "stalker", "di malam ronde 1 peek Andi, dia Hitman", jenis="klaim_peek")),
 ]
 
 class PenulisPalsu:

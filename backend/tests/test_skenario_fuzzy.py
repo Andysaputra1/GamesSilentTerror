@@ -976,7 +976,7 @@ def daftar_skenario():
     S.append(dict(nama="115b Hasil Peek lama tidak disebut semalam", cerita="Peek Budi dilakukan dua malam lalu, dan malam tadi Stalker tidak bisa Peek.",
                   ingatan=buat_ingatan(tiga_r3, sampai=(3, "day"), peran="stalker", intel=[(1, "Budi", "civilian")]),
                   view=buat_view(3, "day", 35, peran="stalker", next_peek=4),
-                  harapan={"chat": [("bela_diri", "Nara")], "jenis": "role_bukti_aksi", "bukti_klaim": "kemarin peek Budi, dia bukan Hitman"}))
+                  harapan={"chat": [("bela_diri", "Nara")], "jenis": "role_bukti_aksi", "bukti_klaim": "di malam ronde 1 peek Budi, dia bukan Hitman"}))
     palsu = [ch(3, "day", 20, "Citra", "Aku Stalker, semalam aku peek Nara, dia Hitman.", "offend", ["Nara"]),
              ch(3, "day", 25, "Andi", "Nara aneh.", "offend", ["Nara"]), ch(3, "day", 30, "Budi", "Nara aneh.", "offend", ["Nara"])]
     S.append(dict(nama="116 Hitman berisiko tinggi memakai Spy palsu", cerita="Risiko tinggi, jadi Guard palsu ke warga dengan kecurigaan publik terendah, seri menurut nama.",
@@ -1710,6 +1710,25 @@ def skenario_perbaikan():
                   ingatan=buat_ingatan(peek_budi, sampai=(3, "day"), peran="hitman"),
                   view=buat_view(3, "day", 40, peran="hitman", next_gag=5, korban_gag_tim=["Budi"]),
                   harapan={"chat": [("tuduh", "Budi")], "jenis": "serang_korban_gag", "pesan_bukan": ["gag"]}))
+
+    # Klaim Peek: Stalker Peek di malam ronde 1, lalu tiap dua malam (engine: next_peek = ronde + 2).
+    suara_nara = {"Andi": "Nara", "Budi": "Nara", "Citra": "Nara"}
+    for nomor, ronde, bukti in (("602", 3, "di malam ronde 1 peek Andi, dia Hitman"), ("603", 4, "semalam peek Andi, dia Hitman")):
+        peek_nara = [ch(ronde, "day", 10, "Andi", "Aku Stalker, semalam aku peek Nara, dia Hitman.", "offend", ["Nara"])]
+        bela = [{"ronde": ronde, "fase": "tribunal", "waktu": jam(ronde, "tribunal", 2), "aksi": "bela_diri", "intent": "defend", "target": "Nara"}]
+        S.append(dict(nama=f"{nomor} Klaim Peek palsu di Tribunal ronde {ronde} menyebut malam yang mungkin",
+                      cerita=f"Skenario 100 di ronde {ronde}. Stalker asli hanya bisa Peek di malam 1, 3, 5, ..., jadi klaimnya menyebut malam "
+                             f"{'ronde 1, bukan semalam' if ronde == 3 else '3 sebagai semalam'}.",
+                      ingatan=buat_ingatan(peek_nara, sampai=(ronde, "tribunal"), peran="hitman", aksi_bot=bela),
+                      view=buat_view(ronde, "tribunal", 30, peran="hitman", suara=suara_nara),
+                      harapan={"chat": [("tuduh", "Andi")], "jenis": "klaim_peek", "role_diakui": "stalker", "bukti_klaim": bukti,
+                               **({"pesan_bukan": ["semalam"]} if ronde == 3 else {})}))
+    S.append(dict(nama="604 Hasil Peek lama menyebut malam Peek yang sebenarnya",
+                  cerita="Stalker Peek Dodi di malam ronde 1 dan baru mengungkapnya di siang ronde 3, jadi kalimatnya tidak berkata semalam.",
+                  ingatan=buat_ingatan(sampai=(3, "day"), peran="stalker", intel=[(1, "Dodi", "hitman")]),
+                  view=buat_view(3, "day", 30, peran="stalker", next_peek=3),
+                  harapan={"chat": [("tuduh", "Dodi")], "jenis": "hasil_peek", "bukti_klaim": "di malam ronde 1 peek Dodi, dia Hitman",
+                           "pesan_bukan": ["semalam"]}))
     return S
 
 
@@ -1801,8 +1820,8 @@ def cek_harapan(hasil, harapan):
 
 class SkenarioFuzzyTests(unittest.TestCase):
     def test_jumlah_skenario_sama_dengan_notebook(self):
-        self.assertEqual(len(SKENARIO), 322)
-        self.assertEqual(len({s["nama"] for s in SKENARIO}), 322)
+        self.assertEqual(len(SKENARIO), 325)
+        self.assertEqual(len({s["nama"] for s in SKENARIO}), 325)
 
     def test_semua_skenario_lulus(self):
         for s in SKENARIO:

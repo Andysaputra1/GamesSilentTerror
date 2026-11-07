@@ -109,6 +109,9 @@ TAMBAHAN_TRIBUNAL = 30
 
 TAMBAHAN_TRIBUNAL_CEPAT = 10
 
+# Sama dengan engine (next_peek = ronde + 2): Stalker yang Peek di malam ronde r baru bisa Peek lagi di malam ronde r + 2.
+JEDA_PEEK = 2
+
 # Fase sesudah (ronde, fase) menurut engine: siang ronde 1 langsung malam; malam → siang ronde berikutnya.
 def fase_berikut(ronde, fase):
     if fase == "day":
@@ -1227,6 +1230,11 @@ def urutkan_kandidat(tabel, kolom="kecurigaan"):
                                                    kind="stable")
     return kandidat, keunggulan_skor(kandidat[kolom].tolist())
 
+# Kapan Peek yang diklaim terjadi, untuk kalimat: "semalam" hanya bila malam itu malam terakhir (ronde ini dikurangi satu), selain
+# itu nomor rondenya, supaya klaim tidak menunjuk malam saat Stalker tidak mungkin Peek.
+def waktu_peek(malam, ronde):
+    return "semalam" if malam == ronde - 1 else f"di malam ronde {malam}"
+
 # Role yang diakui bot saat membuka role: (role, bukti_klaim, relasi_tambahan). Role asli tidak ikut ke rencana. Hitman memakai
 # Civilian palsu, atau Spy palsu saat risikonya tinggi. Tidak ada malam sebelum ronde 1, jadi Guard palsu baru ada sesudahnya.
 def klaim_role_bot(ctx):
@@ -1242,8 +1250,7 @@ def klaim_role_bot(ctx):
         x = ctx["ingatan"].intel[-1]
         hitman = x["peran"] == "hitman"
         # Hasil Peek menyebut orang itu langsung, jadi ia ikut menjadi target. Saksi Guard tidak.
-        waktu = "semalam" if x["ronde"] == ronde - 1 else "kemarin"
-        return ("stalker", f"{waktu} peek {x['pemain']}, dia {'Hitman' if hitman else 'bukan Hitman'}",
+        return ("stalker", f"{waktu_peek(x['ronde'], ronde)} peek {x['pemain']}, dia {'Hitman' if hitman else 'bukan Hitman'}",
                 [{"pemain": x["pemain"], "relasi": "offend" if hitman else "defend"}])
     return peran, None, []
 
@@ -1496,13 +1503,18 @@ def _calon_chat_hitman(ctx):
         return calon
     disuarakan = konteks["sudah_disuarakan"]
     calon += calon_tuduh_hitman(ctx, layak, kambing, alasan_kambing)
-    # Klaim palsu hanya sekali per game dan hanya saat Hitman sudah dicurigai.
+    # Klaim palsu hanya sekali per game dan hanya saat Hitman sudah dicurigai. Malamnya harus malam yang mungkin bagi Stalker: Peek
+    # pertama di malam ronde 1, lalu tiap JEDA_PEEK malam (1, 3, 5, ...), dan yang disebut malam terakhir yang mungkin. Hitman belum
+    # pernah mengklaim malam Peek lain (klaim ini sekali per game, dan bela_diri Hitman tidak mengaku Stalker), jadi jadwalnya selalu
+    # mulai dari malam 1. Ronde 1 belum punya malam, jadi belum ada klaim.
     penuduh = fitur[fitur["menuduh_tim"] > 0].sort_values(["menuduh_tim", "pemain"], ascending=[False, True])
-    if diri["risiko_saya"] >= RISIKO_SEDANG and len(penuduh) and not any(a.get("jenis") == "klaim_peek" for a in ingatan.aksi_bot):
-        t = penuduh.iloc[0]["pemain"]
+    malam = 1 + (view["ronde"] - 2) // JEDA_PEEK * JEDA_PEEK
+    if (malam >= 1 and diri["risiko_saya"] >= RISIKO_SEDANG and len(penuduh)
+            and not any(a.get("jenis") == "klaim_peek" for a in ingatan.aksi_bot)):
+        t, waktu = penuduh.iloc[0]["pemain"], waktu_peek(malam, view["ronde"])
         calon.append({"aksi": "tuduh", "jenis": "klaim_peek", "sistem": "klaim_palsu", "target": t, "role_diakui": "stalker",
-                      "bukti_klaim": f"semalam peek {t}, dia Hitman",
-                      "alasan": [f"Aku Stalker, semalam aku peek {t}, dia Hitman."],
+                      "bukti_klaim": f"{waktu} peek {t}, dia Hitman",
+                      "alasan": [f"Aku Stalker, {waktu} aku peek {t}, dia Hitman."],
                       "input": {"risiko_saya": diri["risiko_saya"], "suara_saya": diri["suara_saya"]}})
     # Membela rekan Syndicate yang sedang ditekan dengan alasan publik saja. Kepercayaan = citra rekan di mata warga, jadi rekan
     # yang sudah sangat dicurigai atau hampir dieksekusi tidak dibela, dan Hitman yang berisiko tinggi tidak ikut mencolok.
@@ -1581,21 +1593,23 @@ def rencana_vote(aksi, target=None, alasan=(), skor=None, **tanda):
 def rencana_aksi(aksi, target=None, alasan=(), skor=None, pindah=False):
     return {"aksi": aksi, "target": target, "alasan": list(alasan), "skor": skor, **({"pindah": True} if pindah else {})}
 
-# Stalker yang sudah tahu Hitman langsung membuka klaim; fakta pasti tidak perlu dinalar.
-# Bila ada beberapa Hitman hasil Peek, yang masih hidup dan belum diungkap di fase ini diungkap lebih dulu.
+# Stalker yang sudah tahu Hitman langsung membuka klaim; fakta pasti tidak perlu dinalar. Kalimatnya menyebut malam Peek yang
+# sebenarnya. Bila ada beberapa Hitman hasil Peek, yang masih hidup dan belum diungkap di fase ini diungkap lebih dulu.
 def chat_pasti(ctx):
     view, ingatan = ctx["view"], ctx["ingatan"]
     hidup = {p["nama"] for p in view["pemain"] if p["hidup"]}
+    malam = {x["pemain"]: x["ronde"] for x in ingatan.intel}
     ph = next((h for h in ctx["pengetahuan"]["hitman_diketahui"]
-               if h in hidup and not sudah_aksi(ingatan, view, "tuduh", h, jenis="hasil_peek")), None)
+               if h in hidup and h in malam and not sudah_aksi(ingatan, view, "tuduh", h, jenis="hasil_peek")), None)
     aksi_fase = _aksi_fase(ingatan, view)
     inisiatif = sum(a["aksi"] not in AKSI_REAKTIF for a in aksi_fase)
     if (ph is None or view["fase"] not in ("day", "tribunal") or not view["saya"]["can_chat"]
             or inisiatif >= MAKS_INISIATIF[view["fase"]]):
         return None
+    waktu = waktu_peek(malam[ph], view["ronde"])
     rencana = rencana_chat({"aksi": "tuduh", "jenis": "hasil_peek", "target": ph, "role_diakui": "stalker",
-                            "bukti_klaim": f"semalam peek {ph}, dia Hitman",
-                            "alasan": [f"Aku Stalker, semalam aku peek {ph}: dia Hitman."]})
+                            "bukti_klaim": f"{waktu} peek {ph}, dia Hitman",
+                            "alasan": [f"Aku Stalker, {waktu} aku peek {ph}: dia Hitman."]})
     return rencana, pd.DataFrame([{"aksi": "tuduh", "jenis": "hasil_peek", "target": ph, "sumber": "fakta hasil Peek"}])
 
 # Hasil Peek Hitman berarti vote langsung, tanpa menunggu.
@@ -1771,8 +1785,8 @@ def templat_pesan(rencana):
     t = rencana["target"]
     bukti = rencana["alasan"][0] if rencana["alasan"] else ""
     templat_jenis = {
-        "hasil_peek": f"Aku Stalker, aku semalam peek {t}, dia Hitman. Ayo vote {t}!",
-        "klaim_peek": f"Aku Stalker, aku semalam peek {t}, dia Hitman.",
+        "hasil_peek": f"Aku Stalker, aku {rencana.get('bukti_klaim')}. Ayo vote {t}!",
+        "klaim_peek": f"Aku Stalker, aku {rencana.get('bukti_klaim')}.",
         "serang_korban_gag": f"{t} dari tadi diam aja, curiga.",
         "balik_tuduh": f"Aku bukan Hitman, justru {t} yang aneh, dia nuduh aku tanpa bukti.",
         "ajak_pindah": f"Seri nih, pindah ke {t} aja.",
