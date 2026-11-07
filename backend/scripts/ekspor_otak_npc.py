@@ -70,8 +70,10 @@ ALUR_MODUL = {
 1. tulis_pesan menerima payload rencana chat dari siapkan_nlg, konteks, penulis, dan persona
 2. LLM, bila aktif, paling banyak MAKS_PERCOBAAN_LLM kali:
    2.1 buat_prompt menyusun prompt, lalu penulis.tulis meminta kalimat
-   2.2 nilai_kalimat memeriksa aturan, kalimat_mirip menolak parafrase kalimat yang baru terdengar
-   2.3 Lolos: kalimat dipakai. Ditolak: alasannya ikut ke percobaan berikutnya
+   2.2 nilai_kalimat memeriksa aturan, kalimat_mirip menolak parafrase kalimat yang baru terdengar, dan fakta_disalin
+       meminta tulis ulang bila fakta panjang disalin hampir utuh
+   2.3 Lolos: kalimat dipakai. Ditolak: alasannya ikut ke percobaan berikutnya. Salinan fakta tetap dipakai bila
+       percobaan ulang gagal
 3. Templat: kalimat_templat dicoba satu per satu, varian pertama yang lolos aturan dipakai
 4. Cadangan: tidak ada varian yang lolos, varian pertama tetap dipakai
 5. tulis_chat_tim menulis paket siapkan_nlg_tim: LLM, lalu templat, tanpa IndoBERT; kalimatnya boleh kosong""",

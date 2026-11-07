@@ -373,12 +373,93 @@ class WriterSentenceRuleTests(unittest.TestCase):
         self.assertIn("ECHO", tulisan["teks"])
         self.assertEqual(tulisan["pelanggaran"], [])
 
+    # Salinan fakta panjang ditulis ulang sekali; bila percobaan ulang gagal, salinan itu tetap dipakai, bukan templat.
+    def test_salinan_fakta_ditulis_ulang_sekali(self):
+        fakta = (
+            "ECHO ikut mendorong eksekusi VEIL (ronde 2), padahal jumlah Hitman tidak berkurang"
+            " jadi VEIL bukan Hitman."
+        )
+        salinan = (
+            "Aku curiga ECHO, dia ikut mendorong eksekusi VEIL padahal jumlah Hitman gak berkurang,"
+            " jadi VEIL bukan Hitman."
+        )
+        penulis = PenulisTiruan([salinan, "Aku bot."])
+        self.runtime.penulis = penulis
+        tulisan = self.runtime.tulis(self.bot, {**self.PAYLOAD, "bukti": [fakta]}, self.KONTEKS)
+        self.assertIn("ditolak karena: salin_fakta", penulis.pesan[1])
+        self.assertEqual((tulisan["sumber"], tulisan["teks"]), ("llm", salinan))
+
     # Nama tahap ini dipakai kotak nlg_cek di flowchart simulasi panel.
     def test_tahap_yang_dilaporkan_ke_flowchart(self):
         tahap = []
         self.runtime.penulis = PenulisTiruan(["Aku curiga sama ECHO, dia diam terus dari tadi."])
         self.runtime.tulis(self.bot, self.PAYLOAD, self.KONTEKS, lapor=tahap.append)
         self.assertEqual(tahap, ["nlg", "llm", "aturan"])
+
+
+class AnswerPlanTests(unittest.TestCase):
+    """Rencana jawab F18 dari uji model 6 November: VEIL ditanya ONYX, tersangkanya SAGE, dan ronde ini VEIL vote DUSK."""
+
+    ROSTER = ["NOX", "ECHO", "VEIL", "RAVEN", "ASH", "DUSK", "IRIS", "SAGE", "ONYX", "LARK"]
+    ALASAN = ["SAGE menuduh atau vote aku, padahal aku tahu aku bukan Hitman."]
+    PAYLOAD = {
+        "pembicara": "VEIL", "aksi": "jawab", "jenis": None, "intent": "offend", "target": "SAGE", "role_diakui": None,
+        "bukti_klaim": None, "relasi_tambahan": [], "bukti": ALASAN, "penanya": "ONYX",
+        "paket": {"pertanyaan": "VEIL, gimana penjelasanmu?", "penanya": "ONYX", "kondisi": "agak yakin",
+                  "tersangka": {"nama": "SAGE", "alasan": ALASAN}, "pendapat_pemain": {},
+                  "tindakan_sebelumnya": [
+                      {"tindakan": "bela", "ronde": 7, "target": "ONYX", "alasan": ["Tuduhan ke ONYX masih pendapat, ada yang membela juga."]},
+                      {"tindakan": "vote", "ronde": 7, "target": "DUSK", "alasan": ["ECHO mengaku peek DUSK sebagai Hitman."]}],
+                  "jawaban_role": "aku orang baik", "chat_saya_ronde_ini": 1},
+    }  # fmt: skip
+    KONTEKS = {"roster": ROSTER, "chat_terbaru": [
+        {"pengirim": "ONYX", "teks": "VEIL, gimana penjelasanmu?", "intent": "neutral", "target": [{"pemain": "VEIL", "relasi": "neutral"}]}]}  # fmt: skip
+
+    def setUp(self):
+        self.runtime = runtime_siap()
+        self.addCleanup(self.runtime.tutup)
+        self.runtime.konfigurasi.penulis = "otomatis"
+        self.bot = OtakBot("VEIL", "fuzzy", "kalem", "civilian", None)
+
+    def tulis(self, *jawaban):
+        penulis = PenulisTiruan(jawaban)
+        self.runtime.penulis = penulis
+        return self.runtime.tulis(self.bot, self.PAYLOAD, self.KONTEKS), penulis
+
+    # Dulu "saya yakin DUSK bukan Hitman" lolos karena semua nama di paket boleh dipakai. Target vote boleh dijelaskan, tidak dibela.
+    def test_answer_cannot_defend_its_own_vote_target(self):
+        tulisan, penulis = self.tulis(
+            "Saya tidak menuduh siapa pun, tapi saya yakin DUSK bukan Hitman.",
+            "Saya vote DUSK karena ECHO mengaku sudah peek dia.",
+        )
+        self.assertIn("ditolak karena: bela_lain", penulis.pesan[1])
+        self.assertEqual(tulisan["sumber"], "llm")
+        self.assertEqual(tulisan["teks"], "Saya vote DUSK karena ECHO mengaku sudah peek dia.")
+
+    # Permintaan penjelasan dulu jatuh ke data tersangka; sekarang tindakan sebelumnya yang dikirim ke penulis.
+    def test_explanation_request_sends_previous_actions(self):
+        pesan = self.runtime.nlg.buat_prompt(self.PAYLOAD, self.KONTEKS, "kalem")[1]
+        self.assertIn("Di ronde 7 saya vote DUSK. ECHO mengaku peek DUSK sebagai Hitman.", pesan)
+        self.assertNotIn("Tersangka saya", pesan)
+
+
+class TeamChatIntentTests(unittest.TestCase):
+    """Chat tim Spy dari uji model 6 November: Spy menjaga, jadi prompt tidak memakai target_saya dan kata serangan ditolak."""
+
+    PAKET = {"pembicara": "Nara", "aksi": "chat_tim", "tim": "spy", "pemicu": "pilih_target", "target_saya": "Andi",
+             "pilihan_rekan": None, "alasan": ["Andi menuduh atau vote aku."], "chat_tim": []}  # fmt: skip
+
+    def test_spy_attack_words_are_rewritten(self):
+        runtime = runtime_siap()
+        self.addCleanup(runtime.tutup)
+        runtime.konfigurasi.penulis = "otomatis"
+        penulis = PenulisTiruan(["Gw incer Andi malem ini.", "Gw jaga Andi malem ini."])
+        runtime.penulis = penulis
+        bot = OtakBot("Nara", "fuzzy", "gaul", "spy", None)
+        tulisan = runtime.tulis_tim(bot, self.PAKET, ["Nara", "Andi", "Budi"])
+        self.assertEqual((tulisan["sumber"], tulisan["teks"]), ("llm", "Gw jaga Andi malem ini."))
+        self.assertIn("dijaga_malam_ini: Andi", penulis.pesan[0])
+        self.assertIn("ditolak karena: kata_dilarang", penulis.pesan[1])
 
 
 class WriterCheckTests(unittest.TestCase):
