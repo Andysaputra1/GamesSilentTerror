@@ -16,7 +16,7 @@ Sudah dapat dimainkan dari awal sampai akhir:
 - Login username/email + password, daftar akun, login Google, dan pilihan avatar (6 skin karakter, tersimpan per akun).
 - Main page, buat/gabung ruangan, 4–10 peserta, bot opsional untuk mengisi kursi kosong. Hanya pembuat ruangan yang mengatur bot dan memulai game.
 - Role acak dari server, layar persiapan, timer Day → Tribunal → Night (ronde 1 tanpa Tribunal) tanpa batas ronde (berakhir hanya saat salah satu kubu menang), skill/cooldown, voting, eksekusi, dan kondisi kemenangan.
-- Survei singkat setelah pertandingan; jawabannya dipakai untuk menilai bot per metode penalaran.
+- Survei singkat setelah pertandingan; jawabannya dipakai untuk menilai bot.
 - Panel administrator terpadu di `/panel`: Konfigurasi AI, Checker, Riwayat chat, Manajemen user, Otak NPC, Survei, Simulasi, dan Dokumen (Arsitektur, ERD, Proses AI, Bedah Alur, Bedah Otak Fuzzy, serta kode dan diagram NLU dan Fuzzy).
 
 Role: **Hitman** (Hostage/Gag Order), **Spy** (Guard), **Stalker** (Peek), dan **Civilian** (observasi). Korban Hostage tetap hidup tetapi kehilangan semua aksi permanen (chat, voting, dan skill malam). Saat malam selesai korban diumumkan ke semua pemain dan kartunya bercap *Disandera* sampai akhir; bila Hostage dijaga Guard atau tidak ada pilihan, pengumumannya "Malam ini tidak ada yang disandera" (target yang gagal tidak dibuka).
