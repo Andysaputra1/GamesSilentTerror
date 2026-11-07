@@ -2,7 +2,7 @@
 
 Kode di sini adalah sumber logika bot di game dan boleh diubah langsung. Notebook skripsi npc_fuzzy.ipynb hanya untuk
 laporan; bila logika di sini berubah, notebook ikut diperbarui supaya skripsi tetap menggambarkan game. Patokan
-perilakunya adalah tests/test_skenario_fuzzy.py (320 skenario) dan sidik di tests/jejak/sidik.json.
+perilakunya adalah tests/test_skenario_fuzzy.py (328 skenario) dan sidik di tests/jejak/sidik.json.
 
 Alurnya
 1. Ingatan.sinkron_snapshot mencatat snapshot privat bot dan memberi view. Chat baru masuk ingatan tanpa bacaan;

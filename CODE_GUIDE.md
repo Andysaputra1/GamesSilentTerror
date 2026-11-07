@@ -96,7 +96,7 @@ python -m unittest tests.test_skenario_fuzzy tests.test_skenario_nlg
 python tests/jejak/rekam_jejak.py --cek
 ```
 
-`test_skenario_fuzzy.py` berisi 320 skenario berlabel dari notebook, `test_skenario_nlg.py` pengujian
+`test_skenario_fuzzy.py` berisi 328 skenario berlabel dari notebook, `test_skenario_nlg.py` pengujian
 payload, pemeriksa aturan, templat, dan prompt. `rekam_jejak.py --cek` membandingkan sidik keputusan bot
 pada seed tetap dengan `tests/jejak/sidik.json`. Perapian yang tidak mengubah logika harus memberi sidik
 yang sama. Perubahan logika yang disengaja mengubah sidik; setelah skenario lulus dan perubahan diterima,
