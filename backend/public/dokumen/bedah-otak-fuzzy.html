@@ -59,7 +59,7 @@ li { margin: .25em 0; }
 <ul>
 <li><strong>Rancangan dari pembedahan sudah terpasang.</strong> Fase 1–8 <code>plan/plan05.md</code> mengganti otak bot: 21 sistem Mamdani (dulu 28), tujuh tindakan siang, aturan bersama untuk memilih jenis tindakan, dan nama bukti baru. Nama fungsi di kode ditulis di bawah judul tiap tindakan.</li>
 <!-- fase9: dua perubahan Fase 9 di bawah ditulis untuk keadaan sesudah Fase 9 masuk; periksa terhadap kode -->
-<li><strong>Fase 9</strong> (ukur dan setel) menambah dua aturan yang sudah terpasang: seri nilai calon Hostage diacak stabil per bot dan ronde (<code>seri_acak</code>), dan klaim dari pemain yang sudah terbukti Hitman dianggap pasti bohong (<code>_klaim_peran</code>). Angka keseimbangan dan komposisi akhir menyusul dari ukur Fase 9.</li>
+<li><strong>Fase 9</strong> (ukur dan setel) menambah dua aturan yang sudah terpasang: seri nilai calon Hostage diacak stabil per bot dan ronde (<code>seri_acak</code>), dan klaim dari pemain yang sudah terbukti Hitman dianggap pasti bohong (<code>_klaim_peran</code>). Sesudah keduanya, warga menang 46–59,5% di 4–10 pemain dan komposisi tidak berubah (lihat <a href="#metode">bagian 10</a>).</li>
 <!-- fase9: ubah butir ini sesudah otak baru dideploy -->
 <li><strong>Belum dipakai di game produksi.</strong> Otak baru masuk <code>main</code> dan VM sesudah Fase 9 lulus dan pemilik proyek mengizinkan deploy. Fase 10 (pengayaan data IndoBERT, dilatih pemilik proyek) dan pembekuan menyusul.</li>
 <li><strong>Aturan game baru sudah live di backend</strong> (commit <code>2d0e9b9</code>): Guard boleh ke target yang sama berturut-turut, vote seri menambah waktu sekali, rekan Spy saling tahu, chat tim malam, dan seri Hostage manusia lawan bot memakai pilihan manusia. Otak baru memakai semua aturan ini.</li>
@@ -492,7 +492,7 @@ Bobot 1,0 bila tuduhan chat di ronde ini, 0,6 bila ronde lalu.</code></pre>
 <tr><td>Citra</td><td>tidak menuduh Hitman</td><td>0,7</td><td>0</td><td>0,70</td></tr>
 </table></div>
 <!-- fase9: angka penalti 0,5 sesudah setel Fase 9 -->
-<p>Hitman memilih Citra. Angka ancaman di tabel hanya contoh hitungan penalti. Angka 0,5 adalah perkiraan awal yang disetel di Fase 9. Gag tidak memakai penalti ini.</p>
+<p>Hitman memilih Citra. Angka ancaman di tabel hanya contoh hitungan penalti. Angka 0,5 dipertahankan sesudah ukur Fase 9: tanpa penalti, Hitman menyandera penuduh tunggalnya di 79–90% keputusan, sedangkan dengan 0,5 hanya 5–13%, dan selisih menang warga masih di dalam margin. Gag tidak memakai penalti ini.</p>
 <p><span class="b l">live</span> Pada seri pilihan Hostage antara manusia dan bot, pilihan manusia yang dipakai. Seri sesama manusia memakai pilihan paling awal.</p>
 
 <h3 id="guard"><code>guard</code></h3>
@@ -612,7 +612,7 @@ klaim_role_bermasalah ─┘</code></pre>
 </table></div>
 <p>Hitman bisa membela rekan untuk menurunkan nilai ini. Pembelaan tidak menurunkan bukti keras, dan pembelanya bisa terkena <code>memihak_hitman</code>.</p>
 <!-- fase9: hasil ukur ide #31 di Fase 9 -->
-<p><span class="b k">terpasang</span> Ide #31, diputuskan Claude atas permintaan pemilik proyek: pembagi di atas, dan tuduhan atau pembelaan dari pemain yang tersingkir atau disandera tidak dihitung. Tuduhan korban Hostage tetap masuk <code>penuduh_dibungkam</code>. Aturan ini ada di commit sendiri, jadi bisa dibatalkan bila hasil ukur Fase 9 tidak mendukung.</p>
+<p><span class="b k">terpasang</span> Ide #31, diputuskan Claude atas permintaan pemilik proyek: pembagi di atas, dan tuduhan atau pembelaan dari pemain yang tersingkir atau disandera tidak dihitung. Tuduhan korban Hostage tetap masuk <code>penuduh_dibungkam</code>. Ukur Fase 9 mendukungnya: dengan pembagi lama, warga turun 5,0 poin di 7 pemain dan 6,5 poin di 10 pemain, jadi aturan ini dipertahankan.</p>
 
 <h3 id="perilaku"><code>perilaku_mencurigakan</code></h3>
 <p><strong>Arti:</strong> apakah cara bicara orang ini aneh.</p>
@@ -1078,7 +1078,7 @@ AKSI         gag            (ancaman_sekarang, ancaman)     Hitman, siang
 <h3>Kecepatan logika</h3>
 <p>Ukur <code>putuskan</code> sebelum rombak, di laptop, 5 game 7 pemain, tanpa IndoBERT dan LLM, dengan cache fuzzy: median 11,0 ms, rata-rata 12,9 ms, 95% di bawah 24,3 ms, terlama 137 ms.</p>
 <!-- fase9: waktu per tahap otak baru dari checker_traces uji main -->
-<p>Waktu per tahap otak baru (logika, NLU, LLM) diukur di Fase 9 lewat <code>checker_traces</code> uji main.</p>
+<p>Waktu per tahap otak baru (logika, NLU, LLM) belum diukur, karena butuh <code>checker_traces</code> dari uji main sesudah deploy.</p>
 
 <h3>Data lambat produksi, 27 dan 29 Oktober</h3>
 <p>Sumbernya tabel <code>checker_traces</code>, sebelum rombak. Rata-rata langkah bot Fuzzy per hari, dalam milidetik:</p>
@@ -1104,7 +1104,18 @@ AKSI         gag            (ancaman_sekarang, ancaman)     Hitman, siang
 <tr><td>10</td><td>2/2/1</td><td>46,5%</td><td>± 6,9</td><td>8,15</td><td>masuk</td></tr>
 </table></div>
 <!-- fase9: tabel keseimbangan sesudah rombak dan komposisi akhir -->
-<p>Angka sesudah rombak dan komposisi akhir (<code>KOMPOSISI_PERAN</code>) menyusul dari ukur akhir Fase 9, lalu dicatat di <code>GAME_CONCEPT.md</code>. Kandidat komposisi yang pernah diukur tercatat di <code>plan/plan05.md</code> bagian Fase 9.</p>
+<p>Sesudah rombak (ukur akhir Fase 9, 6 November 2026, cara ukur sama, termasuk seri Hostage acak dan klaim Hitman terbukti):</p>
+<div class="tabel"><table>
+<tr><th>Pemain</th><th>Hitman/Spy/Stalker</th><th>Warga menang</th><th>Margin</th><th>Rata-rata ronde</th><th>Terhadap target</th></tr>
+<tr><td>4</td><td>1/1/1</td><td>47,0%</td><td>± 6,9</td><td>2,00</td><td>masuk</td></tr>
+<tr><td>5</td><td>1/1/1</td><td>47,0%</td><td>± 6,9</td><td>2,39</td><td>masuk</td></tr>
+<tr><td>6</td><td>1/1/1</td><td>46,0%</td><td>± 6,9</td><td>3,23</td><td>masuk</td></tr>
+<tr><td>7</td><td>2/2/1</td><td>58,0%</td><td>± 6,8</td><td>3,87</td><td>masuk</td></tr>
+<tr><td>8</td><td>2/2/1</td><td>54,0%</td><td>± 6,9</td><td>4,84</td><td>masuk</td></tr>
+<tr><td>9</td><td>2/2/1</td><td>55,0%</td><td>± 6,9</td><td>6,05</td><td>masuk</td></tr>
+<tr><td>10</td><td>2/2/1</td><td>59,5%</td><td>± 6,8</td><td>7,24</td><td>masuk, dekat batas atas</td></tr>
+</table></div>
+<p>Pertandingan tanpa pemenang 0, dan aksi ilegal 0. Komposisi lain yang diukur semuanya di bawah 40% (2,5–36,5%), jadi <code>KOMPOSISI_PERAN</code> tidak diubah. Tabel lengkap dan uji A/B paksa vote ada di <code>GAME_CONCEPT.md</code>.</p>
 
 <h3>Survei dan evaluasi</h3>
 <p>Ide #30 ditutup: skripsi tidak lagi membandingkan metode. Jawaban survei lama, yang bot-nya bercampur metode, sudah dihapus pemilik proyek lewat panel Survei, dan label metode di layar sudah dihapus lewat commit <code>a51be3f</code>. Aturan dan otak harus dibekukan sebelum data survei baru dikumpulkan.</p>
@@ -1143,7 +1154,7 @@ AKSI         gag            (ancaman_sekarang, ancaman)     Hitman, siang
 <tr><td>#29</td><td>Guard boleh ke target yang sama berturut-turut</td><td><span class="b l">live</span> <span class="b k">terpasang</span></td></tr>
 <tr><td>#30</td><td>Skripsi tidak lagi membandingkan metode</td><td>final</td></tr>
 <!-- fase9: hasil ukur ide #31 di Fase 9 -->
-<tr><td>#31</td><td>Hitungan <code>tekanan</code> dan <code>dukungan</code> mengikuti pemain yang masih bisa bersuara. Commit sendiri, bisa dibatalkan bila hasil ukur Fase 9 tidak mendukung</td><td><span class="b k">terpasang</span></td></tr>
+<tr><td>#31</td><td>Hitungan <code>tekanan</code> dan <code>dukungan</code> mengikuti pemain yang masih bisa bersuara. Dipertahankan sesudah ukur Fase 9 (pembagi lama menurunkan warga 5–6,5 poin)</td><td><span class="b k">terpasang</span></td></tr>
 <tr><td>#32</td><td>Pola kata klaim role diperluas, dan label IndoBERT klaim dikerjakan belakangan</td><td><span class="b k">terpasang</span></td></tr>
 <!-- fase9: dua aturan dari Fase 9 -->
 <tr><td>Fase 9</td><td>Seri nilai calon Hostage diacak stabil per bot dan ronde; klaim dari pemain yang sudah terbukti Hitman dianggap pasti bohong</td><td><span class="b k">terpasang</span></td></tr>
@@ -1156,7 +1167,7 @@ AKSI         gag            (ancaman_sekarang, ancaman)     Hitman, siang
 <tr><td><code>jawab</code></td><td>Semua chat <code>neutral</code> yang menyebut bot dijawab, walau bukan pertanyaan</td><td>Bot bisa menanggapi sapaan atau komentar biasa</td></tr>
 <tr><td><code>jawab</code></td><td>Pertanyaan yang terbaca <code>offend</code> atau <code>defend</code> tidak dijawab</td><td>"Setuju vote Budi, Dodi?" bisa tidak dijawab</td></tr>
 <tr><td><code>jawab</code></td><td>Hasil bergantung pada label IndoBERT</td><td>Pertanyaan yang salah label bisa terlewat, atau masuk <code>bela_diri</code></td></tr>
-<tr><td><code>jawab</code></td><td>Bot saling menyebut bisa saling membalas</td><td>Chat bisa berantai sampai batas reaktif; diukur di Fase 9</td></tr>
+<tr><td><code>jawab</code></td><td>Bot saling menyebut bisa saling membalas</td><td>Chat bisa berantai sampai batas reaktif. Fase 9: 39–59% balasan reaktif sudah di kedalaman ≥ 2, rantai terpanjang 10–12</td></tr>
 <tr><td><code>jawab</code></td><td>Dua pertanyaan sebelum bot chat: hanya yang terbaru dijawab</td><td>Pertanyaan lama bisa terlewat</td></tr>
 <tr><td><code>jawab</code></td><td>Templat umum tidak membaca pertanyaan</td><td>Saat LLM gagal, jawaban bisa tidak nyambung</td></tr>
 <tr><td><code>chat_tim</code></td><td>Chat rekan manusia tidak mengubah target bot</td><td>Bot bisa menanggapi, tetapi tidak terbujuk oleh isi chat</td></tr>
@@ -1167,7 +1178,7 @@ AKSI         gag            (ancaman_sekarang, ancaman)     Hitman, siang
 <li>Panel chat tim dan keterangan seri belum dilihat di browser, dan status deploy Vercel belum diperiksa.</li>
 <li>Di HP, pesan tim baru tidak menaikkan penanda belum dibaca di tab Chat.</li>
 <!-- fase9: dokumen dibangun ulang sesudah Fase 9 masuk -->
-<li>Proses AI, Kode dan Diagram Alir Fuzzy, serta Arsitektur dibangun ulang dari kode baru lewat skrip <code>bangun-dokumen-rombak</code> di <code>communicationfolder</code> sesudah Fase 9 masuk.</li>
+<li>Kode Fuzzy, Diagram Alir Fuzzy, dan Cara Kerja Bot dibangun dari kode baru lewat skrip <code>bangun-dokumen-rombak</code> di <code>communicationfolder</code>. Bagian bot di Proses AI dan Arsitektur belum diperbarui.</li>
 </ul>
 
 <h3>Masih terbuka</h3>
@@ -1176,7 +1187,7 @@ AKSI         gag            (ancaman_sekarang, ancaman)     Hitman, siang
 <tr><td>Ide #1</td><td>Ganti Mamdani ke Sugeno. Data menunjukkan bukan penyebab lambat</td><td><span class="b u">ditunda</span></td></tr>
 <tr><td>Ide #2</td><td>Pisah tekanan total dan tekanan ronde ini. Diputuskan tetap satu angka dulu; dipisah hanya bila uji main menunjukkan bot salah karena ini</td><td><span class="b u">ditunda</span></td></tr>
 <!-- fase9: angka perkiraan sesudah setel Fase 9 -->
-<tr><td>Angka perkiraan</td><td>Bobot tuduhan ke rekan, nilai pengulang klaim palsu, penalti jejak 0,5, batas Guard 0,3, dan setuju 80%. Disetel di <code>plan05</code> Fase 9</td><td><span class="b u">belum dijawab</span></td></tr>
+<tr><td>Angka perkiraan</td><td>Diuji di Fase 9 dengan ±50%: penalti jejak dan bobot tuduhan ke rekan aman; batas Guard 0,3 peka (0,15 menaikkan warga 7 pemain ke 61,5%); <code>memihak_hitman</code> dan setuju 80% tidak pernah aktif di room semua bot, jadi baru bisa dinilai lewat uji main. Semua angka tetap</td><td><span class="b k">terpasang</span></td></tr>
 <tr><td>Label kalimat baru</td><td>Keputusan label di <code>plan05</code> bagian 15.1 ditulis ke <code>ATURAN_LABEL.md</code>, lalu data ditambah dan model dilatih ulang di Fase 10</td><td><span class="b s">disetujui</span></td></tr>
 <tr><td>Label klaim role</td><td>Pekerjaan IndoBERT belakangan, sesudah uji main</td><td><span class="b u">ditunda</span></td></tr>
 <tr><td><code>plan04.md</code></td><td>Struktur controller untuk Fuzzy saja, dikerjakan sesudah Fase 9 dan 10, sebelum pembekuan</td><td><span class="b s">disetujui</span></td></tr>
