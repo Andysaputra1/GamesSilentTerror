@@ -70,6 +70,7 @@ class PanelTests(unittest.TestCase):
             ("kode-fuzzy", "Kode Fuzzy Logic"),
             ("diagram-alir-fuzzy", "Diagram Alir Fuzzy Logic"),
             ("bedah-otak-fuzzy", "Bedah Otak Fuzzy"),
+            ("cara-kerja-bot", "Cara Kerja Bot"),
             ("kode-nlu-intent", "Kode NLU Intent"),
             ("kode-nlu-target", "Kode NLU Target"),
             ("diagram-alir-nlu", "Diagram Alir NLU"),
