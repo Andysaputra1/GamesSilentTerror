@@ -7,7 +7,7 @@ memanggilnya adalah bot_controller.py dan pencatat NLU pertandingan.
 Alurnya
 1. Saat otak dimuat, folder_model mencari folder dua model IndoBERT, lalu NLUIndoBERT membukanya dan NLUBersama
    membungkusnya dengan memo
-2. Tiap chat dibaca anotasi_chat:
+2. Tiap chat baru di ingatan bot dibaca baca_chat_baru, satu per satu lewat anotasi_chat:
    2.1 Model 1 (NLUIndoBERT.intent): nama pemain diganti nama yang dikenal model (varian_nama_intent), tiga varian
        dirata-ratakan
    2.2 Model 2 (NLUIndoBERT.target): satu teks pasangan per kandidat (buat_teks_pasangan) dengan 12 chat terakhir
@@ -305,7 +305,7 @@ def pemain_disebut(teks, daftar_pemain, pengirim, common_words):
 # Keluaran: chat yang sama + intent, conf_intent (0–1), dan target [{pemain, relasi, prob, sumber}].
 #           sumber = ["indobert"], ["nama"], atau keduanya. Hanya relasi offend/defend yang menjadi bukti (relasi_chat);
 #           target neutral menandai pemain yang diajak bicara (konteks "penanya").
-# Dipakai oleh: Ingatan.sinkron_snapshot (setiap chat baru).
+# Dipakai oleh: baca_chat_baru (setiap chat baru di ingatan bot) dan baca_chat (pencatat NLU pertandingan).
 def anotasi_chat(nlu, chat, riwayat, daftar_pemain):
     intent, confidence = nlu.intent(chat["teks"], daftar_pemain)
     konteks = [{
@@ -323,6 +323,25 @@ def anotasi_chat(nlu, chat, riwayat, daftar_pemain):
             else:
                 sama["sumber"].append("nama")
     return {**chat, "intent": intent, "conf_intent": confidence, "target": target}
+
+
+# Bacakan chat baru di ingatan satu bot, mulai indeks `dari`, berurutan: tiap chat memakai chat sebelumnya yang sudah
+# terbaca sebagai konteks, sama seperti saat bacaan dulu dilakukan di dalam Ingatan.sinkron_snapshot. Tanpa NLU, chat
+# dibiarkan tanpa bacaan. Bila NLU gagal di tengah, chat yang belum terbaca dikeluarkan lagi dari ingatan supaya
+# dibaca ulang di langkah berikutnya.
+# Alur: 1 tiap chat baru: anotasi_chat dengan chat sebelumnya -> 2 ganti catatan chat dengan hasil bacaannya
+#                         \> 1.2 NLU gagal: keluarkan chat yang belum terbaca, lalu teruskan galatnya
+def baca_chat_baru(nlu, ingatan, roster, dari):
+    if nlu is None:
+        return
+    for i in range(dari, len(ingatan.chat)):
+        try:
+            ingatan.chat[i] = anotasi_chat(nlu, ingatan.chat[i], ingatan.chat[:i], roster)
+        except Exception:
+            for chat in ingatan.chat[i:]:
+                ingatan._id_chat.discard(chat["id"])
+            del ingatan.chat[i:]
+            raise
 
 
 # Target NLU menjadi teks pendek untuk panel, mis. "NOX: offend (0.91)".

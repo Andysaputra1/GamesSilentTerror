@@ -5,7 +5,8 @@ laporan; bila logika di sini berubah, notebook ikut diperbarui supaya skripsi te
 perilakunya adalah tests/test_skenario_fuzzy.py (320 skenario) dan sidik di tests/jejak/sidik.json.
 
 Alurnya
-1. Ingatan.sinkron_snapshot mencatat snapshot privat bot dan memberi view (chat baru dibaca anotasi_chat dari nlu.py)
+1. Ingatan.sinkron_snapshot mencatat snapshot privat bot dan memberi view. Chat baru masuk ingatan tanpa bacaan;
+   bot_controller lalu menyuruh nlu.baca_chat_baru membacanya sebelum putuskan dipanggil
 2. putuskan dipanggil sekali tiap langkah bot:
    2.1 hitung_bukti: tabel bukti per pemain dan konteks permainan
    2.2 pengetahuan_peran: fakta pasti menurut role
@@ -30,8 +31,6 @@ import numpy as np
 import pandas as pd
 import skfuzzy as fuzz
 from skfuzzy import control as ctrl
-
-from app.bot.nlu import anotasi_chat
 
 # scikit-fuzzy memanggil np.maximum dengan argumen ketiga posisional; peringatannya tidak memengaruhi hasil.
 warnings.filterwarnings("ignore", category=DeprecationWarning, module=r"skfuzzy(\..*)?")
@@ -239,12 +238,13 @@ class Ingatan:
 
     # Ingatan: mengubah snapshot backend menjadi view keputusan sambil mencatat pengamatan baru.
     # Masukan : snapshot = Match.snapshot(nama_bot) {round, phase, deadline, players, messages, tribunal_votes, me};
-    #           waktu_terima = detik saat snapshot diterima; nlu = NLUIndoBERT (None: chat disimpan tanpa anotasi).
+    #           waktu_terima = detik saat snapshot diterima. Chat baru dicatat tanpa intent dan target; bacaannya diisi
+    #           nlu.baca_chat_baru sesudah fungsi ini, berurutan sesuai catatan.
     # Keluaran: view = {ronde, fase, waktu, deadline, durasi, pemain, suara_tribunal, komposisi, hitman_tersisa,
     #           tribunal_tambahan, saya};
     #           pemain = [{nama, hidup, sandera}], sandera = ronde malam korban Hostage (diumumkan server) atau None.
     # Dipakai oleh: game sebelum putuskan(ingatan, view); ingatan yang diperbarui dibaca semua tahap berikutnya.
-    def sinkron_snapshot(self, snapshot, waktu_terima, nlu=None):
+    def sinkron_snapshot(self, snapshot, waktu_terima):
         me = snapshot["me"]
         if me["name"] != self.nama_bot:
             raise ValueError("Snapshot bukan milik bot ini.")
@@ -315,15 +315,12 @@ class Ingatan:
 
         # Waktu chat dari server. Fase chat tetap dari snapshot: chat yang baru terlihat saat malam/selesai dikirim di
         # akhir fase publik sebelumnya, yaitu siang di ronde 1 dan Tribunal di ronde berikutnya.
-        daftar_pemain = [p["nama"] for p in pemain]
         fase_chat = fase if fase in ("day", "tribunal") else ("day" if ronde == 1 else "tribunal")
         for pesan in snapshot["messages"]:
             if pesan["id"] in self._id_chat:
                 continue
             chat = {"id": pesan["id"], "ronde": ronde, "fase": fase_chat, "waktu": pesan.get("time", waktu_terima),
                     "pengirim": pesan["sender"], "teks": pesan["message"]}
-            if nlu is not None:
-                chat = anotasi_chat(nlu, chat, self.chat, daftar_pemain)
             self.catat_chat(chat)
 
         # Langkah pertama sesudah batas kunci adalah saat terkunci, satu-satunya kesempatan bot mengikuti rekan manusia.

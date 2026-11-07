@@ -1286,7 +1286,7 @@ const ALUR_AI = {
   nlu_pesan: {
     tahap: ['nlu_pesan'],
     judul: 'NLU IndoBERT membaca chat',
-    kode: 'BrainRuntime.baca_chat → anotasi_chat',
+    kode: 'nlu.baca_chat → anotasi_chat',
     tujuan: 'Memahami chat: maksudnya apa dan ditujukan ke siapa.',
     proses:
       'Chat dibaca dua model IndoBERT berurutan (intent lalu target) dengan konteks chat sebelumnya.',
@@ -1326,10 +1326,10 @@ const ALUR_AI = {
   sinkron: {
     tahap: ['nlu'],
     judul: 'Ingatan bot diperbarui',
-    kode: 'Ingatan.sinkron_snapshot (+ anotasi_chat untuk chat baru)',
+    kode: 'Ingatan.sinkron_snapshot → nlu.baca_chat_baru',
     tujuan: 'Menyamakan memori bot dengan keadaan permainan yang ia lihat.',
     proses:
-      'Snapshot privat bot dibaca: chat baru (diberi NLU), vote, eksekusi, pemain keluar, korban Hostage yang diumumkan, hasil Peek, Gag, pilihan malam rekan, fase, dan waktu. Chat tim hanya masuk view, tidak pernah menjadi bukti.',
+      'Snapshot privat bot dibaca: chat baru, vote, eksekusi, pemain keluar, korban Hostage yang diumumkan, hasil Peek, Gag, pilihan malam rekan, fase, dan waktu. Chat tim hanya masuk view, tidak pernah menjadi bukti. Sesudah itu NLU membaca chat yang baru masuk ingatan, berurutan.',
     keluaran: 'view: ronde, fase, pemain hidup, izin chat/vote/aksi milik bot.',
     alasan: 'Bot hanya tahu yang boleh dilihat role-nya; role lawan tidak pernah bocor.',
   },

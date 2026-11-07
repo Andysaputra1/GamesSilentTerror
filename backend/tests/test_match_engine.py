@@ -826,6 +826,7 @@ class ChatOrderTests(unittest.TestCase):
     # Chat yang terbaca bot dalam satu langkah harus tetap kronologis (audit AI 1 Okt: ID UUID mengacak urutan).
     def test_bot_memory_keeps_chat_order_within_one_snapshot(self):
         from app.bot import fuzzy
+        from app.bot.nlu import baca_chat_baru
 
         class NLUTiruan:
             ambang = 0.0
@@ -842,9 +843,8 @@ class ChatOrderTests(unittest.TestCase):
             match.add_message("Andi", "Aku curiga sama Budi")
             match.add_message("Budi", "Justru Citra yang aneh")
             ingatan = fuzzy.Ingatan("Dodi")
-            view = ingatan.sinkron_snapshot(
-                match.snapshot("Dodi"), match.deadline - 60, NLUTiruan()
-            )
+            view = ingatan.sinkron_snapshot(match.snapshot("Dodi"), match.deadline - 60)
+            baca_chat_baru(NLUTiruan(), ingatan, [p["nama"] for p in view["pemain"]], 0)
             tabel, _ = fuzzy.hitung_bukti(ingatan, view)
             budi = tabel[tabel["pemain"] == "Budi"].iloc[0]
             self.assertEqual(budi["alihkan_tuduhan"], 1.0)  # dituduh lalu hanya menuduh pihak ketiga

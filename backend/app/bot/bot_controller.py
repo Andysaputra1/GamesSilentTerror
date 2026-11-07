@@ -12,7 +12,7 @@ Alurnya
 5. prepare: Tunggu otak siap, bagi persona dan siapkan ingatan tiap bot, lalu buka ronde 1
 6. brain_turn (satu langkah satu bot):
    6.1 Lihat: Ambil snapshot permainan milik bot
-   6.2 Pikir: IndoBERT membaca chat baru, fuzzy memutuskan (BrainRuntime.langkah)
+   6.2 Pikir: ingatan mencatat snapshot, IndoBERT membaca chat baru, lalu fuzzy memutuskan (BrainRuntime.langkah)
    6.3 Aksi: Kirim vote atau aksi rahasia ke game (pindah pilihan malam bila otak memintanya), lalu vote yang diterima
        masuk ingatan bot
    6.4 Chat tim: Bila ada rekan manusia, tulis kalimat dan simpan di kanal tim, tanpa database, siaran, atau NLU
@@ -38,7 +38,7 @@ from time import perf_counter
 from typing import TYPE_CHECKING
 
 from app.bot import nlg
-from app.bot.nlu import NLUBersama, NLUIndoBERT, baca_chat, folder_model, teks_target
+from app.bot.nlu import NLUBersama, NLUIndoBERT, baca_chat, baca_chat_baru, folder_model, teks_target
 from app.bot.penjelasan import jelaskan
 from app.bot.penjelasan import lengkapi as lengkapi_penjelasan
 from app.bot.penjelasan import ringkas as ringkas_penjelasan
@@ -234,13 +234,14 @@ class BrainRuntime:
             for match_id in [m for m in self.pertandingan if m not in match_ids]:
                 del self.pertandingan[match_id]
 
-    # Satu keputusan di thread otak: sinkron snapshot dan NLU, putuskan() metode bot, lalu penjelasan untuk panel.
+    # Satu keputusan di thread otak: sinkron snapshot, NLU membaca chat baru, putuskan() metode bot, lalu penjelasan
+    # untuk panel.
     # Penjelasan hanya untuk langkah yang bisa menjadi jejak: ada vote/aksi, rencana chat, atau chat tim; langkah diam
     # tidak dicatat. `waktu` mencatat lama tiap tahap (ms) dan `nlu_baru` chat yang baru dibaca IndoBERT di langkah
     # ini. selalu_jelaskan: simulasi panel ingin penjelasan juga untuk langkah diam; lapor(tahap) memberi tahu simulasi
     # tahap yang sedang berjalan (flowchart live).
-    # Alur: 1 sinkron snapshot (NLU chat baru) -> 2 putuskan -> 3 chat yang baru dibaca -> 4 penjelasan -> 5 lama tiap
-    #       tahap -> 6 konteks NLG
+    # Alur: 1 sinkron snapshot -> 2 NLU membaca chat baru -> 3 putuskan -> 4 chat yang baru dibaca -> 5 penjelasan
+    #       -> 6 lama tiap tahap -> 7 konteks NLG
     def langkah(self, bot: OtakBot, snapshot, sekarang, selalu_jelaskan=False, lapor=nlg.tanpa_lapor):
         # modul = bot/fuzzy.py (dimuat di _muat), jadi modul.putuskan ada di file itu.
         modul = self.modul[bot.metode]
@@ -248,7 +249,8 @@ class BrainRuntime:
             modul = fuzzy
         mulai, jumlah_chat_sebelumnya = time.perf_counter(), len(bot.ingatan.chat)
         lapor("nlu")
-        view = bot.ingatan.sinkron_snapshot(snapshot, sekarang, self.nlu)
+        view = bot.ingatan.sinkron_snapshot(snapshot, sekarang)
+        baca_chat_baru(self.nlu, bot.ingatan, [p["nama"] for p in view["pemain"]], jumlah_chat_sebelumnya)
         selesai_nlu = time.perf_counter()
         lapor("logika")
         keputusan = modul.putuskan(bot.ingatan, view)

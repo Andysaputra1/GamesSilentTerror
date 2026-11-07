@@ -176,7 +176,8 @@ KODE_ALUR = {
     ],
     "sinkron": [
         (BOT, "BrainRuntime.langkah", [
-            ("sinkron_snapshot(", "ingatan diperbarui (NLU chat baru di sini)"),
+            ("sinkron_snapshot(", "ingatan diperbarui dari snapshot"),
+            ("baca_chat_baru(", "NLU membaca chat yang baru masuk ingatan"),
             ("modul.putuskan(", "logika metode bot"),
             ("jelaskan(bot", "penjelasan untuk panel"),
             ('keputusan["waktu"]', "lama tiap tahap dicatat"),
@@ -184,8 +185,7 @@ KODE_ALUR = {
         (FZ, "Ingatan.sinkron_snapshot", [
             ("self.catat_eksekusi(", "eksekusi Tribunal dicatat"),
             ("self.intel = ", "hasil Peek milik bot sendiri"),
-            ("anotasi_chat(nlu, chat", "chat baru dibaca NLU"),
-            ("self.catat_chat(chat)", "chat masuk ingatan"),
+            ("self.catat_chat(chat)", "chat masuk ingatan, belum dibaca NLU"),
         ]),
     ],
     "bukti": [

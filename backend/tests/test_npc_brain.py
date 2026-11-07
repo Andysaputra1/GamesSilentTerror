@@ -11,9 +11,9 @@ import unittest
 from unittest.mock import AsyncMock, Mock, patch
 
 from app.game.match_engine import Match
-from app.bot.bot_controller import BrainRuntime
-from app.bot.nlu import NLUBersama, baca_chat
-from app.bot.bot_controller import LANTAI_MAKS, NPCService, catat_nlu
+from app.bot import fuzzy
+from app.bot.bot_controller import LANTAI_MAKS, BrainRuntime, NPCService, catat_nlu
+from app.bot.nlu import NLUBersama, baca_chat, baca_chat_baru
 from app.services.persistence_service import PersistenceError
 from app.services.room_service import RoomService
 from tests.nlu_palsu import NLUPalsu
@@ -123,6 +123,26 @@ class BrainRuntimeTests(unittest.TestCase):
         self.assertEqual(hasil["konteks"][-1]["target"], [{"pemain": "NOX", "relasi": "offend"}])
         self.assertEqual(hasil["daftar_pemain"], roster)
         self.assertEqual(baca_chat(self.runtime.nlu, [], "human", "Halo.", roster)["konteks"], [])
+
+    # NLU terpisah dari ingatan: chat baru dibaca berurutan dengan chat sebelumnya sebagai konteks. Bila NLU gagal di
+    # tengah, chat yang belum terbaca keluar lagi dari ingatan dan dibaca ulang di langkah berikutnya.
+    def test_baca_chat_baru_reads_in_order_and_retries_after_a_failure(self):
+        match = Match(["human"], ["NOX", "ECHO", "VEIL"], now=0.0)
+        for teks in ("Aku curiga ECHO.", "Halo semua.", "Vote ECHO aja."):
+            match.add_message("human", teks, now=1.0)
+        ingatan = fuzzy.Ingatan("NOX")
+        roster = list(match.players)
+        gagal = Mock(side_effect=[("offend", 0.9), RuntimeError("model rusak")])
+        nlu = NLUBersama(Mock(intent=gagal, target=Mock(return_value=[])), "palsu")
+        ingatan.sinkron_snapshot(match.snapshot("NOX"), 2.0)
+        with self.assertRaises(RuntimeError):
+            baca_chat_baru(nlu, ingatan, roster, 0)
+        self.assertEqual([c["teks"] for c in ingatan.chat], ["Aku curiga ECHO."])
+        self.assertEqual(ingatan.chat[0]["intent"], "offend")
+        ingatan.sinkron_snapshot(match.snapshot("NOX"), 3.0)
+        baca_chat_baru(self.runtime.nlu, ingatan, roster, 1)
+        self.assertEqual([c["teks"] for c in ingatan.chat], ["Aku curiga ECHO.", "Halo semua.", "Vote ECHO aja."])
+        self.assertEqual([c["intent"] for c in ingatan.chat], ["offend", "neutral", "offend"])
 
     # Konteks NLG dari langkah: 12 chat terakhir dan suara Tribunal. Prompt menampilkan tuduhan dan suara ke bot
     # sebagai pemicu, dan tidak lagi memuat contoh kalimat templat.

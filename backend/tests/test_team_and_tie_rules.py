@@ -26,6 +26,7 @@ from app.game.match_engine import (
 )
 from app.bot import fuzzy
 from app.bot.bot_controller import NPCService, riwayat_nlu
+from app.bot.nlu import baca_chat_baru
 from app.services.room_service import Room, RoomService
 
 ENAM = ["hitman", "spy", "stalker", "civilian", "civilian2", "civilian3"]
@@ -418,7 +419,8 @@ class TeamChatTests(unittest.TestCase):
         nlu = Mock(ambang=0.0, common_words=frozenset())
         for bot in ("hitman2", "spy2", "civilian"):
             ingatan = fuzzy.Ingatan(bot)
-            ingatan.sinkron_snapshot(snapshot_berlabel(game.snapshot(bot), game.labels), 1.0, nlu)
+            view = ingatan.sinkron_snapshot(snapshot_berlabel(game.snapshot(bot), game.labels), 1.0)
+            baca_chat_baru(nlu, ingatan, [p["nama"] for p in view["pemain"]], 0)
             self.assertEqual(ingatan.chat, [])
             self.assertNotIn(RAHASIA_HITMAN, str(vars(ingatan)))
             self.assertNotIn(RAHASIA_SPY, str(vars(ingatan)))
