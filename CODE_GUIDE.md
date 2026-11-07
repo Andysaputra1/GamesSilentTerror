@@ -12,12 +12,13 @@ permintaan pengguna.
 | `frontend/src/app/core/` | Request API, sesi, guard navigasi, dan komponen profil |
 | `frontend/src/app/app.routes.ts` | Route frontend dan guard yang harus dilalui |
 | `frontend/docker/start.mjs` | Menjalankan frontend lokal menggunakan konfigurasi publik |
-| `backend/app/` | Semua kode aplikasi: entry point, controller, socket, service, module, model, konfigurasi |
+| `backend/app/` | Semua kode aplikasi: entry point, controller, socket, service, game, bot, model, konfigurasi |
 | `backend/app/main.py` | Startup FastAPI, Socket.IO, model analisis, dan lifecycle server |
 | `backend/app/controllers/routes.py` | Daftar router HTTP yang aktif |
 | `backend/app/controllers/` | Validasi request, autentikasi route, dan respons HTTP |
-| `backend/app/services/` | Aturan login dan Google (`auth_service.py`), panel (`panel_service.py`), chat manusia (`chat_service.py`), penyimpanan chat dan jejak (`persistence_service.py`), password, room, survei, checker, konfigurasi AI, dan klien Ollama |
-| `backend/app/module/` | Pertandingan, bot NPC, dan simulasi |
+| `backend/app/services/` | Aturan login dan Google (`auth_service.py`), panel (`panel_service.py`), chat manusia (`chat_service.py`), penyimpanan chat dan jejak (`persistence_service.py`), room dan tindakan bot (`room_service.py`), password, survei, checker, konfigurasi AI, dan klien Ollama |
+| `backend/app/game/match_engine.py` | Engine pertandingan: role, fase, skill, vote, kemenangan, snapshot privat |
+| `backend/app/bot/` | Bot NPC: `bot_controller.py` (urutan langkah bot dan otak bersama), `nlu.py` (IndoBERT membaca chat), `fuzzy.py` (keputusan Fuzzy Mamdani), `nlg.py` (kalimat dan rantai penulis LLM), `penjelasan.py` (penjelasan untuk panel), `simulasi.py` (simulasi panel) |
 | `backend/app/models/` | Kueri SQL berparameter |
 | `backend/app/sockets/server.py` | Membuat `sio`, mencatat sambungan, dan mengirim ke room (`emit_room`) |
 | `backend/app/sockets/chat.py` | Event `connect`, `disconnect`, dan `send_chat`; penolakan chat dikirim sebagai `system_alert` |
@@ -25,8 +26,7 @@ permintaan pengguna.
 | `backend/app/middleware/` | Autentikasi request, batas percobaan login, CORS, dan respons validasi |
 | `backend/public/panel/` | Halaman administrasi yang disajikan backend |
 | `backend/scripts/` | CLI akun, penyiapan environment deployment, dan kredensial panel |
-| `backend/app/module/npc_brain/` | Runtime otak NPC; `generated/` adalah ekspor notebook (jangan diedit manual) |
-| `backend/tests/` | Unit/integration test serta skrip smoke test manual |
+| `backend/tests/` | Unit/integration test, skenario bot (`test_skenario_fuzzy.py`, `test_skenario_nlg.py`), alat jejak keputusan bot (`jejak/`), serta skrip smoke test manual |
 
 Daftar router di `controllers/routes.py` adalah acuan endpoint aktif. Modul admin,
 history, dan checker lama masih memiliki pemeriksaan kompatibilitas; keberadaan
@@ -50,11 +50,13 @@ file saja tidak berarti route tersebut dibuka pada aplikasi utama.
    `Match` dan `me.team_messages`, sengaja tanpa socket, database, NLU, atau `@traced`.
    Aturan kemenangan dijelaskan lebih lengkap di `GAME_CONCEPT.md`.
 5. **Chat dan AI:** `services/chat_service.py` memeriksa sesi/hak chat, lalu menyimpan dan
-   menyiarkan pesan tanpa menganalisisnya. Pada pertandingan, `NPCService`
-   mengambil langkah mandiri dari timer untuk setiap bot: snapshot privat ->
-   `backend/app/module/npc_brain` (IndoBERT -> fuzzy hasil ekspor notebook -> NLG
-   yang dicek aturan) -> aksi/vote engine serta chat. Fase diperiksa ulang
-   sebelum keputusan diterapkan. Vote/aksi langsung diterapkan; chat bot melewati
+   menyiarkan pesan; sesudah terkirim IndoBERT membacanya lewat `catat_nlu`. Pada pertandingan,
+   `NPCService` (`bot/bot_controller.py`) mengambil langkah mandiri dari timer untuk setiap bot:
+   `room_service.lihat_untuk_bot` (snapshot privat) -> `Ingatan.sinkron_snapshot` -> `nlu.baca_chat_baru`
+   (IndoBERT) -> `fuzzy.putuskan` -> vote/aksi lewat `room_service.pilihan_bot` -> kalimat `nlg.py` yang
+   dicek aturan -> `room_service.chat_bot` -> `emit_room`. Bot memakai service yang sama dengan pemain dan
+   tidak mengubah `Match` langsung. Fase diperiksa ulang sebelum keputusan diterapkan. Vote/aksi langsung
+   diterapkan; chat bot melewati
    "lantai bicara" (`NPCService._ambil_giliran_bicara`): paling banyak `LANTAI_MAKS` (3) bot
    menyusun/mengetik bersamaan per pertandingan tanpa rencana kembar (intent + target
    sama), dan rencana yang lebih tua dari chat bot lain dibatalkan lalu diputuskan
@@ -70,10 +72,35 @@ file saja tidak berarti route tersebut dibuka pada aplikasi utama.
 7. **Panel:** sesi administrator terpisah dari pemain. Panel membaca arsip dan
    menyimpan konfigurasi AI; nilai API key tidak dikirim kembali ke browser.
    Checker per room menampilkan penjelasan setiap langkah bot yang dibuat
-   `backend/app/module/npc_brain/penjelasan.py` di `BrainRuntime.langkah` (identitas, parameter,
+   `backend/app/bot/penjelasan.py` di `BrainRuntime.langkah` (identitas, parameter,
    penalaran fuzzy, keputusan) dan dilengkapi hasil engine/NLG di
-   `NPCService._trace`. Daftar jejak hanya membawa `ringkas`; penjelasan lengkap
+   `isi_jejak` (`bot/bot_controller.py`). Daftar jejak hanya membawa `ringkas`; penjelasan lengkap
    diambil per jejak lewat `GET /api/panel/checker/{code}/jejak/{id}`.
+
+## Mengubah logika bot
+
+Kode bot di `backend/app/bot/` adalah sumber logikanya dan diubah langsung di sana. Notebook skripsi
+(`training/prethesis/ai_2_dataset_baru/npc_fuzzy.ipynb` dan `npc_nlg.ipynb`) hanya untuk laporan; tidak ada
+lagi ekspor notebook ke backend. Bila logika bot berubah, perbarui juga notebook supaya skripsi tetap
+menggambarkan game.
+
+- Keputusan chat, vote, dan aksi malam: `bot/fuzzy.py` (`putuskan` dan fungsi `keputusan_*`).
+- Pembacaan chat: `bot/nlu.py`. Kalimat dan pemeriksa aturan: `bot/nlg.py`.
+- Urutan satu langkah bot dan penjadwalannya: `bot/bot_controller.py`.
+
+Sebelum dan sesudah mengubah atau merapikan kode bot:
+
+```sh
+cd backend
+python -m unittest tests.test_skenario_fuzzy tests.test_skenario_nlg
+python tests/jejak/rekam_jejak.py --cek
+```
+
+`test_skenario_fuzzy.py` berisi 320 skenario berlabel dari notebook, `test_skenario_nlg.py` pengujian
+payload, pemeriksa aturan, templat, dan prompt. `rekam_jejak.py --cek` membandingkan sidik keputusan bot
+pada seed tetap dengan `tests/jejak/sidik.json`. Perapian yang tidak mengubah logika harus memberi sidik
+yang sama. Perubahan logika yang disengaja mengubah sidik; setelah skenario lulus dan perubahan diterima,
+simpan sidik baru dengan `--tulis`.
 
 ## Profil dan manajemen akun
 

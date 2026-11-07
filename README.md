@@ -77,7 +77,7 @@ Lakukan penyalinan hanya saat setup awal; jangan menimpa `.env` yang sudah dikon
 
 ### 3. Siapkan otak NPC (IndoBERT + fuzzy + NLG)
 
-Bot memakai logika notebook skripsi (`training/prethesis/ai_2_dataset_baru`). Kode logikanya sudah ada di `backend/app/module/npc_brain/generated/` (hasil ekspor, jangan diedit manual). Yang perlu disalin hanyalah dua folder model IndoBERT (±440 MB masing-masing, diabaikan Git):
+Kode otak bot ada di `backend/app/bot/` (NLU `nlu.py`, keputusan Fuzzy `fuzzy.py`, kalimat `nlg.py`). Notebook skripsi (`training/prethesis/ai_2_dataset_baru`) hanya untuk laporan. Yang perlu disalin hanyalah dua folder model IndoBERT (±440 MB masing-masing, diabaikan Git):
 
 ```text
 backend/artifacts/indobert/intent/   ← models/notebook_standalone/intent_classifier_transformer
@@ -88,14 +88,13 @@ Folder target harus memuat `pair_builder.json` dan `ambang_target.json` hasil `n
 
 Pengaturan di `.env` (lihat `.env.example`): `NPC_WRITER` (`otomatis` atau `templat`), `NPC_WRITER_ORDER` (prioritas rantai penulis: `openrouter`, `tautan`), dan `NPC_OPENROUTER_MODEL`. Hanya dua LLM yang dipakai: OpenRouter dan LLM sendiri lewat link (Ollama di Docker yang dibuka lewat tunnel, lihat `ai-docker/`). Key OpenRouter dan link diambil dari panel **Konfigurasi AI**. Urutan rantai, model OpenRouter, dan model link bisa diubah dari panel **Otak NPC** (tombol **Tes koneksi semua prioritas** memeriksa semua jalur).
 
-Setelah mengubah logika bot di notebook, jalankan ulang notebook sampai skenario/pengujiannya lulus, lalu ekspor ulang:
+Logika bot diubah langsung di `backend/app/bot/`. Sesudahnya jalankan skenario bot dan bandingkan sidik jejak keputusan (lihat `CODE_GUIDE.md`, bagian Mengubah logika bot), lalu perbarui notebook supaya skripsi tetap menggambarkan game:
 
 ```sh
 cd backend
-python scripts/ekspor_otak_npc.py --notebook-dir ../../training/prethesis/ai_2_dataset_baru
+python -m unittest tests.test_skenario_fuzzy tests.test_skenario_nlg
+python tests/jejak/rekam_jejak.py --cek
 ```
-
-Tes `test_npc_brain` gagal bila hasil ekspor sudah tidak sama dengan notebook.
 
 ## Menjalankan aplikasi
 
@@ -325,22 +324,22 @@ backend/              Python FastAPI + Socket.IO
     controllers/      API HTTP (REST)
     middleware/       Cek login, batas percobaan, CORS, respons validasi
     sockets/          server.py (sio, kirim ke room) dan chat.py (event Socket.IO)
-    services/         Logika login, room, chat, survei, panel, konfigurasi AI, dan klien Ollama
-    module/           Engine pertandingan, bot, dan simulasi
-      npc_brain/      Runtime otak NPC; generated/ = ekspor notebook skripsi
+    services/         Logika login, room (termasuk tindakan bot), chat, survei, panel, konfigurasi AI, dan klien Ollama
+    game/             match_engine.py: engine pertandingan
+    bot/              Bot NPC: bot_controller.py (langkah bot), nlu.py, fuzzy.py, nlg.py, penjelasan.py, simulasi.py
     models/           Query SQL terparameterisasi
     schemas/          Validasi request/response API
   public/panel/       Halaman panel administrator
   artifacts/indobert/ Model IndoBERT intent + target untuk otak NPC (disalin manual)
   migrations/         Skema SQL V01–V10 (lokal dan Azure)
   deployment/         Konfigurasi produksi Azure (Dockerfile, Caddy)
-  scripts/            create_user.py, setup_panel.py, ekspor_otak_npc.py, setup_azure.py
+  scripts/            create_user.py, setup_panel.py, setup_azure.py, simulasi_keseimbangan.py, uji_ab_vote.py
 proxy/                Gateway Nginx
 ai-docker/            LLM penulis kalimat bot (Qwen3 4B/14B) di laptop + tunnel untuk VM; jalankan.bat
 docker-compose.yml    Service development dan volume
 ```
 
-Alur chat manusia: **pesan → otorisasi → validasi ulang fase/hak chat → penyimpanan MySQL → broadcast**. Secara terpisah, timer menjalankan bot: **snapshot privat → IndoBERT (baca chat) → fuzzy → NLG → cek aturan → aksi/vote/chat**. Analisis lama SVM → agresivitas → fuzzy 2 input dan balasan NOX sudah dihapus; model SVM hanya dipakai sebagai NLU cadangan bila IndoBERT tidak ada.
+Alur chat manusia: **pesan → otorisasi → validasi ulang fase/hak chat → penyimpanan MySQL → broadcast**. Secara terpisah, timer menjalankan bot (`backend/app/bot/bot_controller.py`): **snapshot privat → ingatan → IndoBERT (baca chat) → fuzzy → vote/aksi lewat room_service → NLG → cek aturan → chat lewat room_service → kirim ke room**. Analisis lama SVM → agresivitas → fuzzy 2 input dan balasan NOX sudah dihapus; model SVM hanya dipakai sebagai NLU cadangan bila IndoBERT tidak ada.
 
 Dengan container aplikasi sudah berjalan:
 

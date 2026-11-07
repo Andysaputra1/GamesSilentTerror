@@ -4,7 +4,7 @@ Semua kursi bot memakai otak Fuzzy di app/bot/fuzzy.py, komposisi engine, label 
 per fase, seed sama untuk kedua kebijakan. Keluaran: win rate warga ± CI95 dan akurasi vote warga (porsi suara warga
 yang mengenai Hitman). Dasar kebijakan di notebook (bagian Kebijakan Vote saat Bukti Lemah).
 
-Pemakaian (dari folder backend, Python dengan numpy + pandas + skfuzzy, mis. venv prethesis):
+Pemakaian (dari folder backend, dengan dependensi backend di requirements.txt; app/bot/nlg.py membaca pengaturan app):
     python scripts/uji_ab_vote.py . 200 6 [jumlah_pemain=6]
 """
 

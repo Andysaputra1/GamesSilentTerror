@@ -3,7 +3,7 @@
 Semua kursi bot memakai otak Fuzzy di app/bot/fuzzy.py, label NLU sempurna dari rencana
 pengirim, LANGKAH keputusan per fase, engine Match asli. Angka lama di GAME_CONCEPT diukur dengan metode campuran.
 
-Pemakaian (dari folder backend, Python dengan numpy + pandas, mis. venv prethesis):
+Pemakaian (dari folder backend, dengan dependensi backend di requirements.txt; app/bot/nlg.py membaca pengaturan app):
     python scripts/simulasi_keseimbangan.py . 200 6 "7:2/2/1" "8:2/2/1"
 """
 

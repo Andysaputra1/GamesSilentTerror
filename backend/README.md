@@ -40,23 +40,32 @@ backend/
       game_queries.py           # SELECT/INSERT/UPDATE pemain, chat, dan jejak checker
       panel_queries.py          # Sesi panel, konfigurasi, arsip room, jejak, riwayat, kesiapan skema
       survey_queries.py         # Survei akhir pertandingan dan catatan metode bot
-    module/                     # Engine pertandingan, bot, dan simulasi
+    game/
+      match_engine.py           # Engine pertandingan: role, fase, skill, vote, kemenangan, snapshot privat
+    bot/                        # Bot NPC; berpikir saja, tanpa SQL, bertindak lewat services/room_service.py
+      bot_controller.py         # Urutan satu langkah bot (NPCService) dan otak bersama (BrainRuntime)
+      nlu.py                    # IndoBERT membaca chat, aturan nama, memo bersama, pencatat NLU
+      fuzzy.py                  # Ingatan bot dan keputusan Fuzzy Mamdani (putuskan)
+      nlg.py                    # Kalimat: LLM atau templat, pemeriksa aturan, rantai penulis panel
+      penjelasan.py             # Penjelasan keputusan bot untuk checker panel
+      simulasi.py               # Simulasi panel dengan otak yang sama
     schemas/                    # Validasi request/response API
   artifacts/
     indobert/                   # Model NLU intent dan target
   deployment/                   # Dockerfile Azure dan proxy
   migrations/                   # SQL untuk membuat/mengubah struktur tabel
   public/                       # Panel administrator dan dokumen
-  scripts/                      # CLI akun, penyiapan deployment, ekspor, dan simulasi
+  scripts/                      # CLI akun, penyiapan deployment, dan simulasi keseimbangan
   tests/
 ```
 
-Alur: HTTP -> controllers, atau Socket.IO -> sockets, lalu services dan module -> models (SQL) -> MySQL.
+Alur manusia: HTTP -> controllers, atau Socket.IO -> sockets, lalu services -> game/ dan models (SQL) -> MySQL.
+Alur bot: jam -> bot/bot_controller.py -> nlu -> fuzzy -> services/ -> nlg -> services/ -> kirim ke room.
 Koneksi dan pool MySQL disediakan oleh `app/config/database.py`.
 Model tidak menyimpan aturan HTTP atau menulis respons API. Service mengatur
 transaksi agar beberapa query bisa commit/rollback bersama.
 
-Engine murni ada di `app/module/match_engine.py`: role, fase, skill, cooldown,
+Engine murni ada di `app/game/match_engine.py`: role, fase, skill, cooldown,
 voting, kemenangan, serta snapshot privat. `app/services/room_service.py` membatasi
 akses anggota/host dan memegang lock. `app/main.py` menjalankan clock pertandingan;
 frontend hanya menampilkan keputusan server. Lihat [alur dan aturan game](../GAME_CONCEPT.md).
