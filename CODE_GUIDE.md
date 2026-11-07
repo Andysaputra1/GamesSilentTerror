@@ -18,7 +18,7 @@ permintaan pengguna.
 | `backend/app/controllers/` | Validasi request, autentikasi route, dan respons HTTP |
 | `backend/app/services/` | Aturan login dan Google (`auth_service.py`), panel (`panel_service.py`), chat manusia (`chat_service.py`), penyimpanan chat dan jejak (`persistence_service.py`), room dan tindakan bot (`room_service.py`), password, survei, checker, konfigurasi AI, dan klien Ollama |
 | `backend/app/game/match_engine.py` | Engine pertandingan: role, fase, skill, vote, kemenangan, snapshot privat |
-| `backend/app/bot/` | Bot NPC: `bot_controller.py` (urutan langkah bot dan otak bersama), `nlu.py` (IndoBERT membaca chat), `fuzzy.py` (keputusan Fuzzy Mamdani), `nlg.py` (kalimat dan rantai penulis LLM), `penjelasan.py` (penjelasan untuk panel), `simulasi.py` (simulasi panel) |
+| `backend/app/bot/` | Bot NPC: `bot_controller.py` (urutan langkah bot dan otak bersama), `nlu.py` (IndoBERT membaca chat), `fuzzy_1.py` (Fuzzy Mamdani [FUZZY 1]: menilai pemain), `fuzzy_2.py` (Fuzzy Mamdani [FUZZY 2]: memilih tindakan), `nlg.py` (kalimat dan rantai penulis LLM), `penjelasan.py` (penjelasan untuk panel), `simulasi.py` (simulasi panel) |
 | `backend/app/models/` | Kueri SQL berparameter |
 | `backend/app/sockets/server.py` | Membuat `sio`, mencatat sambungan, dan mengirim ke room (`emit_room`) |
 | `backend/app/sockets/chat.py` | Event `connect`, `disconnect`, dan `send_chat`; penolakan chat dikirim sebagai `system_alert` |
@@ -53,7 +53,7 @@ file saja tidak berarti route tersebut dibuka pada aplikasi utama.
    menyiarkan pesan; sesudah terkirim IndoBERT membacanya lewat `catat_nlu`. Pada pertandingan,
    `NPCService` (`bot/bot_controller.py`) mengambil langkah mandiri dari timer untuk setiap bot:
    `room_service.lihat_untuk_bot` (snapshot privat) -> `Ingatan.sinkron_snapshot` -> `nlu.baca_chat_baru`
-   (IndoBERT) -> `fuzzy.putuskan` -> vote/aksi lewat `room_service.pilihan_bot` -> kalimat `nlg.py` yang
+   (IndoBERT) -> `fuzzy_2.putuskan` -> vote/aksi lewat `room_service.pilihan_bot` -> kalimat `nlg.py` yang
    dicek aturan -> `room_service.chat_bot` -> `emit_room`. Bot memakai service yang sama dengan pemain dan
    tidak mengubah `Match` langsung. Fase diperiksa ulang sebelum keputusan diterapkan. Vote/aksi langsung
    diterapkan; chat bot melewati
@@ -84,7 +84,11 @@ Kode bot di `backend/app/bot/` adalah sumber logikanya dan diubah langsung di sa
 lagi ekspor notebook ke backend. Bila logika bot berubah, perbarui juga notebook supaya skripsi tetap
 menggambarkan game.
 
-- Keputusan chat, vote, dan aksi malam: `bot/fuzzy.py` (`putuskan` dan fungsi `keputusan_*`).
+- Otak Fuzzy terbagi dua file. `bot/fuzzy_1.py` [FUZZY 1] menilai pemain: mesin Mamdani, `Ingatan` dan bahan
+  bukti, kecurigaan dari sudut pandang warga (7 sistem), serta ancaman dan kambing hitam untuk Hitman (4 sistem).
+  `bot/fuzzy_2.py` [FUZZY 2] memilih tindakan per sesi (Diskusi, Tribunal, Aksi Malam; tiap sesi semua role dulu,
+  lalu per role) dengan 10 sistem keputusan, lalu `putuskan` menggabungkan semuanya. `fuzzy_2` mengimpor
+  `fuzzy_1`, tidak sebaliknya; sistem [FUZZY 2] didaftarkan ke mesin `fuzzy_1` lewat `daftarkan_sistem`.
 - Pembacaan chat: `bot/nlu.py`. Kalimat dan pemeriksa aturan: `bot/nlg.py`.
 - Urutan satu langkah bot dan penjadwalannya: `bot/bot_controller.py`.
 

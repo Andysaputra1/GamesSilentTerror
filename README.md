@@ -77,7 +77,7 @@ Lakukan penyalinan hanya saat setup awal; jangan menimpa `.env` yang sudah dikon
 
 ### 3. Siapkan otak NPC (IndoBERT + fuzzy + NLG)
 
-Kode otak bot ada di `backend/app/bot/` (NLU `nlu.py`, keputusan Fuzzy `fuzzy.py`, kalimat `nlg.py`). Notebook skripsi (`training/prethesis/ai_2_dataset_baru`) hanya untuk laporan. Yang perlu disalin hanyalah dua folder model IndoBERT (±440 MB masing-masing, diabaikan Git):
+Kode otak bot ada di `backend/app/bot/` (NLU `nlu.py`, Fuzzy `fuzzy_1.py` menilai pemain dan `fuzzy_2.py` memilih tindakan, kalimat `nlg.py`). Notebook skripsi (`training/prethesis/ai_2_dataset_baru`) hanya untuk laporan. Yang perlu disalin hanyalah dua folder model IndoBERT (±440 MB masing-masing, diabaikan Git):
 
 ```text
 backend/artifacts/indobert/intent/   ← models/notebook_standalone/intent_classifier_transformer
@@ -326,7 +326,7 @@ backend/              Python FastAPI + Socket.IO
     sockets/          server.py (sio, kirim ke room) dan chat.py (event Socket.IO)
     services/         Logika login, room (termasuk tindakan bot), chat, survei, panel, konfigurasi AI, dan klien Ollama
     game/             match_engine.py: engine pertandingan
-    bot/              Bot NPC: bot_controller.py (langkah bot), nlu.py, fuzzy.py, nlg.py, penjelasan.py, simulasi.py
+    bot/              Bot NPC: bot_controller.py (langkah bot), nlu.py, fuzzy_1.py, fuzzy_2.py, nlg.py, penjelasan.py, simulasi.py
     models/           Query SQL terparameterisasi
     schemas/          Validasi request/response API
   public/panel/       Halaman panel administrator
