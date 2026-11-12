@@ -1,6 +1,6 @@
 """Uji A/B kebijakan paksa vote saat warga kritis (PAKSA_VOTE_KRITIS) dengan aturan engine terbaru.
 
-Semua kursi bot memakai otak Fuzzy di app/bot/fuzzy_1.py dan fuzzy_2.py, komposisi engine, label NLU sempurna,
+Semua kursi bot memakai otak Fuzzy (app/bot/ingatan.py, fuzzy_controller.py, dan fuzzy/), komposisi engine, label NLU sempurna,
 LANGKAH keputusan per fase, seed sama untuk kedua kebijakan. Keluaran: win rate warga ± CI95 dan akurasi vote warga
 (porsi suara warga yang mengenai Hitman). Dasar kebijakan di notebook (bagian Kebijakan Vote saat Bukti Lemah).
 
@@ -17,14 +17,15 @@ from pathlib import Path
 
 BACKEND = Path(sys.argv[1]).resolve()
 sys.path.insert(0, str(BACKEND))
-from app.bot import fuzzy_1, fuzzy_2  # noqa: E402
+from app.bot import fuzzy_controller  # noqa: E402
+from app.bot import ingatan as ingatan_bot  # noqa: E402
 from app.bot import nlg as NLG  # noqa: E402  (hanya templat chat tim, tanpa LLM)
 from app.game import match_engine  # noqa: E402
 
 NAMA = ["NOX", "ECHO", "VEIL", "RAVEN", "ASH", "DUSK", "IRIS", "SAGE", "ONYX", "LARK"]
 RONDE_MAKS = 30
 # Modul tiap metode: (penilai yang memegang Ingatan, pemutus yang memegang putuskan dan PAKSA_VOTE_KRITIS).
-MODUL = {"fuzzy": (fuzzy_1, fuzzy_2)}
+MODUL = {"fuzzy": (ingatan_bot, fuzzy_controller)}
 # Paling banyak separuh core, supaya mesin tetap bisa dipakai. SIM_PROSES boleh menurunkannya lagi.
 PROSES = max(1, min(int(os.environ.get("SIM_PROSES", "64")), (os.cpu_count() or 2) // 2))
 

@@ -45,8 +45,15 @@ backend/
     bot/                        # Bot NPC; berpikir saja, tanpa SQL, bertindak lewat services/room_service.py
       bot_controller.py         # Urutan satu langkah bot (NPCService) dan otak bersama (BrainRuntime)
       nlu.py                    # IndoBERT membaca chat, aturan nama, memo bersama, pencatat NLU
-      fuzzy_1.py                # [FUZZY 1] menilai pemain: mesin Mamdani, Ingatan, kecurigaan, ancaman
-      fuzzy_2.py                # [FUZZY 2] memilih tindakan per sesi lalu putuskan; mengimpor fuzzy_1
+      ingatan.py                # Bahan: Ingatan bot, chat/vote/fakta -> angka bukti per pemain (tanpa fuzzy)
+      fuzzy_controller.py       # Main controller fuzzy: putuskan; [FUZZY 1] -> Tribunal -> Diskusi -> Malam -> bungkus
+      fuzzy/                    # Hanya fungsi fuzzy (input 0-1 -> keluaran 0-100), satu sistem = satu fungsi
+        mesin.py                # Kurva, bangun sistem Mamdani, centroid + cache, SEMUA_SISTEM, penjelasan
+        kecurigaan.py           # [FUZZY 1] 7 sistem kecurigaan warga
+        ancaman.py              # [FUZZY 1] 4 sistem ancaman dan kambing hitam Hitman
+        diskusi.py              # [FUZZY 2] 6 sistem chat
+        tribunal.py             # [FUZZY 2] 2 sistem vote warga
+        malam.py                # [FUZZY 2] 2 sistem aksi malam (Gag, Peek)
       nlg.py                    # Kalimat: LLM atau templat, pemeriksa aturan, rantai penulis panel
       penjelasan.py             # Penjelasan keputusan bot untuk checker panel
       simulasi.py               # Simulasi panel dengan otak yang sama
@@ -61,7 +68,8 @@ backend/
 ```
 
 Alur manusia: HTTP -> controllers, atau Socket.IO -> sockets, lalu services -> game/ dan models (SQL) -> MySQL.
-Alur bot: jam -> bot/bot_controller.py -> nlu -> fuzzy -> services/ -> nlg -> services/ -> kirim ke room.
+Alur bot: jam -> bot/bot_controller.py -> ingatan -> nlu -> fuzzy_controller (fuzzy/) -> services/ -> nlg -> services/
+-> kirim ke room.
 Koneksi dan pool MySQL disediakan oleh `app/config/database.py`.
 Model tidak menyimpan aturan HTTP atau menulis respons API. Service mengatur
 transaksi agar beberapa query bisa commit/rollback bersama.

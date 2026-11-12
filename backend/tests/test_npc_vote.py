@@ -7,7 +7,9 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
 
 from app.game.match_engine import Match
-from app.bot import fuzzy_1, fuzzy_2, nlg
+from app.bot import fuzzy as fuzzy_bot
+from app.bot import fuzzy_controller, nlg
+from app.bot import ingatan as ingatan_bot
 from app.bot.penjelasan import jelaskan
 from app.bot.bot_controller import NPCService
 from app.services.room_service import pindahkan_vote
@@ -47,9 +49,9 @@ class VotePaksaTests(unittest.TestCase):
         game = tribunal()
         game.players["warga3"].alive = False
         game.players["warga2"].hostage, game.players["warga2"].hostage_round = True, 2
-        ingatan = fuzzy_1.Ingatan("warga1")
+        ingatan = ingatan_bot.Ingatan("warga1")
         view = ingatan.sinkron_snapshot(game.snapshot("warga1"), detik)
-        return game, ingatan, view, fuzzy_2.putuskan(ingatan, view)
+        return game, ingatan, view, fuzzy_controller.putuskan(ingatan, view)
 
     def test_critical_citizen_votes_and_the_engine_accepts_it(self):
         game, _, _, hasil = self.langkah_kritis(60.0)
@@ -62,7 +64,7 @@ class VotePaksaTests(unittest.TestCase):
     def test_panel_explains_forced_vote(self):
         _, _, view, hasil = self.langkah_kritis(60.0)
         bot = SimpleNamespace(nama="warga1", metode="fuzzy", persona="santai", peran="civilian", langkah=1)
-        p = jelaskan(bot, (fuzzy_1, fuzzy_2), view, hasil)
+        p = jelaskan(bot, (fuzzy_controller, fuzzy_bot), view, hasil)
         self.assertTrue(p["keputusan"]["vote"]["paksa"])
         self.assertIn("PAKSA_VOTE_KRITIS", p["penalaran"]["vote"]["catatan"])
 
@@ -76,11 +78,11 @@ class PindahSuaraOtakTests(unittest.TestCase):
     # warga3 pernah vote warga1, jadi menurut warga1 ia lebih dicurigai daripada warga2 yang sudah dipilihnya. Suara warga1 dan spy seri.
     def waktu_tambahan(self, suara_warga1="warga2"):
         game = tribunal()
-        ingatan = fuzzy_1.Ingatan("warga1")
+        ingatan = ingatan_bot.Ingatan("warga1")
         view = ingatan.sinkron_snapshot(game.snapshot("warga1"), 1.0)
         ingatan.catat_vote(2, "warga3", "warga1")
         game.vote("warga1", suara_warga1)
-        ingatan.catat_vote_bot(view, fuzzy_2.rencana_vote("vote", suara_warga1, ["pilihan awal"]))
+        ingatan.catat_vote_bot(view, fuzzy_controller.rencana_vote("vote", suara_warga1, ["pilihan awal"]))
         game.vote("spy", "stalker")
         game.npc_decisions = {(3, "tribunal", nama) for nama in ENAM}
         game.tick(game.deadline)
@@ -89,7 +91,7 @@ class PindahSuaraOtakTests(unittest.TestCase):
 
     def langkah(self, game, ingatan):
         view = ingatan.sinkron_snapshot(game.snapshot("warga1"), game.deadline - 5)
-        return view, fuzzy_2.putuskan(ingatan, view)
+        return view, fuzzy_controller.putuskan(ingatan, view)
 
     def test_bot_moves_once_to_a_stronger_target(self):
         game, ingatan = self.waktu_tambahan()
@@ -120,7 +122,7 @@ class PindahSuaraOtakTests(unittest.TestCase):
         game, ingatan = self.waktu_tambahan()
         view, hasil = self.langkah(game, ingatan)
         bot = SimpleNamespace(nama="warga1", metode="fuzzy", persona="santai", peran="civilian", langkah=1)
-        p = jelaskan(bot, (fuzzy_1, fuzzy_2), view, hasil)
+        p = jelaskan(bot, (fuzzy_controller, fuzzy_bot), view, hasil)
         self.assertTrue(p["keputusan"]["vote"]["pindah"])
         self.assertIn("dipindah", p["penalaran"]["vote"]["catatan"])
 

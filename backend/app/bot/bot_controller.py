@@ -2,8 +2,8 @@
 Pengendali bot: urutan satu langkah setiap bot, dari jam permainan sampai vote, aksi malam, dan chat terkirim.
 
 Bot diperlakukan seperti pemain tanpa browser. Otak bersama (BrainRuntime) memuat NLU (nlu.py), logika Fuzzy
-(fuzzy_1.py menilai pemain, fuzzy_2.py memilih tindakan), dan penulis kalimat (nlg.py), lalu menyimpan ingatan dan
-persona tiap bot per pertandingan.
+(ingatan.py bahan bukti, fuzzy_controller.py putuskan, fungsi fuzzy di folder fuzzy/), dan penulis kalimat (nlg.py),
+lalu menyimpan ingatan dan persona tiap bot per pertandingan.
 
 Alurnya
 1. Saat server nyala, main.py memanggil brain_runtime.mulai_memuat: fuzzy, IndoBERT, lalu rantai penulis dimuat di latar
@@ -13,7 +13,8 @@ Alurnya
 5. prepare: Tunggu otak siap, bagi persona dan siapkan ingatan tiap bot, lalu buka ronde 1
 6. brain_turn (satu langkah satu bot):
    6.1 Lihat: Ambil snapshot permainan milik bot
-   6.2 Pikir: ingatan mencatat snapshot, IndoBERT membaca chat baru, lalu fuzzy memutuskan (BrainRuntime.langkah)
+   6.2 Pikir: ingatan mencatat snapshot, IndoBERT membaca chat baru, lalu fuzzy_controller.putuskan memutuskan
+       (BrainRuntime.langkah)
    6.3 Aksi: Kirim vote atau aksi rahasia ke game (pindah pilihan malam bila otak memintanya), lalu vote yang diterima
        masuk ingatan bot
    6.4 Chat tim: Bila ada rekan manusia, tulis kalimat dan simpan di kanal tim, tanpa database, siaran, atau NLU
@@ -53,14 +54,15 @@ from app.sockets.server import emit_room, sio
 
 if TYPE_CHECKING:
     # Hanya untuk editor (Ctrl+klik). Saat program jalan modul ini dimuat di _muat, supaya server cepat nyala.
-    from app.bot import fuzzy_1, fuzzy_2
+    from app.bot import fuzzy, fuzzy_controller
 
 logger = logging.getLogger("shadow_heist.npc")
 logger_otak = logging.getLogger("shadow_heist.npc_brain")
 
-# Modul logika tiap metode: (penilai, pemutus). Game sekarang hanya memakai fuzzy: fuzzy_1 menilai pemain (Ingatan dan
-# mesin Mamdani), fuzzy_2 memilih tindakan (putuskan) dan mengimpor fuzzy_1.
-METODE_MODUL = {"fuzzy": ("fuzzy_1", "fuzzy_2")}
+# Modul logika tiap metode: (bahan, pengendali, fungsi fuzzy). Game sekarang hanya memakai fuzzy: ingatan memegang
+# Ingatan dan bahan bukti, fuzzy_controller memegang putuskan (mengimpor ingatan dan fuzzy), dan paket fuzzy memegang
+# daftar sistem dan mesin Mamdani yang dibaca penjelasan panel.
+METODE_MODUL = {"fuzzy": ("ingatan", "fuzzy_controller", "fuzzy")}
 # Pemuatan otak yang gagal dicoba ulang paling cepat setelah jeda ini (detik).
 JEDA_MUAT_ULANG_DETIK = 60
 # Batas waktu keputusan otak dan penulisan kalimat (termasuk rantai LLM) agar bot tidak menggantung.
@@ -246,11 +248,11 @@ class BrainRuntime:
     # Alur: 1 sinkron snapshot -> 2 NLU membaca chat baru -> 3 putuskan -> 4 chat yang baru dibaca -> 5 penjelasan
     #       -> 6 lama tiap tahap -> 7 konteks NLG
     def langkah(self, bot: OtakBot, snapshot, sekarang, selalu_jelaskan=False, lapor=nlg.tanpa_lapor):
-        # penilai = bot/fuzzy_1.py, modul = bot/fuzzy_2.py (dimuat di _muat); modul.putuskan ada di fuzzy_2.
-        # Penjelasan panel membaca keduanya: mesin Mamdani di fuzzy_1, ambang keputusan di fuzzy_2.
-        penilai, modul = self.modul[bot.metode]
+        # modul = bot/fuzzy_controller.py (putuskan), paket_fuzzy = bot/fuzzy/ (keduanya dimuat di _muat).
+        # Penjelasan panel membaca keduanya: ambang keputusan di fuzzy_controller, daftar sistem dan mesin di fuzzy/.
+        _, modul, paket_fuzzy = self.modul[bot.metode]
         if TYPE_CHECKING:
-            penilai, modul = fuzzy_1, fuzzy_2
+            modul, paket_fuzzy = fuzzy_controller, fuzzy
         mulai, jumlah_chat_sebelumnya = time.perf_counter(), len(bot.ingatan.chat)
         lapor("nlu")
         view = bot.ingatan.sinkron_snapshot(snapshot, sekarang)
@@ -275,7 +277,7 @@ class BrainRuntime:
             or keputusan.get("nlg_tim") is not None
             or keputusan["npc_decision"]["action"] != "wait"
         ):
-            keputusan["penjelasan"] = jelaskan(bot, (penilai, modul), view, keputusan)
+            keputusan["penjelasan"] = jelaskan(bot, (modul, paket_fuzzy), view, keputusan)
         keputusan["waktu"] = {
             "nlu_ms": round((selesai_nlu - mulai) * 1000, 1),
             "logika_ms": round((selesai_logika - selesai_nlu) * 1000, 1),

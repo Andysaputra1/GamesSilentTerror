@@ -119,8 +119,10 @@ def kode_alur(node: str, token=Depends(require_panel)):
 # Hanya objek di daftar KODE_ALUR yang bisa dibaca; panel tidak dapat meminta modul atau nama lain.
 BOT = "app.bot.bot_controller"
 NLU = "app.bot.nlu"
-FZ1 = "app.bot.fuzzy_1"  # [FUZZY 1] menilai pemain
-FZ2 = "app.bot.fuzzy_2"  # [FUZZY 2] memilih tindakan
+ING = "app.bot.ingatan"  # bahan bukti: Ingatan, hitung_bukti, pengetahuan_peran
+FC = "app.bot.fuzzy_controller"  # main controller fuzzy: putuskan dan urutan keputusan
+MESIN = "app.bot.fuzzy.mesin"  # mesin Mamdani bersama semua fungsi fuzzy
+FZ_KEC = "app.bot.fuzzy.kecurigaan"  # [FUZZY 1] fungsi fuzzy kecurigaan
 NLG = "app.bot.nlg"
 
 # node flowchart → [(modul, nama bertitik, [(potongan teks baris inti, catatan)])]
@@ -183,14 +185,14 @@ KODE_ALUR = {
             ("jelaskan(bot", "penjelasan untuk panel"),
             ('keputusan["waktu"]', "lama tiap tahap dicatat"),
         ]),
-        (FZ1, "Ingatan.sinkron_snapshot", [
+        (ING, "Ingatan.sinkron_snapshot", [
             ("self.catat_eksekusi(", "eksekusi Tribunal dicatat"),
             ("self.intel = ", "hasil Peek milik bot sendiri"),
             ("self.catat_chat(chat)", "chat masuk ingatan, belum dibaca NLU"),
         ]),
     ],
     "bukti": [
-        (FZ1, "hitung_bukti", [
+        (ING, "hitung_bukti", [
             ('"tekanan": min(', "tekanan: tuduhan + vote ke pemain ini"),
             ('"dukungan": min(', "dukungan: pembelaan dari pemain lain"),
             ('"plin_plan": min(', "berganti sikap atau vote tidak sesuai ucapan"),
@@ -198,10 +200,10 @@ KODE_ALUR = {
             ('"memihak_hitman": ', "pernah membela pemain yang kini terbukti Hitman"),
             ('"diam": diam', "belum bicara di ronde ini"),
         ]),
-        (FZ1, "pengetahuan_peran", []),
+        (ING, "pengetahuan_peran", []),
     ],
     "fl": [
-        (FZ2, "putuskan", [
+        (FC, "putuskan", [
             ("hitung_bukti(ingatan, view)", "bukti tiap pemain"),
             ("nilai_kecurigaan(tabel)", "kecurigaan lewat hierarki fuzzy"),
             ("keputusan_pindah_vote(ctx)", "waktu tambahan seri: suara yang sudah ada dinilai ulang"),
@@ -214,61 +216,63 @@ KODE_ALUR = {
         ]),
     ],
     "fl_1": [
-        (FZ1, "MF_INPUT", [("[0.2, 0.5, 0.8]", "titik fungsi keanggotaan tingkat sedang")]),
-        (FZ1, "_mf", [("trapmf", "4 titik = trapesium, 3 titik = segitiga")]),
-        (FZ1, "keanggotaan", [("interp_membership", "derajat x pada tiap tingkat")]),
+        (MESIN, "MF_INPUT", [("[0.2, 0.5, 0.8]", "titik fungsi keanggotaan tingkat sedang")]),
+        (MESIN, "_mf", [("trapmf", "4 titik = trapesium, 3 titik = segitiga")]),
+        (MESIN, "keanggotaan", [("interp_membership", "derajat x pada tiap tingkat")]),
     ],
     "fl_2": [
-        (FZ1, "_bangun_sistem", [
+        (MESIN, "_bangun_sistem", [
             ("ctrl.Rule(a[x] & b[y]", "9 aturan JIKA–MAKA; & = DAN (min)"),
             ('defuzzify_method = "centroid"', "defuzzifikasi centroid"),
         ]),
-        (FZ1, "aturan_aktif", [("min(derajat_a[x], derajat_b[y])", "kekuatan aturan = min derajat input")]),
+        (MESIN, "aturan_aktif", [("min(derajat_a[x], derajat_b[y])", "kekuatan aturan = min derajat input")]),
     ],
     "fl_3": [
-        (FZ1, "fuzzy", [("_fuzzy_tersimpan(nama", "hasil disimpan per input (cache)")]),
-        (FZ1, "_fuzzy_tersimpan", [("simulasi.compute()", "skfuzzy: agregasi max lalu centroid")]),
-        (FZ1, "HIERARKI", [('("kecurigaan", "ucapan", "bukti_keras")', "sistem puncak: kecurigaan")]),
-        (FZ1, "nilai_kecurigaan", [
-            ("for sistem, x, y in HIERARKI", "sistem dihitung bertingkat"),
-            ("fuzzy(sistem, nilai[x], nilai[y]) / 100", "keluaran 0–100 menjadi 0–1"),
+        (MESIN, "hitung", [("_fuzzy_tersimpan(nama", "hasil disimpan per input (cache)")]),
+        (MESIN, "_fuzzy_tersimpan", [("simulasi.compute()", "skfuzzy: agregasi max lalu centroid")]),
+        (FZ_KEC, "ATURAN_KECURIGAAN", [("# ucapan rendah", "baris = ucapan, kolom = bukti_keras")]),
+        (FZ_KEC, "kecurigaan", [('hitung("kecurigaan"', "sistem puncak: kecurigaan")]),
+        (FC, "nilai_kecurigaan", [
+            ("kecurigaan_fz.sentimen_sosial(", "empat sistem bukti lebih dulu"),
+            ("kecurigaan_fz.ucapan(s, p) / 100", "keluaran 0–100 menjadi input 0–1 sistem berikutnya"),
+            ("kecurigaan_fz.kecurigaan(u, bk)", "sistem puncak: kecurigaan"),
             ('(1 - b["p_sandera"])', "nol bila diumumkan disandera"),
         ]),
     ],
     "fl_4": [
-        (FZ2, "keputusan_chat", [
+        (FC, "keputusan_chat", [
             ('c["aksi"] in AKSI_REAKTIF', "bela diri dan jawab dibalas tanpa nilai"),
-            ('c["skor"] = fuzzy(sistem', "prioritas tiap kandidat chat"),
+            ('c["skor"] = nilai_sistem(sistem', "prioritas tiap kandidat chat (fuzzy/diskusi.py)"),
             ("calon.sort(", "prioritas tertinggi di depan"),
             (">= AMBANG_CHAT", "mencapai ambang: dikirim"),
             ("calon_gali(ctx)", "di bawah ambang: gali tersangka sebagai cadangan"),
         ]),
-        (FZ2, "AMBANG_CHAT", []),
-        (FZ2, "keputusan_aksi", [
+        (FC, "AMBANG_CHAT", []),
+        (FC, "keputusan_aksi", [
             ('if "sistem" in c:', "Gag dan Peek dinilai sistem; Hostage dan Guard sudah membawa nilai"),
             ("pilih_gag(ctx, calon)", "Gag memakai aturan urutan sendiri"),
         ]),
-        (FZ2, "pilih_gag", [
+        (FC, "pilih_gag", [
             ("BATAS_ANCAMAN_GAG", "ancaman tinggi tanpa rekan manusia: Gag sekarang"),
             ("GAG_WAJIB_FRAKSI", "sesudah 60% siang: Gag wajib"),
             ("AMBANG_GAG", "warga yang sudah bicara: nilai minimal"),
         ]),
     ],
     "keputusan": [
-        (FZ2, "rencana_chat", []),
-        (FZ2, "pertahanan_suara", [
+        (FC, "rencana_chat", []),
+        (FC, "pertahanan_suara", [
             ('["warga_terdesak"] < BATAS_WARGA_KRITIS', "hanya saat warga kritis"),
             ("hashlib.sha256(kunci)", "semua tersangka bernilai sama: acak stabil per bot dan ronde"),
         ]),
-        (FZ2, "format_npc", [
+        (FC, "format_npc", [
             ('if rencana_a["aksi"] in AKSI_RAHASIA', "aksi rahasia diutamakan"),
             ('elif rencana_v["aksi"] == "vote"', "lalu vote"),
         ]),
-        (FZ2, "siapkan_nlg", [
+        (FC, "siapkan_nlg", [
             ('if not rencana["kirim"]', "tidak chat: NLG tidak dijalankan"),
             ('"cadangan": templat_pesan(', "kalimat cadangan bila semua gagal"),
         ]),
-        (FZ2, "siapkan_nlg_tim", [
+        (FC, "siapkan_nlg_tim", [
             ("MAKS_CHAT_TIM", "paling banyak 3 pesan tim per malam"),
             ('paket("ikut_manusia"', "Hitman memberi tahu ikut pilihan rekan manusia saat terkunci"),
         ]),
@@ -350,7 +354,7 @@ KODE_ALUR = {
         ("app.services.persistence_service", "PersistenceService.record_nlu", [
             ("set_message_nlu", "bacaan NLU untuk riwayat chat"),
         ]),
-        (FZ1, "Ingatan.catat_aksi_bot", []),
+        (ING, "Ingatan.catat_aksi_bot", []),
     ],
     "output": [
         (BOT, "isi_jejak", [
@@ -394,10 +398,12 @@ def _parameter(obj):
 def _potongan(modul, nama, inti):
     baris, mulai, berkas, obj = _sumber(modul, nama)
     hasil, hilang = [], []
+    # Baris parameter = baris def pertama; fungsi fuzzy diawali baris dekorator @sistem_fuzzy.
+    baris_def = next((i for i, t in enumerate(baris) if t.lstrip().startswith(("def ", "async def "))), 0)
     for i, teks in enumerate(baris):
         bersih = teks.strip()
         jenis = (
-            "param" if i == 0 and obj is not None and not inspect.isclass(obj)
+            "param" if i == baris_def and obj is not None and not inspect.isclass(obj)
             else "output" if bersih.startswith(("return ", "yield ")) or bersih == "return"
             else "catatan" if bersih.startswith(("#", '"""'))
             else None

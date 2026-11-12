@@ -245,8 +245,8 @@ def _keputusan(hasil):
 
 
 # ---------------------------------------------------------------- penalaran per metode
-# Modul otak yang dibaca penjelasan: satu modul, atau beberapa modul berurutan. Otak Fuzzy memakai dua: fuzzy_1 (mesin
-# Mamdani: SEMUA_SISTEM, keanggotaan, aturan_aktif, HIERARKI) dan fuzzy_2 (ambang keputusan).
+# Modul otak yang dibaca penjelasan: satu modul, atau beberapa modul berurutan. Otak Fuzzy memakai dua:
+# fuzzy_controller (ambang keputusan) dan paket fuzzy (SEMUA_SISTEM, keanggotaan, aturan_aktif, POHON_KECURIGAAN).
 def _modul_otak(modul):
     return modul if isinstance(modul, tuple) else (modul,)
 
@@ -419,7 +419,7 @@ def _blok_vote(modul, metode, jejak, rencana, peran):
     return blok
 
 
-# Mengapa tersangka teratas dicurigai: hierarki Mamdani.
+# Mengapa tersangka teratas dicurigai: pohon kecurigaan Mamdani, satu baris per sistem dari bukti sampai puncak.
 def _blok_kecurigaan(modul, metode, hasil, peran):
     if peran == "hitman":
         return None
@@ -431,7 +431,7 @@ def _blok_kecurigaan(modul, metode, hasil, peran):
             "hasil": f"kecurigaan akhir {_fmt(r.get('kecurigaan'))}"}  # fmt: skip
     if r.get("fakta"):
         blok["hasil"] += f" ({r['fakta']})"
-    hierarki = _dari(modul, "HIERARKI", [])
+    hierarki = _dari(modul, "POHON_KECURIGAAN", [])
     blok["hierarki"] = {
         "kolom": ["sistem", "input 1", "nilai 1", "input 2", "nilai 2", "keluaran"],
         "baris": [[s, x, _nilai(r.get(x)), y, _nilai(r.get(y)),
@@ -510,7 +510,7 @@ def batasi(penjelasan):
 def jelaskan(bot, modul, view, hasil):
     """Ringkas hasil putuskan() satu langkah bot; tidak pernah melempar error ke game.
 
-    modul = modul otak bot: (fuzzy_1, fuzzy_2) dari BrainRuntime, atau satu modul tiruan di tes.
+    modul = modul otak bot: (fuzzy_controller, fuzzy) dari BrainRuntime, atau satu modul tiruan di tes.
     """
     try:
         identitas = _identitas(bot, view)

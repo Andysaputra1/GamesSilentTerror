@@ -45,9 +45,14 @@ class KodeAlurTests(unittest.TestCase):
         nama = {p["nama"]: p for p in kode_node("fl_3")}
         self.assertIn(
             "simulasi.compute()",
-            " ".join(b["teks"] for b in nama["fuzzy_1._fuzzy_tersimpan"]["baris"]),
+            " ".join(b["teks"] for b in nama["mesin._fuzzy_tersimpan"]["baris"]),
         )
-        self.assertTrue(nama["fuzzy_1.HIERARKI"]["konstanta"])
+        self.assertTrue(nama["kecurigaan.ATURAN_KECURIGAAN"]["konstanta"])
+        # Fungsi fuzzy berdekorator: baris parameter = baris def, bukan baris @sistem_fuzzy.
+        puncak = nama["kecurigaan.kecurigaan"]
+        self.assertEqual([p["nama"] for p in puncak["parameter"]], ["ucapan", "bukti_keras"])
+        self.assertTrue(puncak["baris"][0]["teks"].startswith("@sistem_fuzzy("))
+        self.assertEqual(puncak["baris"][1]["jenis"], "param")
         with self.assertRaises(KeyError):
             kode_node("os.system")
 

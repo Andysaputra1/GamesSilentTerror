@@ -11,7 +11,8 @@ import unittest
 from unittest.mock import AsyncMock, Mock, patch
 
 from app.game.match_engine import Match
-from app.bot import fuzzy_1
+from app.bot import fuzzy as fuzzy_bot
+from app.bot import ingatan as ingatan_bot
 from app.bot.bot_controller import LANTAI_MAKS, BrainRuntime, NPCService, catat_nlu
 from app.bot.nlu import NLUBersama, baca_chat, baca_chat_baru
 from app.services.persistence_service import PersistenceError
@@ -53,19 +54,57 @@ class BrainRuntimeTests(unittest.TestCase):
         self.assertIsNone(self.runtime.otak_bot(match.id, "NOX"))
 
     def test_removed_systems_and_action_stay_out_of_the_bot_modules(self):
-        from app.bot import fuzzy_2, nlg
+        from app.bot import fuzzy_controller, nlg
 
-        self.assertEqual(len(fuzzy_1.SEMUA_SISTEM), 21)
+        self.assertEqual(len(fuzzy_bot.SEMUA_SISTEM), 21)
         dihapus = "bela_diri h_bela_diri jawab h_jawab info_sandera sandera lindung".split()
-        self.assertFalse(set(dihapus) & set(fuzzy_1.SEMUA_SISTEM))
+        self.assertFalse(set(dihapus) & set(fuzzy_bot.SEMUA_SISTEM))
         self.assertEqual(
-            fuzzy_2.URUTAN_AKSI, ["bela_diri", "jawab", "bela_orang", "tuduh", "tanya_info"]
+            fuzzy_controller.URUTAN_AKSI, ["bela_diri", "jawab", "bela_orang", "tuduh", "tanya_info"]
         )
-        self.assertEqual(set(fuzzy_2.INTENT_AKSI), set(fuzzy_2.URUTAN_AKSI))
-        self.assertLessEqual({"ajak_bicara", "klaim_palsu"}, set(fuzzy_1.SEMUA_SISTEM))
+        self.assertEqual(set(fuzzy_controller.INTENT_AKSI), set(fuzzy_controller.URUTAN_AKSI))
+        self.assertLessEqual({"ajak_bicara", "klaim_palsu"}, set(fuzzy_bot.SEMUA_SISTEM))
         lama = {"ungkap", "klaim_palsu", "info_sandera", "ajak_bicara"}
         self.assertFalse(lama & set(nlg.VARIASI))
         self.assertFalse(lama & set(nlg.MAKSUD_AKSI))
+
+    # Satu sistem = satu fungsi: fungsi yang terdaftar menghitung sistem bernama sama (bukan sistem lain), input = nama
+    # parameternya, dan pohon kecurigaan panel sama dengan urutan fungsi di fuzzy/kecurigaan.py.
+    def test_each_fuzzy_function_computes_its_own_registered_system(self):
+        import inspect
+
+        from app.bot.fuzzy import mesin
+
+        for nama, s in fuzzy_bot.SEMUA_SISTEM.items():
+            with self.subTest(sistem=nama):
+                self.assertEqual(s["fungsi"].__name__, nama)
+                self.assertEqual(s["input"], tuple(inspect.signature(s["fungsi"]).parameters))
+                for a, b in ((0.13, 0.77), (0.62, 0.41), (0.95, 0.05)):
+                    self.assertEqual(s["fungsi"](a, b), mesin.hitung(nama, a, b))
+        self.assertEqual(
+            [s for s, _, _ in fuzzy_bot.POHON_KECURIGAAN],
+            ["sentimen_sosial", "perilaku_mencurigakan", "jejak", "kejanggalan", "ucapan", "bukti_keras", "kecurigaan"],
+        )
+
+    # Arah impor otak tetap satu arah: folder fuzzy/ hanya memakai fuzzy/mesin.py, ingatan.py tidak memakai file bot lain,
+    # dan fuzzy_controller.py hanya memakai ingatan dan fuzzy/.
+    def test_brain_imports_point_one_way(self):
+        import ast
+        from pathlib import Path
+
+        bot = Path(__file__).parents[1] / "app" / "bot"
+
+        def impor_bot(berkas):
+            pohon = ast.parse(berkas.read_text(encoding="utf-8"))
+            return {n.module for n in ast.walk(pohon) if isinstance(n, ast.ImportFrom) and n.module
+                    and n.module.startswith("app.bot")}
+
+        for berkas in (bot / "fuzzy").glob("*.py"):
+            if berkas.name != "__init__.py":
+                with self.subTest(berkas=berkas.name):
+                    self.assertLessEqual(impor_bot(berkas), {"app.bot.fuzzy.mesin"})
+        self.assertEqual(impor_bot(bot / "ingatan.py"), set())
+        self.assertEqual(impor_bot(bot / "fuzzy_controller.py"), {"app.bot.fuzzy", "app.bot.ingatan"})
 
     def test_bots_do_not_echo_each_others_sentences(self):
         match = Match(["human"], ["NOX", "ECHO", "VEIL"], now=0.0)
@@ -131,7 +170,7 @@ class BrainRuntimeTests(unittest.TestCase):
         match = Match(["human"], ["NOX", "ECHO", "VEIL"], now=0.0)
         for teks in ("Aku curiga ECHO.", "Halo semua.", "Vote ECHO aja."):
             match.add_message("human", teks, now=1.0)
-        ingatan = fuzzy_1.Ingatan("NOX")
+        ingatan = ingatan_bot.Ingatan("NOX")
         roster = list(match.players)
         gagal = Mock(side_effect=[("offend", 0.9), RuntimeError("model rusak")])
         nlu = NLUBersama(Mock(intent=gagal, target=Mock(return_value=[])), "palsu")
@@ -247,7 +286,7 @@ class BrainRuntimeTests(unittest.TestCase):
     def test_each_bot_is_decided_only_by_its_labelled_method(self):
         dipanggil = {}
         with contextlib.ExitStack() as tumpukan:
-            for metode, (_, modul) in self.runtime.modul.items():
+            for metode, (_, modul, _) in self.runtime.modul.items():
                 for nama_fungsi in ("keputusan_chat", "keputusan_vote", "keputusan_aksi"):
 
                     def rekam(ctx, *args, _asli=getattr(modul, nama_fungsi), _metode=metode):
@@ -497,7 +536,7 @@ class HostageResultTests(unittest.TestCase):
         game.act("spy", "guard", "civilian")
         game.resolve_night()
         game.round, game.phase = 2, "day"
-        M = importlib.import_module("app.bot.fuzzy_1")
+        M = importlib.import_module("app.bot.ingatan")
 
         def gagal_sandera(snapshot):
             ingatan = M.Ingatan("hitman")
@@ -529,7 +568,7 @@ class GagRuleTests(unittest.TestCase):
             player.role = name.rstrip("23")
         game.round, game.phase = 3, "day"
         game.deadline = game.durations["day"]
-        M1, M2 = (importlib.import_module(f"app.bot.{n}") for n in ("fuzzy_1", "fuzzy_2"))
+        M1, M2 = (importlib.import_module(f"app.bot.{n}") for n in ("ingatan", "fuzzy_controller"))
         ingatan = M1.Ingatan("hitman")
         snapshot = game.snapshot("hitman")
         snapshot["me"]["team_humans"] = list(rekan_manusia)
