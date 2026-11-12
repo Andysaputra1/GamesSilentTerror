@@ -18,7 +18,7 @@ permintaan pengguna.
 | `backend/app/controllers/` | Validasi request, autentikasi route, dan respons HTTP |
 | `backend/app/services/` | Aturan login dan Google (`auth_service.py`), panel (`panel_service.py`), chat manusia (`chat_service.py`), penyimpanan chat dan jejak (`persistence_service.py`), room dan tindakan bot (`room_service.py`), password, survei, checker, konfigurasi AI, dan klien Ollama |
 | `backend/app/game/match_engine.py` | Engine pertandingan: role, fase, skill, vote, kemenangan, snapshot privat |
-| `backend/app/bot/` | Bot NPC: `bot_controller.py` (urutan langkah bot dan otak bersama), `nlu.py` (IndoBERT membaca chat), `fuzzy_1.py` (Fuzzy Mamdani [FUZZY 1]: menilai pemain), `fuzzy_2.py` (Fuzzy Mamdani [FUZZY 2]: memilih tindakan), `nlg.py` (kalimat dan rantai penulis LLM), `penjelasan.py` (penjelasan untuk panel), `simulasi.py` (simulasi panel) |
+| `backend/app/bot/` | Bot NPC: `bot_controller.py` (urutan langkah bot dan otak bersama), `nlu.py` (IndoBERT membaca chat), `ingatan.py` (bahan: ingatan bot dan angka bukti per pemain), `fuzzy_controller.py` (main controller Fuzzy Mamdani: `putuskan` dan urutan keputusan), `fuzzy/` (fungsi fuzzy saja: `mesin.py`, `kecurigaan.py`, `ancaman.py`, `diskusi.py`, `tribunal.py`, `malam.py`), `nlg.py` (kalimat dan rantai penulis LLM), `penjelasan.py` (penjelasan untuk panel), `simulasi.py` (simulasi panel) |
 | `backend/app/models/` | Kueri SQL berparameter |
 | `backend/app/sockets/server.py` | Membuat `sio`, mencatat sambungan, dan mengirim ke room (`emit_room`) |
 | `backend/app/sockets/chat.py` | Event `connect`, `disconnect`, dan `send_chat`; penolakan chat dikirim sebagai `system_alert` |
@@ -53,7 +53,7 @@ file saja tidak berarti route tersebut dibuka pada aplikasi utama.
    menyiarkan pesan; sesudah terkirim IndoBERT membacanya lewat `catat_nlu`. Pada pertandingan,
    `NPCService` (`bot/bot_controller.py`) mengambil langkah mandiri dari timer untuk setiap bot:
    `room_service.lihat_untuk_bot` (snapshot privat) -> `Ingatan.sinkron_snapshot` -> `nlu.baca_chat_baru`
-   (IndoBERT) -> `fuzzy_2.putuskan` -> vote/aksi lewat `room_service.pilihan_bot` -> kalimat `nlg.py` yang
+   (IndoBERT) -> `fuzzy_controller.putuskan` -> vote/aksi lewat `room_service.pilihan_bot` -> kalimat `nlg.py` yang
    dicek aturan -> `room_service.chat_bot` -> `emit_room`. Bot memakai service yang sama dengan pemain dan
    tidak mengubah `Match` langsung. Fase diperiksa ulang sebelum keputusan diterapkan. Vote/aksi langsung
    diterapkan; chat bot melewati
@@ -84,13 +84,39 @@ Kode bot di `backend/app/bot/` adalah sumber logikanya dan diubah langsung di sa
 lagi ekspor notebook ke backend. Bila logika bot berubah, perbarui juga notebook supaya skripsi tetap
 menggambarkan game.
 
-- Otak Fuzzy terbagi dua file. `bot/fuzzy_1.py` [FUZZY 1] menilai pemain: mesin Mamdani, `Ingatan` dan bahan
-  bukti, kecurigaan dari sudut pandang warga (7 sistem), serta ancaman dan kambing hitam untuk Hitman (4 sistem).
-  `bot/fuzzy_2.py` [FUZZY 2] memilih tindakan per sesi (Diskusi, Tribunal, Aksi Malam; tiap sesi semua role dulu,
-  lalu per role) dengan 10 sistem keputusan, lalu `putuskan` menggabungkan semuanya. `fuzzy_2` mengimpor
-  `fuzzy_1`, tidak sebaliknya; sistem [FUZZY 2] didaftarkan ke mesin `fuzzy_1` lewat `daftarkan_sistem`.
+- Otak Fuzzy terbagi tiga bagian:
+  - `bot/ingatan.py` (bahan): `Ingatan` satu bot, lalu chat, vote, dan fakta dibaca menjadi angka bukti 0–1 per
+    pemain (`hitung_bukti`, `pengetahuan_peran`, konteks permainan, pola teks, klaim role, fitur Spy dan Hitman).
+    Tidak ada fuzzy di sini.
+  - `bot/fuzzy/` (hanya fungsi fuzzy): satu sistem = satu fungsi berparameter dua input 0–1 yang mengembalikan
+    centroid 0–100. `mesin.py` berisi kurva, pembangun sistem, cache, dan daftar `SEMUA_SISTEM`; `kecurigaan.py`
+    (7 sistem) dan `ancaman.py` (4 sistem) adalah [FUZZY 1], `diskusi.py` (6), `tribunal.py` (2), dan `malam.py`
+    (2) adalah [FUZZY 2]. Folder ini tidak berisi urutan keputusan atau kondisi game.
+  - `bot/fuzzy_controller.py` (main controller): `putuskan` dan semua logika di sekitar pemanggilan fuzzy, berurutan
+    [FUZZY 1] menilai pemain → Tribunal → Sesi Diskusi → Aksi Malam → bungkus keputusan; tiap sesi semua role dulu,
+    lalu per role. Rangkaian fuzzy (mis. `sentimen_sosial` dan `perilaku_mencurigakan` → `ucapan` → `kecurigaan`)
+    ditulis di sini sebagai panggilan biasa.
+  - Arah impor: `fuzzy_controller` mengimpor `ingatan` dan `fuzzy/`; `ingatan` tidak mengimpor file bot lain; file di
+    `fuzzy/` hanya mengimpor `fuzzy/mesin.py`.
 - Pembacaan chat: `bot/nlu.py`. Kalimat dan pemeriksa aturan: `bot/nlg.py`.
-- Urutan satu langkah bot dan penjadwalannya: `bot/bot_controller.py`.
+- Urutan satu langkah bot dan penjadwalannya: `bot/bot_controller.py` (modul otak dimuat lambat di `BrainRuntime._muat`).
+
+### Menambah atau mengubah satu fuzzy
+
+1. Buka file kelompoknya di `bot/fuzzy/` (atau buat file baru lalu impor di `bot/fuzzy/__init__.py`; urutan impor
+   di sana menjadi urutan `SEMUA_SISTEM`).
+2. Tulis tabel aturan sebagai konstanta `ATURAN_<NAMA>` tepat di atas fungsinya: 3 baris × 3 kolom dari `"rendah"`,
+   `"sedang"`, `"tinggi"`, baris = tingkat input pertama, kolom = tingkat input kedua.
+3. Tulis fungsinya dengan dekorator `@sistem_fuzzy(ATURAN_<NAMA>, "arti satu kalimat")`. Nama fungsi menjadi nama
+   sistem, nama parameter menjadi nama input (tampil di panel, mis. `tekanan=tinggi DAN dukungan=rendah`). Badannya
+   cukup `return hitung("<nama>", input_pertama, input_kedua)`; keluarannya 0–100.
+4. Panggil fungsinya di `bot/fuzzy_controller.py`. Bila keluarannya menjadi input fuzzy lain, bagi 100 dulu. Sistem
+   yang dipilih kandidat (chat, Gag, Peek) dipanggil lewat nama dengan `nilai_sistem(nama, input_kandidat)`.
+5. Mengubah tabel atau kurva (`MF_INPUT`, `MF_OUTPUT` di `mesin.py`) mengubah perilaku bot; mengubah arti hanya
+   mengubah teks penjelasan panel. Keduanya mengubah sidik: jalankan pemeriksaan di bawah, lalu simpan sidik baru
+   bila perubahan diterima.
+
+### Memeriksa sebelum dan sesudah mengubah
 
 Sebelum dan sesudah mengubah atau merapikan kode bot:
 
