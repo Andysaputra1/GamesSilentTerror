@@ -92,10 +92,10 @@ details[open] > summary { margin-bottom: 8px; }
   <p class="lede">Model 2: target dan relasi per pemain (offend, defend, neutral, tidak_ada). Kode training notebook sel demi sel, dengan keluaran dari run yang sudah ada (tidak
   dijalankan ulang). Diagram alir dan cara hitungnya ada di dokumen <b>Diagram Alir NLU</b>.</p>
   <dl class="meta">
-    <dt>Notebook</dt><dd><code>training/prethesis/ai_2_dataset_baru/nlu_target.ipynb</code> (commit 2c70aad 2026-10-27)</dd>
+    <dt>Notebook</dt><dd><code>training/prethesis/ai_2_dataset_baru/nlu_target.ipynb</code> (commit 4e752b7 2026-11-07)</dd>
     <dt>Model hasil</dt><dd><code>ai_2_dataset_baru/models/target_classifier/target_classifier_transformer</code>, dimuat game sebagai NLU IndoBERT
-      (pemakaiannya di game: dokumen Kode Fuzzy Logic / Utility AI / Behavior Tree, sel 17–18)</dd>
-    <dt>Dibuat</dt><dd>2026-10-27 15:22</dd>
+      (dipakai game di <code>backend/app/bot/nlu.py</code>; jalurnya di dokumen Cara Kerja Bot bagian [INPUT])</dd>
+    <dt>Dibuat</dt><dd>2026-11-12 15:01</dd>
   </dl>
   <nav><ol><li><a href="#dataset">Pembuatan dataset</a></li><li><a href="#nlu_target-0">Library yang digunakan</a></li><li><a href="#nlu_target-3">EDA</a></li><li><a href="#nlu_target-16">Preprocessing</a></li><li><a href="#nlu_target-36">Cara membaca dan menjalankan notebook</a></li><li><a href="#nlu_target-37">Pengaturan eksperimen</a></li><li><a href="#nlu_target-54">SVM</a></li><li><a href="#nlu_target-102">Naive Bayes</a></li><li><a href="#nlu_target-150">Transformer (IndoBERT)</a></li><li><a href="#nlu_target-181">Ringkasan Perbandingan</a></li></ol></nav>
 </header>
@@ -202,7 +202,7 @@ details[open] > summary { margin-bottom: 8px; }
     <span class="n">TrainingArguments</span><span class="p">,</span>
     <span class="n">set_seed</span><span class="p">,</span>
 <span class="p">)</span>
-</pre><div class="keluaran"><div class="lbl">Keluaran</div><pre class="out">C:\Users\andyc\Documents\a_skripsi\training\prethesis\venv\Lib\site-packages\tqdm\auto.py:21: TqdmWarning: IProgress not found. Please update jupyter and ipywidgets. See https://ipywidgets.readthedocs.io/en/stable/user_install.html
+</pre><div class="keluaran"><div class="lbl">Keluaran</div><pre class="out">training\prethesis\venv\Lib\site-packages\tqdm\auto.py:21: TqdmWarning: IProgress not found. Please update jupyter and ipywidgets. See https://ipywidgets.readthedocs.io/en/stable/user_install.html
   from .autonotebook import tqdm as notebook_tqdm</pre></div></section><div class="md" id="nlu_target-3"><h2>EDA</h2></div><section class="cell" id="nlu_target-4"><div class="lbl">Sel 4 · nlu_target.ipynb</div><ul class="isi-sel"><li><code>DATASET_PATH</code> <span class='jenis'>konstanta</span><br>Dataset target (hasil pilot) dan dataset sumber untuk daftar kata umum.</li><li><code>SOURCE_PATH</code> <span class='jenis'>konstanta</span></li><li><code>DATASET_TAMBAHAN</code> <span class='jenis'>konstanta</span><br>Sesi tambahan (plan03, 27 Okt 2026): 80% hanya untuk train IndoBERT, 20% menjadi "uji tambahan" yang dilaporkan</li></ul><pre class="code"><span class="c1"># Dataset target (hasil pilot) dan dataset sumber untuk daftar kata umum.</span>
 <span class="n">DATASET_PATH</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;data/dataset_final3_context_target_pilot25_lengkap.csv&quot;</span><span class="p">)</span>
 <span class="n">SOURCE_PATH</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;data/dataset_final3.csv&quot;</span><span class="p">)</span>
