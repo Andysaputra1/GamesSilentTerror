@@ -44,8 +44,15 @@ class FakeQueries:
         self.bots = []
         self.participants = []
 
+    # Sama dengan SQL asli: ORDER BY position, id.
     def list_questions(self, db, active_only=True):
-        return [dict(q) for q in self.questions if q["active"] or not active_only]
+        urut = sorted(self.questions, key=lambda q: (q["position"], q["id"]))
+        return [dict(q) for q in urut if q["active"] or not active_only]
+
+    def update_positions(self, db, rows):
+        posisi = {row["id"]: row["position"] for row in rows}
+        for q in self.questions:
+            q["position"] = posisi.get(q["id"], q["position"])
 
     def count_answers(self, db, match_id, username):
         return sum(a["match_id"] == match_id and a["username"] == username for a in self.answers)
@@ -103,6 +110,8 @@ class ValidationTests(unittest.TestCase):
                                 "scale_min": 1, "scale_max": 6, "label_min": "Bosan",
                                 "label_max": "Seru"})  # fmt: skip
         self.assertEqual((ok["code"], ok["prompt"]), ("keseruan", "Seberapa seru?"))
+        # Posisi tidak pernah diambil dari isian panel: server yang menentukannya.
+        self.assertNotIn("position", validate_question({**ok, "position": 999}))
         bad = [
             {"code": "x", "prompt": "Valid?", "kind": "stars"},
             {"code": "ok_code", "prompt": "Valid?", "kind": "stars", "scale_min": 0},
@@ -143,9 +152,35 @@ class ValidationTests(unittest.TestCase):
             with self.assertRaises(ValueError, msg=answers):
                 validate_answers(questions, answers)
 
+    def test_other_choice_requires_details_and_respects_text_limit(self):
+        q = question(1, "choice", required=False,
+                     options=["Lebih cepat", "Lebih berempati", "Lainnya"])  # fmt: skip
+        self.assertEqual(validate_answers({1: q}, []), [])
+        for answer, expected in (
+            ("Lebih cepat", "Lebih cepat"),
+            ("Lebih berempati", "Lebih berempati"),
+            ("Lainnya:  Lebih   pintar", "Lainnya: Lebih pintar"),
+            ("Lainnya: " + "a" * 991, "Lainnya: " + "a" * 991),
+        ):
+            with self.subTest(answer=answer):
+                rows = validate_answers({1: q}, [{"question_id": 1, "text": answer}])
+                self.assertEqual(rows, [(q, None, expected)])
+        for answer in ("Lainnya", "Lainnya:  ", "Lainnya: " + "a" * 992, "Lebih pintar"):
+            with self.subTest(answer=answer), self.assertRaises(ValueError):
+                validate_answers({1: q}, [{"question_id": 1, "text": answer}])
+
+        # Isian bebas tidak boleh meloloskan jawaban di pertanyaan pilihan biasa.
+        q["options"] = ["Lebih cepat", "Lebih berempati"]
+        with self.assertRaises(ValueError):
+            validate_answers({1: q}, [{"question_id": 1, "text": "Lainnya: Lebih pintar"}])
+
 
 class SurveyServiceTests(unittest.TestCase):
     def setUp(self):
+        # Profil akun tidak terkait survei; hindari ketergantungan pada database nyata.
+        self.enterContext(
+            patch("app.services.room_service.auth_queries.account_profiles", return_value=[])
+        )
         self.rooms = RoomService()
         self.room = self.rooms.create("alice")
         self.rooms.join(self.room.code, "bob")
@@ -164,6 +199,7 @@ class SurveyServiceTests(unittest.TestCase):
         app.dependency_overrides[require_authenticated_user] = lambda x_user=Header(
             "alice"
         ): SimpleNamespace(username=x_user)
+        app.dependency_overrides[require_panel] = lambda: "fixture-token"
         self.client = self.enterContext(TestClient(app))
 
     def answers(self):
@@ -217,6 +253,20 @@ class SurveyServiceTests(unittest.TestCase):
         self.assertEqual(
             self.client.post(endpoint, json=bad, headers={"x-user": "bob"}).status_code, 422
         )
+
+    def test_other_choice_is_saved_with_the_question_snapshot(self):
+        self.fake.questions[2]["options"] = ["Lebih cepat", "Lebih berempati", "Lainnya"]
+        self.finish()
+        answers = self.answers()
+        answers[2]["text"] = "Lainnya: Lebih pintar membaca situasi"
+        response = self.client.post(
+            f"/api/rooms/{self.room.code}/survey",
+            json={"match_id": self.match.id, "answers": answers},
+        )
+        self.assertEqual(response.status_code, 200)
+        saved = next(row for row in self.fake.answers if row["question_id"] == 3)
+        self.assertEqual(saved["value_text"], answers[2]["text"])
+        self.assertIn("Lainnya", saved["question_snapshot"]["options"])
 
     # Pemain yang keluar room setelah pertandingan selesai tetap bisa mengirim survei: registri memori selama
     # jendelanya, lalu arsip peserta (dicatat saat pemain terakhir keluar dan room dibersihkan).
@@ -314,6 +364,74 @@ class SurveyServiceTests(unittest.TestCase):
         self.service.update_question(1, {**question(1), "code": "q1", "active": False})
         self.assertNotIn(1, [q["id"] for q in self.fake.list_questions(None)])
 
+    # Pertanyaan baru selalu masuk paling bawah walau panel lama masih mengirim position; edit tidak
+    # menggeser posisinya.
+    def test_new_question_goes_last_and_edit_keeps_its_position(self):
+        created = self.service.create_question(
+            {"code": "strategi", "prompt": "Strategi bot masuk akal?", "kind": "text"}
+        )
+        self.assertEqual(created["position"], 14)  # posisi terbesar (4) + 10
+        response = self.client.post(
+            "/api/panel/survey/questions",
+            json={"code": "kedua", "prompt": "Pertanyaan kedua?", "kind": "text", "position": -500},
+        )
+        self.assertEqual((response.status_code, response.json()["position"]), (201, 24))
+        self.assertEqual(
+            [q["code"] for q in self.fake.list_questions(None)][-2:], ["strategi", "kedua"]
+        )
+        response = self.client.put(
+            "/api/panel/survey/questions/1",
+            json={**question(1), "prompt": "Sudah diubah?", "position": 999},
+        )
+        self.assertEqual((response.status_code, response.json()["position"]), (200, 1))
+        self.assertEqual(
+            [(q["prompt"], q["position"]) for q in self.fake.questions if q["id"] == 1],
+            [("Sudah diubah?", 1)],
+        )
+
+    # Urutan baru memuat semua pertanyaan, termasuk yang nonaktif. Form pemain langsung mengikutinya
+    # dan pertanyaan baru sesudahnya tetap masuk paling bawah.
+    def test_reorder_rewrites_positions_and_the_player_form_follows(self):
+        self.fake.questions[1]["active"] = False
+        response = self.client.put("/api/panel/survey/questions/order", json={"ids": [4, 2, 1, 3]})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json()["questions"],
+            [{"id": 4, "position": 10}, {"id": 2, "position": 20},
+             {"id": 1, "position": 30}, {"id": 3, "position": 40}],
+        )  # fmt: skip
+        self.finish()
+        status = self.service.status(self.room.code, "alice")
+        self.assertEqual([q["id"] for q in status["questions"]], [4, 1, 3])
+        created = self.service.create_question(
+            {"code": "baru", "prompt": "Pertanyaan baru?", "kind": "text"}
+        )
+        self.assertEqual(created["position"], 50)
+
+    # Daftar yang kurang, dobel, atau berisi id asing ditolak tanpa mengubah posisi; perlu login.
+    def test_reorder_rejects_incomplete_duplicate_or_unknown_ids(self):
+        sebelum = [(q["id"], q["position"]) for q in self.fake.questions]
+        endpoint = "/api/panel/survey/questions/order"
+        for ids, pesan in (
+            ([1, 2, 3], "semua pertanyaan"),
+            ([1, 2, 3, 4, 4], "lebih dari sekali"),
+            ([1, 2, 3, 4, 99], "tidak ada"),
+            ([1, 2, 3, 99], "tidak ada"),
+        ):
+            with self.subTest(ids=ids):
+                response = self.client.put(endpoint, json={"ids": ids})
+                self.assertEqual(response.status_code, 400)
+                self.assertIn(pesan, response.json()["detail"])
+        for body in ({"ids": []}, {}, {"ids": ["satu"]}):
+            with self.subTest(body=body):
+                self.assertEqual(self.client.put(endpoint, json=body).status_code, 422)
+        self.assertEqual([(q["id"], q["position"]) for q in self.fake.questions], sebelum)
+        tanpa_login = FastAPI()
+        tanpa_login.include_router(router)
+        self.assertEqual(
+            TestClient(tanpa_login).put(endpoint, json={"ids": [1, 2, 3, 4]}).status_code, 401
+        )
+
     # Membersihkan jawaban juga menghapus arsip peserta, supaya pertandingan lama tidak diminta diisi lagi.
     def test_panel_clears_answers_and_reminders_before_a_question_can_be_deleted(self):
         self.fake.answers = [{"match_id": "lama", "username": "alice", "question_id": 1}]
@@ -362,7 +480,9 @@ class SurveyExportTests(unittest.TestCase):
             service.clear_responses.assert_not_called()
             service.delete_question.assert_not_called()
             service.clear_responses.return_value = {"deleted": 3}
-            self.assertEqual(self.client.delete("/api/panel/survey/responses").json(), {"deleted": 3})
+            self.assertEqual(
+                self.client.delete("/api/panel/survey/responses").json(), {"deleted": 3}
+            )
             self.assertEqual(self.client.delete("/api/panel/survey/questions/1").status_code, 204)
             service.delete_question.side_effect = ValueError("masih punya jawaban")
             self.assertEqual(self.client.delete("/api/panel/survey/questions/1").status_code, 400)
@@ -391,6 +511,42 @@ class SurveyCleanSqlTests(unittest.TestCase):
             survey_queries.delete_question(database, 1)
             ids = database.execute(text("SELECT id FROM survey_questions")).scalars().all()
             self.assertEqual(ids, [2])
+
+
+class SurveyOrderSqlTests(unittest.TestCase):
+    """SQL urutan dijalankan sungguhan (SQLite): posisi tersimpan, edit tidak menggesernya."""
+
+    def test_positions_are_rewritten_and_edits_keep_them(self):
+        engine = create_engine("sqlite://")
+        with Session(engine) as database:
+            database.execute(text(
+                "CREATE TABLE survey_questions (id INTEGER PRIMARY KEY, code TEXT, prompt TEXT, "
+                "kind TEXT, scale_min INT, scale_max INT, label_min TEXT, label_max TEXT, "
+                "options TEXT, required BOOLEAN, active BOOLEAN, position INT)"
+            ))  # fmt: skip
+            for posisi, kode in ((10, "aa"), (20, "bb"), (30, "cc")):
+                data = validate_question({"code": kode, "prompt": f"Soal {kode}?", "kind": "text"})
+                survey_queries.insert_question(database, {**data, "position": posisi})
+
+            def urutan():
+                return [
+                    (q["code"], q["position"])
+                    for q in survey_queries.list_questions(database, active_only=False)
+                ]
+
+            survey_queries.update_positions(
+                database,
+                [{"id": 3, "position": 10}, {"id": 1, "position": 20}, {"id": 2, "position": 30}],
+            )
+            self.assertEqual(urutan(), [("cc", 10), ("aa", 20), ("bb", 30)])
+            ubah = validate_question({"code": "aa", "prompt": "Soal aa diubah?", "kind": "text"})
+            survey_queries.update_question(database, 1, {**ubah, "position": 999})
+            self.assertEqual(urutan(), [("cc", 10), ("aa", 20), ("bb", 30)])
+            # Posisi kembar tetap berurutan menurut id.
+            survey_queries.update_positions(
+                database, [{"id": id_, "position": 10} for id_ in (3, 2, 1)]
+            )
+            self.assertEqual([kode for kode, _ in urutan()], ["aa", "bb", "cc"])
 
 
 class SurveySummarySqlTests(unittest.TestCase):

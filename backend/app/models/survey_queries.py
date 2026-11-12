@@ -50,7 +50,8 @@ def insert_question(database: Session, pertanyaan: dict) -> int:
     return int(hasil.lastrowid)
 
 
-# QUERY UPDATE: ubah pertanyaan; jawaban lama tetap memakai salinan pertanyaan saat dijawab.
+# QUERY UPDATE: ubah isi pertanyaan; jawaban lama tetap memakai salinan pertanyaan saat dijawab.
+# Kolom position tidak disentuh: urutan hanya berubah lewat update_positions.
 def update_question(database: Session, id_pertanyaan: int, pertanyaan: dict) -> int:
     parameter_sql = {
         **pertanyaan,
@@ -61,11 +62,18 @@ def update_question(database: Session, id_pertanyaan: int, pertanyaan: dict) -> 
         text("""
         UPDATE survey_questions SET code=:code, prompt=:prompt, kind=:kind, scale_min=:scale_min,
             scale_max=:scale_max, label_min=:label_min, label_max=:label_max, options=:options,
-            required=:required, active=:active, position=:position
+            required=:required, active=:active
         WHERE id = :id
     """),
         parameter_sql,
     ).rowcount
+
+
+# QUERY UPDATE: tulis posisi banyak pertanyaan sekaligus (executemany; transaksinya diatur service).
+def update_positions(database: Session, daftar_posisi: list[dict]) -> None:
+    database.execute(
+        text("UPDATE survey_questions SET position = :position WHERE id = :id"), daftar_posisi
+    )
 
 
 # QUERY COUNT: apakah akun sudah mengirim survei untuk pertandingan ini.
@@ -175,7 +183,9 @@ def summary(database: Session) -> dict:
     }
 
 
-# QUERY EKSPOR: seluruh jawaban beserta metode bot di pertandingan yang sama.
+# QUERY EKSPOR: seluruh jawaban beserta metode bot di pertandingan yang sama. Satu kiriman
+# (pertandingan + akun) tetap berkelompok menurut waktu kirimnya; di dalamnya jawaban mengikuti
+# urutan pertanyaan sekarang.
 def export_rows(database: Session) -> list[dict]:
     daftar_baris = database.execute(text("""
         SELECT r.created_at, r.match_id, r.room_code, r.username, r.role, r.team, r.outcome,
@@ -184,7 +194,8 @@ def export_rows(database: Session) -> list[dict]:
                                     ORDER BY b.bot_name SEPARATOR ' | ')
                   FROM match_bots b WHERE b.match_id = r.match_id) AS bots
         FROM survey_responses r JOIN survey_questions q ON q.id = r.question_id
-        ORDER BY r.created_at, r.id
+        ORDER BY MIN(r.created_at) OVER (PARTITION BY r.match_id, r.username), r.match_id,
+                 r.username, q.position, q.id
     """))
     return [dict(baris._mapping) for baris in daftar_baris]
 

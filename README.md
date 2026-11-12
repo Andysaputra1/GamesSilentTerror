@@ -232,7 +232,7 @@ Script ini menulis `PANEL_USERNAME=administrator` dan `PANEL_PASSWORD_HASH`, ser
 | 03 Riwayat chat | Arsip chat dari MySQL dengan filter dan ekspor CSV, termasuk intent dan target hasil IndoBERT tiap chat |
 | 04 Manajemen user | Tambah user, reset password akun lokal, hapus akun tanpa menghapus riwayat chat |
 | 05 Otak NPC | Rantai penulis kalimat, tes koneksi tiap prioritas, status NLU IndoBERT |
-| 06 Survei | Mengatur pertanyaan survei, ringkasan jawaban per metode bot, dan ekspor CSV |
+| 06 Survei | Mengatur pertanyaan survei, urutannya (seret ⋮⋮ atau tombol ▲▼, langsung tersimpan; pertanyaan baru masuk paling bawah), ringkasan jawaban per metode bot, dan ekspor CSV |
 | 07 Simulasi | Pertandingan tiruan dengan bot (metode dipilih per bot): chat seperti room asli, flowchart proses AI yang menyala sesuai tahap, dan kode asli tiap tahap |
 | 08 Dokumen | Arsitektur, ERD, Proses AI, Bedah Alur, Bedah Otak Fuzzy, serta kode dan diagram NLU dan Fuzzy (`backend/public/dokumen`: salinan hasil pembuat dokumen di `communicationfolder/`, folder yang tidak ikut repo) |
 

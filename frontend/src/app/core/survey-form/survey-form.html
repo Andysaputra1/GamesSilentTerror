@@ -41,13 +41,29 @@
                 type="radio"
                 [name]="'q' + question.id"
                 [value]="option"
-                [checked]="answers[question.id]?.text === option"
-                (change)="setText(question, option)"
+                [checked]="
+                  option === otherOption
+                    ? isOtherSelected(question)
+                    : answers[question.id]?.text === option
+                "
+                (change)="setChoice(question, option)"
               />
               <span>{{ option }}</span>
             </label>
           }
         </div>
+        @if (isOtherSelected(question)) {
+          <textarea
+            [name]="'q' + question.id + '-other'"
+            [maxlength]="otherMaxLength"
+            rows="3"
+            placeholder="Tuliskan jawaban lainnya…"
+            [attr.aria-label]="question.prompt + ' — Lainnya'"
+            [ngModel]="otherText(question)"
+            (ngModelChange)="setOtherText(question, $event)"
+          ></textarea>
+          <small class="counter"> {{ otherText(question).length }} / {{ otherMaxLength }} </small>
+        }
       } @else {
         <textarea
           [name]="'q' + question.id"

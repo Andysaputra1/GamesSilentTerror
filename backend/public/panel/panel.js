@@ -84,6 +84,10 @@ function clearSession() {
   $('npc-status').replaceChildren();
   $('survey-rows').replaceChildren();
   $('survey-method-rows').replaceChildren();
+  $('survey-order-status').textContent = '';
+  urutanSurvei = [];
+  urutanSurveiTersimpan = [];
+  barisSurvei.clear();
   kosongkanFormSurvei();
   versiRiwayat++;
   traces = [];
@@ -2230,97 +2234,204 @@ const LABEL_JENIS_PERTANYAAN = {
   choice: 'Pilihan ganda',
   text: 'Teks bebas',
 };
+// Pilihan yang membuka isian bebas di form pemain (sama dengan PILIHAN_LAINNYA di backend).
+const PILIHAN_LAINNYA = 'Lainnya';
+// Urutan tabel Survei: id yang tampil, urutan terakhir yang diterima server, dan baris tabel per
+// id. Simpan urutan berjalan satu per satu; perubahan selama menyimpan dikirim sesudahnya.
+let urutanSurvei = [],
+  urutanSurveiTersimpan = [],
+  simpanUrutanBerjalan = false,
+  simpanUrutanLagi = false;
+const barisSurvei = new Map();
+
+// Pasang baris tabel Survei sesuai urutanSurvei lalu perbarui nomor dan tombol ▲▼. Memindah baris
+// di DOM membuang fokus keyboard, jadi fokus dikembalikan ke tombol yang tadi dipakai.
+// Alur: 1 ingat fokus -> 2 pasang baris -> 3 perbarui nomor dan tombol -> 4 kembalikan fokus
+function tampilkanUrutanSurvei() {
+  // 1 ingat fokus
+  const fokus = document.activeElement;
+  const barisFokus = fokus?.closest?.('#survey-rows tr');
+  // 2 pasang baris berurutan
+  $('survey-rows').replaceChildren(...urutanSurvei.map((id) => barisSurvei.get(id)));
+  // 3 perbarui nomor dan tombol; tombol di ujung tabel nonaktif
+  urutanSurvei.forEach((id, indeks) => {
+    const baris = barisSurvei.get(id);
+    baris.querySelector('.urutan-nomor').textContent = String(indeks + 1);
+    baris.querySelector('.urutan-naik').disabled = indeks === 0;
+    baris.querySelector('.urutan-turun').disabled = indeks === urutanSurvei.length - 1;
+  });
+  // 4 kembalikan fokus; tombol yang kini nonaktif (baris di ujung) diganti tombol arah sebaliknya
+  if (barisFokus?.isConnected && document.activeElement !== fokus)
+    (fokus.disabled ? barisFokus.querySelector('.urutan-tombol:not(:disabled)') : fokus)?.focus();
+}
+// Pindahkan satu pertanyaan ke indeks baru, tampilkan langsung, lalu kirim seluruh urutan (termasuk
+// yang nonaktif). Bila simpan sebelumnya masih berjalan, urutan terbaru dikirim sesudahnya.
+// Alur: 1 susun -> 2 tampilkan -> 3 kirim -> 4.1.1 Tersimpan
+//                                         \> 4.2.1 gagal: pulihkan urutan -> 4.2.2 tampilkan error
+async function pindahkanPertanyaanSurvei(id, indeksBaru) {
+  // 1 susun urutan baru; tujuan di luar tabel atau sama dengan tempat lama tidak mengubah apa pun
+  const indeksLama = urutanSurvei.indexOf(id);
+  if (indeksLama < 0 || indeksBaru < 0 || indeksBaru >= urutanSurvei.length) return;
+  if (indeksBaru === indeksLama) return;
+  urutanSurvei = urutanSurvei.filter((lain) => lain !== id);
+  urutanSurvei.splice(indeksBaru, 0, id);
+  // 2 tampilkan
+  tampilkanUrutanSurvei();
+  // 3 kirim ke server; perulangan mengirim lagi bila urutan berubah selama menunggu jawaban
+  if (simpanUrutanBerjalan) {
+    simpanUrutanLagi = true;
+    return;
+  }
+  const generasiAwal = generation;
+  const status = $('survey-order-status');
+  simpanUrutanBerjalan = true;
+  status.textContent = 'Menyimpan…';
+  status.className = 'status-pending';
+  try {
+    do {
+      simpanUrutanLagi = false;
+      const ids = [...urutanSurvei];
+      await request('/api/panel/survey/questions/order', { ids }, 'PUT');
+      urutanSurveiTersimpan = ids;
+    } while (simpanUrutanLagi);
+    // 4.1.1 Tersimpan
+    status.textContent = 'Tersimpan';
+    status.className = 'status-good';
+  } catch (error) {
+    // 4.2.1 gagal: pulihkan urutan tersimpan; kegagalan dari sesi yang sudah keluar diabaikan
+    if (generasiAwal !== generation) return;
+    urutanSurvei = [...urutanSurveiTersimpan];
+    tampilkanUrutanSurvei();
+    // 4.2.2 tampilkan error
+    status.textContent = `Urutan gagal disimpan dan dikembalikan: ${error.message}`;
+    status.className = 'status-bad';
+    notice(status.textContent);
+  } finally {
+    simpanUrutanBerjalan = false;
+    simpanUrutanLagi = false;
+  }
+}
+// Muat ringkasan survei lalu tampilkan tabel pertanyaan (urutan server) dan rata-rata per metode.
+// Alur: 1 ambil ringkasan -> 2 kelompokkan nilai -> 3 bangun baris -> 4 tampilkan -> 5 tabel metode
 async function muatSurvei() {
-  // INPUT: ringkasan dari server; jawaban untuk sesi lama diabaikan
+  // 1 ambil ringkasan; jawaban untuk sesi lama diabaikan
   const generasiAwal = generation;
   const ringkasan = await request('/api/panel/survey/summary');
   if (!token || generasiAwal !== generation) return;
 
-  // PROSES: kelompokkan sebaran nilai dan jumlah jawaban teks per pertanyaan
+  // 2 kelompokkan sebaran nilai dan jumlah jawaban teks per pertanyaan
   const sebaranNilai = {};
   for (const baris of ringkasan.distribution) (sebaranNilai[baris.question_id] ??= []).push(baris);
   const jumlahJawabanTeks = Object.fromEntries(
     ringkasan.text_answers.map((baris) => [baris.question_id, baris.n]),
   );
 
-  // OUTPUT: satu baris tabel per pertanyaan, lalu tabel rata-rata per metode bot
-  $('survey-rows').replaceChildren(
-    ...ringkasan.questions.map((pertanyaan) => {
-      const nilaiPertanyaan = sebaranNilai[pertanyaan.id] ?? [];
-      const totalJawaban = nilaiPertanyaan.reduce((jumlah, baris) => jumlah + baris.n, 0);
-      const rataRata = totalJawaban
-        ? nilaiPertanyaan.reduce((jumlah, baris) => jumlah + baris.n * baris.value_number, 0) /
-          totalJawaban
-        : null;
-      const hasilJawaban =
-        pertanyaan.kind === 'text' || pertanyaan.kind === 'choice'
-          ? `${jumlahJawabanTeks[pertanyaan.id] ?? 0} jawaban`
-          : totalJawaban
-            ? `${totalJawaban} jawaban · rata-rata ${rataRata.toFixed(2)}`
-            : 'Belum ada';
-      const artiSkala =
-        pertanyaan.label_min || pertanyaan.label_max
-          ? `${pertanyaan.scale_min} = ${pertanyaan.label_min ?? '—'} · ${pertanyaan.scale_max} = ${pertanyaan.label_max ?? '—'}`
-          : '—';
-      let jenisDanSkala = LABEL_JENIS_PERTANYAAN.text;
-      if (pertanyaan.kind === 'stars' || pertanyaan.kind === 'scale')
-        jenisDanSkala = `${LABEL_JENIS_PERTANYAAN[pertanyaan.kind]} ${pertanyaan.scale_min}–${pertanyaan.scale_max}`;
-      else if (pertanyaan.kind === 'choice')
-        jenisDanSkala = `${LABEL_JENIS_PERTANYAAN.choice}: ${pertanyaan.options.join(' / ')}`;
+  // 3 bangun baris tiap pertanyaan; disimpan per id supaya bisa disusun ulang tanpa dibangun lagi
+  barisSurvei.clear();
+  for (const pertanyaan of ringkasan.questions) {
+    const nilaiPertanyaan = sebaranNilai[pertanyaan.id] ?? [];
+    const totalJawaban = nilaiPertanyaan.reduce((jumlah, baris) => jumlah + baris.n, 0);
+    const rataRata = totalJawaban
+      ? nilaiPertanyaan.reduce((jumlah, baris) => jumlah + baris.n * baris.value_number, 0) /
+        totalJawaban
+      : null;
+    const hasilJawaban =
+      pertanyaan.kind === 'text' || pertanyaan.kind === 'choice'
+        ? `${jumlahJawabanTeks[pertanyaan.id] ?? 0} jawaban`
+        : totalJawaban
+          ? `${totalJawaban} jawaban · rata-rata ${rataRata.toFixed(2)}`
+          : 'Belum ada';
+    const artiSkala =
+      pertanyaan.label_min || pertanyaan.label_max
+        ? `${pertanyaan.scale_min} = ${pertanyaan.label_min ?? '—'} · ${pertanyaan.scale_max} = ${pertanyaan.label_max ?? '—'}`
+        : '—';
+    let jenisDanSkala = LABEL_JENIS_PERTANYAAN.text;
+    if (pertanyaan.kind === 'stars' || pertanyaan.kind === 'scale')
+      jenisDanSkala = `${LABEL_JENIS_PERTANYAAN[pertanyaan.kind]} ${pertanyaan.scale_min}–${pertanyaan.scale_max}`;
+    else if (pertanyaan.kind === 'choice')
+      jenisDanSkala = `${LABEL_JENIS_PERTANYAAN.choice}: ${pertanyaan.options
+        .map((pilihan) => (pilihan === PILIHAN_LAINNYA ? `${pilihan} (isian bebas)` : pilihan))
+        .join(' / ')}`;
 
-      const tombolEdit = node('button', 'Edit', 'secondary');
-      tombolEdit.type = 'button';
-      // Isi form dari data pertanyaan untuk diedit.
-      tombolEdit.onclick = () => {
-        $('survey-id').value = String(pertanyaan.id);
-        $('survey-code').value = pertanyaan.code;
-        $('survey-position').value = String(pertanyaan.position);
-        $('survey-prompt').value = pertanyaan.prompt;
-        $('survey-kind').value = pertanyaan.kind;
-        $('survey-min').value = String(pertanyaan.scale_min);
-        $('survey-max').value = String(pertanyaan.scale_max);
-        $('survey-label-min').value = pertanyaan.label_min ?? '';
-        $('survey-label-max').value = pertanyaan.label_max ?? '';
-        $('survey-options').value = pertanyaan.options.join('\n');
-        $('survey-required').checked = pertanyaan.required;
-        $('survey-active').checked = pertanyaan.active;
-        $('survey-editor-title').textContent = 'Edit pertanyaan: ' + pertanyaan.code;
-        $('survey-editor-box').open = true;
-      };
-      const tombolStatus = node(
-        'button',
-        pertanyaan.active ? 'Nonaktifkan' : 'Aktifkan',
-        'secondary',
-      );
-      tombolStatus.type = 'button';
-      tombolStatus.onclick = handle(() =>
-        simpanPertanyaanSurvei({ ...pertanyaan, active: !pertanyaan.active }, pertanyaan.id),
-      );
-      const tombolHapus = node('button', 'Hapus', 'danger');
-      tombolHapus.type = 'button';
-      tombolHapus.onclick = handle(async () => {
-        if (!window.confirm(`Hapus pertanyaan "${pertanyaan.prompt}" secara permanen?`)) return;
-        await request(`/api/panel/survey/questions/${pertanyaan.id}`, undefined, 'DELETE');
-        if ($('survey-id').value === String(pertanyaan.id)) kosongkanFormSurvei();
-        notice('Pertanyaan survei dihapus.');
-        await muatSurvei();
-      });
-      const selAksi = node('td');
-      selAksi.append(tombolEdit, ' ', tombolStatus, ' ', tombolHapus);
+    // Sel urutan: pegangan seret (mouse), nomor tampil, dan tombol ▲▼ untuk HP dan keyboard.
+    const selUrutan = node('td', undefined, 'urutan-survei');
+    const pegangan = node('span', '⋮⋮', 'pegangan-seret');
+    pegangan.draggable = true;
+    pegangan.title = 'Seret untuk memindah urutan';
+    pegangan.setAttribute('aria-hidden', 'true');
+    selUrutan.append(pegangan, node('span', '', 'urutan-nomor'));
+    for (const [langkah, simbol, kerja, kelas] of [
+      [-1, '▲', 'Naikkan', 'urutan-naik'],
+      [1, '▼', 'Turunkan', 'urutan-turun'],
+    ]) {
+      const tombolUrutan = node('button', simbol, `secondary urutan-tombol ${kelas}`);
+      tombolUrutan.type = 'button';
+      tombolUrutan.title = `${kerja} (Alt+${langkah < 0 ? '↑' : '↓'})`;
+      tombolUrutan.setAttribute('aria-label', `${kerja} urutan: ${pertanyaan.prompt}`);
+      tombolUrutan.onclick = () =>
+        pindahkanPertanyaanSurvei(pertanyaan.id, urutanSurvei.indexOf(pertanyaan.id) + langkah);
+      selUrutan.append(tombolUrutan);
+    }
 
-      const barisTabel = document.createElement('tr');
-      barisTabel.append(
-        node('td', String(pertanyaan.position)),
-        node('td', pertanyaan.prompt + (pertanyaan.required ? '' : ' (opsional)')),
-        node('td', jenisDanSkala),
-        node('td', artiSkala),
-        node('td', pertanyaan.active ? 'Aktif' : 'Nonaktif'),
-        node('td', hasilJawaban),
-        selAksi,
-      );
-      return barisTabel;
-    }),
-  );
+    const tombolEdit = node('button', 'Edit', 'secondary');
+    tombolEdit.type = 'button';
+    // Isi form dari data pertanyaan untuk diedit; posisi tidak ikut, edit tidak menggeser urutan.
+    tombolEdit.onclick = () => {
+      $('survey-id').value = String(pertanyaan.id);
+      $('survey-code').value = pertanyaan.code;
+      $('survey-prompt').value = pertanyaan.prompt;
+      $('survey-kind').value = pertanyaan.kind;
+      $('survey-min').value = String(pertanyaan.scale_min);
+      $('survey-max').value = String(pertanyaan.scale_max);
+      $('survey-label-min').value = pertanyaan.label_min ?? '';
+      $('survey-label-max').value = pertanyaan.label_max ?? '';
+      $('survey-options').value = pertanyaan.options.join('\n');
+      $('survey-required').checked = pertanyaan.required;
+      $('survey-active').checked = pertanyaan.active;
+      $('survey-editor-title').textContent = 'Edit pertanyaan: ' + pertanyaan.code;
+      $('survey-editor-box').open = true;
+    };
+    const tombolStatus = node(
+      'button',
+      pertanyaan.active ? 'Nonaktifkan' : 'Aktifkan',
+      'secondary',
+    );
+    tombolStatus.type = 'button';
+    tombolStatus.onclick = handle(() =>
+      simpanPertanyaanSurvei({ ...pertanyaan, active: !pertanyaan.active }, pertanyaan.id),
+    );
+    const tombolHapus = node('button', 'Hapus', 'danger');
+    tombolHapus.type = 'button';
+    tombolHapus.onclick = handle(async () => {
+      if (!window.confirm(`Hapus pertanyaan "${pertanyaan.prompt}" secara permanen?`)) return;
+      await request(`/api/panel/survey/questions/${pertanyaan.id}`, undefined, 'DELETE');
+      if ($('survey-id').value === String(pertanyaan.id)) kosongkanFormSurvei();
+      notice('Pertanyaan survei dihapus.');
+      await muatSurvei();
+    });
+    const selAksi = node('td');
+    selAksi.append(tombolEdit, ' ', tombolStatus, ' ', tombolHapus);
+
+    const barisTabel = document.createElement('tr');
+    barisTabel.dataset.id = String(pertanyaan.id);
+    barisTabel.append(
+      selUrutan,
+      node('td', pertanyaan.prompt + (pertanyaan.required ? '' : ' (opsional)')),
+      node('td', jenisDanSkala),
+      node('td', artiSkala),
+      node('td', pertanyaan.active ? 'Aktif' : 'Nonaktif'),
+      node('td', hasilJawaban),
+      selAksi,
+    );
+    barisSurvei.set(pertanyaan.id, barisTabel);
+  }
+
+  // 4 tampilkan urutan dari server (ORDER BY position, id), sekaligus urutan tersimpan terakhir
+  urutanSurvei = ringkasan.questions.map((pertanyaan) => pertanyaan.id);
+  urutanSurveiTersimpan = [...urutanSurvei];
+  tampilkanUrutanSurvei();
+
+  // 5 tabel rata-rata per metode
   const teksPertanyaan = Object.fromEntries(
     ringkasan.questions.map((pertanyaan) => [pertanyaan.id, pertanyaan.prompt]),
   );
@@ -2717,7 +2828,6 @@ $('survey-form').onsubmit = handle(async () => {
           .filter(Boolean),
         required: $('survey-required').checked,
         active: $('survey-active').checked,
-        position: Number($('survey-position').value) || 0,
       },
       Number($('survey-id').value) || null,
     );
@@ -2726,6 +2836,77 @@ $('survey-form').onsubmit = handle(async () => {
   }
 });
 $('cancel-survey').onclick = kosongkanFormSurvei;
+// Seret pegangan ⋮⋮ untuk memindah pertanyaan survei; garis hijau di atas atau bawah baris menandai
+// tempat jatuh. Pendengar dipasang sekali di <tbody>, jadi berlaku juga untuk baris baru.
+// Alur: 1 dragstart catat baris -> 2 dragover tandai tempat -> 3 drop pindahkan -> 4 dragend bersih
+let idSurveiDiseret = null,
+  tempatJatuhSurvei = null;
+// Hapus garis penanda tempat jatuh dari tabel Survei.
+function hapusPenandaJatuh() {
+  for (const baris of $('survey-rows').querySelectorAll('.jatuh-sebelum, .jatuh-sesudah'))
+    baris.classList.remove('jatuh-sebelum', 'jatuh-sesudah');
+  tempatJatuhSurvei = null;
+}
+$('survey-rows').addEventListener('dragstart', (event) => {
+  // 1 catat baris; seret yang tidak berawal dari pegangan (mis. teks terpilih) dibiarkan
+  const baris = event.target.closest?.('.pegangan-seret')?.closest('tr[data-id]');
+  if (!baris) return;
+  idSurveiDiseret = Number(baris.dataset.id);
+  baris.classList.add('sedang-diseret');
+  if (event.dataTransfer) {
+    // Firefox baru mulai menyeret bila ada data; gambar seret memakai seluruh baris, bukan ikonnya.
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', baris.dataset.id);
+    const kotak = baris.getBoundingClientRect();
+    event.dataTransfer.setDragImage(baris, event.clientX - kotak.left, event.clientY - kotak.top);
+  }
+});
+$('survey-rows').addEventListener('dragover', (event) => {
+  // 2 tandai tempat jatuh: separuh atas baris = sebelum, separuh bawah = sesudah
+  const baris = event.target.closest?.('tr[data-id]');
+  if (idSurveiDiseret === null || !baris) return;
+  event.preventDefault();
+  if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+  const id = Number(baris.dataset.id);
+  const kotak = baris.getBoundingClientRect();
+  const sesudah = event.clientY > kotak.top + kotak.height / 2;
+  if (tempatJatuhSurvei?.id === id && tempatJatuhSurvei.sesudah === sesudah) return;
+  hapusPenandaJatuh();
+  // Di atas baris yang sedang diseret: urutan tidak berubah, jadi tidak ada penanda.
+  if (id === idSurveiDiseret) return;
+  baris.classList.add(sesudah ? 'jatuh-sesudah' : 'jatuh-sebelum');
+  tempatJatuhSurvei = { id, sesudah };
+});
+$('survey-rows').addEventListener('dragleave', (event) => {
+  if (!$('survey-rows').contains(event.relatedTarget)) hapusPenandaJatuh();
+});
+$('survey-rows').addEventListener('drop', (event) => {
+  // 3 pindahkan; indeks tujuan dihitung dari urutan tanpa baris yang diseret
+  if (idSurveiDiseret === null) return;
+  event.preventDefault();
+  const id = idSurveiDiseret;
+  const tempat = tempatJatuhSurvei;
+  hapusPenandaJatuh();
+  if (!tempat) return;
+  const tanpaYangDiseret = urutanSurvei.filter((lain) => lain !== id);
+  pindahkanPertanyaanSurvei(id, tanpaYangDiseret.indexOf(tempat.id) + (tempat.sesudah ? 1 : 0));
+});
+$('survey-rows').addEventListener('dragend', () => {
+  // 4 bersihkan, juga saat seret dibatalkan (Esc atau dilepas di luar tabel)
+  idSurveiDiseret = null;
+  hapusPenandaJatuh();
+  for (const baris of $('survey-rows').querySelectorAll('.sedang-diseret'))
+    baris.classList.remove('sedang-diseret');
+});
+// Alt+↑/↓ saat fokus di dalam baris (tombol ▲▼, Edit, dan lainnya) memindah pertanyaan itu.
+$('survey-rows').addEventListener('keydown', (event) => {
+  if (!event.altKey || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) return;
+  const baris = event.target.closest?.('tr[data-id]');
+  if (!baris) return;
+  event.preventDefault();
+  const id = Number(baris.dataset.id);
+  pindahkanPertanyaanSurvei(id, urutanSurvei.indexOf(id) + (event.key === 'ArrowUp' ? -1 : 1));
+});
 $('survey-clean').onclick = handle(async () => {
   if ($('survey-clean-confirm').value.trim() !== 'BERSIHKAN')
     throw new Error('Ketik BERSIHKAN dengan tepat untuk menghapus semua jawaban survei.');

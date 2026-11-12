@@ -39,7 +39,13 @@ class Question(BaseModel):
     options: list[str] = Field(default_factory=list, max_length=8)
     required: bool = True
     active: bool = True
-    position: int = Field(default=0, ge=-1000, le=1000)
+    # Tidak ada kolom position: server yang menentukan posisi (baru = paling bawah, susunan ulang
+    # lewat endpoint urutan). Panel lama yang masih mengirim position diabaikan, bukan ditolak.
+
+
+# Semua id pertanyaan (termasuk yang nonaktif) dalam urutan baru; kelengkapannya diperiksa service.
+class QuestionOrder(BaseModel):
+    ids: list[int] = Field(min_length=1, max_length=1000)
 
 
 # Terjemahkan kegagalan layanan survei menjadi status HTTP yang jelas tanpa detail internal.
@@ -88,8 +94,15 @@ def panel_create_question(body: Question, token=Depends(require_panel)):
     return survey_call(lambda: survey_service.create_question(body.model_dump()))
 
 
+@router.put("/api/panel/survey/questions/order")
+# PANEL: simpan urutan pertanyaan hasil seret atau tombol ▲▼. Harus didaftarkan sebelum rute
+# /questions/{question_id}: rute itu juga cocok dengan "order" lalu menolaknya dengan 422.
+def panel_reorder_questions(body: QuestionOrder, token=Depends(require_panel)):
+    return survey_call(lambda: survey_service.reorder_questions(body.ids))
+
+
 @router.put("/api/panel/survey/questions/{question_id}")
-# PANEL: ubah pertanyaan atau nonaktifkan.
+# PANEL: ubah pertanyaan atau nonaktifkan; posisinya tidak ikut berubah.
 def panel_update_question(question_id: int, body: Question, token=Depends(require_panel)):
     return survey_call(lambda: survey_service.update_question(question_id, body.model_dump()))
 

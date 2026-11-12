@@ -260,13 +260,136 @@ test('survey menu renders questions as text and edits scale meaning from the pan
   assert.match(rows.textContent, /rata-rata 5.00/);
   assert.match(w.document.querySelector('#survey-method-rows').textContent, /fuzzy/);
   assert.match(w.document.querySelector('#survey-method-rows').textContent, /campuran/);
-  rows.querySelector('button').click();
+  assert.equal(w.document.querySelector('#survey-position'), null); // posisi ditentukan server
+  [...rows.querySelectorAll('button')].find((tombol) => tombol.textContent === 'Edit').click();
   assert.equal(w.document.querySelector('#survey-editor-box').open, true);
   w.document.querySelector('#survey-label-max').value = 'Seru sekali';
   await w.document.querySelector('#survey-form').onsubmit({ preventDefault() {} });
   assert.equal(saved.label_max, 'Seru sekali');
   assert.equal(saved.kind, 'stars');
+  assert.equal('position' in saved, false);
   assert.equal(w.document.querySelector('#survey-editor-box').open, false);
+});
+
+test('urutan survei: seret, ▲▼, Alt+panah tersimpan; gagal simpan memulihkan urutan', async (t) => {
+  const questions = [1, 2, 3].map((id) => ({
+    id,
+    code: `q${id}`,
+    prompt: `Pertanyaan ${id}`,
+    kind: id === 3 ? 'choice' : 'text',
+    scale_min: 1,
+    scale_max: 6,
+    label_min: null,
+    label_max: null,
+    options: id === 3 ? ['Lebih cepat', 'Lainnya'] : [],
+    required: false,
+    active: id !== 2, // pertanyaan nonaktif ikut diurutkan
+    position: id * 10,
+  }));
+  const saved = [];
+  let gagal = false;
+  const w = setup(t, (path, options) => {
+    if (path === '/api/panel/survey/summary')
+      return response({ questions, distribution: [], per_method: [], text_answers: [] });
+    if (path === '/api/panel/survey/questions/order' && options.method === 'PUT') {
+      saved.push(JSON.parse(options.body).ids);
+      return gagal
+        ? response({ detail: 'Database survei belum siap.' }, 503)
+        : response({ questions: [] });
+    }
+    return undefined;
+  });
+  await login(w);
+  await w.document.querySelector('[data-menu=survey]').onclick({ preventDefault() {} });
+  const doc = w.document;
+  const status = doc.querySelector('#survey-order-status');
+  const baris = (id) => doc.querySelector(`#survey-rows tr[data-id="${id}"]`);
+  const urutan = () =>
+    [...doc.querySelectorAll('#survey-rows tr')].map((tr) => Number(tr.dataset.id));
+  const nomor = () =>
+    [...doc.querySelectorAll('#survey-rows .urutan-nomor')].map((n) => n.textContent);
+  // jsdom tanpa DragEvent; getBoundingClientRect bernilai 0, jadi clientY > 0 = separuh bawah.
+  const seret = (jenis, sasaran, clientY = 0) =>
+    sasaran.dispatchEvent(new w.MouseEvent(jenis, { bubbles: true, cancelable: true, clientY }));
+  assert.deepEqual(urutan(), [1, 2, 3]);
+  assert.deepEqual(nomor(), ['1', '2', '3']);
+  assert.match(baris(3).textContent, /Lainnya \(isian bebas\)/);
+  assert.equal(baris(1).querySelector('.urutan-naik').disabled, true);
+  assert.equal(baris(3).querySelector('.urutan-turun').disabled, true);
+
+  // Seret baris 1 ke bawah baris 3: penanda tempat jatuh muncul, lalu urutan baru disimpan.
+  seret('dragstart', baris(1).querySelector('.pegangan-seret'));
+  assert.ok(baris(1).classList.contains('sedang-diseret'));
+  // Di atas baris yang sedang diseret tidak ada penanda.
+  seret('dragover', baris(1).querySelector('td'), 5);
+  assert.equal(doc.querySelector('.jatuh-sebelum, .jatuh-sesudah'), null);
+  seret('dragover', baris(3).querySelector('td'), -5);
+  assert.ok(baris(3).classList.contains('jatuh-sebelum'));
+  seret('dragover', baris(3).querySelector('td'), 5);
+  assert.ok(baris(3).classList.contains('jatuh-sesudah'));
+  assert.equal(baris(3).classList.contains('jatuh-sebelum'), false);
+  seret('drop', baris(3).querySelector('td'), 5);
+  assert.equal(status.textContent, 'Menyimpan…');
+  seret('dragend', baris(1).querySelector('.pegangan-seret'));
+  await settle();
+  assert.deepEqual(urutan(), [2, 3, 1]);
+  assert.deepEqual(saved, [[2, 3, 1]]);
+  assert.deepEqual(nomor(), ['1', '2', '3']);
+  assert.equal(status.textContent, 'Tersimpan');
+  assert.equal(doc.querySelector('.jatuh-sebelum, .jatuh-sesudah, .sedang-diseret'), null);
+  // Seret yang tidak berawal dari pegangan tidak memindah apa pun.
+  seret('dragstart', baris(2).querySelector('button'));
+  seret('dragover', baris(1).querySelector('td'), 5);
+  seret('drop', baris(1).querySelector('td'), 5);
+  await settle();
+  assert.equal(saved.length, 1);
+
+  // Tombol ▲ dan Alt+↓; fokus tetap di baris yang dipindah.
+  const naik = baris(1).querySelector('.urutan-naik');
+  naik.focus();
+  naik.click();
+  await settle();
+  assert.deepEqual(urutan(), [2, 1, 3]);
+  assert.equal(doc.activeElement, naik);
+  baris(2)
+    .querySelector('.urutan-turun')
+    .dispatchEvent(
+      new w.KeyboardEvent('keydown', { key: 'ArrowDown', altKey: true, bubbles: true }),
+    );
+  await settle();
+  assert.deepEqual(urutan(), [1, 2, 3]);
+  assert.deepEqual(saved.slice(1), [
+    [2, 1, 3],
+    [1, 2, 3],
+  ]);
+  // Ujung tabel: tidak ada request.
+  baris(1)
+    .querySelector('.urutan-turun')
+    .dispatchEvent(new w.KeyboardEvent('keydown', { key: 'ArrowUp', altKey: true, bubbles: true }));
+  await settle();
+  assert.equal(saved.length, 3);
+
+  // Dua perubahan cepat: yang kedua menunggu simpan pertama, lalu dikirim sebagai urutan terbaru.
+  baris(3).querySelector('.urutan-naik').click();
+  baris(3).querySelector('.urutan-naik').click();
+  await settle();
+  assert.deepEqual(saved.slice(3), [
+    [1, 3, 2],
+    [3, 1, 2],
+  ]);
+  assert.equal(status.textContent, 'Tersimpan');
+
+  // Gagal simpan: tabel kembali ke urutan tersimpan terakhir dan pesan error tampil.
+  gagal = true;
+  baris(2).querySelector('.urutan-naik').click();
+  assert.deepEqual(urutan(), [3, 2, 1]);
+  assert.equal(status.textContent, 'Menyimpan…');
+  await settle();
+  assert.deepEqual(urutan(), [3, 1, 2]);
+  assert.deepEqual(nomor(), ['1', '2', '3']);
+  assert.match(status.textContent, /gagal disimpan/);
+  assert.match(status.textContent, /Database survei belum siap/);
+  assert.match(doc.querySelector('#notice').textContent, /Database survei belum siap/);
 });
 
 test('survey menu deletes answers only after typed confirmation and a question after confirm', async (t) => {

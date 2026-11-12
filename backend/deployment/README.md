@@ -29,6 +29,7 @@ sebelum backend versi baru diaktifkan:
 | `V8__fix_role_stalker_enum` | `SOURCE /docker-entrypoint-initdb.d/V08__fix_role_stalker_enum.sql;` (pastikan dulu `SELECT COUNT(*) FROM players WHERE role = 'detective';` bernilai 0) |
 | `V9__chat_nlu` | `SOURCE /docker-entrypoint-initdb.d/V09__chat_nlu.sql;` |
 | `V10__match_participants` | `SOURCE /docker-entrypoint-initdb.d/V10__match_participants.sql;` |
+| `V11__survey_player_feedback` | `SOURCE /docker-entrypoint-initdb.d/V11__survey_player_feedback.sql;` (hanya menambah lima pertanyaan survei di paling bawah; tidak mengubah struktur tabel) |
 
 Nama file memakai nomor dua digit (V01, V05, …) agar MySQL menjalankannya berurutan pada volume kosong
 (tanpa itu V10 jalan sebelum V1). Versi yang dicatat di dalam file tetap nama lama (`V5__chat_history`)
@@ -116,9 +117,10 @@ karena kode lama tidak mencatat apakah respons benar-benar dipublikasikan.
 
 ## Survei, NPC, dan avatar
 
-Database lama: jalankan file V07 sampai V10 yang versinya belum tercatat (tabel migrasi di atas).
+Database lama: jalankan file V07 sampai V11 yang versinya belum tercatat (tabel migrasi di atas).
 Tanpa V07 kolom `skin_id` dan tabel survei belum ada, tanpa V08 peserta Stalker gagal diarsipkan,
-dan tanpa V09 (kolom `chat_messages.nlu`) menu Riwayat chat di panel gagal dimuat. Jangan menghapus volume untuk menjalankan migrasi.
+dan tanpa V09 (kolom `chat_messages.nlu`) menu Riwayat chat di panel gagal dimuat. Tanpa V11 aplikasi
+tetap jalan, hanya lima pertanyaan survei pengalaman bermain yang belum ada. Jangan menghapus volume untuk menjalankan migrasi.
 
 `schema_migrations` menyimpan versi struktur yang sudah diterapkan dan waktunya.
 Saat ini project memakai SQL manual, belum ada migration runner otomatis; tabel ini

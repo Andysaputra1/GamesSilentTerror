@@ -37,11 +37,11 @@ const status: SurveyStatus = {
 };
 
 describe('SurveyForm', () => {
-  function create(): { fixture: ComponentFixture<SurveyForm>; form: SurveyForm } {
+  function create(survey = status): { fixture: ComponentFixture<SurveyForm>; form: SurveyForm } {
     TestBed.configureTestingModule({ imports: [SurveyForm], providers: [provideHttpClient()] });
     const fixture = TestBed.createComponent(SurveyForm);
     fixture.componentRef.setInput('code', 'ABC123');
-    fixture.componentRef.setInput('survey', status);
+    fixture.componentRef.setInput('survey', survey);
     fixture.detectChanges();
     return { fixture, form: fixture.componentInstance };
   }
@@ -84,5 +84,77 @@ describe('SurveyForm', () => {
     expect(done).toHaveBeenCalledTimes(1);
     expect(form.error).toBe('Survei gagal dikirim. Coba lagi.');
     expect(form.sending).toBe(false);
+  });
+
+  it('collects other-choice details and clears them when a preset is chosen', async () => {
+    const choice = {
+      ...status.questions[1],
+      kind: 'choice' as const,
+      options: ['Lebih cepat', 'Lebih berempati', 'Lainnya'],
+    };
+    const { fixture, form } = create({ ...status, questions: [choice] });
+    const submit = vi
+      .spyOn(TestBed.inject(GameService), 'submitSurvey')
+      .mockReturnValue(of({ submitted: true, answers: 1 }));
+    const buttons = fixture.nativeElement.querySelectorAll('input[type="radio"]');
+    const send = fixture.nativeElement.querySelector('.submit-survey') as HTMLButtonElement;
+    expect(send.disabled).toBe(false); // Harapan Bot NPC boleh dilewati.
+
+    buttons[2].click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const details = fixture.nativeElement.querySelector('textarea') as HTMLTextAreaElement;
+    expect(details.maxLength).toBe(991);
+    expect(buttons[2].checked).toBe(true);
+    expect(send.disabled).toBe(true);
+    form.submit();
+    expect(submit).not.toHaveBeenCalled();
+
+    details.value = '   ';
+    details.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect(send.disabled).toBe(true);
+
+    details.value = 'Lebih pintar membaca situasi';
+    details.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect(send.disabled).toBe(false);
+    form.submit();
+    expect(submit).toHaveBeenLastCalledWith('ABC123', 'match-1', [
+      { question_id: choice.id, text: 'Lainnya: Lebih pintar membaca situasi' },
+    ]);
+
+    buttons[0].click();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('textarea')).toBeNull();
+    expect(buttons[2].checked).toBe(false);
+    form.submit();
+    expect(submit).toHaveBeenLastCalledWith('ABC123', 'match-1', [
+      { question_id: choice.id, text: 'Lebih cepat' },
+    ]);
+  });
+
+  // Pertanyaan wajib: Lainnya tanpa isian belum dianggap menjawab. Pilihan biasa tanpa opsi Lainnya
+  // tidak pernah membuka isian, walau teksnya kebetulan diawali "Lainnya: ".
+  it('requires other-choice details on mandatory questions only when the option exists', async () => {
+    const base = { ...status.questions[1], kind: 'choice' as const, required: true };
+    const withOther = { ...base, id: 7, options: ['Ya', 'Lainnya'] };
+    const withoutOther = { ...base, id: 8, options: ['Ya', 'Tidak'] };
+    const { fixture, form } = create({ ...status, questions: [withOther, withoutOther] });
+    const radios = fixture.nativeElement.querySelectorAll('input[type="radio"]');
+    const send = fixture.nativeElement.querySelector('.submit-survey') as HTMLButtonElement;
+    radios[1].click(); // Lainnya
+    radios[3].click(); // Tidak
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(send.disabled).toBe(true);
+    const details = fixture.nativeElement.querySelectorAll('textarea');
+    expect(details.length).toBe(1);
+    details[0].value = 'Kadang-kadang';
+    details[0].dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect(send.disabled).toBe(false);
+    form.setText(withoutOther, 'Lainnya: bukan opsi');
+    expect(form.isOtherSelected(withoutOther)).toBe(false);
   });
 });

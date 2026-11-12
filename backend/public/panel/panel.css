@@ -497,6 +497,23 @@ a.metric .hint { display: block; margin-top: 6px; }
 .status-muted { color: #9aacbf !important; }
 #menu-survey td button { margin: 2px 0; }
 #menu-survey h3 { margin-top: 28px; }
+/* SURVEI: urutan pertanyaan (pegangan seret, nomor, tombol ▲▼), status simpan, dan penanda tempat jatuh. */
+.survey-order-bar { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; }
+.survey-order-bar .hint { margin: 0; max-width: 760px; }
+#survey-order-status { font-size: 12px; font-weight: 650; overflow-wrap: anywhere; }
+#menu-survey .survey-order-bar + .table-scroll { margin-top: 12px; }
+#menu-survey td.urutan-survei { white-space: nowrap; vertical-align: middle; }
+.pegangan-seret { display: inline-block; padding: 4px 6px; color: #7f91a9; font-weight: 700; letter-spacing: -2px; cursor: grab; user-select: none; }
+.pegangan-seret:hover { color: #baf578; }
+.pegangan-seret:active { cursor: grabbing; }
+.urutan-nomor { display: inline-block; min-width: 2em; text-align: center; font-weight: 650; color: #e6effa; }
+#menu-survey .urutan-tombol { margin: 0 0 0 4px; padding: 5px 9px; font-size: 11px; }
+#survey-rows tr.sedang-diseret { opacity: .45; }
+#survey-rows tr.jatuh-sebelum td { box-shadow: inset 0 2px 0 #baf578; }
+#survey-rows tr.jatuh-sesudah td { box-shadow: inset 0 -2px 0 #baf578; }
+/* Layar sentuh tidak bisa menyeret: pegangan disembunyikan, tombol ▲▼ dibesarkan supaya mudah diketuk. */
+@media (hover: none) and (pointer: coarse) { .pegangan-seret { display: none; } }
+@media (max-width: 700px), (hover: none) and (pointer: coarse) { #menu-survey .urutan-tombol { min-width: 40px; min-height: 40px; } }
 /* CHECKER ROOM: ringkasan room, linimasa per bot, dan kartu penjelasan keputusan otak. */
 .room-summary { display: grid; gap: 12px; margin: 0 0 16px; padding: 16px 18px; background: #0e1724; border: 1px solid #293546; border-radius: 10px; min-width: 0; }
 .room-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }

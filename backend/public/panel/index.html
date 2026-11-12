@@ -231,6 +231,14 @@
             </div>
             <button id="download-survey">&darr; Download jawaban (CSV)</button>
           </div>
+          <div class="survey-order-bar">
+            <p class="hint">
+              Seret pegangan &#8942;&#8942; untuk mengubah urutan, atau pakai tombol &#9650;&#9660;
+              (Alt+&uarr;/&darr;). Urutan langsung tersimpan dan dipakai form pemain serta CSV.
+              Pertanyaan baru selalu masuk paling bawah.
+            </p>
+            <span id="survey-order-status" role="status" aria-live="polite"></span>
+          </div>
           <div class="table-scroll">
             <table>
               <thead>
@@ -273,9 +281,6 @@
                   pattern="[a-z0-9_]+"
                   autocomplete="off"
               /></label>
-              <label
-                >Urutan<input id="survey-position" type="number" min="-1000" max="1000" value="0"
-              /></label>
               <label class="full-width"
                 >Pertanyaan<input id="survey-prompt" required minlength="3" maxlength="300"
               /></label>
@@ -310,6 +315,10 @@
                   id="survey-options"
                   rows="3"
                 ></textarea>
+                <small
+                  >Pilihan bernama persis <strong>Lainnya</strong> membuka isian bebas untuk pemain;
+                  jawabannya tersimpan sebagai "Lainnya: &hellip;".</small
+                >
               </label>
               <label class="check"
                 ><input id="survey-required" type="checkbox" checked /> Wajib dijawab</label

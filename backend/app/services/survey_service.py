@@ -20,6 +20,11 @@ JENIS = {"stars", "scale", "choice", "text"}
 JENIS_BERSKALA = {"stars", "scale"}
 NILAI_SKALA_MAKS = 10
 PANJANG_TEKS = 1000
+# Jarak position antarpertanyaan: pertanyaan baru = terbesar + jarak, susunan ulang = 10, 20, 30, …
+JARAK_URUTAN = 10
+# Pilihan ini membuka isian bebas; tetap disimpan di value_text agar snapshot dan CSV utuh.
+PILIHAN_LAINNYA = "Lainnya"
+AWAL_JAWABAN_LAINNYA = f"{PILIHAN_LAINNYA}:"
 # Pemain yang sudah keluar room tetap bisa mengirim survei selama ini (hanya di memori).
 BERLAKU_SELESAI_DETIK = 30 * 60
 KODE_DUPLIKAT_MYSQL = 1062
@@ -69,9 +74,8 @@ def validate_question(data: dict) -> dict:
     try:
         skala_minimum = int(data.get("scale_min", 1))
         skala_maksimum = int(data.get("scale_max", 6))
-        urutan = int(data.get("position", 0))
     except (TypeError, ValueError) as error:
-        raise ValueError("Skala dan urutan harus berupa angka bulat.") from error
+        raise ValueError("Skala harus berupa angka bulat.") from error
     if jenis == "stars" and skala_minimum != 1:
         raise ValueError("Pertanyaan bintang selalu dimulai dari 1.")
     if jenis in JENIS_BERSKALA and not 0 <= skala_minimum < skala_maksimum <= NILAI_SKALA_MAKS:
@@ -90,10 +94,9 @@ def validate_question(data: dict) -> dict:
             raise ValueError("Pilihan ganda membutuhkan 2–8 pilihan berbeda.")
         if any(not 1 <= len(item) <= 80 for item in pilihan):
             raise ValueError("Setiap pilihan 1–80 karakter.")
-    if not -1000 <= urutan <= 1000:
-        raise ValueError("Urutan harus antara -1000 dan 1000.")
 
-    # OUTPUT: data siap simpan; jenis tanpa skala memakai skala bawaan 1–6
+    # OUTPUT: data siap simpan; jenis tanpa skala memakai skala bawaan 1–6. Posisi ditentukan server
+    # (pertanyaan baru di paling bawah, susunan ulang lewat reorder_questions).
     return {
         "code": kode,
         "prompt": teks_pertanyaan,
@@ -104,7 +107,6 @@ def validate_question(data: dict) -> dict:
         "options": pilihan,
         "required": bool(data.get("required", True)),
         "active": bool(data.get("active", True)),
-        "position": urutan,
     }
 
 
@@ -144,8 +146,19 @@ def validate_answers(pertanyaan_aktif: dict[int, dict], daftar_jawaban: list[dic
                 if pertanyaan["required"]:
                     raise ValueError(f"Jawab pertanyaan: {pertanyaan['prompt']}")
                 continue
-            if pertanyaan["kind"] == "choice" and teks not in pertanyaan["options"]:
-                raise ValueError(f"Pilihan untuk '{pertanyaan['prompt']}' tidak tersedia.")
+            if pertanyaan["kind"] == "choice":
+                pilihan = pertanyaan["options"]
+                if PILIHAN_LAINNYA in pilihan and (
+                    teks == PILIHAN_LAINNYA or teks.startswith(AWAL_JAWABAN_LAINNYA)
+                ):
+                    rincian = teks.removeprefix(AWAL_JAWABAN_LAINNYA).strip()
+                    if teks == PILIHAN_LAINNYA or not rincian:
+                        raise ValueError(
+                            f"Tuliskan jawaban lainnya untuk '{pertanyaan['prompt']}'."
+                        )
+                    teks = f"{AWAL_JAWABAN_LAINNYA} {rincian}"
+                elif teks not in pilihan:
+                    raise ValueError(f"Pilihan untuk '{pertanyaan['prompt']}' tidak tersedia.")
             if len(teks) > PANJANG_TEKS:
                 raise ValueError(f"Jawaban teks maksimal {PANJANG_TEKS} karakter.")
             baris_jawaban.append((pertanyaan, None, teks))
@@ -300,9 +313,7 @@ class SurveyService:
                 queries.count_answers(database, konteks["match_id"], username),
             )
 
-        pertanyaan_aktif, jumlah_jawaban = jalankan_transaksi(
-            ambil_pertanyaan_dan_jumlah_jawaban
-        )
+        pertanyaan_aktif, jumlah_jawaban = jalankan_transaksi(ambil_pertanyaan_dan_jumlah_jawaban)
         return {
             "match_id": konteks["match_id"],
             "submitted": jumlah_jawaban > 0,
@@ -345,35 +356,86 @@ class SurveyService:
                 raise SurveyAlreadySubmitted(PESAN_SUDAH_DIKIRIM) from error
             raise
 
-    # PANEL: tambah pertanyaan; kode harus unik.
+    # Tambah pertanyaan dari panel. Kode harus unik, dan pertanyaan baru selalu masuk paling bawah.
+    # Alur: 1 validasi -> 2 baca pertanyaan -> 3 tolak kode kembar -> 4 posisi maks+10 -> 5 simpan
     def create_question(self, data):
+        # 1 validasi
         pertanyaan = validate_question(data)
 
         def simpan_pertanyaan_baru(database):
+            # 2 baca semua pertanyaan, termasuk yang nonaktif
             tersimpan = queries.list_questions(database, active_only=False)
+            # 3 tolak kode kembar
             if any(item["code"] == pertanyaan["code"] for item in tersimpan):
                 raise ValueError("Kode pertanyaan sudah dipakai.")
-            return queries.insert_question(database, pertanyaan)
+            # 4 posisi dihitung di transaksi yang sama dengan INSERT; posisi kembar (dua panel
+            # menyimpan bersamaan) tetap berurutan karena list_questions juga mengurutkan menurut id
+            posisi = max((item["position"] for item in tersimpan), default=0) + JARAK_URUTAN
+            # 5 simpan
+            return queries.insert_question(database, {**pertanyaan, "position": posisi}), posisi
 
-        return {"id": jalankan_transaksi(simpan_pertanyaan_baru), **pertanyaan}
+        id_baru, posisi = jalankan_transaksi(simpan_pertanyaan_baru)
+        return {"id": id_baru, **pertanyaan, "position": posisi}
 
-    # PANEL: ubah pertanyaan; jawaban lama tetap memakai salinan pertanyaan saat dijawab.
+    # Ubah pertanyaan dari panel tanpa menggeser posisinya; jawaban lama tetap memakai salinan
+    # pertanyaan saat dijawab.
+    # Alur: 1 validasi -> 2 cari pertanyaan -> 3 tolak kode kembar -> 4 simpan (posisi tetap)
     def update_question(self, id_pertanyaan, data):
+        # 1 validasi
         pertanyaan = validate_question(data)
 
         def simpan_perubahan(database):
+            # 2 cari pertanyaan
             tersimpan = queries.list_questions(database, active_only=False)
-            if not any(item["id"] == id_pertanyaan for item in tersimpan):
+            lama = next((item for item in tersimpan if item["id"] == id_pertanyaan), None)
+            if lama is None:
                 raise LookupError("Pertanyaan tidak ditemukan.")
+            # 3 tolak kode kembar
             if any(
                 item["code"] == pertanyaan["code"] and item["id"] != id_pertanyaan
                 for item in tersimpan
             ):
                 raise ValueError("Kode pertanyaan sudah dipakai.")
+            # 4 simpan; kolom position tidak ikut diubah
             queries.update_question(database, id_pertanyaan, pertanyaan)
+            return lama["position"]
 
-        jalankan_transaksi(simpan_perubahan)
-        return {"id": id_pertanyaan, **pertanyaan}
+        posisi = jalankan_transaksi(simpan_perubahan)
+        return {"id": id_pertanyaan, **pertanyaan, "position": posisi}
+
+    # Simpan urutan baru dari panel (seret atau ▲▼). Daftar memuat semua pertanyaan, termasuk yang
+    # nonaktif, tepat sekali; posisinya ditulis ulang 10, 20, 30, … dalam satu transaksi.
+    # Alur: 1 tolak id dobel -> 2 baca semua id -> 3 tolak id asing/kurang -> 4 tulis posisi baru
+    def reorder_questions(self, daftar_id: list[int]):
+        # 1 tolak id dobel
+        if len(set(daftar_id)) != len(daftar_id):
+            raise ValueError("Urutan memuat pertanyaan yang sama lebih dari sekali.")
+
+        def simpan_urutan(database):
+            # 2 baca semua id, termasuk pertanyaan nonaktif
+            id_tersimpan = {
+                item["id"] for item in queries.list_questions(database, active_only=False)
+            }
+            # 3 tolak id asing atau kurang (biasanya panel lain baru menambah/menghapus pertanyaan)
+            if set(daftar_id) - id_tersimpan:
+                raise ValueError(
+                    "Urutan memuat pertanyaan yang tidak ada. "
+                    "Muat ulang menu Survei lalu coba lagi."
+                )
+            if id_tersimpan - set(daftar_id):
+                raise ValueError(
+                    "Urutan harus memuat semua pertanyaan, termasuk yang nonaktif. "
+                    "Muat ulang menu Survei lalu coba lagi."
+                )
+            # 4 tulis posisi baru
+            posisi_baru = [
+                {"id": id_pertanyaan, "position": (indeks + 1) * JARAK_URUTAN}
+                for indeks, id_pertanyaan in enumerate(daftar_id)
+            ]
+            queries.update_positions(database, posisi_baru)
+            return posisi_baru
+
+        return {"questions": jalankan_transaksi(simpan_urutan)}
 
     # PANEL: hapus permanen semua jawaban dan arsip peserta; pertanyaan tetap ada.
     def clear_responses(self):

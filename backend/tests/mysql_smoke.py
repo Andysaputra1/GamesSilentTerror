@@ -18,6 +18,7 @@ from app.main import app
 from app.config.database import SessionLocal, jalankan_transaksi
 from app.models import auth_queries, game_queries, panel_queries, survey_queries
 from app.services.persistence_service import PersistenceError, PersistenceService
+from app.services.survey_service import validate_question
 
 
 # Hash acak berbentuk SHA-256, sesuai kolom token CHAR(64).
@@ -420,6 +421,62 @@ class MovedSqlIntegration(unittest.TestCase):
             jalankan_transaksi(lambda db: auth_queries.delete_account(db, id_akun))
             self.assertIsNone(akun_panel(id_akun))
             self.assertIsNone(akun_login(nama))
+
+
+# Survei di MySQL asli: pertanyaan hasil migrasi (termasuk V11) lolos validasi panel, susunan ulang
+# ditulis lewat executemany, dan ekspor CSV mengikuti urutan pertanyaan. Data uji di-rollback.
+@unittest.skipUnless(os.getenv("STRUCTURE_TEST_DB") == "1", "requires disposable MySQL")
+class SurveySqlIntegration(unittest.TestCase):
+    V11 = [
+        "pengalaman_bermain",
+        "saran_kesan_pesan",
+        "kesenangan_bersama_bot",
+        "harapan_bot_npc",
+        "kesenangan_individu",
+    ]
+
+    def test_migrated_questions_pass_panel_validation_and_v11_is_last(self):
+        semua = jalankan_transaksi(lambda db: survey_queries.list_questions(db, active_only=False))
+        for pertanyaan in semua:
+            hasil = validate_question(pertanyaan)
+            for kolom in hasil:
+                self.assertEqual(hasil[kolom], pertanyaan[kolom], (pertanyaan["code"], kolom))
+        posisi = {pertanyaan["code"]: pertanyaan["position"] for pertanyaan in semua}
+        self.assertEqual(sorted(self.V11, key=posisi.get), self.V11)
+        lama = [nilai for kode, nilai in posisi.items() if kode not in self.V11]
+        self.assertLess(max(lama), min(posisi[kode] for kode in self.V11))
+        harapan = next(item for item in semua if item["code"] == "harapan_bot_npc")
+        self.assertEqual(
+            (harapan["kind"], harapan["required"], harapan["options"]),
+            ("choice", False, ["Lebih cepat", "Lebih berempati", "Lainnya"]),
+        )
+
+    def test_reorder_and_export_follow_question_positions(self):
+        with SessionLocal() as db:
+            try:
+                semua = survey_queries.list_questions(db, active_only=False)
+                dibalik = [pertanyaan["id"] for pertanyaan in reversed(semua)]
+                survey_queries.update_positions(
+                    db,
+                    [{"id": id_, "position": (i + 1) * 10} for i, id_ in enumerate(dibalik)],
+                )
+                urut = survey_queries.list_questions(db, active_only=False)
+                self.assertEqual([pertanyaan["id"] for pertanyaan in urut], dibalik)
+                # Satu kiriman, jawabannya disisipkan berlawanan dengan urutan pertanyaan.
+                id_match, kode_room = uuid4().hex, _kode_room()
+                for id_pertanyaan in (dibalik[1], dibalik[0]):
+                    survey_queries.insert_answer(
+                        db,
+                        {"match_id": id_match, "room_code": kode_room, "username": "smoke_survei",
+                         "question_id": id_pertanyaan, "question_snapshot": {"prompt": "uji"},
+                         "value_number": None, "value_text": "Lainnya: uji urutan",
+                         "role": "spy", "team": "civilians", "outcome": "won"},
+                    )  # fmt: skip
+                ekspor = [b for b in survey_queries.export_rows(db) if b["match_id"] == id_match]
+                self.assertEqual([b["code"] for b in ekspor], [urut[0]["code"], urut[1]["code"]])
+                self.assertEqual(ekspor[0]["value_text"], "Lainnya: uji urutan")
+            finally:
+                db.rollback()
 
 
 if __name__ == "__main__":
