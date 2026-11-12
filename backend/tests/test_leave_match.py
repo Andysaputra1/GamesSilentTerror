@@ -277,31 +277,31 @@ class LeaveRoomTests(unittest.TestCase):
         self.assertNotIn(self.room.code, self.rooms.rooms)
 
     def test_npc_views_show_the_left_player_as_not_alive(self):
-        from app.bot import fuzzy_1
+        from app.bot import ingatan as ingatan_bot
 
         self.rooms.leave(self.room.code, "alice")
         snapshot = snapshot_berlabel(self.match.snapshot("NOX"), self.match.labels)
         alice = next(p for p in snapshot["players"] if p["name"] == "alice")
         self.assertEqual((alice["alive"], alice["left"]), (False, True))
-        view = fuzzy_1.Ingatan("NOX").sinkron_snapshot(snapshot, time.time())
+        view = ingatan_bot.Ingatan("NOX").sinkron_snapshot(snapshot, time.time())
         self.assertIn({"nama": "alice", "hidup": False, "sandera": None}, view["pemain"])
 
     def test_bot_memory_records_leaver_without_tribunal_blame(self):
-        from app.bot import fuzzy_1
+        from app.bot import ingatan as ingatan_bot
 
         sebelum = snapshot_berlabel(self.match.snapshot("ECHO"), self.match.labels)
         self.rooms.leave(self.room.code, "alice")
         sesudah = snapshot_berlabel(self.match.snapshot("ECHO"), self.match.labels)
-        ingatan = fuzzy_1.Ingatan("ECHO")
+        ingatan = ingatan_bot.Ingatan("ECHO")
         ingatan.sinkron_snapshot(sebelum, time.time())
         view = ingatan.sinkron_snapshot(sesudah, time.time())
         # Keluar bukan eksekusi Tribunal: tidak ada bukti "mendorong eksekusi warga" untuk siapa pun.
         self.assertEqual(ingatan.eksekusi, [])
         self.assertEqual(ingatan.keluar, [{"ronde": 1, "pemain": "alice", "hitman": None}])
-        tabel, _ = fuzzy_1.hitung_bukti(ingatan, view)
+        tabel, _ = ingatan_bot.hitung_bukti(ingatan, view)
         self.assertTrue((tabel["ikut_salah_eksekusi"] == 0).all())
         # Room 1 Hitman dan game berlanjut: yang keluar pasti bukan Hitman.
-        self.assertIn("alice", fuzzy_1.pengetahuan_peran(ingatan, view)["pasti_orang_baik"])
+        self.assertIn("alice", ingatan_bot.pengetahuan_peran(ingatan, view)["pasti_orang_baik"])
 
     def test_http_leave_returns_left_twice_and_rejects_outsiders(self):
         app = FastAPI()

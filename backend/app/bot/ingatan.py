@@ -1,161 +1,28 @@
-"""[FUZZY 1] Menilai pemain: dari snapshot dan ingatan bot sampai kecurigaan, ancaman, dan kambing hitam tiap pemain.
+"""BAHAN otak bot: Ingatan satu bot, lalu chat, vote, dan fakta dibaca menjadi angka bukti 0–1 per pemain.
 
-Otak Fuzzy Mamdani bot terbagi dua file. File ini menilai pemain; fuzzy_2.py memilih tindakan (chat, vote, aksi malam)
-lewat putuskan dan mengimpor file ini. File ini tidak pernah mengimpor fuzzy_2, jadi tidak ada impor melingkar.
-
-Kode di sini adalah sumber logika bot di game dan boleh diubah langsung. Notebook skripsi npc_fuzzy.ipynb hanya untuk
-laporan; bila logika di sini berubah, notebook ikut diperbarui supaya skripsi tetap menggambarkan game. Patokan
-perilakunya adalah tests/test_skenario_fuzzy.py (328 skenario) dan sidik di tests/jejak/sidik.json.
+Tidak ada fuzzy di sini. fuzzy_controller.putuskan membaca keluaran file ini (tabel bukti, konteks, pengetahuan pasti,
+fitur Spy dan Hitman) lalu memanggil fungsi fuzzy di bot/fuzzy/. File ini tidak mengimpor file bot lain.
 
 Isi berurutan
-1. Mesin Mamdani: kurva rendah/sedang/tinggi, satu sistem dua input dengan 9 aturan, hitung centroid, dan cache. Semua
-   sistem didaftarkan ke mesin ini lewat daftarkan_sistem, termasuk 10 sistem [FUZZY 2] dari fuzzy_2
-2. Bahan bukti (Ingatan): Ingatan.sinkron_snapshot mencatat snapshot privat bot; hitung_bukti membaca chat, vote, dan
-   fakta menjadi angka bukti 0–1 per pemain beserta konteks permainan; pengetahuan_peran mengumpulkan fakta pasti
-   menurut role
-3. Kecurigaan, sudut pandang warga (Civilian, Spy, Stalker): 7 sistem bertingkat. sentimen_sosial,
-   perilaku_mencurigakan, jejak, dan kejanggalan → ucapan dan bukti_keras → kecurigaan; lalu fakta pasti menimpa hasilnya
-   (terapkan_pengetahuan). Spy juga menilai siapa yang terancam (fitur_lindung, bahan Guard)
-4. Ancaman dan kambing hitam, sudut pandang Hitman: fitur_hitman lalu 4 sistem (ancaman_langsung dan ancaman_peran →
-   ancaman; kambing)
+1. Waktu fase dan komposisi role
+2. Ingatan: catatan pengamatan satu bot; sinkron_snapshot mencatat snapshot privat bot dan memberi view
+3. Membaca chat, vote, klaim role, dan status lawan: pola teks, relasi chat, dugaan Hostage/Gag, klaim role, memihak
+   Hitman, pengaruh
+4. Bukti per pemain, konteks permainan, dan fakta pasti: hitung_bukti (dengan _konteks_permainan) dan
+   pengetahuan_peran
+5. Bahan per role sesudah kecurigaan dinilai: fitur_lindung (Spy, bahan Guard) dan fitur_hitman (bahan ancaman dan
+   kambing hitam)
 """
 
 import math
 import re
-import warnings
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
-from functools import lru_cache
 
 import numpy as np
 import pandas as pd
-import skfuzzy as fuzz
-from skfuzzy import control as ctrl
 
-# scikit-fuzzy memanggil np.maximum dengan argumen ketiga posisional; peringatannya tidak memengaruhi hasil.
-warnings.filterwarnings("ignore", category=DeprecationWarning, module=r"skfuzzy(\..*)?")
-
-# ===== 1. MESIN MAMDANI: kurva rendah/sedang/tinggi, tabel aturan, hitung centroid =====
-
-# Tiga tingkat bahasa untuk semua input dan keluaran: rendah, sedang, tinggi.
-R_, S_, T_ = "rendah", "sedang", "tinggi"
-
-TINGKAT = [R_, S_, T_]
-
-# Titik kurva input 0–1: rendah dan tinggi trapesium, sedang segitiga. Derajat ketiganya selalu berjumlah 1.
-MF_INPUT = {R_: [0.0, 0.0, 0.2, 0.5], S_: [0.2, 0.5, 0.8], T_: [0.5, 0.8, 1.0, 1.0]}
-
-# Titik kurva keluaran 0–100: tiga segitiga.
-MF_OUTPUT = {R_: [0, 15, 30], S_: [35, 50, 65], T_: [70, 85, 100]}
-
-# Sumbu input 0–1 (201 titik).
-_SEMESTA = np.linspace(0, 1, 201)
-
-# Fungsi keanggotaan dari titik kurva MF_INPUT atau MF_OUTPUT.
-# Menerima semesta = titik sumbu (array), titik = 4 angka (trapesium) atau 3 angka (segitiga).
-# Hasilnya array derajat 0–1 untuk setiap titik semesta.
-# Dipanggil oleh _bangun_sistem (kurva input dan keluaran) dan _KURVA_INPUT (kurva input untuk fuzzifikasi).
-def _mf(semesta, titik):
-    return fuzz.trapmf(semesta, titik) if len(titik) == 4 else fuzz.trimf(semesta, titik)
-
-# Satu sistem Mamdani dua input dengan 9 aturan lengkap (setiap pasangan tingkat input pertama × input kedua).
-# Menerima spesifikasi = satu entri SEMUA_SISTEM {input: (nama_a, nama_b), aturan: matriks 3×3, arti}.
-# Hasilnya ControlSystemSimulation skfuzzy dengan DAN = min, implikasi = clipping (min), agregasi = max,
-#   defuzzifikasi centroid pada semesta 0–100.
-# Dipanggil oleh daftarkan_sistem (setiap sistem dibangun sekali).
-# Alur: 1 dua input dan keluaran 0–100 -> 2 kurva rendah/sedang/tinggi -> 3 9 aturan JIKA–MAKA -> 4 simulasi skfuzzy
-def _bangun_sistem(spesifikasi):
-    nama_a, nama_b = spesifikasi["input"]
-    a = ctrl.Antecedent(_SEMESTA, nama_a)
-    b = ctrl.Antecedent(_SEMESTA, nama_b)
-    keluaran = ctrl.Consequent(np.linspace(0, 100, 201), "keluaran")
-    keluaran.defuzzify_method = "centroid"
-    for tingkat, titik in MF_INPUT.items():
-        a[tingkat] = _mf(a.universe, titik)
-        b[tingkat] = _mf(b.universe, titik)
-    for tingkat, titik in MF_OUTPUT.items():
-        keluaran[tingkat] = _mf(keluaran.universe, titik)
-    # Aturan (i, j): JIKA a = TINGKAT[i] DAN b = TINGKAT[j] MAKA keluaran = aturan[i][j]; "&" pada skfuzzy = minimum.
-    aturan = [ctrl.Rule(a[x] & b[y], keluaran[spesifikasi["aturan"][i][j]])
-              for i, x in enumerate(TINGKAT) for j, y in enumerate(TINGKAT)]
-    # Cache internal skfuzzy dikosongkan tiap 10.000 run; hasil tetap disimpan _fuzzy_tersimpan.
-    return ctrl.ControlSystemSimulation(ctrl.ControlSystem(aturan), flush_after_run=10000)
-
-# Sistem yang dikenal mesin: nama → spesifikasi {input, aturan, arti}, dan nama → simulasi skfuzzy yang sudah dibangun.
-# Keduanya diisi daftarkan_sistem: 11 sistem [FUZZY 1] di file ini, lalu 10 sistem [FUZZY 2] saat fuzzy_2 dimuat.
-SEMUA_SISTEM = {}
-
-SIMULASI = {}
-
-# Daftarkan sistem ke mesin: spesifikasinya masuk SEMUA_SISTEM dan dibangun sekali menjadi simulasi di SIMULASI.
-# Menerima sistem = {nama: spesifikasi}, bentuk spesifikasi seperti di _bangun_sistem.
-# Dipanggil oleh bagian kecurigaan dan ancaman di file ini, serta bagian putuskan di fuzzy_2.
-# Alur: 1 simpan spesifikasi -> 2 bangun simulasi tiap sistem
-def daftarkan_sistem(sistem):
-    SEMUA_SISTEM.update(sistem)
-    SIMULASI.update({nama: _bangun_sistem(spesifikasi) for nama, spesifikasi in sistem.items()})
-
-# Satu run skfuzzy, disimpan per (nama, a, b) agar input yang sama tidak dihitung ulang.
-# Menerima nama sistem, a dan b = input yang sudah divalidasi dan dibulatkan oleh fuzzy().
-# Hasilnya float 0–100 = centroid himpunan keluaran hasil agregasi.
-# Dipanggil oleh fuzzy (jangan dipanggil langsung karena tanpa validasi input).
-# Alur: 1 isi kedua input simulasi -> 2 hitung aturan, agregasi, dan centroid -> 3 ambil keluaran
-@lru_cache(maxsize=500_000)
-def _fuzzy_tersimpan(nama, a, b):
-    simulasi = SIMULASI[nama]
-    nama_a, nama_b = SEMUA_SISTEM[nama]["input"]
-    simulasi.input[nama_a], simulasi.input[nama_b] = a, b
-    simulasi.compute()
-    return float(simulasi.output["keluaran"])
-
-# Inferensi Mamdani satu sistem: fuzzifikasi → aturan DAN (min) → agregasi (max) → centroid 0–100.
-# Menerima nama = kunci SEMUA_SISTEM; a, b = input pertama dan kedua sesuai urutan "input" sistem (angka 0–1).
-# Hasilnya float 0–100 (nilai tegas). Pemanggil membaginya 100 bila hasilnya menjadi input sistem berikutnya.
-# Dipanggil oleh nilai_kecurigaan dan nilai_ancaman di file ini, serta keputusan_chat, keputusan_vote, dan
-#   keputusan_aksi di fuzzy_2.
-# Alur: 1 tiap input: tolak bila di luar 0–1, jepit lalu bulatkan 4 desimal -> 2 hasil dari cache _fuzzy_tersimpan
-def fuzzy(nama, a, b):
-    nilai = []
-    for x in (a, b):
-        x = float(x)
-        # Toleransi 1e-9 hanya untuk galat pembulatan; input lain di luar 0–1 adalah kesalahan dan harus berhenti.
-        if not math.isfinite(x) or not -1e-9 <= x <= 1 + 1e-9:
-            raise ValueError(f"Input sistem {nama} harus angka 0–1, didapat {x}.")
-        # Dijepit ke 0–1 lalu dibulatkan 4 desimal: kunci cache yang stabil.
-        nilai.append(round(min(1.0, max(0.0, x)), 4))
-    return _fuzzy_tersimpan(nama, *nilai)
-
-# Kurva input yang sudah dihitung sekali, untuk fuzzifikasi di keanggotaan.
-_KURVA_INPUT = {tingkat: _mf(_SEMESTA, titik) for tingkat, titik in MF_INPUT.items()}
-
-# Fuzzifikasi satu nilai: derajat x pada kurva rendah, sedang, dan tinggi (interpolasi linear seperti skfuzzy).
-# Menerima x = angka 0–1.
-# Hasilnya {"rendah": derajat, "sedang": derajat, "tinggi": derajat}; jumlahnya 1 (MF_INPUT partisi kesatuan).
-# Dipanggil oleh aturan_aktif dan penjelasan panel (penjelasan.py).
-def keanggotaan(x):
-    return {t: float(fuzz.interp_membership(_SEMESTA, kurva, x)) for t, kurva in _KURVA_INPUT.items()}
-
-# Aturan yang menyala untuk satu pasangan input; menjelaskan hasil fuzzy() dan tidak dipakai saat memutuskan.
-# Menerima nama sistem, a dan b (0–1).
-# Hasilnya DataFrame {jika, maka, kekuatan}, terkuat dulu. Kekuatan = min(derajat a, derajat b), bukan peluang.
-# Dipanggil oleh penjelasan panel (penjelasan.py), serta contoh penalaran dan pengujian cakupan di notebook.
-# Alur: 1 derajat kedua input -> 2 kekuatan 9 aturan, yang nol dibuang -> 3 urutkan dari yang terkuat
-def aturan_aktif(nama, a, b):
-    spesifikasi = SEMUA_SISTEM[nama]
-    nama_a, nama_b = spesifikasi["input"]
-    derajat_a, derajat_b = keanggotaan(a), keanggotaan(b)
-    baris = []
-    for i, x in enumerate(TINGKAT):
-        for j, y in enumerate(TINGKAT):
-            kekuatan = min(derajat_a[x], derajat_b[y])
-            if kekuatan > 0:
-                baris.append({"jika": f"{nama_a}={x} DAN {nama_b}={y}", "maka": spesifikasi["aturan"][i][j],
-                              "kekuatan": kekuatan})
-    return pd.DataFrame(baris).sort_values("kekuatan", ascending=False, kind="stable")
-
-# ===== 2. BAHAN BUKTI (Ingatan): chat, vote, dan fakta menjadi angka bukti per pemain =====
-
-# ----- waktu fase dan komposisi role
+# ===== 1. WAKTU FASE DAN KOMPOSISI ROLE =====
 
 # Urutan fase dalam satu ronde, untuk mengurutkan chat dan tindakan.
 URUTAN_FASE = {"day": 0, "tribunal": 1, "night": 2}
@@ -206,7 +73,7 @@ def waktu_berjalan(ingatan, view):
 def komposisi(view):
     return view.get("komposisi") or {"hitman": 1, "spy": 1, "stalker": 1, "civilian": max(1, len(view["pemain"]) - 3)}
 
-# ----- Ingatan: catatan pengamatan satu bot
+# ===== 2. INGATAN: catatan pengamatan satu bot =====
 
 # Role yang dikenal otak bot.
 PERAN = ("civilian", "spy", "stalker", "hitman")
@@ -408,7 +275,7 @@ class Ingatan:
                                        for h in me.get("syndicate_hostages", [])]},
         }
 
-# ----- membaca chat, vote, klaim role, dan status lawan
+# ===== 3. MEMBACA CHAT, VOTE, KLAIM ROLE, DAN STATUS LAWAN =====
 
 # Keyakinan intent minimal agar chat terbaca jelas; offend/defend di bawahnya tidak menjadi bukti.
 MIN_CONF_INTENT = 0.60
@@ -656,7 +523,7 @@ def _pengaruh(relasi, votes, hidup, R):
     skala = max(1, len(hidup) - 2)
     return {p: min(1.0, v / skala) for p, v in per_pemain.items()}
 
-# ----- bukti per pemain, konteks permainan, dan fakta pasti
+# ===== 4. BUKTI PER PEMAIN, KONTEKS PERMAINAN, DAN FAKTA PASTI =====
 
 # Chat ronde ini dianggap ramai (chat_sepi = 0) mulai sekian pesan pemain lain.
 MIN_PESAN_INFO = 4
@@ -768,12 +635,12 @@ def _konteks_permainan(ingatan, view, publik, chats, relasi, klaim, p_sandera):
 # Pemain diam: nilai diam penuh sesudah porsi siang ini berlalu tanpa ia bicara.
 DIAM_FRAKSI = 0.35
 
-# Bukti per pemain dan konteks permainan, dihitung ulang dari ingatan setiap langkah. Tabelnya lalu dinilai Mamdani
-# (kecurigaan), dan menjadi bahan fitur Hitman/Spy serta kandidat tindakan.
+# Bukti per pemain dan konteks permainan, dihitung ulang dari ingatan setiap langkah. Tabelnya lalu dinilai pohon fuzzy
+# kecurigaan (fuzzy_controller.nilai_kecurigaan), dan menjadi bahan fitur Hitman/Spy serta kandidat tindakan.
 # Menerima ingatan, view; publik=True = sudut pandang pengamat netral tanpa pengetahuan pribadi (dipakai Hitman).
 # Hasilnya (tabel, konteks). tabel = DataFrame satu baris per pemain: bukti 0–1 (tekanan, dukungan, klaim_role_bermasalah, p_sandera,
 #   ...), penanda kandidat, dan rincian kalimat alasan. konteks = dict dari _konteks_permainan.
-# Dipanggil oleh putuskan di fuzzy_2 (tabel pribadi; Hitman juga tabel publik).
+# Dipanggil oleh fuzzy_controller.putuskan (tabel pribadi; Hitman juga tabel publik).
 # Alur: 1 status Hostage dan Gag (dugaan_status) -> 2 relasi chat, klaim role, pengaruh vote -> 3 bukti tiap
 #       pemain -> 4 konteks permainan (_konteks_permainan)
 def hitung_bukti(ingatan, view, publik=False):
@@ -998,7 +865,7 @@ def hitung_bukti(ingatan, view, publik=False):
 # Hasilnya dibaca terapkan_pengetahuan, fitur Hitman, kandidat tindakan, serta chat_pasti/vote_pasti lewat ctx.
 # Menerima ingatan (intel, eksekusi, keluar), view (role, rekan, rekan_spy, hasil_sandera, komposisi, fase).
 # Hasilnya dict {hitman_diketahui, pasti_orang_baik, rekan, gagal_sandera}.
-# Dipanggil oleh putuskan di fuzzy_2.
+# Dipanggil oleh fuzzy_controller.putuskan.
 # Alur: 1 hasil Peek: pasti baik atau Hitman -> 2 korban eksekusi dan pemain keluar menurut pengumuman -> 3 semua Hitman
 #       sudah diketahui: sisanya pasti baik -> 4 rekan Hitman dan Hostage gagal per target
 def pengetahuan_peran(ingatan, view):
@@ -1031,96 +898,13 @@ def pengetahuan_peran(ingatan, view):
     return {"hitman_diketahui": hitman_diketahui, "pasti_orang_baik": pasti_orang_baik, "rekan": rekan,
             "gagal_sandera": gagal_sandera}
 
-# ===== 3. KECURIGAAN, sudut pandang warga (Civilian, Spy, Stalker): 7 sistem =====
-
-# Tujuh sistem kecurigaan [FUZZY 1]. aturan[i][j] = keluaran saat input pertama tingkat ke-i dan input kedua tingkat
-# ke-j (rendah, sedang, tinggi).
-SISTEM_KECURIGAAN = {
-    "sentimen_sosial": {"input": ("tekanan", "dukungan"), "aturan": [[R_, R_, R_], [S_, R_, R_], [T_, S_, S_]],
-               "arti": "Banyak penuduh menaikkan kecurigaan; pembela menurunkannya."},
-    "perilaku_mencurigakan": {"input": ("plin_plan", "alihkan_tuduhan"), "aturan": [[R_, R_, S_], [R_, S_, T_], [S_, T_, T_]],
-                 "arti": "Plin-plan dan mengalihkan tuduhan saling menguatkan."},
-    "jejak": {"input": ("penuduh_dibungkam", "jejak_kedua"), "aturan": [[R_, S_, T_], [S_, T_, T_], [T_, T_, T_]],
-              "arti": "Satu jejak aksi Hitman yang kuat sudah cukup untuk tinggi."},
-    "kejanggalan": {"input": ("menuduh_orang_baik", "klaim_role_bermasalah"), "aturan": [[R_, S_, T_], [S_, S_, T_], [S_, T_, T_]],
-                "arti": "Menyerang pemain yang pasti bersih saja = sedang (bisa warga keliru); klaim bermasalah kuat = tinggi."},
-    "ucapan": {"input": ("sentimen_sosial", "perilaku_mencurigakan"), "aturan": [[R_, R_, S_], [R_, S_, T_], [S_, T_, T_]],
-               "arti": "Gabungan bukti lunak."},
-    "bukti_keras": {"input": ("jejak", "kejanggalan"), "aturan": [[R_, S_, T_], [S_, T_, T_], [T_, T_, T_]],
-                    "arti": "Gabungan bukti keras."},
-    "kecurigaan": {"input": ("ucapan", "bukti_keras"), "aturan": [[R_, S_, T_], [S_, S_, T_], [S_, T_, T_]],
-                   "arti": "Bukti lunak saja maksimal sedang; bukti keras tinggi langsung tinggi."},
-}
-
-daftarkan_sistem(SISTEM_KECURIGAAN)
-
-# Urutan hitung kecurigaan: (sistem, input pertama, input kedua), empat sistem bukti dulu, lalu gabungannya.
-HIERARKI = [
-    ("sentimen_sosial", "tekanan", "dukungan"),
-    ("perilaku_mencurigakan", "plin_plan", "alihkan_tuduhan"),
-    ("jejak", "penuduh_dibungkam", "jejak_kedua"),
-    ("kejanggalan", "menuduh_orang_baik", "klaim_role_bermasalah"),
-    ("ucapan", "sentimen_sosial", "perilaku_mencurigakan"),
-    ("bukti_keras", "jejak", "kejanggalan"),
-    ("kecurigaan", "ucapan", "bukti_keras"),
-]
-
-# Kecurigaan warga lewat hierarki Mamdani: empat sistem bukti → dua sistem gabungan → kecurigaan.
-# Menerima tabel = hasil hitung_bukti, satu baris per pemain (9 bukti 0–1, p_sandera, kandidat).
-# Hasilnya salinan tabel + jejak_kedua, sentimen_sosial, perilaku_mencurigakan, jejak, kejanggalan, ucapan, bukti_keras, kecurigaan_mentah (0–1), dan
-#   kecurigaan = kecurigaan_mentah × (1 − p_sandera); bukan kandidat (mati, atau bot sendiri) bernilai 0.
-# Dipanggil oleh putuskan di fuzzy_2 (warga: tabel bukti pribadi; Hitman: tabel publik, bahan fitur Hitman).
-# Alur: 1 tiap pemain: ambil 7 bukti dan jejak_kedua -> 2 hitung sistem HIERARKI dari bawah ke atas -> 3
-#       kecurigaan dikali (1 - p_sandera) -> 4 gabung ke tabel
-def nilai_kecurigaan(tabel):
-    baris = []
-    for _, b in tabel.iterrows():
-        nilai = {k: float(b[k]) for k in ("tekanan", "dukungan", "plin_plan", "alihkan_tuduhan", "penuduh_dibungkam",
-                                          "menuduh_orang_baik", "klaim_role_bermasalah")}
-        # Setiap sistem hanya punya dua input, jadi dua jejak aksi berbagi satu input.
-        nilai["jejak_kedua"] = max(float(b["ikut_salah_eksekusi"]), float(b["memihak_hitman"]))
-        # Keluaran 0–100 dibagi 100 agar bisa menjadi input 0–1 sistem berikutnya.
-        for sistem, x, y in HIERARKI:
-            nilai[sistem] = fuzzy(sistem, nilai[x], nilai[y]) / 100
-        # jejak_kedua dan enam keluaran antara, untuk jejak penalaran.
-        antara = {"jejak_kedua": nilai["jejak_kedua"], **{s: nilai[s] for s, _, _ in HIERARKI[:-1]}}
-        # Korban Hostage (diumumkan, p_sandera = 1) bukan Hitman, jadi kecurigaannya menjadi 0.
-        baris.append({**antara, "kecurigaan_mentah": nilai["kecurigaan"],
-                      "kecurigaan": nilai["kecurigaan"] * (1 - b["p_sandera"]) if b["kandidat"] else 0.0})
-    return pd.concat([tabel, pd.DataFrame(baris, index=tabel.index)], axis=1)
-
-# Fakta pasti menimpa hasil penalaran untuk role warga. Klaim bersih dari pengaku Stalker hampir pasti benar bila
-# Hitman hanya satu: klaim bersih palsu dari Hitman tetap menunjuk warga, dan warga tidak diuntungkan berbohong.
-# Bila Hitman lebih dari satu, Hitman bisa membersihkan rekannya, jadi bobot klaimnya sudah dipotong di hitung_bukti.
-# Kecurigaan pemain itu dikali (1 − bobot klaim); klaim yang pasti bohong sudah dibuang sebelumnya.
-# Menerima tabel hasil nilai_kecurigaan dan pengetahuan_peran. Keluaran: salinan tabel + kolom fakta.
-# Alur: 1 salin tabel -> 2 tiap kandidat: Hitman hasil Peek = 1, pasti baik = 0, diklaim bersih = dikali
-#       (1 − bobot klaim)
-def terapkan_pengetahuan(tabel, pengetahuan):
-    tabel = tabel.copy()
-    tabel["fakta"] = ""
-    for i, b in tabel.iterrows():
-        if not b["kandidat"]:
-            continue
-        if b["pemain"] in pengetahuan["hitman_diketahui"]:
-            tabel.loc[i, "kecurigaan"] = 1.0
-            tabel.loc[i, "fakta"] = "hasil Peek: Hitman"
-        elif b["pemain"] in pengetahuan["pasti_orang_baik"]:
-            tabel.loc[i, "kecurigaan"] = 0.0
-            tabel.loc[i, "fakta"] = "pasti bukan Hitman"
-        elif b.get("bersih_klaim", 0.0) > 0:
-            faktor = 1 - b["bersih_klaim"]
-            # Skor dan pemutus serinya ikut diskalakan.
-            tabel.loc[i, "kecurigaan"] = b["kecurigaan"] * faktor
-            tabel.loc[i, "bukti_total"] = b["bukti_total"] * faktor
-            tabel.loc[i, "fakta"] = "diklaim bersih oleh pengaku Stalker"
-    return tabel
+# ===== 5. BAHAN PER ROLE SESUDAH KECURIGAAN: fitur Spy dan fitur Hitman =====
 
 # Fitur Spy: seberapa mungkin tiap pemain diincar Hitman, dari sudut pandang warga. Hasilnya (ctx["lindung"]) menjadi
 # bahan kandidat Guard di calon_aksi.
 # Menerima ingatan, view, tabel = bukti pribadi berisi kecurigaan (sesudah terapkan_pengetahuan).
 # Hasilnya DataFrame per pemain hidup {menuduh_tersangka, mengaku_stalker, pengaruh, terancam}.
-# Dipanggil oleh putuskan di fuzzy_2 (role Spy).
+# Dipanggil oleh fuzzy_controller.putuskan (role Spy).
 # Alur: 1 relasi chat, vote, klaim, dan pengaruh dari sudut pandang bot -> 2 tiap pemain hidup: menuduh tersangka kuat,
 #       mengaku Stalker, pengaruh -> 3 terancam = nilai terbesar ketiganya
 def fitur_lindung(ingatan, view, tabel):
@@ -1152,18 +936,17 @@ def fitur_lindung(ingatan, view, tabel):
                       "terancam": min(1.0, max(menuduh_tersangka, mengaku_stalker, 0.8 * nilai_pengaruh))})
     return pd.DataFrame(baris)
 
-# ===== 4. ANCAMAN + KAMBING HITAM, sudut pandang Hitman: 4 sistem =====
-
 # Kolom tabel fitur_hitman; tabel tanpa warga tetap memakai kolom ini.
 KOLOM_HITMAN = ["pemain", "menuduh_tim", "pengaruh", "mengaku_role_penting", "kecurigaan_publik", "kredibilitas",
                 "dukungan_suara", "ancaman_sekarang", "bicara_ronde_ini", "jejak_tuduhan"]
 
 # Fitur Hitman: ancaman tiap warga dan citra publiknya, serta risiko diri sendiri. Rekan Syndicate dan korban Hostage tidak
 # pernah menjadi target, jadi tidak masuk tabel ini (tidak dituduh, tidak di-vote sebagai kambing hitam, tidak disandera/di-Gag).
-# Tabelnya lalu dinilai Mamdani (ancaman, kambing hitam) dan menjadi bahan kandidat chat, vote, dan aksi Hitman.
+# Tabelnya lalu dinilai fuzzy ancaman dan kambing (fuzzy_controller.nilai_ancaman) dan menjadi bahan kandidat chat, vote,
+# dan aksi Hitman.
 # Menerima ingatan, view, publik = tabel publik yang sudah dinilai nilai_kecurigaan, pengetahuan, konteks.
 # Hasilnya (DataFrame kolom KOLOM_HITMAN, satu baris per warga hidup yang bebas; diri {risiko_saya, suara_saya, korban_gag_tim}).
-# Dipanggil oleh putuskan di fuzzy_2 (role Hitman).
+# Dipanggil oleh fuzzy_controller.putuskan (role Hitman).
 # Alur: 1 relasi chat, vote, klaim, dan pengaruh dari sudut pandang publik -> 2 tiap warga bebas: tuduhan ke Syndicate,
 #       jejak bila dibungkam, klaim role penting, citra publik -> 3 risiko dan porsi suara bot sendiri
 def fitur_hitman(ingatan, view, publik, pengetahuan, konteks):
@@ -1219,37 +1002,3 @@ def fitur_hitman(ingatan, view, publik, pengetahuan, konteks):
     diri = {"risiko_saya": float(pub.loc[bot, "kecurigaan"]), "suara_saya": konteks["porsi_suara"].get(bot, 0.0),
             "korban_gag_tim": list(view["saya"].get("korban_gag_tim", []))}
     return pd.DataFrame(baris, columns=KOLOM_HITMAN), diri
-
-# Empat sistem Hitman [FUZZY 1]: ancaman_langsung dan ancaman_peran → ancaman (target Hostage dan Gag), dan kambing
-# → kambing_hitam (target tuduhan dan vote).
-SISTEM_ANCAMAN = {
-    "ancaman_langsung": {"input": ("menuduh_tim", "pengaruh"), "aturan": [[R_, R_, S_], [S_, S_, T_], [T_, T_, T_]],
-                         "arti": "Penuduh Hitman berbahaya, apalagi jika tuduhannya diikuti orang lain."},
-    "ancaman_peran": {"input": ("mengaku_role_penting", "kredibilitas"), "aturan": [[R_, R_, S_], [S_, S_, T_], [T_, T_, T_]],
-                      "arti": "Pengaku Stalker/Spy dan pemain yang dipercaya berbahaya."},
-    "ancaman": {"input": ("ancaman_langsung", "ancaman_peran"), "aturan": [[R_, S_, T_], [S_, T_, T_], [T_, T_, T_]],
-                "arti": "Salah satu ancaman tinggi sudah cukup."},
-    "kambing": {"input": ("kecurigaan_publik", "dukungan_suara"), "aturan": [[R_, R_, S_], [S_, S_, T_], [T_, T_, T_]],
-                "arti": "Kambing hitam terbaik: sudah terlihat mencurigakan atau sudah mulai di-vote warga."},
-}
-
-daftarkan_sistem(SISTEM_ANCAMAN)
-
-# Ancaman dan kambing hitam tiap warga untuk bot Hitman: tiga sistem ancaman bertingkat dan satu sistem kambing.
-# Menerima fitur = hasil fitur_hitman, satu baris per warga hidup (menuduh_tim, pengaruh, mengaku_role_penting, ...; 0–1).
-# Hasilnya salinan fitur + ancaman_langsung, ancaman_peran, ancaman (input sistem sandera, pemutus seri Gag), dan
-#   kambing_hitam (target tuduhan dan vote Hitman); semuanya 0–1.
-# Dipanggil oleh putuskan di fuzzy_2 (Hitman); kolomnya menjadi bahan kandidat chat, vote, dan aksi rahasia Hitman.
-# Alur: 1 tiap warga: ancaman_langsung dan ancaman_peran -> 2 ancaman gabungan -> 3 kambing_hitam -> 4 gabung
-#       ke tabel fitur
-def nilai_ancaman(fitur):
-    baris = []
-    for _, r in fitur.iterrows():
-        langsung = fuzzy("ancaman_langsung", r["menuduh_tim"], r["pengaruh"]) / 100
-        peran = fuzzy("ancaman_peran", r["mengaku_role_penting"], r["kredibilitas"]) / 100
-        baris.append({"ancaman_langsung": langsung, "ancaman_peran": peran,
-                      "ancaman": fuzzy("ancaman", langsung, peran) / 100,
-                      "kambing_hitam": fuzzy("kambing", r["kecurigaan_publik"], r["dukungan_suara"]) / 100})
-    # Kolom ditulis eksplisit agar tabel tanpa warga pun tetap punya kolom yang sama.
-    kolom = ["ancaman_langsung", "ancaman_peran", "ancaman", "kambing_hitam"]
-    return pd.concat([fitur, pd.DataFrame(baris, index=fitur.index, columns=kolom)], axis=1)

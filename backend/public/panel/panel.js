@@ -1346,7 +1346,7 @@ const ALUR_AI = {
   fl: {
     metode: 'fuzzy',
     judul: 'FL · Fuzzy Mamdani',
-    kode: 'fuzzy_2.putuskan',
+    kode: 'fuzzy_controller.putuskan',
     tujuan: 'Menalar dengan aturan bahasa manusia (rendah/sedang/tinggi).',
     proses:
       'Bukti → sistem fuzzy bertingkat → kecurigaan. Chat yang dinilai, vote, Gag, dan Peek diberi prioritas 0–100. Bela diri dan jawab dikirim tanpa nilai; Hostage dan Guard memakai nilai 0–1 tanpa fuzzy.',
@@ -1375,7 +1375,7 @@ const ALUR_AI = {
   fl_3: {
     metode: 'fuzzy',
     judul: 'Agregasi + defuzzifikasi',
-    kode: 'fuzzy(nama, a, b) · nilai_kecurigaan (HIERARKI)',
+    kode: 'fuzzy/mesin.hitung · fuzzy/kecurigaan.py · nilai_kecurigaan (pohon)',
     tujuan: 'Menggabungkan aturan menjadi satu angka.',
     proses:
       'Keluaran aturan digabung (max), lalu centroid → 0–100. Bertingkat: sentimen_sosial, perilaku_mencurigakan, jejak, kejanggalan, ucapan, bukti_keras → kecurigaan.',

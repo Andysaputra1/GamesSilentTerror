@@ -825,7 +825,7 @@ class SocketGameTests(unittest.IsolatedAsyncioTestCase):
 class ChatOrderTests(unittest.TestCase):
     # Chat yang terbaca bot dalam satu langkah harus tetap kronologis (audit AI 1 Okt: ID UUID mengacak urutan).
     def test_bot_memory_keeps_chat_order_within_one_snapshot(self):
-        from app.bot import fuzzy_1
+        from app.bot import ingatan as ingatan_bot
         from app.bot.nlu import baca_chat_baru
 
         class NLUTiruan:
@@ -842,10 +842,10 @@ class ChatOrderTests(unittest.TestCase):
             match = Match(["Andi", "Budi", "Citra", "Dodi"], [])
             match.add_message("Andi", "Aku curiga sama Budi")
             match.add_message("Budi", "Justru Citra yang aneh")
-            ingatan = fuzzy_1.Ingatan("Dodi")
+            ingatan = ingatan_bot.Ingatan("Dodi")
             view = ingatan.sinkron_snapshot(match.snapshot("Dodi"), match.deadline - 60)
             baca_chat_baru(NLUTiruan(), ingatan, [p["nama"] for p in view["pemain"]], 0)
-            tabel, _ = fuzzy_1.hitung_bukti(ingatan, view)
+            tabel, _ = ingatan_bot.hitung_bukti(ingatan, view)
             budi = tabel[tabel["pemain"] == "Budi"].iloc[0]
             self.assertEqual(budi["alihkan_tuduhan"], 1.0)  # dituduh lalu hanya menuduh pihak ketiga
 
@@ -861,15 +861,15 @@ class ChatTimeTests(unittest.TestCase):
         self.assertEqual(match.snapshot("Citra")["messages"][1]["time"], 12.5)
 
     def test_bot_reads_server_time_and_keeps_order_on_equal_times(self):
-        from app.bot import fuzzy_1
+        from app.bot import ingatan as ingatan_bot
 
         match = Match(["Andi", "Budi", "Citra", "Dodi"], [], now=0.0)
         match.add_message("Andi", "Halo.", now=5.0)
         match.add_message("Budi", "Hai.", now=5.0)
-        ingatan = fuzzy_1.Ingatan("Dodi")
+        ingatan = ingatan_bot.Ingatan("Dodi")
         ingatan.sinkron_snapshot(match.snapshot("Dodi"), 30.0)
         self.assertEqual([c["waktu"] for c in ingatan.chat], [5.0, 5.0])
-        self.assertEqual([c["pengirim"] for c in fuzzy_1._chat_urut(ingatan)], ["Andi", "Budi"])
+        self.assertEqual([c["pengirim"] for c in ingatan_bot._chat_urut(ingatan)], ["Andi", "Budi"])
 
 
 class DisplayNameTests(unittest.TestCase):
