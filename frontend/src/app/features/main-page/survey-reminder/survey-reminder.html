@@ -11,7 +11,7 @@
       @for (item of pending; track item.match_id) {
         <li>
           <p>
-            Ayo isi survei untuk game ruangan <b>{{ item.room_code }}</b>
+            Mohon isi survei untuk pertandingan di ruangan <b>{{ item.room_code }}</b>
             <small
               >{{ roleLabel[item.role] ?? item.role }} ·
               {{ item.outcome === 'won' ? 'Menang' : 'Kalah' }}</small

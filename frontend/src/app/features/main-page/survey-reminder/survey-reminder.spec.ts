@@ -78,7 +78,7 @@ describe('SurveyReminder', () => {
     const { page } = create();
     const items = page().querySelectorAll('.reminder__list li');
     expect(items.length).toBe(2);
-    expect(items[0].textContent).toContain('Ayo isi survei untuk game ruangan QWE456');
+    expect(items[0].textContent).toContain('Mohon isi survei untuk pertandingan di ruangan QWE456');
     expect(items[0].textContent).toContain('Hitman · Menang');
     expect(items[1].textContent).toContain('Spy · Kalah');
     expect(items[0].querySelector('time')?.textContent).toBe('20 Okt 2026, 17.00 WIB');
