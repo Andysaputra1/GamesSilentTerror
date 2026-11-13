@@ -12,14 +12,18 @@ from app.bot.nlg import (
     MAKSUD_AKSI,
     PERSONA,
     VARIASI,
+    VARIASI_PERSONA,
+    bentuk_dasar,
     buat_prompt,
     fakta_disalin,
+    isi_templat,
     kalimat_templat,
     kelompok_varian,
     klaim_diri,
     nilai_kalimat,
     periksa_aturan,
     tulis_pesan,
+    ubah_kata_ganti,
 )
 
 # fmt: off
@@ -325,3 +329,61 @@ class PayloadTemplatTests(unittest.TestCase):
         assert not fakta_disalin("Jangan vote aku, masih terlalu awal, buktinya belum ada.", kasus_uji["B18"]["payload"], "santai")
         assert not fakta_disalin("Jangan vote aku dan Budi, aku Stalker, aku semalam peek Budi, dia bukan Hitman.", kasus_uji["B24"]["payload"], "santai")
         # fmt: on
+
+
+class VarianKembarTests(unittest.TestCase):
+    # Varian persona: setiap persona punya daftar sendiri di setiap kelompok, ditulis dengan kata gantinya sendiri, tidak kembar
+    # dengan varian lain, dan semuanya lolos pemeriksa aturan untuk kasus bawaan kelompok itu.
+    def test_varian_persona_lolos_aturan_di_semua_persona(self):
+        # fmt: off
+        kasus = {kelompok_varian(r["payload"]): r for r in KASUS_BAWAAN}
+        kata_ganti_lain = {"santai": r"\b(?:gw|gue|gua|lu|lo|saya)\b", "gaul": r"\b(?:aku|kamu|saya)\b", "kalem": r"\b(?:aku|gw|gue|gua|lu|lo)\b"}
+        assert set(VARIASI_PERSONA) <= set(VARIASI) and set(kata_ganti_lain) == set(PERSONA)
+        for kelompok, per_persona in VARIASI_PERSONA.items():
+            assert set(per_persona) == set(PERSONA), kelompok
+            r = kasus[kelompok]
+            for persona, daftar in per_persona.items():
+                bersama = {bentuk_dasar(ubah_kata_ganti(t, persona)) for t in (isi_templat(x, r["payload"]) for x in VARIASI[kelompok]) if t}
+                sendiri = [isi_templat(pola, r["payload"]) for pola in daftar]
+                assert None not in sendiri, (kelompok, persona)
+                assert len({bentuk_dasar(t) for t in sendiri}) == len(sendiri) and not bersama & {bentuk_dasar(t) for t in sendiri}, (kelompok, persona)
+                for teks in sendiri:
+                    assert not re.search(kata_ganti_lain[persona], teks.casefold()), (kelompok, persona, teks)
+                    assert ubah_kata_ganti(teks, persona) == teks, (kelompok, persona, teks)
+                    assert not nilai_kalimat(teks, r["payload"], konteks_dari(r))["pelanggaran"], (kelompok, persona, teks)
+                    assert teks in kalimat_templat(r["payload"], persona), (kelompok, persona, teks)
+        # fmt: on
+
+    # Bot yang sama mengulang rencana yang sama dalam satu ronde (bela diri di Tribunal bisa sampai sepuluh kali). Dengan
+    # hindari seperti BrainRuntime.tulis, kalimatnya tidak persis sama selama masih ada varian yang belum dipakai; sesudah
+    # semua terpakai, yang paling lama tidak dipakai muncul lagi. Masukan yang sama selalu memberi kalimat yang sama.
+    # Persis = sama bentuk dasarnya, jadi varian yang hanya beda tanda baca terhitung satu.
+    def test_bot_tidak_mengulang_kalimat_persis_dalam_satu_ronde(self):
+        for r in KASUS_BAWAAN:
+            konteks = konteks_dari(r)
+            chat = tuple(c["teks"] for c in konteks["chat_terbaru"])
+            for persona in PERSONA:
+                riwayat = []
+                for _ in range(len({bentuk_dasar(t) for t in kalimat_templat(r["payload"], persona)})):
+                    hindari = tuple(riwayat[-12:]) + chat
+                    teks = tulis_pesan(r["payload"], konteks, None, persona, hindari=hindari)["teks"]
+                    self.assertEqual(teks, tulis_pesan(r["payload"], konteks, None, persona, hindari=hindari)["teks"])
+                    riwayat.append(teks)
+                with self.subTest(kasus=r["sumber"], persona=persona):
+                    self.assertEqual(len({bentuk_dasar(t) for t in riwayat}), len(riwayat), riwayat)
+                    lagi = tulis_pesan(r["payload"], konteks, None, persona, hindari=tuple(riwayat[-12:]) + chat)["teks"]
+                    self.assertEqual(lagi, riwayat[0])
+
+    # Kalimat yang baru dikirim bot lain di room juga dihindari, termasuk bentuk persona lain ("Gw ..." sama dengan "Aku ...").
+    def test_kalimat_bot_lain_tidak_dikembari(self):
+        for r in KASUS_BAWAAN:
+            konteks = konteks_dari(r)
+            chat = tuple(c["teks"] for c in konteks["chat_terbaru"])
+            for persona in PERSONA:
+                if len(kalimat_templat(r["payload"], persona)) < 2:
+                    continue
+                for lain in PERSONA:
+                    sudah = tulis_pesan(r["payload"], konteks, None, lain, hindari=chat)["teks"]
+                    teks = tulis_pesan(r["payload"], konteks, None, persona, hindari=chat + (sudah,))["teks"]
+                    with self.subTest(kasus=r["sumber"], persona=persona, lain=lain):
+                        self.assertNotEqual(bentuk_dasar(teks), bentuk_dasar(sudah))
