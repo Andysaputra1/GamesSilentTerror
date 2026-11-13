@@ -91,7 +91,7 @@ def skip(code: str, body: SkipOption, user=Depends(require_authenticated_user)):
 
 
 @router.post("/{code}/start")
-# START: otorisasi host dan jumlah peserta dilakukan di RoomService.
+# START: otorisasi host dicek RoomService; batas 4–10 peserta dicek Match saat pertandingan dibuat.
 def start(code: str, body: StartOption, user=Depends(require_authenticated_user)):
     return _jalankan_perintah_game(lambda: room_service.start(code, user.username, body.quick))
 
@@ -151,7 +151,8 @@ def team_chat(code: str, body: TeamChatOption, user=Depends(require_authenticate
 
 
 @router.post("/{code}/leave")
-# LEAVE: keluar saat pertandingan aktif = tereliminasi seperti dieksekusi (`left`); idempoten.
+# LEAVE: keluar saat pertandingan aktif = tereliminasi seperti dieksekusi (`left`). Aman diulang selama room masih
+# ada; sesudah room dihapus (anggota terakhir keluar) panggilan berikutnya mendapat 400.
 def leave(code: str, user=Depends(require_authenticated_user)):
     _jalankan_perintah_game(lambda: room_service.leave(code, user.username))
     return {"left": True}

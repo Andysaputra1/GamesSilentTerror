@@ -281,8 +281,9 @@ class Match:
             max(persiapan["min_until"], persiapan["ready_at"] + PREPARATION_COUNTDOWN_SECONDS),
         )
 
-    # Mulai sesuai countdown; UI membuka kartu otomatis lima detik sebelum mulai.
-    # Tombol Siap maupun pembukaan kartu terakhir tidak melewati waktu baca minimum.
+    # Mulai sesuai jadwal (_hitung_waktu_mulai: waktu baca, AI siap + countdown, batas tunggu); UI membuka kartu
+    # otomatis lima detik sebelum mulai. Tombol Siap dan buka kartu hanya memicu pengecekan ulang jadwal, tidak
+    # mempercepatnya (persetujuan Siap hanya ditampilkan sebagai jumlah).
     def try_begin(self, now=None):
         waktu_mulai = self._hitung_waktu_mulai() if self.phase == "preparing" else None
         if waktu_mulai is None:
@@ -570,7 +571,8 @@ class Match:
             f"{self.labels[name]} meninggalkan permainan.{self._catatan_tersingkir()}"
         )
         self.check_winner()
-        # Fase tidak menunggu pemain yang keluar: persiapan dan skip diskusi dicek ulang.
+        # Sesudah pemain keluar: saat siang, skip diskusi dicek ulang tanpa menunggu persetujuannya; saat persiapan,
+        # jadwal mulai dicek ulang (persiapan memang tidak menunggu pemain).
         now = time.time() if now is None else now
         if self.phase == "preparing":
             self.try_begin(now)
@@ -732,7 +734,8 @@ class Match:
             else:
                 self.try_begin(now)
             return
-        # Scheduler LLM mendapat waktu memilih; fallback aturan hanya mengisi pilihan yang kosong di deadline.
+        # Otak bot (Fuzzy) memilih selama fase berjalan; aksi cadangan engine (run_bots) hanya mengisi pilihan bot yang
+        # masih kosong di deadline.
         if self.phase != "finished" and now >= self.deadline:
             self.run_bots()
         if self.phase == "finished" or now < self.deadline:

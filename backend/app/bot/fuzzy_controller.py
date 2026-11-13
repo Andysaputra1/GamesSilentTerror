@@ -1326,7 +1326,8 @@ def batasan_nlg(rencana):
 # Menerima rencana chat (keluaran keputusan_chat), view (nama bot).
 # Hasilnya {pembicara, aksi, jenis, intent, target, role_diakui, bukti_klaim, relasi_tambahan, bukti, gaya, batasan, cadangan}
 #   (+ penanya dan paket untuk jawab), atau None bila bot tidak chat.
-# Dipanggil oleh putuskan (kunci nlg) → npc_nlg menulis kalimat lalu memeriksanya dengan aturan.
+# Dipanggil oleh putuskan (kunci nlg) → nlg_controller.tulis_pesan menulis kalimat lalu memeriksanya dengan aturan
+# (nlg/aturan.py).
 def siapkan_nlg(rencana, view):
     if not rencana["kirim"]:
         return None

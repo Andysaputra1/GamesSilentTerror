@@ -12,18 +12,22 @@ from time import monotonic
 from app.bot.nlg.aturan import buang_pikiran
 from app.config.settings import JALUR_PENULIS_NPC
 
+# Model bawaan jalur OpenRouter bila panel dan .env tidak memilih model lain (produksi memilih model lewat panel
+# Otak NPC, sekarang google/gemini-2.5-flash).
 MODEL_OPENROUTER = "qwen/qwen3-14b"
-
+# Model bawaan jalur tautan (LLM sendiri lewat ai-docker) bila tidak dipilih lain; bila tidak tersedia, dipakai
+# model sekeluarga.
 MODEL_TAUTAN = "qwen3:14b"
-
+# Batas token jawaban LLM per permintaan; kalimat bot hanya 1–2 kalimat, sisanya ruang aman.
 MAKS_TOKEN_LLM = 1024
-
+# Batas waktu satu permintaan HTTP ke LLM (detik). nlg_controller juga hanya mencoba ulang bila percobaan sebelumnya
+# selesai sebelum batas ini, supaya kalimat tetap tepat waktu.
 BATAS_WAKTU_DETIK = 20
-
+# Batas waktu cek kesehatan jalur penulis di latar (kunci, model, link), detik.
 BATAS_CEK_DETIK = 8
-
+# Jalur yang gagal sementara diistirahatkan selama ini (detik), berlipat dua setiap gagal beruntun ...
 JEDA_GAGAL_DETIK = 30
-
+# ... sampai paling lama sekian detik.
 JEDA_MAKS_DETIK = 300
 
 # Jalur rantai penulis yang dikenal game; sama dengan pilihan NPC_WRITER_ORDER di pengaturan.

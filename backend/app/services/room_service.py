@@ -371,7 +371,8 @@ class RoomService:
             room.match.tick()
             return {"room": self.snapshot(room), "game": room.match.snapshot(username)}
 
-    # SIAP: manusia boleh mempercepat layar persiapan setelah membaca panduan; AI tetap harus siap.
+    # SIAP: manusia menandai sudah membaca panduan. Tanda ini hanya ditampilkan sebagai jumlah yang setuju;
+    # jadwal mulai ronde 1 tetap mengikuti waktu baca, kesiapan AI, dan hitung mundur (Match._hitung_waktu_mulai).
     @traced
     def ready(self, code, username, *, match_id):
         with self.lock:
