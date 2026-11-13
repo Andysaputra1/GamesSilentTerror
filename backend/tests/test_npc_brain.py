@@ -17,6 +17,7 @@ from app.bot.bot_controller import LANTAI_MAKS, BrainRuntime, NPCService, catat_
 from app.bot.nlu import NLUBersama, baca_chat, baca_chat_baru
 from app.services.persistence_service import PersistenceError
 from app.services.room_service import RoomService
+from tests.palsu.bot_lobby import isi_kursi_bot
 from tests.palsu.arsip_palsu import arsip_bot_palsu
 from tests.palsu.nlu_palsu import NLUPalsu
 from app.bot.nlg.prompt import MAKSUD_AKSI, buat_prompt
@@ -307,7 +308,7 @@ class NPCServiceBrainTests(unittest.IsolatedAsyncioTestCase):
         self.runtime = runtime_siap()
         self.rooms = RoomService()
         self.room = self.rooms.create("human")
-        self.rooms.set_bot(self.room.code, "human", True)
+        isi_kursi_bot(self.rooms, self.room.code, "human")
         self.rooms.start(self.room.code, "human")
         self.match = self.room.match
         self.sio = Mock(emit=AsyncMock())

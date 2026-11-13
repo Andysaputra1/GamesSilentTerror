@@ -1,9 +1,15 @@
 import unittest
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 from sqlalchemy.exc import OperationalError
 
-from app.services.room_service import RoomService
+from app.controllers.rooms import router
+from app.middleware.auth import require_authenticated_user
+from app.services.room_service import BOT_MAKS, RoomService
+from tests.palsu.bot_lobby import isi_kursi_bot
 from app.services.checker_service import checker_service
 from app.services.auth_service import SessionValidationError
 from app.sockets import chat, server
@@ -21,13 +27,13 @@ class RoomTests(unittest.TestCase):
     def test_create_join_and_bot_permissions(self):
         room = self.rooms.create("alice")
         self.assertRegex(room.code, r"^[A-F0-9]{6}$")
-        self.assertFalse(room.bot_enabled)
+        self.assertEqual(room.jumlah_bot, 0)
         self.rooms.join(room.code.lower(), "bob")
         self.rooms.join(room.code, "bob")
         self.assertEqual(room.members, ["alice", "bob"])
         with self.assertRaises(ValueError):
-            self.rooms.set_bot(room.code, "bob", True)
-        self.assertTrue(self.rooms.set_bot(room.code, "alice", True).bot_enabled)
+            self.rooms.ubah_bot(room.code, "bob", "tambah")
+        self.assertEqual(self.rooms.ubah_bot(room.code, "alice", "tambah").jumlah_bot, 1)
 
     # TES LOBBY: tolak akses nonanggota, kode hilang, dan join melebihi kapasitas.
     def test_missing_nonmember_and_full_room(self):
@@ -46,7 +52,7 @@ class RoomTests(unittest.TestCase):
     def test_finished_match_releases_members_for_a_new_room(self):
         lama = self.rooms.create("alice", capacity=4)
         self.rooms.join(lama.code, "bob")
-        self.rooms.set_bot(lama.code, "alice", True)
+        isi_kursi_bot(self.rooms, lama.code, "alice")
         self.rooms.start(lama.code, "alice")
         lama.match.finish("civilians", "hitman_executed", "Hitman dieksekusi.")
         baru = self.rooms.create("alice")
@@ -56,6 +62,120 @@ class RoomTests(unittest.TestCase):
         self.assertNotIn(lama.code, self.rooms.rooms)  # room lama yang kosong dibersihkan
         with self.assertRaises(ValueError):
             self.rooms.create("bob")  # masih anggota lobby baru yang belum mulai
+
+
+class BotLobbyTests(unittest.TestCase):
+    """Host menambah atau mengurangi bot satu per satu, paling banyak BOT_MAKS, dan hanya selama masih di lobby."""
+
+    def setUp(self):
+        self.rooms = RoomService()
+
+    # Room milik alice, lalu alice menekan tombol bot sebanyak `tekan` kali.
+    # Alur: 1 buat room -> 2 tekan Tambah bot -> 3 kembalikan room
+    def room_dengan_bot(self, tekan=0, capacity=6):
+        room = self.rooms.create("alice", capacity=capacity)
+        for _ in range(tekan):
+            self.rooms.ubah_bot(room.code, "alice", "tambah")
+        return room
+
+    def test_tambah_satu_per_satu_sesuai_urutan_nama(self):
+        room = self.room_dengan_bot()
+        self.assertEqual(self.rooms.snapshot(room)["bots"], [])
+        for jumlah in range(1, 4):
+            self.rooms.ubah_bot(room.code, "alice", "tambah")
+            lobby = self.rooms.snapshot(room)
+            self.assertEqual(lobby["bots"], ["NOX", "ECHO", "VEIL"][:jumlah])
+            self.assertEqual((lobby["bot_count"], lobby["bot_max"]), (jumlah, BOT_MAKS))
+        self.assertNotIn("bot_enabled", lobby)
+
+    def test_paling_banyak_lima_bot_walau_kursi_masih_kosong(self):
+        room = self.room_dengan_bot(tekan=BOT_MAKS, capacity=10)
+        self.assertEqual(BOT_MAKS, 5)
+        with self.assertRaisesRegex(ValueError, "Bot paling banyak 5."):
+            self.rooms.ubah_bot(room.code, "alice", "tambah")
+        self.assertEqual(self.rooms.bot_names(room), ["NOX", "ECHO", "VEIL", "RAVEN", "ASH"])
+
+    def test_kursi_penuh_menolak_bot_baru(self):
+        room = self.room_dengan_bot(tekan=3, capacity=4)
+        with self.assertRaisesRegex(ValueError, "Kursi penuh"):
+            self.rooms.ubah_bot(room.code, "alice", "tambah")
+        self.assertEqual(len(self.rooms.bot_names(room)), 3)
+
+    def test_kurangi_sampai_nol_lalu_ditolak(self):
+        room = self.room_dengan_bot(tekan=3)
+        for sisa in (2, 1, 0):
+            self.rooms.ubah_bot(room.code, "alice", "kurangi")
+            self.assertEqual(len(self.rooms.bot_names(room)), sisa)
+        with self.assertRaisesRegex(ValueError, "Belum ada bot"):
+            self.rooms.ubah_bot(room.code, "alice", "kurangi")
+        with self.assertRaises(ValueError):
+            self.rooms.ubah_bot(room.code, "alice", "hapus")
+
+    # Kursi penuh: manusia baru menggantikan bot terakhir; bila ia keluar sebelum mulai, bot itu kembali.
+    # Tombol berikutnya dihitung dari bot yang ikut, jadi Kurangi tetap mengurangi tepat satu.
+    def test_manusia_masuk_menggantikan_bot_terakhir(self):
+        room = self.room_dengan_bot(tekan=5)
+        self.rooms.join(room.code, "bob")
+        self.assertEqual(self.rooms.bot_names(room), ["NOX", "ECHO", "VEIL", "RAVEN"])
+        with self.assertRaisesRegex(ValueError, "Kursi penuh"):
+            self.rooms.ubah_bot(room.code, "alice", "tambah")
+        self.rooms.leave(room.code, "bob")
+        self.assertEqual(len(self.rooms.bot_names(room)), 5)
+        self.rooms.join(room.code, "bob")
+        self.rooms.ubah_bot(room.code, "alice", "kurangi")
+        self.assertEqual(self.rooms.bot_names(room), ["NOX", "ECHO", "VEIL"])
+
+    def test_hanya_host_di_lobby_yang_boleh_mengatur_bot(self):
+        room = self.room_dengan_bot(tekan=1)
+        self.rooms.join(room.code, "bob")
+        for orang in ("bob", "outsider"):
+            with self.subTest(orang=orang), self.assertRaises(ValueError):
+                self.rooms.ubah_bot(room.code, orang, "tambah")
+        with self.assertRaisesRegex(ValueError, "Hanya pembuat ruangan"):
+            self.rooms.ubah_bot(room.code, "bob", "kurangi")
+        self.assertEqual(len(self.rooms.bot_names(room)), 1)
+
+    def test_bot_terkunci_sesudah_pertandingan_mulai(self):
+        room = self.room_dengan_bot(tekan=3)
+        self.rooms.start(room.code, "alice")
+        for aksi in ("tambah", "kurangi"):
+            with (
+                self.subTest(aksi=aksi),
+                self.assertRaisesRegex(ValueError, "setelah pertandingan"),
+            ):
+                self.rooms.ubah_bot(room.code, "alice", aksi)
+        lobby = self.rooms.snapshot(room)
+        self.assertEqual((sorted(lobby["bots"]), lobby["bot_count"]), (["ECHO", "NOX", "VEIL"], 3))
+
+    def test_mulai_dengan_kurang_dari_empat_peserta_memberi_pesan_jelas(self):
+        room = self.room_dengan_bot(tekan=2)
+        with self.assertRaisesRegex(ValueError, "minimal 4 peserta"):
+            self.rooms.start(room.code, "alice")
+        self.assertIsNone(room.match)
+        self.rooms.ubah_bot(room.code, "alice", "tambah")
+        self.rooms.start(room.code, "alice")
+        self.assertEqual(len(room.match.players), 4)
+
+    def test_api_bot_menerima_satu_aksi_dan_mengembalikan_snapshot(self):
+        app = FastAPI()
+        app.include_router(router)
+        app.dependency_overrides[require_authenticated_user] = lambda: SimpleNamespace(
+            username="alice"
+        )
+        room = self.room_dengan_bot(tekan=4)
+        jalur = f"/api/rooms/{room.code}/bot"
+        with patch("app.controllers.rooms.room_service", self.rooms), TestClient(app) as client:
+            lobby = client.post(jalur, json={"aksi": "tambah"})
+            self.assertEqual(lobby.status_code, 200)
+            self.assertEqual((lobby.json()["bot_count"], lobby.json()["bot_max"]), (5, 5))
+            self.assertEqual(len(lobby.json()["bots"]), 5)
+            ditolak = client.post(jalur, json={"aksi": "tambah"})
+            self.assertEqual(
+                (ditolak.status_code, ditolak.json()["detail"]), (400, "Bot paling banyak 5.")
+            )
+            for body in ({"enabled": True}, {"aksi": "hapus"}, {}):
+                self.assertEqual(client.post(jalur, json=body).status_code, 422)
+            self.assertEqual(client.post(jalur, json={"aksi": "kurangi"}).json()["bot_count"], 4)
 
 
 class SocketRoomTests(unittest.IsolatedAsyncioTestCase):
@@ -125,7 +245,7 @@ class SocketRoomTests(unittest.IsolatedAsyncioTestCase):
             with self.subTest(change=change):
                 rooms = RoomService()
                 room = rooms.create("alice")
-                rooms.set_bot(room.code, "alice", True)
+                isi_kursi_bot(rooms, room.code, "alice")
                 rooms.start(room.code, "alice")
                 real_begin = checker_service.begin
 
@@ -152,7 +272,7 @@ class SocketRoomTests(unittest.IsolatedAsyncioTestCase):
     async def test_error_after_delivery_is_not_sent_as_rejection(self):
         rooms = RoomService()
         room = rooms.create("alice")
-        rooms.set_bot(room.code, "alice", True)
+        isi_kursi_bot(rooms, room.code, "alice")
         rooms.start(room.code, "alice")
         room.match.phase = "day"
         sambungan = {"sid": {"username": "alice", "token": "alice", "room": room.code}}
@@ -170,7 +290,7 @@ class SocketRoomTests(unittest.IsolatedAsyncioTestCase):
         rooms = RoomService()
         room = rooms.create("alice")
         other = rooms.create("bob")
-        rooms.set_bot(room.code, "alice", True)
+        isi_kursi_bot(rooms, room.code, "alice")
         sambungan = {"sid": {"username": "alice", "token": "alice", "room": room.code}}
         with (
             socket_palsu(rooms, sambungan) as sio,
@@ -218,7 +338,7 @@ class DisplayNameRoomTests(unittest.TestCase):
         ):
             room = rooms.create("alice")
             rooms.join(room.code, "bob")
-            rooms.set_bot(room.code, "alice", True)
+            isi_kursi_bot(rooms, room.code, "alice")
             lobby = rooms.snapshot(room)
             self.assertEqual(
                 [m["label"] for m in lobby["members"]], ["Alice Wonder", "Alice Wonder"]

@@ -1,7 +1,8 @@
 """Daftar lobby aktif untuk satu proses backend. Restart menghapus semua room aktif.
 
 Alurnya di lobby
-1. Host membuat room (create), pemain lain bergabung dengan kodenya (join), host boleh menyalakan bot pengisi kursi kosong (set_bot)
+1. Host membuat room (create), pemain lain bergabung dengan kodenya (join), host menambah atau mengurangi bot
+   pengisi kursi kosong satu per satu (ubah_bot, paling banyak BOT_MAKS)
 2. Host memulai (start): pertandingan dibuat, tetapi ronde 1 ditahan di layar persiapan sampai otak bot siap
 
 Alurnya saat pemain bertindak (play, skip, cancel_vote, cancel_action, team_chat)
@@ -37,6 +38,9 @@ logger = logging.getLogger("shadow_heist.rooms")
 
 # Nama NPC; juga dicadangkan agar tidak bisa dipakai sebagai username akun.
 BOT_NAMES = ("NOX", "ECHO", "VEIL", "RAVEN", "ASH", "DUSK", "IRIS", "SAGE", "ONYX", "LARK")
+
+# Batas bot yang boleh ditambahkan host ke satu room. Simulasi panel memakai batasnya sendiri (3–9 bot).
+BOT_MAKS = 5
 
 
 # Aksi rahasia yang bisa dipilih otak bot lewat Match.act.
@@ -96,7 +100,7 @@ class Room:
     members: list[str] = field(default_factory=list)
     members_skin: dict[str, str] = field(default_factory=dict)
     members_label: dict[str, str] = field(default_factory=dict)  # username → nama tampilan
-    bot_enabled: bool = False
+    jumlah_bot: int = 0  # pilihan host 0–BOT_MAKS; yang ikut dibatasi kursi kosong (bot_names)
     match: Match | None = None
     capacity: int = 6
     peserta_tercatat: bool = False  # peserta pertandingan selesai sudah dikirim ke arsip survei
@@ -273,28 +277,42 @@ class RoomService:
                 self._ingat_profil(room, [username])
             return room
 
-    # SERVICE LOBBY: periksa kepemilikan lalu aktifkan/nonaktifkan bot pengisi kursi pada ruangan.
+    # Bot yang ikut: sebanyak pilihan host, tetapi tidak melebihi kursi kosong. Manusia yang bergabung saat kursi penuh
+    # menggantikan bot terakhir; bila ia keluar sebelum pertandingan mulai, bot itu kembali.
+    # Alur: 1 sudah bertanding: bot dari Match -> 2 lobby: BOT_NAMES sebanyak min(jumlah_bot, kursi kosong)
+    def bot_names(self, room):
+        if room.match:
+            return [peserta.name for peserta in room.match.players.values() if peserta.bot]
+        jumlah_kursi_kosong = room.capacity - len(room.members)
+        jumlah_ikut = min(room.jumlah_bot, jumlah_kursi_kosong)
+        return [nama for nama in BOT_NAMES if nama not in room.members][:jumlah_ikut]
+
+    # SERVICE LOBBY: host menambah atau mengurangi tepat satu bot, atomik di dalam lock. Hitungan berangkat dari
+    # bot yang ikut, jadi tiap tekan mengubah daftar bot tepat satu, walau manusia sempat mengambil kursi bot.
+    # Alur: 1 cek host dan lobby -> 2 hitung bot ikut -> 3.1.1 tambah: tolak bila BOT_MAKS atau kursi penuh -> 4 simpan
+    #                                                 \> 3.2.1 kurangi: tolak bila belum ada bot            / [lanjut 4]
     @traced
-    def set_bot(self, code: str, username: str, enabled: bool) -> Room:
+    def ubah_bot(self, code: str, username: str, aksi: str) -> Room:
         with self.lock:
             room = self.get(code, username)
             if room.owner != username:
                 raise ValueError("Hanya pembuat ruangan yang dapat mengatur bot.")
             if room.match is not None:
                 raise ValueError("Bot tidak dapat diubah setelah pertandingan dimulai.")
-            if enabled and len(room.members) >= room.capacity:
-                raise ValueError("Kursi penuh. Bot membutuhkan satu kursi kosong.")
-            room.bot_enabled = enabled
+            jumlah_ikut = len(self.bot_names(room))
+            if aksi == "tambah":
+                if jumlah_ikut >= BOT_MAKS:
+                    raise ValueError(f"Bot paling banyak {BOT_MAKS}.")
+                if len(room.members) + jumlah_ikut >= room.capacity:
+                    raise ValueError("Kursi penuh. Bot membutuhkan satu kursi kosong.")
+                room.jumlah_bot = jumlah_ikut + 1
+            elif aksi == "kurangi":
+                if jumlah_ikut == 0:
+                    raise ValueError("Belum ada bot untuk dikurangi.")
+                room.jumlah_bot = jumlah_ikut - 1
+            else:
+                raise ValueError("Aksi bot harus tambah atau kurangi.")
             return room
-
-    # NPC mengisi sisa kapasitas yang dipilih host; manusia yang bergabung menggantikan kursi NPC.
-    def bot_names(self, room):
-        if room.match:
-            return [peserta.name for peserta in room.match.players.values() if peserta.bot]
-        if not room.bot_enabled:
-            return []
-        jumlah_kursi_kosong = room.capacity - len(room.members)
-        return [nama for nama in BOT_NAMES if nama not in room.members][:jumlah_kursi_kosong]
 
     # METHOD SERIALISASI: salin data publik ruangan dan roster untuk respons API/socket.
     def snapshot(self, room: Room):
@@ -314,8 +332,9 @@ class RoomService:
                 "code": room.code,
                 "owner": room.owner,
                 "members": anggota_dengan_skin,
-                "bot_enabled": room.bot_enabled,
                 "bots": nama_bot,
+                "bot_count": len(nama_bot),
+                "bot_max": BOT_MAKS,
                 "phase": room.match.phase if room.match else "lobby",
                 "capacity": room.capacity,
                 "match_durations": dict(room.match.durations) if room.match else None,
@@ -331,7 +350,9 @@ class RoomService:
             room = self.current(username)
             return self.snapshot(room) if room else None
 
-    # START: hanya host; role tidak pernah dikembalikan lewat snapshot lobby.
+    # START: hanya host; role tidak pernah dikembalikan lewat snapshot lobby. Batas 4–10 peserta tetap dicek Match;
+    # cek kurang dari 4 di sini hanya supaya host membaca pesan yang jelas.
+    # Alur: 1 cek host dan anggota -> 2 baca ulang profil -> 3 hitung bot, tolak bila peserta < 4 -> 4 Match persiapan
     @traced
     def start(self, code, username, quick=False):
         with self.lock:
@@ -347,6 +368,10 @@ class RoomService:
             # Baca ulang: skin dan nama tampilan boleh diganti selama anggota menunggu di lobby.
             self._ingat_profil(room, room.members)
             nama_bot = self.bot_names(room)
+            if len(room.members) + len(nama_bot) < 4:
+                raise ValueError(
+                    "Butuh minimal 4 peserta (manusia + bot) untuk mulai. Tambah bot atau tunggu pemain lain."
+                )
             nama_tampilan = {
                 anggota: room.members_label.get(anggota, anggota) for anggota in room.members
             }

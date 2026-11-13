@@ -20,6 +20,7 @@ from app.middleware.auth import require_authenticated_user
 from app.models import survey_queries
 from app.services.persistence_service import PersistenceError
 from app.services.room_service import RoomService
+from tests.palsu.bot_lobby import isi_kursi_bot
 from app.services.survey_service import (
     BERLAKU_SELESAI_DETIK,
     SurveyAlreadySubmitted,
@@ -186,7 +187,7 @@ class SurveyServiceTests(unittest.TestCase):
         self.rooms = RoomService()
         self.room = self.rooms.create("alice")
         self.rooms.join(self.room.code, "bob")
-        self.rooms.set_bot(self.room.code, "alice", True)
+        isi_kursi_bot(self.rooms, self.room.code, "alice")
         self.rooms.start(self.room.code, "alice")
         self.match = self.room.match
         self.match.begin()

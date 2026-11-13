@@ -69,7 +69,8 @@ describe('MainPage', () => {
       owner: 'andy',
       members: [{ name: 'andy', skin_id: 'kiera' }],
       bots: [],
-      bot_enabled: false,
+      bot_count: 0,
+      bot_max: 5,
       phase: 'lobby',
       capacity: 10,
     };
@@ -100,7 +101,8 @@ describe('MainPage', () => {
       owner: 'alice',
       members: [{ name: 'andy', skin_id: 'kiera' }],
       bots: [],
-      bot_enabled: false,
+      bot_count: 0,
+      bot_max: 5,
       phase: 'lobby',
     });
     expect(sessionStorage.getItem('shadow_heist_room')).toBe('ABC123');

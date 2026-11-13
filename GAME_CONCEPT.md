@@ -51,7 +51,9 @@ GDD awal dengan beberapa perubahan (lihat [Perubahan atas GDD awal](#perubahan-a
 
 Cara angka ini diukur dan riwayatnya ada di [Keseimbangan komposisi](#keseimbangan-komposisi).
 
-- NPC mengisi kursi kosong sampai kapasitas. Manusia yang bergabung sebelum mulai menggantikan kursi NPC. Roster
+- Host menambah NPC satu per satu (**+ Tambah bot**, sekali tekan satu bot) dan menguranginya dengan cara yang sama,
+  paling banyak 5 bot per room. Bot yang ikut = jumlah pilihan host, tetapi tidak melebihi kursi kosong (kapasitas
+  dikurangi manusia). Manusia yang bergabung saat kursi penuh menggantikan bot terakhir. Roster
   terkunci sesudah mulai; anggota lama boleh reconnect. Pemain yang keluar di tengah pertandingan tidak bisa bergabung
   lagi ke pertandingan itu.
 - Satu akun menempati satu room. Keluar dari lobby sebelum pindah room. Room yang pertandingannya sudah selesai

@@ -49,8 +49,8 @@ salin hasilnya ke `backend/public/dokumen/`.
 
 - Daftar akun, login username dan password (email juga diterima untuk akun yang punya email), login Google, dan
   pilihan avatar (6 skin, tersimpan per akun).
-- Main page, buat atau gabung ruangan untuk 4–10 peserta, dan bot opsional pengisi kursi kosong. Hanya pembuat
-  ruangan yang mengatur bot dan memulai game.
+- Main page, buat atau gabung ruangan untuk 4–10 peserta, dan bot opsional pengisi kursi kosong (ditambah satu per
+  satu, paling banyak 5). Hanya pembuat ruangan yang mengatur bot dan memulai game.
 - Role acak dari server, layar persiapan, ronde siang → Tribunal → malam (ronde 1 tanpa Tribunal) sampai salah satu
   kubu menang, skill dan cooldown, voting, eksekusi, chat tim malam, serta kondisi kemenangan.
 - Survei setelah pertandingan, dengan pertanyaan yang diatur dari panel. Isi bawaannya sepuluh pertanyaan formal
@@ -229,7 +229,8 @@ di panel, atau CLI di bawah.
 
 1. Login, lalu di Main page pilih **Enter Tribunal**.
 2. **Buat Ruangan** (pilih kapasitas) atau **Gabung** dengan kode ruangan.
-3. Pemilik ruangan menekan **+ Bot** bila ingin kursi kosong diisi bot. Dengan bot, game bisa dicoba sendirian;
+3. Pemilik ruangan menekan **+ Tambah bot** sekali untuk tiap bot yang diinginkan (paling banyak 5, selama masih ada
+   kursi kosong), dan **− Kurangi bot** untuk melepasnya satu per satu. Dengan bot, game bisa dicoba sendirian;
    tanpa bot, siapkan minimal 4 akun.
 4. Pemilik ruangan menekan **Mulai Permainan**; anggota lain menekan **Masuk Permainan**.
 5. Sesudah pertandingan, isi survei, lalu kembali ke lobby → Keluar ruangan → buat ruangan baru. Satu ruangan hanya

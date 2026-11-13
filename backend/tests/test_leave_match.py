@@ -13,6 +13,7 @@ from app.controllers.rooms import router
 from app.middleware.auth import require_authenticated_user
 from app.game.match_engine import PREPARATION_MIN_SECONDS, Match, snapshot_berlabel
 from app.services.room_service import RoomService
+from tests.palsu.bot_lobby import isi_kursi_bot
 
 RAHASIA = " Role tetap dirahasiakan sampai permainan selesai."
 KUNCI_PUBLIK = {"name", "label", "alive", "skin_id"}
@@ -234,7 +235,7 @@ class LeaveRoomTests(unittest.TestCase):
         self.rooms = RoomService()
         self.room = self.rooms.create("alice")
         self.rooms.join(self.room.code, "bob")
-        self.rooms.set_bot(self.room.code, "alice", True)
+        isi_kursi_bot(self.rooms, self.room.code, "alice")
         self.rooms.start(self.room.code, "alice")
         self.match = self.room.match
         roles = {"NOX": "hitman", "ECHO": "spy", "VEIL": "stalker"}

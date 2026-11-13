@@ -5,6 +5,7 @@ import unittest
 
 from app.game.match_engine import Match
 from app.services.room_service import RoomService
+from tests.palsu.bot_lobby import isi_kursi_bot
 
 
 class VictoryRulesTests(unittest.TestCase):
@@ -171,7 +172,7 @@ class SingleRoomTests(unittest.TestCase):
         self.assertNotIn(self.first.code, self.rooms.rooms)
 
     def test_finished_room_is_recoverable_until_player_moves_on(self):
-        self.rooms.set_bot(self.first.code, "alice", True)
+        isi_kursi_bot(self.rooms, self.first.code, "alice")
         self.rooms.start(self.first.code, "alice")
         hitman = next(p for p in self.first.match.players.values() if p.role == "hitman")
         hitman.alive = False

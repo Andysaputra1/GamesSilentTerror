@@ -1,6 +1,7 @@
 import unittest
 from unittest.mock import Mock, patch
 from app.services.room_service import RoomService
+from tests.palsu.bot_lobby import isi_kursi_bot
 from app.services.persistence_service import PersistenceError
 from app.sockets import chat
 from tests.palsu.socket_palsu import socket_palsu
@@ -10,7 +11,7 @@ class ChatDurabilityTests(unittest.IsolatedAsyncioTestCase):
     async def run_chat(self, *, db_fails=False):
         rooms = RoomService()
         room = rooms.create("alice")
-        rooms.set_bot(room.code, "alice", True)
+        isi_kursi_bot(rooms, room.code, "alice")
         persistence = Mock()
         persistence.record_player_message.return_value = 42
         if db_fails:

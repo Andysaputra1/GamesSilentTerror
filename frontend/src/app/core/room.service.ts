@@ -21,8 +21,10 @@ export interface Room {
   code: string;
   owner: string;
   members: RoomMember[];
-  bot_enabled: boolean;
   bots: string[];
+  // Jumlah bot yang ikut dan batas pilihan host; snapshot lama di sessionStorage belum membawanya.
+  bot_count?: number;
+  bot_max?: number;
   phase: string;
   capacity?: number;
   match_durations?: PhaseDurations | null;

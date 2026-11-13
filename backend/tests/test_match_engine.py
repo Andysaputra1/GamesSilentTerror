@@ -15,6 +15,7 @@ from tests.palsu.socket_palsu import socket_palsu
 from app.game.match_engine import KOMPOSISI_PERAN, Match, label_unik, snapshot_berlabel
 from app.config.skins import ALL_SKINS
 from app.services.room_service import RoomService
+from tests.palsu.bot_lobby import isi_kursi_bot
 
 
 class EngineTests(unittest.TestCase):
@@ -108,7 +109,7 @@ class EngineTests(unittest.TestCase):
             self.assertTrue(all(fast.durations[p] < durations[p] for p in durations))
         rooms = RoomService()
         room = rooms.create("solo", capacity=4)
-        rooms.set_bot(room.code, "solo", True)
+        isi_kursi_bot(rooms, room.code, "solo")
         self.assertEqual(len(rooms.bot_names(room)), 3)
         preview = rooms.snapshot(room)["phase_durations"]["standard"]
         rooms.start(room.code, "solo")
@@ -669,13 +670,17 @@ class RoomGameTests(unittest.TestCase):
     def setUp(self):
         self.rooms = RoomService()
         self.room = self.rooms.create("alice")
-        self.rooms.set_bot(self.room.code, "alice", True)
+        isi_kursi_bot(self.rooms, self.room.code, "alice")
 
+    # Room 10 kursi: bot paling banyak 5; manusia baru mengambil kursi bot hanya saat kursi sudah penuh.
     def test_room_options_capacity_and_bot_replacement(self):
         room = self.rooms.create("host", capacity=10)
-        self.rooms.set_bot(room.code, "host", True)
-        self.assertEqual(len(self.rooms.bot_names(room)), 9)
-        for i in range(9):
+        isi_kursi_bot(self.rooms, room.code, "host")
+        self.assertEqual(self.rooms.bot_names(room), ["NOX", "ECHO", "VEIL", "RAVEN", "ASH"])
+        for i in range(4):
+            self.rooms.join(room.code, f"guest{i}")
+        self.assertEqual(len(self.rooms.bot_names(room)), 5)
+        for i in range(4, 9):
             self.rooms.join(room.code, f"guest{i}")
         self.assertEqual(self.rooms.bot_names(room), [])
         with self.assertRaises(ValueError):
@@ -714,7 +719,7 @@ class RoomGameTests(unittest.TestCase):
         # Keluar saat pertandingan aktif kini diizinkan (tereliminasi); lihat test_leave_match.py.
         for operation in [
             lambda: self.rooms.join(self.room.code, "outsider"),
-            lambda: self.rooms.set_bot(self.room.code, "alice", False),
+            lambda: self.rooms.ubah_bot(self.room.code, "alice", "kurangi"),
             lambda: self.rooms.start(self.room.code, "alice"),
         ]:
             with self.assertRaises(ValueError):
@@ -796,7 +801,7 @@ class SocketGameTests(unittest.IsolatedAsyncioTestCase):
     async def test_night_hostage_gag_malformed_and_spoof_never_echo(self):
         rooms = RoomService()
         room = rooms.create("alice")
-        rooms.set_bot(room.code, "alice", True)
+        isi_kursi_bot(rooms, room.code, "alice")
         rooms.start(room.code, "alice")
         sambungan = {"sid": {"username": "alice", "token": "alice", "room": room.code}}
         with (

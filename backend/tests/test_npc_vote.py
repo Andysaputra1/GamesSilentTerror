@@ -14,6 +14,7 @@ from app.bot.penjelasan import jelaskan
 from app.bot.bot_controller import NPCService
 from app.services.room_service import pindahkan_vote
 from app.services.room_service import RoomService
+from tests.palsu.bot_lobby import isi_kursi_bot
 from tests.palsu.arsip_palsu import arsip_bot_palsu
 from tests.test_npc_brain import runtime_siap
 from app.bot.nlg_controller import tulis_pesan
@@ -155,7 +156,7 @@ class KirimPindahTests(unittest.IsolatedAsyncioTestCase):
         self.runtime = runtime_siap()
         self.rooms = RoomService()
         self.room = self.rooms.create("human")
-        self.rooms.set_bot(self.room.code, "human", True)
+        isi_kursi_bot(self.rooms, self.room.code, "human")
         self.rooms.start(self.room.code, "human")
         self.match = self.room.match
         self.service = NPCService(Mock(emit=AsyncMock()), runtime=self.runtime)

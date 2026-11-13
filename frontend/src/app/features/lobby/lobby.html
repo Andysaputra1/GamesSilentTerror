@@ -158,21 +158,33 @@
 
                 @if (room.phase === 'lobby') {
                   <div class="room-controls">
-                    @if (room.owner === username) {
-                      <div class="room-control-row">
-                        <div>
-                          <b>Fill empty seats</b>
-                          <p>Tambahkan bot untuk melengkapi meja.</p>
-                        </div>
+                    <div class="room-control-row room-bot-control">
+                      <div>
+                        <b>Bot {{ jumlahBot }}/{{ batasBot }}</b>
+                        <p>
+                          {{ room.bots.length ? room.bots.join(', ') : 'Belum ada bot di meja.' }}
+                        </p>
+                      </div>
+                      <div class="room-bot-buttons">
                         <button
                           class="room-secondary"
                           type="button"
-                          (click)="toggleBot()"
-                          [disabled]="busy || (!room.bot_enabled && room.members.length >= (room.capacity ?? capacity))"
+                          (click)="ubahBot('kurangi')"
+                          [disabled]="!bisaUbahBot('kurangi')"
                         >
-                          {{ room.bot_enabled ? 'Remove bots' : '+ Bots' }}
+                          − Kurangi bot
+                        </button>
+                        <button
+                          class="room-secondary"
+                          type="button"
+                          (click)="ubahBot('tambah')"
+                          [disabled]="!bisaUbahBot('tambah')"
+                        >
+                          + Tambah bot
                         </button>
                       </div>
+                    </div>
+                    @if (room.owner === username) {
                       <label class="room-quick-mode"
                         ><input type="checkbox" [(ngModel)]="modeCepat" [disabled]="busy" /><span
                           >Quick mode <small>(timer lebih singkat)</small></span
@@ -184,10 +196,14 @@
                         (click)="startGame()"
                         [disabled]="busy || room.members.length + room.bots.length < 4"
                       >
-                        {{ busy ? 'PREPARING…' : 'START GAME' }} <b aria-hidden="true">↗</b>
+                        {{ busy && memulai ? 'PREPARING…' : 'START GAME' }}
+                        <b aria-hidden="true">↗</b>
                       </button>
                       @if (room.members.length + room.bots.length < 4) {
-                        <p class="room-hint">Butuh minimal 4 pemain (termasuk bot) untuk mulai.</p>
+                        <p class="room-hint">
+                          Butuh minimal 4 peserta (manusia + bot) untuk mulai. Tambah bot atau
+                          tunggu pemain lain.
+                        </p>
                       }
                     } @else {
                       <p class="room-waiting">Waiting for {{ ownerLabel }} to start the game.</p>

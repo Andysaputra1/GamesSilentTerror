@@ -36,6 +36,7 @@ export class Lobby implements OnInit, OnDestroy {
   room: Room | null = null;
   error = '';
   busy = false;
+  memulai = false; // label PREPARING… hanya untuk permintaan start, bukan tombol bot
   copied = false;
   modeCepat = false;
   capacity = 6;
@@ -177,18 +178,40 @@ export class Lobby implements OnInit, OnDestroy {
     }
   }
 
-  // METHOD EVENT TOMBOL: minta perubahan pilihan NOX; izin pembuat ruangan diperiksa backend.
-  toggleBot(): void {
-    if (this.room && !this.busy)
-      this.kirimPermintaanRoom('POST', '/' + this.room.code + '/bot', {
-        enabled: !this.room.bot_enabled,
-      });
+  // Jumlah bot yang ikut dan batasnya (BOT_MAKS di backend); snapshot lama tanpa angka ini memakai daftar bot.
+  get jumlahBot(): number {
+    return this.room?.bot_count ?? this.room?.bots.length ?? 0;
+  }
+
+  get batasBot(): number {
+    return this.room?.bot_max ?? 5;
+  }
+
+  // Tombol bot aktif hanya untuk host di lobby dan selama tidak ada permintaan yang berjalan.
+  // Alur: 1 host, lobby, tidak sibuk? -> 2.1.1 tambah: di bawah batas dan masih ada kursi kosong
+  //                                   \> 2.2.1 kurangi: masih ada bot
+  bisaUbahBot(aksi: 'tambah' | 'kurangi'): boolean {
+    const room = this.room;
+    if (!room || this.busy || room.owner !== this.username || room.phase !== 'lobby') return false;
+    if (aksi === 'kurangi') return this.jumlahBot > 0;
+    const kursiTerisi = room.members.length + this.jumlahBot;
+    return this.jumlahBot < this.batasBot && kursiTerisi < (room.capacity ?? this.capacity);
+  }
+
+  // METHOD EVENT TOMBOL: sekali tekan menambah atau mengurangi satu bot. `busy` menahan klik kedua sampai respons
+  // datang; izin host, batas, dan kursi kosong tetap dicek backend.
+  // Alur: 1 tombol boleh dipakai? -> 2 POST /bot {aksi} -> 3 snapshot baru menggantikan room
+  ubahBot(aksi: 'tambah' | 'kurangi'): void {
+    if (!this.room || !this.bisaUbahBot(aksi)) return;
+    this.memulai = false;
+    this.kirimPermintaanRoom('POST', '/' + this.room.code + '/bot', { aksi });
   }
 
   // START: backend memeriksa host/jumlah peserta lalu mengacak role.
   startGame(): void {
-    if (this.room && !this.busy)
-      this.kirimPermintaanRoom('POST', '/' + this.room.code + '/start', { quick: this.modeCepat });
+    if (!this.room || this.busy) return;
+    this.memulai = true;
+    this.kirimPermintaanRoom('POST', '/' + this.room.code + '/start', { quick: this.modeCepat });
   }
 
   // Keluar hanya dari lobby atau game selesai; tidak mengeluarkan pemain lain.

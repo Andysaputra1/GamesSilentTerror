@@ -42,7 +42,8 @@ describe('Game', () => {
         owner: 'alice',
         members: [member('alice')],
         bots: ['NOX'],
-        bot_enabled: true,
+        bot_count: 1,
+        bot_max: 5,
         phase: 'day',
       },
       game: {

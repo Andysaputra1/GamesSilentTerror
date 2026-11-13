@@ -383,6 +383,17 @@
   text-align: center;
 }
 
+/* Bot ditambah atau dikurangi satu per satu; tombolnya turun ke baris sendiri bila kertas sempit. */
+.room-bot-control {
+  flex-wrap: wrap;
+}
+
+.room-bot-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .room-quick-mode {
   display: flex;
   align-items: center;

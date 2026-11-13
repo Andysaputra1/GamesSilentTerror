@@ -149,6 +149,17 @@
     padding-top: 14px;
   }
 
+  /* HP: dua tombol bot selebar kertas, masing-masing setengah, dengan target sentuh 44px. */
+  .room-bot-buttons {
+    flex: 1 1 100%;
+  }
+
+  .room-bot-buttons .room-secondary {
+    flex: 1 1 0;
+    justify-content: center;
+    min-height: 44px;
+  }
+
   .room-quick-mode,
   .room-waiting {
     font-size: 14px;

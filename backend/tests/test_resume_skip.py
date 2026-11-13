@@ -9,6 +9,7 @@ from app.controllers.rooms import router
 from app.middleware.auth import require_authenticated_user
 from app.game.match_engine import Match
 from app.services.room_service import RoomService
+from tests.palsu.bot_lobby import isi_kursi_bot
 
 
 class SkipTests(unittest.TestCase):
@@ -73,7 +74,7 @@ class ActiveRoomTests(unittest.TestCase):
         self.rooms = RoomService()
         self.room = self.rooms.create("alice")
         self.rooms.join(self.room.code, "bob")
-        self.rooms.set_bot(self.room.code, "alice", True)
+        isi_kursi_bot(self.rooms, self.room.code, "alice")
         self.other = self.rooms.create("carol")
         self.rooms.start(self.room.code, "alice")
         self.room.match.begin()  # lewati layar persiapan; alur persiapan diuji di test_match_engine
@@ -91,7 +92,7 @@ class ActiveRoomTests(unittest.TestCase):
 
     def test_no_start_with_busy_member_and_finished_releases_account(self):
         self.other.members.append("alice")  # akun sudah bergabung sebelum match pertama mulai
-        self.rooms.set_bot(self.other.code, "carol", True)
+        isi_kursi_bot(self.rooms, self.other.code, "carol")
         with self.assertRaises(ValueError):
             self.rooms.start(self.other.code, "carol")
         hitman = next(p for p in self.room.match.players.values() if p.role == "hitman")

@@ -16,7 +16,8 @@ const waitingRoom: Room = {
   owner: 'alice',
   members: [{ name: 'alice', skin_id: 'dexter' }],
   bots: [],
-  bot_enabled: false,
+  bot_count: 0,
+  bot_max: 5,
   phase: 'lobby',
 };
 

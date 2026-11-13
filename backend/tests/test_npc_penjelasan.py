@@ -29,6 +29,7 @@ from app.bot.penjelasan import (
 )
 from app.bot.bot_controller import NPCService
 from app.services.room_service import RoomService
+from tests.palsu.bot_lobby import isi_kursi_bot
 from tests.palsu.arsip_palsu import arsip_bot_palsu
 from tests.test_npc_brain import AKSI_RAHASIA, runtime_siap
 
@@ -270,7 +271,7 @@ class CheckerPenjelasanTests(unittest.TestCase):
         runtime = runtime_siap()
         rooms = RoomService()
         room = rooms.create("human")
-        rooms.set_bot(room.code, "human", True)
+        isi_kursi_bot(rooms, room.code, "human")
         rooms.start(room.code, "human")
         runtime.siapkan_pertandingan(room.match, room.code)
         with (
@@ -304,7 +305,7 @@ class NPCServicePenjelasanTests(unittest.IsolatedAsyncioTestCase):
         self.runtime = runtime_siap()
         self.rooms = RoomService()
         self.room = self.rooms.create("human")
-        self.rooms.set_bot(self.room.code, "human", True)
+        isi_kursi_bot(self.rooms, self.room.code, "human")
         self.rooms.start(self.room.code, "human")
         self.match = self.room.match
         self.service = NPCService(Mock(emit=AsyncMock()), runtime=self.runtime)

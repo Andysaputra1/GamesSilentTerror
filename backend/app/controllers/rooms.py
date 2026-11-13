@@ -17,8 +17,9 @@ class CreateRoom(BaseModel):
     capacity: int = Field(default=6, ge=4, le=10)
 
 
+# Satu tekan = satu bot; aksi di server atomik, jadi dobel klik atau dua tab tidak melompati batas.
 class BotOption(BaseModel):
-    enabled: bool
+    aksi: Literal["tambah", "kurangi"]
 
 
 class StartOption(BaseModel):
@@ -189,6 +190,6 @@ def details(code: str, user=Depends(require_authenticated_user)):
 
 
 @router.post("/{code}/bot")
-# CONTROLLER: minta service mengubah pilihan bot; hanya pembuat ruangan yang diizinkan.
+# CONTROLLER: host menambah atau mengurangi satu bot; izin host, batas BOT_MAKS, dan kursi kosong dicek service.
 def bot(code: str, body: BotOption, user=Depends(require_authenticated_user)):
-    return _jalankan_perintah_lobby(lambda: room_service.set_bot(code, user.username, body.enabled))
+    return _jalankan_perintah_lobby(lambda: room_service.ubah_bot(code, user.username, body.aksi))

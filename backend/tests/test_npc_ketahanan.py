@@ -21,6 +21,7 @@ from app.bot.bot_controller import NPCService
 from app.bot.nlg.pengaturan import tanpa_lapor
 from app.services.checker_service import checker_service
 from app.services.room_service import RoomService
+from tests.palsu.bot_lobby import isi_kursi_bot
 
 
 def runtime_siap():
@@ -35,7 +36,7 @@ class BrainTurnKetahananTests(unittest.IsolatedAsyncioTestCase):
         self.runtime = runtime_siap()
         self.rooms = RoomService()
         self.room = self.rooms.create("human")
-        self.rooms.set_bot(self.room.code, "human", True)
+        isi_kursi_bot(self.rooms, self.room.code, "human")
         self.rooms.start(self.room.code, "human")
         self.match = self.room.match
         self.service = NPCService(Mock(emit=AsyncMock()), runtime=self.runtime)
