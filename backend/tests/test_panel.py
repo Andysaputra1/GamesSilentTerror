@@ -69,7 +69,7 @@ class PanelTests(unittest.TestCase):
             ("arsitektur", "Arsitektur Sistem Silent Terror"),
             ("bedah-alur", "Bedah Alur Silent Terror"),
             ("kode-fuzzy", "Kode Fuzzy Logic"),
-            ("diagram-alir-fuzzy", "Diagram Alir Fuzzy Logic"),
+            ("diagram-alir-fuzzy", "Diagram Alir Fuzzy"),
             ("bedah-otak-fuzzy", "Bedah Otak Fuzzy"),
             ("cara-kerja-bot", "Cara Kerja Bot"),
             ("kode-nlg", "Kode NLG"),
