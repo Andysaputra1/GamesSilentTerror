@@ -174,7 +174,8 @@ class RoomService:
 
     # LEAVE: dari lobby/hasil keluar biasa. Dari pertandingan aktif, pemain dianggap tereliminasi
     # seperti dieksekusi (Match.leave) lalu keanggotaannya dicabut, jadi tidak bisa kembali ke
-    # pertandingan itu. Room tanpa anggota manusia dibersihkan; keluar dua kali tidak mengubah apa pun.
+    # pertandingan itu. Room tanpa anggota manusia dibersihkan. Keluar ulang oleh peserta pertandingan yang sudah
+    # keluar diabaikan selama room masih ada; selain itu (lobby, atau room sudah dihapus) ditolak lewat get.
     @traced
     def leave(self, code, username):
         with self.lock:

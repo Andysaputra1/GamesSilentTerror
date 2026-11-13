@@ -1190,8 +1190,9 @@ def calon_peek(ctx):
 # Kandidat aksi rahasia sesuai kemampuan role saat ini. Bot yang sudah memilih Hostage atau Guard tetap menghitung kandidat, karena
 # pindah target dan chat tim membacanya.
 # Menerima ctx (view.saya: ability, can_act, aksi_malam, terkunci, aksi_rekan, aksi_rekan_spy; fitur_hitman, lindung, tabel, pengetahuan).
-# Hasilnya (kemampuan, daftar kandidat {aksi, target, alasan, input}); Gag dan Peek membawa sistem dan seri (pemutus seri),
-#   Hostage dan Guard membawa skor 0–1 tanpa sistem.
+# Hasilnya (kemampuan, daftar kandidat {aksi, target, alasan, input, seri}); Gag dan Peek membawa sistem, Hostage dan Guard
+#   membawa skor 0–1 tanpa sistem. Semua kandidat membawa kunci seri (pemutus seri): Hostage acak stabil per bot dan ronde,
+#   Guard rekan Spy lebih dulu, Gag ancaman tertinggi, Peek kecurigaan tertinggi.
 # Dipanggil oleh keputusan_aksi.
 # Alur: 1 Hostage/Guard yang bisa dipakai atau sudah dipilih: kandidatnya -> 2 tidak bisa bertindak: kosong -> 3 Gag atau
 #       Peek

@@ -151,8 +151,8 @@ def team_chat(code: str, body: TeamChatOption, user=Depends(require_authenticate
 
 
 @router.post("/{code}/leave")
-# LEAVE: keluar saat pertandingan aktif = tereliminasi seperti dieksekusi (`left`). Aman diulang selama room masih
-# ada; sesudah room dihapus (anggota terakhir keluar) panggilan berikutnya mendapat 400.
+# LEAVE: keluar saat pertandingan aktif = tereliminasi seperti dieksekusi (`left`). Keluar ulang dari pertandingan
+# yang sama diabaikan selama room masih ada; di lobby, atau sesudah room dihapus, keluar ulang mendapat 400.
 def leave(code: str, user=Depends(require_authenticated_user)):
     _jalankan_perintah_game(lambda: room_service.leave(code, user.username))
     return {"left": True}

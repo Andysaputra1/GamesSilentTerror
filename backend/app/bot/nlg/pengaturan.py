@@ -36,7 +36,7 @@ class KonfigurasiNPC:
     model_tautan: str = ""  # kosong = model Ollama dari Konfigurasi AI/.env (OLLAMA_MODEL)
 
 
-# Pengganti lapor(tahap) saat tidak ada pemantau; hanya simulasi panel yang memantau tahap.
+# Pengganti lapor(tahap) saat tidak ada pemantau. Pemantau tahap: simulasi panel dan alur live Checker.
 def tanpa_lapor(tahap):
     pass
 
@@ -52,7 +52,8 @@ class JamPenulis:
     def __getattr__(self, nama):
         return getattr(self.penulis, nama)
 
-    # Panggil LLM sambil mencatat lamanya; simulasi panel diberi tahu tahap llm lalu aturan.
+    # Panggil LLM sambil mencatat lamanya; pemantau (simulasi panel, alur live Checker) diberi tahu tahap llm lalu
+    # aturan.
     def tulis(self, sistem, pesan):
         mulai = perf_counter()
         self.lapor("llm")
