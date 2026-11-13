@@ -18,8 +18,8 @@ BACKEND = Path(sys.argv[1]).resolve()
 sys.path.insert(0, str(BACKEND))
 from app.bot import fuzzy_controller  # noqa: E402
 from app.bot.ingatan import Ingatan  # noqa: E402
-from app.bot import nlg  # noqa: E402  (hanya templat chat tim, tanpa LLM)
 from app.game import match_engine  # noqa: E402
+from app.bot.nlg_controller import tulis_chat_tim  # noqa: E402
 
 NAMA = ["NOX", "ECHO", "VEIL", "RAVEN", "ASH", "DUSK", "IRIS", "SAGE", "ONYX", "LARK"]
 RONDE_MAKS = 30
@@ -81,7 +81,7 @@ def satu_game(argumen):
                         match.act(n, npc["action"], npc["target"])
                     # Chat tim hanya ada bila rekan manusia aktif, jadi di room semua bot paket ini selalu kosong.
                     if hasil.get("nlg_tim"):
-                        teks = nlg.tulis_chat_tim(hasil["nlg_tim"], nama, None, "santai")["teks"]
+                        teks = tulis_chat_tim(hasil["nlg_tim"], nama, None, "santai")["teks"]
                         if teks:
                             match.add_team_message(n, teks)
                         ingatan.catat_chat_tim(view, hasil["nlg_tim"], bool(teks))

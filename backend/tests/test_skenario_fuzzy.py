@@ -14,8 +14,8 @@ import unittest
 
 from app.bot.ingatan import URUTAN_FASE, Ingatan, bot_terkunci, durasi_fase
 from app.bot.fuzzy_controller import INTENT_AKSI, baris_pemain, putuskan, seri_acak
-from app.bot.nlg import tulis_pesan
 from app.bot.nlu import pemain_disebut
+from app.bot.nlg_controller import tulis_pesan
 
 # fmt: off
 PEMAIN_DEMO = ["Nara", "Andi", "Budi", "Citra", "Dodi", "Eka"]

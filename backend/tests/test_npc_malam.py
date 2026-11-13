@@ -10,7 +10,7 @@ import unittest
 from unittest.mock import AsyncMock, Mock, patch
 
 from app.game.match_engine import Match, snapshot_berlabel
-from app.bot import fuzzy_controller, nlg
+from app.bot import fuzzy_controller
 from app.bot import ingatan as ingatan_bot
 from app.bot.bot_controller import BrainRuntime
 from app.bot.nlu import NLUBersama
@@ -21,6 +21,7 @@ from app.services.checker_service import checker_service
 from app.services.room_service import Room, RoomService
 from tests.palsu.arsip_palsu import arsip_bot_palsu
 from tests.palsu.nlu_palsu import NLUPalsu
+from app.bot.nlg_controller import tulis_chat_tim
 
 DELAPAN = ["hitman", "hitman2", "spy", "spy2", "stalker", "civilian", "civilian2", "civilian3"]
 RAHASIA = "rahasia-tim-jangan-bocor"
@@ -268,7 +269,7 @@ class TeamWriterTests(unittest.TestCase):
     def test_template_answer_passes_and_public_payloads_have_no_team_role(self):
         p = {"pembicara": "NOX", "aksi": "chat_tim", "tim": "hitman", "pemicu": "beda", "target_saya": "ECHO",
              "pilihan_rekan": "VEIL", "alasan": ["ECHO menuduh atau vote aku."], "chat_tim": []}  # fmt: skip
-        hasil = nlg.tulis_chat_tim(p, ["NOX", "ECHO", "VEIL", "RAVEN"])
+        hasil = tulis_chat_tim(p, ["NOX", "ECHO", "VEIL", "RAVEN"])
         self.assertEqual(hasil["sumber"], "templat")
         self.assertIn("ECHO", hasil["teks"])
         self.assertNotIn("tim", fuzzy_controller.siapkan_nlg(fuzzy_controller.rencana_chat({"aksi": "jawab", "target": None, "alasan": []}),

@@ -21,7 +21,7 @@ from app.config.database import PersistenceError, jalankan_transaksi
 from app.config.settings import settings
 from app.models import panel_queries
 from app.bot.bot_controller import brain_runtime
-from app.bot.nlg import POLA_MODEL_TAUTAN
+from app.bot.nlg.pengaturan import POLA_MODEL_TAUTAN
 from app.services.activity_service import activity
 from app.services.ai_config_service import ai_runtime, simpan_konfigurasi_ai
 from app.services.checker_service import checker_service

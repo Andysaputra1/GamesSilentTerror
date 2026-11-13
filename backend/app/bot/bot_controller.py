@@ -2,7 +2,7 @@
 Pengendali bot: urutan satu langkah setiap bot, dari jam permainan sampai vote, aksi malam, dan chat terkirim.
 
 Bot diperlakukan seperti pemain tanpa browser. Otak bersama (BrainRuntime) memuat NLU (nlu.py), logika Fuzzy
-(ingatan.py bahan bukti, fuzzy_controller.py putuskan, fungsi fuzzy di folder fuzzy/), dan penulis kalimat (nlg.py),
+(ingatan.py bahan bukti, fuzzy_controller.py putuskan, fungsi fuzzy di folder fuzzy/), dan penulis kalimat (nlg_controller.py, isi tahapnya di folder nlg/),
 lalu menyimpan ingatan dan persona tiap bot per pertandingan.
 
 Alurnya
@@ -39,7 +39,10 @@ from functools import partial
 from time import perf_counter
 from typing import TYPE_CHECKING
 
-from app.bot import nlg
+from app.bot import nlg_controller
+from app.bot.nlg.pengaturan import JamPenulis, PenulisNPC, tanpa_lapor
+from app.bot.nlg.prompt import JUMLAH_CHAT_KONTEKS, buat_prompt
+from app.bot.nlg.templat import persona_bot
 from app.bot.nlu import NLUBersama, NLUIndoBERT, baca_chat, baca_chat_baru, folder_model
 from app.bot.penjelasan import jelaskan
 from app.bot.penjelasan import lengkapi as lengkapi_penjelasan
@@ -106,7 +109,7 @@ class BrainRuntime:
         self.modul = {}
         self.nlg = None
         self.nlu = None
-        self.penulis_npc = nlg.PenulisNPC(self.lock)
+        self.penulis_npc = PenulisNPC(self.lock)
         self.status = {"siap": False, "gagal": False, "detail": "Belum dimuat.", "progres": 0.0, "nlu": None}
         self.pertandingan: dict[str, dict[str, OtakBot]] = {}
         self._thread = None
@@ -143,7 +146,7 @@ class BrainRuntime:
             self._set(detail="Memuat logika fuzzy…", progres=0.1)
             for metode, nama in METODE_MODUL.items():
                 self.modul[metode] = tuple(importlib.import_module(f"app.bot.{n}") for n in nama)
-            self.nlg = nlg
+            self.nlg = nlg_controller
             self._set(detail="Memuat NLU IndoBERT (intent dan target)…", progres=0.35)
             if nlu is None:
                 # Tanpa IndoBERT otak dianggap gagal dimuat: bot memakai aksi cadangan engine.
@@ -209,7 +212,7 @@ class BrainRuntime:
         cepat = match.durations == phase_durations(len(match.players), True)
         otak = {}
         for nama in bots:
-            persona = self.nlg.persona_bot(nama, bots) if self.nlg else "santai"
+            persona = persona_bot(nama, bots) if self.nlg else "santai"
             ingatan = self.modul["fuzzy"][0].Ingatan(nama, cepat=cepat)
             otak[nama] = OtakBot(nama, "fuzzy", persona, match.players[nama].role, ingatan)
         return otak
@@ -247,7 +250,7 @@ class BrainRuntime:
     # tahap yang sedang berjalan (flowchart live).
     # Alur: 1 sinkron snapshot -> 2 NLU membaca chat baru -> 3 putuskan -> 4 chat yang baru dibaca -> 5 penjelasan
     #       -> 6 lama tiap tahap -> 7 konteks NLG
-    def langkah(self, bot: OtakBot, snapshot, sekarang, selalu_jelaskan=False, lapor=nlg.tanpa_lapor):
+    def langkah(self, bot: OtakBot, snapshot, sekarang, selalu_jelaskan=False, lapor=tanpa_lapor):
         # modul = bot/fuzzy_controller.py (putuskan), paket_fuzzy = bot/fuzzy/ (keduanya dimuat di _muat).
         # Penjelasan panel membaca keduanya: ambang keputusan di fuzzy_controller, daftar sistem dan mesin di fuzzy/.
         _, modul, paket_fuzzy = self.modul[bot.metode]
@@ -284,7 +287,7 @@ class BrainRuntime:
             "penjelasan_ms": round((time.perf_counter() - selesai_logika) * 1000, 1),
         }
         # Konteks NLG: chat terbaru sepanjang konteks prompt, dan suara Tribunal sebagai pemicu bela diri/bela orang.
-        chat = sorted(bot.ingatan.chat, key=lambda c: c["waktu"])[-self.nlg.JUMLAH_CHAT_KONTEKS :]
+        chat = sorted(bot.ingatan.chat, key=lambda c: c["waktu"])[-JUMLAH_CHAT_KONTEKS:]
         konteks = {
             "roster": [p["nama"] for p in view["pemain"]],
             "chat_terbaru": [
@@ -299,11 +302,11 @@ class BrainRuntime:
     # Rencana menjadi kalimat (thread penulis), dengan pengaman aturan. pakai_llm=False: hanya templat, dipakai sebagai
     # cadangan cepat saat penulis LLM melewati batas waktu.
     # Alur: 1 pilih rantai (atau templat) -> 2 kalimat yang harus dihindari -> 3 tulis_pesan -> 4 catat lama LLM
-    def tulis(self, bot: OtakBot, payload, konteks, pakai_llm=True, lapor=nlg.tanpa_lapor):
+    def tulis(self, bot: OtakBot, payload, konteks, pakai_llm=True, lapor=tanpa_lapor):
         penulis = self.penulis_npc.dipakai(pakai_llm)
         # Hindari kalimat sendiri yang lalu dan chat terbaru di room (bot lain tidak dikembari).
         hindari = tuple(bot.riwayat[-12:]) + tuple(c["teks"] for c in konteks["chat_terbaru"])
-        jam = nlg.JamPenulis(penulis, lapor) if penulis is not None else None
+        jam = JamPenulis(penulis, lapor) if penulis is not None else None
         lapor("nlg" if jam else "aturan")  # tanpa LLM: templat langsung dinilai aturan
         tulisan = self.nlg.tulis_pesan(payload, konteks, jam, bot.persona, hindari=hindari)
         tulisan["llm_detik"] = round(jam.detik, 3) if jam else 0.0
@@ -319,7 +322,7 @@ class BrainRuntime:
     def prompt_nlg(self, bot: OtakBot, payload, konteks):
         if self.penulis_npc.dipakai() is None:
             return None
-        return self.nlg.buat_prompt(payload, konteks, bot.persona)[1]
+        return buat_prompt(payload, konteks, bot.persona)[1]
 
     # Dipanggil setelah pesan benar-benar terkirim.
     def catat_chat(self, bot: OtakBot, view, rencana, teks):

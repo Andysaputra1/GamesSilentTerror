@@ -7,24 +7,11 @@ pengujian yang memeriksa semua rencana berjalan di kasus bawaan saja.
 
 import re
 import unittest
+from app.bot.nlg.aturan import klaim_diri, periksa_aturan
+from app.bot.nlg.prompt import MAKSUD_AKSI, buat_prompt
+from app.bot.nlg.templat import PERSONA, VARIASI, VARIASI_PERSONA, bentuk_dasar, isi_templat, kalimat_templat, kelompok_varian, ubah_kata_ganti
+from app.bot.nlg_controller import fakta_disalin, nilai_kalimat, tulis_pesan
 
-from app.bot.nlg import (
-    MAKSUD_AKSI,
-    PERSONA,
-    VARIASI,
-    VARIASI_PERSONA,
-    bentuk_dasar,
-    buat_prompt,
-    fakta_disalin,
-    isi_templat,
-    kalimat_templat,
-    kelompok_varian,
-    klaim_diri,
-    nilai_kalimat,
-    periksa_aturan,
-    tulis_pesan,
-    ubah_kata_ganti,
-)
 
 # fmt: off
 PEMAIN_DEMO = ["Nara", "Andi", "Budi", "Citra", "Dodi", "Eka"]

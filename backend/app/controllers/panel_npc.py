@@ -123,7 +123,12 @@ ING = "app.bot.ingatan"  # bahan bukti: Ingatan, hitung_bukti, pengetahuan_peran
 FC = "app.bot.fuzzy_controller"  # main controller fuzzy: putuskan dan urutan keputusan
 MESIN = "app.bot.fuzzy.mesin"  # mesin Mamdani bersama semua fungsi fuzzy
 FZ_KEC = "app.bot.fuzzy.kecurigaan"  # [FUZZY 1] fungsi fuzzy kecurigaan
-NLG = "app.bot.nlg"
+NLG = "app.bot.nlg_controller"  # main controller NLG: tulis_pesan dan urutan tahap penulis kalimat
+NLG_PROMPT = "app.bot.nlg.prompt"  # [PROMPT] penyusun prompt LLM
+NLG_PENULIS = "app.bot.nlg.penulis"  # [PENULIS LLM] rantai OpenRouter → tautan
+NLG_ATURAN = "app.bot.nlg.aturan"  # [PERIKSA ATURAN] penolak kalimat
+NLG_TEMPLAT = "app.bot.nlg.templat"  # [TEMPLAT] kalimat siap pakai
+NLG_PANEL = "app.bot.nlg.pengaturan"  # [PANEL] rantai penulis yang diatur panel
 
 # node flowchart → [(modul, nama bertitik, [(potongan teks baris inti, catatan)])]
 KODE_ALUR = {
@@ -296,7 +301,7 @@ KODE_ALUR = {
         ("app.game.match_engine", "Match.act", []),
     ],
     "nlg_prompt": [
-        (NLG, "buat_prompt", [
+        (NLG_PROMPT, "buat_prompt", [
             ("aturan_klaim = (", "aturan klaim role"),
             ("Aturan menulis:", "batasan untuk LLM"),
             ("maksud = MAKSUD_AKSI", "maksud rencana"),
@@ -306,12 +311,12 @@ KODE_ALUR = {
         ]),
     ],
     "nlg_llm": [
-        (NLG, "PenulisBerantai.tulis", [
+        (NLG_PENULIS, "PenulisBerantai.tulis", [
             ("if not p.siap()", "jalur yang sedang istirahat dilewati"),
             ("p.tulis(sistem, pesan)", "panggil LLM jalur ini"),
             ("alasan.append", "gagal: coba jalur berikutnya"),
         ]),
-        (NLG, "JamPenulis.tulis", [
+        (NLG_PANEL, "JamPenulis.tulis", [
             ('self.lapor("llm")', "flowchart: bot sedang di tahap LLM"),
             ("self.detik +=", "lama panggilan LLM dicatat"),
         ]),
@@ -319,21 +324,21 @@ KODE_ALUR = {
     "nlg_cek": [
         (NLG, "tulis_pesan", [
             ("for ke in range(1, MAKS_PERCOBAAN_LLM + 1)", "maksimal 2 percobaan LLM"),
-            ("nilai_kalimat(bersihkan(", "kalimat dibersihkan lalu dinilai"),
+            ("nilai_kalimat(aturan.bersihkan(", "kalimat dibersihkan lalu dinilai"),
             ("kalimat_mirip(nilai[", "parafrase tipis kalimat yang baru terdengar ditolak"),
             ("fakta_disalin(nilai[", "fakta panjang yang disalin hampir utuh ditulis ulang sekali"),
             ('alasan_tolak = ", ".join', "alasan ditolak dikirim ke percobaan berikutnya"),
-            ("# 2) Templat bervariasi.", "LLM gagal: templat"),
+            ("# [2. TEMPLAT]", "LLM gagal: templat"),
         ]),
         (NLG, "nilai_kalimat", [("periksa_aturan(", "cek aturan")]),
-        (NLG, "periksa_aturan", [
+        (NLG_ATURAN, "periksa_aturan", [
             ('"menyebut_ai"', "tidak boleh mengaku AI"),
             ('"klaim_tak_direncanakan"', "tidak boleh mengaku role tanpa rencana"),
             ('"target_hilang"', "target rencana harus disebut"),
         ]),
     ],
     "nlg_templat": [
-        (NLG, "kalimat_templat", [
+        (NLG_TEMPLAT, "kalimat_templat", [
             ("urutan_varian(p, persona)", "varian bersama dan varian persona, diputar per bot dan rencana"),
             ("ubah_kata_ganti(teks, persona)", "gaya bahasa persona"),
             ("persis = max(", "kapan kalimat yang persis sama terakhir terdengar"),

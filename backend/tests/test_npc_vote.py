@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, Mock, patch
 
 from app.game.match_engine import Match
 from app.bot import fuzzy as fuzzy_bot
-from app.bot import fuzzy_controller, nlg
+from app.bot import fuzzy_controller
 from app.bot import ingatan as ingatan_bot
 from app.bot.penjelasan import jelaskan
 from app.bot.bot_controller import NPCService
@@ -16,6 +16,7 @@ from app.services.room_service import pindahkan_vote
 from app.services.room_service import RoomService
 from tests.palsu.arsip_palsu import arsip_bot_palsu
 from tests.test_npc_brain import runtime_siap
+from app.bot.nlg_controller import tulis_pesan
 
 ENAM = ["hitman", "spy", "stalker", "warga1", "warga2", "warga3"]
 
@@ -38,7 +39,7 @@ class AjakVoteTests(unittest.TestCase):
                 rencana = {"pembicara": "NOX", "aksi": "tuduh", "jenis": jenis, "intent": "offend",
                            "target": "ECHO", "bukti": ["ECHO aneh dari tadi."]}  # fmt: skip
                 konteks = {"roster": ["NOX", "ECHO", "VEIL"], "chat_terbaru": []}
-                hasil = nlg.tulis_pesan(rencana, konteks, None, "santai")
+                hasil = tulis_pesan(rencana, konteks, None, "santai")
                 self.assertEqual(hasil["pelanggaran"], [])
                 self.assertIn("ECHO", hasil["teks"])
 

@@ -32,11 +32,14 @@ BACKEND = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(BACKEND))
 
 from app.game import match_engine  # noqa: E402
-from app.bot import fuzzy_controller, nlg  # noqa: E402
+from app.bot import fuzzy_controller  # noqa: E402
 from app.bot.ingatan import Ingatan  # noqa: E402
 from app.bot.bot_controller import BrainRuntime  # noqa: E402
 from app.bot.nlu import NLUBersama, baca_chat  # noqa: E402
 from tests.palsu.nlu_palsu import NLUPalsu  # noqa: E402
+from app.bot.nlg.prompt import JUMLAH_CHAT_KONTEKS, buat_prompt, buat_prompt_tim  # noqa: E402
+from app.bot.nlg.templat import persona_bot  # noqa: E402
+from app.bot.nlg_controller import tulis_chat_tim, tulis_pesan  # noqa: E402
 
 LETAK_ENGINE = "app.game.match_engine"
 SIDIK = Path(__file__).with_name("sidik.json")
@@ -96,7 +99,7 @@ def label_rencana(rencana):
 
 # Konteks NLG seperti BrainRuntime.langkah: chat terbaru sepanjang konteks prompt dan suara Tribunal.
 def konteks_nlg(ingatan, view):
-    chat = sorted(ingatan.chat, key=lambda c: c["waktu"])[-nlg.JUMLAH_CHAT_KONTEKS:]
+    chat = sorted(ingatan.chat, key=lambda c: c["waktu"])[-JUMLAH_CHAT_KONTEKS:]
     return {"roster": [p["nama"] for p in view["pemain"]],
             "chat_terbaru": [{"pengirim": c["pengirim"], "teks": c["teks"], "intent": c.get("intent"),
                               "target": [{"pemain": t["pemain"], "relasi": t["relasi"]} for t in c.get("target", [])]}
@@ -135,12 +138,12 @@ def game_putuskan(argumen):
                     hasil = fuzzy_controller.putuskan(ingatan, view)
                     jejak_a.append(baris(jumlah, seed, ronde, fase, k, n, view, hasil))
                     npc, rc = hasil["npc_decision"], hasil["rencana_chat"]
-                    persona = nlg.persona_bot(n, nama)
+                    persona = persona_bot(n, nama)
                     if hasil["nlg"] is not None:
                         konteks = konteks_nlg(ingatan, view)
                         hindari = tuple(riwayat[n][-12:]) + tuple(c["teks"] for c in konteks["chat_terbaru"])
-                        tulisan = nlg.tulis_pesan(hasil["nlg"], konteks, None, persona, hindari=hindari)
-                        prompt = nlg.buat_prompt(hasil["nlg"], konteks, persona)
+                        tulisan = tulis_pesan(hasil["nlg"], konteks, None, persona, hindari=hindari)
+                        prompt = buat_prompt(hasil["nlg"], konteks, persona)
                         riwayat[n].append(tulisan["teks"])
                         jejak_b.append(baris(jumlah, seed, ronde, fase, k, n, "publik", tanpa_waktu(tulisan), prompt))
                     try:
@@ -160,8 +163,8 @@ def game_putuskan(argumen):
                                 match.cancel_action(n)
                             match.act(n, npc["action"], npc["target"])
                         if hasil.get("nlg_tim"):
-                            tim = nlg.tulis_chat_tim(hasil["nlg_tim"], nama, None, persona)
-                            prompt_tim = nlg.buat_prompt_tim(hasil["nlg_tim"], persona)
+                            tim = tulis_chat_tim(hasil["nlg_tim"], nama, None, persona)
+                            prompt_tim = buat_prompt_tim(hasil["nlg_tim"], persona)
                             jejak_b.append(baris(jumlah, seed, ronde, fase, k, n, "tim", tanpa_waktu(tim), prompt_tim))
                             if tim["teks"]:
                                 match.add_team_message(n, tim["teks"])

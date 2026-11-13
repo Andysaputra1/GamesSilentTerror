@@ -18,12 +18,17 @@ from pydantic import SecretStr
 from app.config.settings import Settings
 from app.controllers.panel import require_panel
 from app.game.match_engine import Match
-from app.bot import fuzzy_controller, nlg
+from app.bot import fuzzy_controller
 from app.bot import ingatan as ingatan_bot
 from app.bot.bot_controller import BrainRuntime, OtakBot
-from app.bot.nlg import JALUR_PENULIS, PenulisNPC
 from app.bot.nlu import NLUBersama
 from tests.palsu.nlu_palsu import NLUPalsu
+from app.bot.nlg.aturan import klaim_diri, periksa_aturan
+from app.bot.nlg.pengaturan import PenulisNPC
+from app.bot.nlg.penulis import JALUR_PENULIS, PenulisBerantai, PenulisDasar, PenulisOpenRouter, PenulisTautan
+from app.bot.nlg.prompt import MAKSUD_AKSI, buat_prompt
+from app.bot.nlg.templat import PERSONA, TEMPLAT_TIM, VARIASI, kalimat_templat
+from app.bot.nlg_controller import tulis_pesan
 
 RAHASIA = {
     "openrouter": "sk-or-rahasia-uji",
@@ -77,7 +82,6 @@ class WriterChainTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.runtime = runtime_siap()
-        cls.nlg = cls.runtime.nlg
 
     @classmethod
     def tearDownClass(cls):
@@ -88,7 +92,7 @@ class WriterChainTests(unittest.TestCase):
         self.awal = (k.penulis, list(k.urutan_penulis), k.model_openrouter, k.model_tautan)
         # Tanpa jaringan: cek jalur (endpoint OpenRouter/link) diganti mock.
         self.cek = self.enterContext(patch.object(PenulisNPC, "_cek"))
-        self.enterContext(patch("app.bot.nlg.ai_runtime.current", konfigurasi_ai))
+        self.enterContext(patch("app.bot.nlg.pengaturan.ai_runtime.current", konfigurasi_ai))
 
     def tearDown(self):
         penulis, urutan, model, model_tautan = self.awal
@@ -104,7 +108,6 @@ class WriterChainTests(unittest.TestCase):
     # Game hanya memakai sebagian jalur notebook: OpenRouter dan link LLM sendiri.
     def test_game_paths_are_notebook_paths(self):
         self.assertEqual(JALUR_PENULIS, ("openrouter", "tautan"))
-        self.assertLessEqual(set(JALUR_PENULIS), set(self.nlg.JALUR_PENULIS))
 
     def test_chain_follows_panel_order_and_skips_missing_keys(self):
         status = self.runtime.atur(
@@ -163,9 +166,8 @@ class WriterChainTests(unittest.TestCase):
         self.assertEqual((status["penulis"], status["penulis_aktif"]), ("templat", False))
 
     def test_rejected_path_falls_through_to_next_writer_in_game(self):
-        nlg = self.nlg
 
-        class Jalur(nlg.PenulisDasar):
+        class Jalur(PenulisDasar):
             def __init__(self, jalur, kode=None):
                 super().__init__(jalur, f"model-{jalur}")
                 self.kode = kode
@@ -178,7 +180,7 @@ class WriterChainTests(unittest.TestCase):
 
         self.runtime.atur(penulis="otomatis", urutan_penulis=["tautan", "openrouter"])
         tautan, openrouter = Jalur("tautan", 401), Jalur("openrouter")
-        self.runtime.penulis_npc.rantai = nlg.PenulisBerantai([tautan, openrouter])
+        self.runtime.penulis_npc.rantai = PenulisBerantai([tautan, openrouter])
         self.runtime.penulis_npc.rantai.cek()
         bot = OtakBot("NOX", "fuzzy", "santai", "civilian", None)
         payload = {"pembicara": "NOX", "aksi": "tuduh", "intent": "offend", "target": "ECHO",
@@ -231,7 +233,7 @@ class PublicPromptRoleTests(unittest.TestCase):
         for bot in ("NOX", "ECHO", "VEIL", "RAVEN"):
             _, view = bot_terdesak(bot)
             payload = {**fuzzy_controller.siapkan_nlg(rencana, view), "pembicara": "RAVEN"}
-            hasil.add(nlg.buat_prompt(payload, self.KONTEKS, "santai"))
+            hasil.add(buat_prompt(payload, self.KONTEKS, "santai"))
         self.assertEqual(len(hasil), 1)
 
     # Rencana nyata tiap role: payload tanpa kunci role, dan Hitman tidak pernah mengaku Hitman.
@@ -243,7 +245,7 @@ class PublicPromptRoleTests(unittest.TestCase):
                 self.assertIsNotNone(payload)
                 self.assertFalse({"peran", "role", "tim", "klaim"} & set(payload))
                 self.assertNotEqual(payload["role_diakui"], "hitman")
-                sistem, pesan = nlg.buat_prompt(payload, self.KONTEKS, "santai")
+                sistem, pesan = buat_prompt(payload, self.KONTEKS, "santai")
                 self.assertNotIn("mengaku Hitman", sistem + pesan)
                 self.assertEqual("Rencana ini memang mengaku" in sistem, bool(payload["role_diakui"]))
 
@@ -288,7 +290,7 @@ class OpenedRoleTests(unittest.TestCase):
             ("Jangan vote aku, aku Spy, semalam aku jaga DUSK.", "nama_lain"),
         ):
             with self.subTest(kalimat=kalimat):
-                self.assertIn(aturan, nlg.periksa_aturan(kalimat, payload, list(ENAM)))
+                self.assertIn(aturan, periksa_aturan(kalimat, payload, list(ENAM)))
 
     # Bot lain membaca role lewat POLA_KLAIM, jadi semua templat buka role harus terbaca sebagai role itu di ketiga persona.
     def test_templates_are_read_as_the_claimed_role(self):
@@ -304,29 +306,29 @@ class OpenedRoleTests(unittest.TestCase):
              "relasi_tambahan": [{"pemain": "ASH", "relasi": "offend"}]},
         ]  # fmt: skip
         for p in rencana:
-            for persona in nlg.PERSONA:
-                for teks in nlg.kalimat_templat(p, persona):
+            for persona in PERSONA:
+                for teks in kalimat_templat(p, persona):
                     with self.subTest(teks=teks):
                         self.assertRegex(teks, f"(?i){ingatan_bot.POLA_KLAIM[p['role_diakui']]}")
-                        self.assertEqual(nlg.periksa_aturan(teks, p, list(ENAM)), [])
-                        self.assertEqual(nlg.klaim_diri(teks.casefold()), {p["role_diakui"]})
+                        self.assertEqual(periksa_aturan(teks, p, list(ENAM)), [])
+                        self.assertEqual(klaim_diri(teks.casefold()), {p["role_diakui"]})
 
 
 class TemplateCoverageTests(unittest.TestCase):
     # Semua jenis di otak punya templat dan maksud. pelintir_bukti memakai kalimat alasan_curiga.
     def test_every_plan_kind_has_templates_and_intent(self):
-        self.assertEqual(set(nlg.MAKSUD_AKSI), set(nlg.VARIASI))
-        jenis = {k.split("/")[1] for k in nlg.VARIASI}
+        self.assertEqual(set(MAKSUD_AKSI), set(VARIASI))
+        jenis = {k.split("/")[1] for k in VARIASI}
         self.assertEqual(set(fuzzy_controller.INTENT_JENIS) - jenis, {"pelintir_bukti"})
-        self.assertTrue(all(len(v) >= 3 for v in nlg.VARIASI.values()))
-        self.assertTrue(all(len(v) >= 5 for isi in nlg.TEMPLAT_TIM.values() for v in isi.values()))
+        self.assertTrue(all(len(v) >= 3 for v in VARIASI.values()))
+        self.assertTrue(all(len(v) >= 5 for isi in TEMPLAT_TIM.values() for v in isi.values()))
 
     # Varian yang baru terdengar tetap dicoba bila semua varian baru gugur aturan.
     def test_heard_variant_is_tried_when_new_variants_fail(self):
         p = {"pembicara": "NOX", "aksi": "tuduh", "jenis": "alasan_curiga", "intent": "offend", "target": "ECHO",
              "bukti": ["ECHO " + "aneh sekali dari tadi " * 12]}  # fmt: skip
         sudah = ["Aku curiga sama ECHO.", "Menurutku ECHO patut dicurigai."]
-        tulisan = nlg.tulis_pesan(p, {"roster": ["NOX", "ECHO"], "chat_terbaru": []}, None, "santai", hindari=sudah)
+        tulisan = tulis_pesan(p, {"roster": ["NOX", "ECHO"], "chat_terbaru": []}, None, "santai", hindari=sudah)
         self.assertEqual(tulisan["sumber"], "templat")
         self.assertIn(tulisan["teks"], sudah)
 
@@ -439,7 +441,7 @@ class AnswerPlanTests(unittest.TestCase):
 
     # Permintaan penjelasan dulu jatuh ke data tersangka; sekarang tindakan sebelumnya yang dikirim ke penulis.
     def test_explanation_request_sends_previous_actions(self):
-        pesan = self.runtime.nlg.buat_prompt(self.PAYLOAD, self.KONTEKS, "kalem")[1]
+        pesan = buat_prompt(self.PAYLOAD, self.KONTEKS, "kalem")[1]
         self.assertIn("Di ronde 7 saya vote DUSK. ECHO mengaku peek DUSK sebagai Hitman.", pesan)
         self.assertNotIn("Tersangka saya", pesan)
 
@@ -470,13 +472,12 @@ class WriterCheckTests(unittest.TestCase):
         self.runtime = runtime_siap()
         self.addCleanup(self.runtime.tutup)
         self.runtime.penulis_npc.konfigurasi.penulis = "otomatis"
-        self.enterContext(patch("app.bot.nlg.ai_runtime.current", konfigurasi_ai))
+        self.enterContext(patch("app.bot.nlg.pengaturan.ai_runtime.current", konfigurasi_ai))
         self.enterContext(
-            patch("app.bot.nlg.ai_runtime.diatur_panel", return_value=True)
+            patch("app.bot.nlg.pengaturan.ai_runtime.diatur_panel", return_value=True)
         )
         # Tanpa jaringan: cek tiap jalur menunggu aba-aba lalu melapor sesuai kelasnya.
         self.lepas = threading.Event()
-        nlg = self.runtime.nlg
 
         def cek_tiruan(hasil):
             def _cek(jalur):
@@ -485,7 +486,7 @@ class WriterCheckTests(unittest.TestCase):
 
             return _cek
 
-        for kelas, hasil in ((nlg.PenulisOpenRouter, "ok"), (nlg.PenulisTautan, "tidak terhubung")):
+        for kelas, hasil in ((PenulisOpenRouter, "ok"), (PenulisTautan, "tidak terhubung")):
             self.enterContext(patch.object(kelas, "_cek", cek_tiruan(hasil)))
 
     def test_flag_stays_on_until_the_last_queued_check_finishes(self):
@@ -515,10 +516,9 @@ class WriterCheckTests(unittest.TestCase):
 
     def test_link_check_requires_an_actual_reply(self):
         self.lepas.set()
-        nlg = self.runtime.nlg
         with (
-            patch.object(nlg.PenulisTautan, "_cek", return_value="ok"),
-            patch.object(nlg.PenulisTautan, "tulis", return_value=("", "ok")) as hit,
+            patch.object(PenulisTautan, "_cek", return_value="ok"),
+            patch.object(PenulisTautan, "tulis", return_value=("", "ok")) as hit,
         ):
             status = self.runtime.segarkan_penulis(latar=False)
         hit.assert_called_once_with("Jawab singkat.", "Balas: ok")

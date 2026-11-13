@@ -19,6 +19,8 @@ from app.services.persistence_service import PersistenceError
 from app.services.room_service import RoomService
 from tests.palsu.arsip_palsu import arsip_bot_palsu
 from tests.palsu.nlu_palsu import NLUPalsu
+from app.bot.nlg.prompt import MAKSUD_AKSI, buat_prompt
+from app.bot.nlg.templat import VARIASI, bentuk_dasar
 
 AKSI_RAHASIA = {"gag", "hostage", "guard", "peek"}
 
@@ -54,7 +56,7 @@ class BrainRuntimeTests(unittest.TestCase):
         self.assertIsNone(self.runtime.otak_bot(match.id, "NOX"))
 
     def test_removed_systems_and_action_stay_out_of_the_bot_modules(self):
-        from app.bot import fuzzy_controller, nlg
+        from app.bot import fuzzy_controller
 
         self.assertEqual(len(fuzzy_bot.SEMUA_SISTEM), 21)
         dihapus = "bela_diri h_bela_diri jawab h_jawab info_sandera sandera lindung".split()
@@ -65,8 +67,8 @@ class BrainRuntimeTests(unittest.TestCase):
         self.assertEqual(set(fuzzy_controller.INTENT_AKSI), set(fuzzy_controller.URUTAN_AKSI))
         self.assertLessEqual({"ajak_bicara", "klaim_palsu"}, set(fuzzy_bot.SEMUA_SISTEM))
         lama = {"ungkap", "klaim_palsu", "info_sandera", "ajak_bicara"}
-        self.assertFalse(lama & set(nlg.VARIASI))
-        self.assertFalse(lama & set(nlg.MAKSUD_AKSI))
+        self.assertFalse(lama & set(VARIASI))
+        self.assertFalse(lama & set(MAKSUD_AKSI))
 
     # Satu sistem = satu fungsi: fungsi yang terdaftar menghitung sistem bernama sama (bukan sistem lain), input = nama
     # parameternya, dan pohon kecurigaan panel sama dengan urutan fungsi di fuzzy/kecurigaan.py.
@@ -119,7 +121,7 @@ class BrainRuntimeTests(unittest.TestCase):
             {"pengirim": "NOX", "teks": pertama, "intent": "neutral", "target": []}
         )
         kedua = self.runtime.tulis(echo, {**rencana, "pembicara": "ECHO"}, konteks)["teks"]
-        dasar = self.runtime.nlg.bentuk_dasar
+        dasar = bentuk_dasar
         self.assertNotEqual(dasar(pertama), dasar(kedua))
 
     def test_shared_nlu_passes_roster_for_name_normalization_and_memoizes(self):
@@ -201,7 +203,7 @@ class BrainRuntimeTests(unittest.TestCase):
         self.assertEqual(konteks["suara_tribunal"], {"human": "NOX"})
         bela = {"pembicara": "NOX", "aksi": "bela_diri", "intent": "defend", "target": "NOX",
                 "bukti": ["Aku bukan Hitman; tuduhan ke aku belum punya bukti."]}  # fmt: skip
-        _, pesan = self.runtime.nlg.buat_prompt(bela, konteks, "santai")
+        _, pesan = buat_prompt(bela, konteks, "santai")
         self.assertIn("<pemicu>\nhuman: Aku curiga NOX, vote NOX.", pesan)
         self.assertIn("Suara Tribunal ke NOX saat ini: human", pesan)
         self.assertNotIn("Contoh", pesan)
