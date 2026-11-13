@@ -183,17 +183,20 @@ def summary(database: Session) -> dict:
     }
 
 
-# QUERY EKSPOR: seluruh jawaban beserta metode bot di pertandingan yang sama. Satu kiriman
-# (pertandingan + akun) tetap berkelompok menurut waktu kirimnya; di dalamnya jawaban mengikuti
-# urutan pertanyaan sekarang.
+# QUERY EKSPOR: seluruh jawaban beserta nama tampilan pengisi (username bila akunnya sudah dihapus) dan
+# metode bot di pertandingan yang sama. Satu kiriman (pertandingan + akun) tetap berkelompok menurut
+# waktu kirimnya; di dalamnya jawaban mengikuti urutan pertanyaan sekarang.
 def export_rows(database: Session) -> list[dict]:
     daftar_baris = database.execute(text("""
-        SELECT r.created_at, r.match_id, r.room_code, r.username, r.role, r.team, r.outcome,
-               r.question_id, q.code, r.question_snapshot, r.value_number, r.value_text,
+        SELECT r.created_at, r.match_id, r.room_code, r.username,
+               COALESCE(a.display_name, r.username) AS display_name, r.role, r.team, r.outcome,
+               r.question_id, q.code, q.prompt AS question_prompt, q.position AS question_position,
+               r.question_snapshot, r.value_number, r.value_text,
                (SELECT GROUP_CONCAT(DISTINCT CONCAT(b.bot_name, ':', b.method, ':', b.persona)
                                     ORDER BY b.bot_name SEPARATOR ' | ')
                   FROM match_bots b WHERE b.match_id = r.match_id) AS bots
         FROM survey_responses r JOIN survey_questions q ON q.id = r.question_id
+        LEFT JOIN user_accounts a ON a.username = r.username
         ORDER BY MIN(r.created_at) OVER (PARTITION BY r.match_id, r.username), r.match_id,
                  r.username, q.position, q.id
     """))

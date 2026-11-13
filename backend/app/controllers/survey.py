@@ -2,7 +2,6 @@
 
 import csv
 import io
-import json
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
@@ -132,32 +131,52 @@ def panel_respondents(token=Depends(require_panel)):
 
 
 @router.get("/api/panel/survey/responses.csv")
-# PANEL: ekspor seluruh jawaban untuk analisis penelitian. UTF-8 dengan BOM (dibaca benar oleh Excel).
-# File ini dibuka di spreadsheet, jadi teks yang diawali = + - @ tab atau CR diberi awalan ' supaya tidak
-# dijalankan sebagai formula (injeksi CSV). Angka tetap angka. CSV riwayat chat sengaja tidak diubah,
-# karena dipakai sebagai dataset NLU dan teksnya harus persis.
-# Alur: 1 ambil baris jawaban -> 2 isi teks pertanyaan dari salinan saat dijawab -> 3 amankan teks dari formula
-#       -> 4 tulis CSV ber-BOM
+# PANEL: ekspor jawaban untuk analisis penelitian. Satu baris = satu kiriman (satu akun di satu pertandingan);
+# setiap pertanyaan menjadi satu kolom berjudul "kode: teks pertanyaan" (urut posisi di panel) berisi jawabannya,
+# angka untuk skala atau teks untuk pilihan dan isian. UTF-8 dengan BOM (dibaca benar oleh Excel). File ini dibuka
+# di spreadsheet, jadi teks yang diawali = + - @ tab atau CR diberi awalan ' supaya tidak dijalankan sebagai formula
+# (injeksi CSV). Angka tetap angka. CSV riwayat chat sengaja tidak diubah, karena dipakai sebagai dataset NLU.
+# Alur: 1 ambil baris jawaban -> 2 kolom pertanyaan urut posisi -> 3 satu baris per kiriman, jawaban di kolom
+#       pertanyaannya -> 4 amankan teks dari formula -> 5 tulis CSV ber-BOM
 def panel_export(token=Depends(require_panel)):
     def aman_spreadsheet(nilai):
         if isinstance(nilai, str) and nilai[:1] in ("=", "+", "-", "@", "\t", "\r"):
             return "'" + nilai
         return nilai
 
+    # 1 baris jawaban (berkelompok per kiriman)
     daftar_baris = survey_call(survey_service.export_rows)
-    penampung_csv = io.StringIO()
-    kolom_csv = [
-        "created_at", "match_id", "room_code", "username", "role", "team", "outcome", "code",
-        "prompt", "value_number", "value_text", "bots",
+
+    # 2 kolom pertanyaan: satu per pertanyaan yang punya jawaban, urut posisi sekarang
+    judul_pertanyaan = {}
+    for baris in sorted(daftar_baris, key=lambda b: (b["question_position"], b["question_id"])):
+        judul_pertanyaan.setdefault(
+            baris["question_id"], f'{baris["code"]}: {baris["question_prompt"]}'
+        )
+    kolom_kiriman = [
+        "created_at", "match_id", "room_code", "username", "display_name", "role", "team", "outcome",
     ]  # fmt: skip
-    penulis_csv = csv.DictWriter(penampung_csv, fieldnames=kolom_csv, extrasaction="ignore")
-    penulis_csv.writeheader()
+    kolom_csv = [*kolom_kiriman, *judul_pertanyaan.values(), "bots"]
+
+    # 3 satu baris per kiriman; waktu kiriman = jawaban pertamanya
+    kiriman = {}
     for baris in daftar_baris:
-        # Teks pertanyaan diambil dari salinan saat dijawab, bukan dari pertanyaan versi sekarang.
-        salinan = baris.get("question_snapshot")
-        salinan = json.loads(salinan) if isinstance(salinan, str) else (salinan or {})
-        isi = {**baris, "prompt": salinan.get("prompt", "")}
-        penulis_csv.writerow({kolom: aman_spreadsheet(isi.get(kolom)) for kolom in kolom_csv})
+        satu = kiriman.setdefault(
+            (baris["match_id"], baris["username"]),
+            {**{kolom: baris.get(kolom) for kolom in kolom_kiriman}, "bots": baris.get("bots")},
+        )
+        satu["created_at"] = min(satu["created_at"], baris["created_at"])
+        jawaban = (
+            baris["value_number"] if baris["value_number"] is not None else baris["value_text"]
+        )
+        satu[judul_pertanyaan[baris["question_id"]]] = jawaban
+
+    # 4-5 amankan dari formula lalu tulis
+    penampung_csv = io.StringIO()
+    penulis_csv = csv.writer(penampung_csv)
+    penulis_csv.writerow([aman_spreadsheet(kolom) for kolom in kolom_csv])
+    for satu in kiriman.values():
+        penulis_csv.writerow([aman_spreadsheet(satu.get(kolom)) for kolom in kolom_csv])
     return Response(
         "﻿" + penampung_csv.getvalue(),
         media_type="text/csv; charset=utf-8",

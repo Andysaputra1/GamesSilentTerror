@@ -456,36 +456,64 @@ class SurveyExportTests(unittest.TestCase):
         app.dependency_overrides[require_panel] = lambda: "fixture-token"
         self.client = TestClient(app)
 
-    # CSV: UTF-8 dengan BOM, kolom tetap, dan teks yang diawali karakter formula diberi awalan ' (injeksi CSV).
-    def test_csv_has_bom_fixed_columns_and_safe_formula_text(self):
-        rows = [{"created_at": "2026-09-30 10:00:00", "match_id": "m1", "room_code": "ABC123",
-                 "username": "alice", "role": "spy", "team": "civilians", "outcome": "won",
-                 "code": "saran", "question_snapshot": '{"prompt": "Saran untuk game?"}',
-                 "value_number": None, "value_text": "=1+1 seru banget 👍",
-                 "bots": "NOX:fuzzy:santai"}]  # fmt: skip
+    # CSV: satu baris per kiriman, satu kolom per pertanyaan ("kode: teks pertanyaan", urut posisi) berisi
+    # jawabannya, nama tampilan di sebelah username, UTF-8 ber-BOM, dan teks berawalan formula diberi '.
+    def test_csv_has_one_row_per_submission_and_one_column_per_question(self):
+        dasar = {"match_id": "m1", "room_code": "ABC123", "username": "alice", "display_name": "Alice W",
+                 "role": "spy", "team": "civilians", "outcome": "won", "bots": "NOX:fuzzy:santai",
+                 "value_number": None, "value_text": None}  # fmt: skip
+        mirip = {"question_id": 7, "code": "kemiripan_manusia", "question_position": 10,
+                 "question_prompt": "Bot NPC berperilaku layaknya pemain manusia."}  # fmt: skip
+        saran = {"question_id": 9, "code": "saran_masukan", "question_position": 30,
+                 "question_prompt": "Saran Anda?"}  # fmt: skip
+        aspek = {"question_id": 8, "code": "aspek_perbaikan", "question_position": 20,
+                 "question_prompt": "Aspek yang perlu ditingkatkan?"}  # fmt: skip
+        rows = [
+            {**dasar, **mirip, "created_at": "2026-11-13 10:00:01", "value_number": 4},
+            {**dasar, **saran, "created_at": "2026-11-13 10:00:00", "value_text": "=1+1 seru banget 👍"},
+            {**dasar, **mirip, "created_at": "2026-11-13 11:00:00", "match_id": "m2", "username": "budi",
+             "display_name": "budi", "value_number": 2, "bots": None},
+            {**dasar, **aspek, "created_at": "2026-11-13 11:00:00", "match_id": "m2", "username": "budi",
+             "display_name": "budi", "value_text": "Lainnya: lebih cepat", "bots": None},
+        ]  # fmt: skip
         with patch("app.controllers.survey.survey_service.export_rows", return_value=rows):
             response = self.client.get("/api/panel/survey/responses.csv")
         self.assertEqual(response.status_code, 200)
         body = response.content.decode("utf-8")
-        self.assertTrue(body.startswith("﻿"))
-        header, line = body.lstrip("﻿").splitlines()[:2]
-        self.assertEqual(header, "created_at,match_id,room_code,username,role,team,outcome,code,"
-                                 "prompt,value_number,value_text,bots")  # fmt: skip
-        self.assertIn(",Saran untuk game?,,'=1+1 seru banget 👍,NOX:fuzzy:santai", line)
+        self.assertTrue(body.startswith("\ufeff"))
+        header, *baris = list(csv.reader(io.StringIO(body.lstrip("\ufeff"))))
+        self.assertEqual(header, [
+            "created_at", "match_id", "room_code", "username", "display_name", "role", "team", "outcome",
+            "kemiripan_manusia: Bot NPC berperilaku layaknya pemain manusia.",
+            "aspek_perbaikan: Aspek yang perlu ditingkatkan?", "saran_masukan: Saran Anda?", "bots",
+        ])  # fmt: skip
+        self.assertEqual(baris, [
+            ["2026-11-13 10:00:00", "m1", "ABC123", "alice", "Alice W", "spy", "civilians", "won",
+             "4", "", "'=1+1 seru banget 👍", "NOX:fuzzy:santai"],
+            ["2026-11-13 11:00:00", "m2", "ABC123", "budi", "budi", "spy", "civilians", "won",
+             "2", "Lainnya: lebih cepat", "", ""],
+        ])  # fmt: skip
 
     # Semua awalan formula diamankan; teks biasa, angka, dan kosong tetap persis.
     def test_csv_escapes_every_formula_prefix_only(self):
-        dasar = {"created_at": "2026-09-30 10:00:00", "match_id": "m1", "room_code": "ABC123",
-                 "username": "alice", "role": "spy", "team": "civilians", "outcome": "won",
-                 "code": "saran", "question_snapshot": '{"prompt": "Saran?"}', "bots": ""}  # fmt: skip
+        dasar = {"created_at": "2026-09-30 10:00:00", "room_code": "ABC123", "username": "alice",
+                 "display_name": "Alice", "role": "spy", "team": "civilians", "outcome": "won",
+                 "question_id": 1, "code": "saran", "question_prompt": "Saran?", "question_position": 10,
+                 "bots": ""}  # fmt: skip
         teks = ["=SUM(A1)", "+1", "-2+3", "@cmd", "\tx", "biasa", "", None]
-        rows = [{**dasar, "value_number": 3 if t is None else None, "value_text": t} for t in teks]
+        rows = [
+            {
+                **dasar,
+                "match_id": f"m{i}",
+                "value_number": 3 if t is None else None,
+                "value_text": t,
+            }
+            for i, t in enumerate(teks)
+        ]
         with patch("app.controllers.survey.survey_service.export_rows", return_value=rows):
             body = self.client.get("/api/panel/survey/responses.csv").content.decode("utf-8-sig")
-        hasil = [r["value_text"] for r in csv.DictReader(io.StringIO(body))]
-        self.assertEqual(hasil, ["'=SUM(A1)", "'+1", "'-2+3", "'@cmd", "'\tx", "biasa", "", ""])
-        angka = [r["value_number"] for r in csv.DictReader(io.StringIO(body))]
-        self.assertEqual(angka[-1], "3")
+        hasil = [r["saran: Saran?"] for r in csv.DictReader(io.StringIO(body))]
+        self.assertEqual(hasil, ["'=SUM(A1)", "'+1", "'-2+3", "'@cmd", "'\tx", "biasa", "", "3"])
 
     # Pengisi: jawaban dikelompokkan per kiriman (pertandingan + akun), terbaru dulu, teks pertanyaan dari
     # salinan saat dijawab; jumlah kiriman, orang, dan pertandingan dihitung terpisah.
