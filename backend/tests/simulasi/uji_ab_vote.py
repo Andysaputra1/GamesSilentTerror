@@ -5,7 +5,7 @@ LANGKAH keputusan per fase, seed sama untuk kedua kebijakan. Keluaran: win rate 
 (porsi suara warga yang mengenai Hitman). Dasar kebijakan di notebook (bagian Kebijakan Vote saat Bukti Lemah).
 
 Pemakaian (dari folder backend, dengan dependensi backend di requirements.txt; app/bot/nlg.py membaca pengaturan app):
-    python scripts/uji_ab_vote.py . 200 6 [jumlah_pemain=6]
+    python tests/simulasi/uji_ab_vote.py . 200 6 [jumlah_pemain=6]
 """
 
 import math

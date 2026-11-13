@@ -14,7 +14,7 @@ from app.bot.penjelasan import jelaskan
 from app.bot.bot_controller import NPCService
 from app.services.room_service import pindahkan_vote
 from app.services.room_service import RoomService
-from tests.arsip_palsu import arsip_bot_palsu
+from tests.palsu.arsip_palsu import arsip_bot_palsu
 from tests.test_npc_brain import runtime_siap
 
 ENAM = ["hitman", "spy", "stalker", "warga1", "warga2", "warga3"]

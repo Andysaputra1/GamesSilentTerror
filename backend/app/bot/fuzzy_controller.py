@@ -336,7 +336,7 @@ def keputusan_vote(ctx):
     return rencana_vote("abstain", alasan=["Belum cukup yakin; vote yang salah mengurangi warga bebas."],
                         skor=kesiapan), jejak
 
-# Kebijakan vote paksa saat warga kritis (diuji A/B lewat scripts/uji_ab_vote.py).
+# Kebijakan vote paksa saat warga kritis (diuji A/B lewat tests/simulasi/uji_ab_vote.py).
 PAKSA_VOTE_KRITIS = True
 
 # Warga kritis: warga_terdesak setinggi ini, yaitu warga bebas tinggal paling banyak dua di atas jumlah Hitman. Dipakai

@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock, Mock, patch
 from app.bot import bot_controller as runtime_modul
 from app.bot.bot_controller import BrainRuntime
 from app.bot.nlu import NLUBersama, folder_model
-from tests.arsip_palsu import arsip_bot_palsu
+from tests.palsu.arsip_palsu import arsip_bot_palsu
 from tests.nlu_palsu import NLUPalsu
 from app.bot.bot_controller import NPCService
 from app.services.room_service import RoomService

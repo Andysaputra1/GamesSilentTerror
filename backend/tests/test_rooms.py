@@ -7,7 +7,7 @@ from app.services.room_service import RoomService
 from app.services.checker_service import checker_service
 from app.services.auth_service import SessionValidationError
 from app.sockets import chat, server
-from socket_palsu import socket_palsu
+from tests.palsu.socket_palsu import socket_palsu
 
 DATABASE_GAGAL = OperationalError("SELECT", {}, Exception("server hilang"))
 

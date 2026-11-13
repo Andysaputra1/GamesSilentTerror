@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from app.controllers.rooms import router
 from app.middleware.auth import require_authenticated_user
 from app.sockets import chat
-from socket_palsu import socket_palsu
+from tests.palsu.socket_palsu import socket_palsu
 from app.game.match_engine import KOMPOSISI_PERAN, Match, label_unik, snapshot_berlabel
 from app.config.skins import ALL_SKINS
 from app.services.room_service import RoomService

@@ -4,7 +4,7 @@ Semua kursi bot memakai otak Fuzzy (app/bot/ingatan.py, fuzzy_controller.py, dan
 pengirim, LANGKAH keputusan per fase, engine Match asli. Angka lama di GAME_CONCEPT diukur dengan metode campuran.
 
 Pemakaian (dari folder backend, dengan dependensi backend di requirements.txt; app/bot/nlg.py membaca pengaturan app):
-    python scripts/simulasi_keseimbangan.py . 200 6 "7:2/2/1" "8:2/2/1"
+    python tests/simulasi/simulasi_keseimbangan.py . 200 6 "7:2/2/1" "8:2/2/1"
 """
 
 import math

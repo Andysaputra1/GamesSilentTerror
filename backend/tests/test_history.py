@@ -3,7 +3,7 @@ from unittest.mock import Mock, patch
 from app.services.room_service import RoomService
 from app.services.persistence_service import PersistenceError
 from app.sockets import chat
-from socket_palsu import socket_palsu
+from tests.palsu.socket_palsu import socket_palsu
 
 
 class ChatDurabilityTests(unittest.IsolatedAsyncioTestCase):

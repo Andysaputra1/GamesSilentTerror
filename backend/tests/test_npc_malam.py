@@ -19,7 +19,7 @@ from app.services.room_service import pindahkan_aksi_malam
 from app.services.activity_service import activity
 from app.services.checker_service import checker_service
 from app.services.room_service import Room, RoomService
-from tests.arsip_palsu import arsip_bot_palsu
+from tests.palsu.arsip_palsu import arsip_bot_palsu
 from tests.nlu_palsu import NLUPalsu
 
 DELAPAN = ["hitman", "hitman2", "spy", "spy2", "stalker", "civilian", "civilian2", "civilian3"]

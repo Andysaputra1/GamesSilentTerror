@@ -86,7 +86,7 @@ def uuid_berurutan():
     return Uuid
 
 
-# Label NLU sempurna dari rencana chat pengirim, seperti scripts/simulasi_keseimbangan.py.
+# Label NLU sempurna dari rencana chat pengirim, seperti tests/simulasi/simulasi_keseimbangan.py.
 def label_rencana(rencana):
     if rencana["intent"] is None or rencana["target"] is None:
         return "neutral", []
