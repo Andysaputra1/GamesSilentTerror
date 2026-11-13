@@ -1,203 +1,157 @@
-# Database Azure
+# Deploy backend ke Azure
 
-Azure memakai folder SQL yang sama dengan lokal: `backend/migrations/` (di-mount ke
-`/docker-entrypoint-initdb.d`). MySQL menjalankan semua file berurutan (V01 sampai V10) **hanya** saat
-volume masih kosong. Tidak ada DROP, penghapusan data, atau akun bawaan: akun dibuat lewat halaman daftar,
-login Google, atau menu Manajemen user di panel.
+File ini untuk memperbarui backend produksi di VM Azure: susunan server, langkah update rutin, backup, menjalankan
+migrasi pada database yang sudah berisi, dan pengaturan panel di VM. Pemasangan pertama (DNS, firewall, Google OAuth,
+Vercel) ada di [AZURE_SETUP.md](AZURE_SETUP.md). Isi tiap migrasi ada di
+[backend/migrations/README.md](../migrations/README.md).
 
-Volume yang sudah berisi data tidak menjalankan file baru: backup dulu, lalu jalankan file yang versinya
-belum tercatat (tabel di bawah). Database Azure yang dibuat sebelum 26 Oktober 2026 berasal dari baseline
-lama: penanda `AZURE_BASELINE_1` menggantikan V1–V4, jadi jangan jalankan V01–V04 di sana.
+## Susunan produksi
 
-## Menerapkan migrasi pada database lama
+| Bagian | Isi |
+| --- | --- |
+| Alamat | Backend `https://backendthesis.andylabs.site`, panel `https://backendthesis.andylabs.site/panel`, frontend `https://silent-terror.andylabs.site` (Vercel) |
+| Repo di VM | `~/GamesSilentTerror`, dengan secret di `.env.azure` (diabaikan Git, jangan dibagikan) |
+| Compose | `docker-compose.azure.yml`, selalu dipakai dengan `--env-file .env.azure` |
+| `mysql` | MySQL 8.4.11. Volume eksternal `shadow_heist_mysql_data`; `backend/migrations/` dipasang ke `/docker-entrypoint-initdb.d`. Tanpa port host dan tanpa phpMyAdmin |
+| `backend` | Image dari `deployment/Dockerfile.azure`: PyTorch CPU, uvicorn **satu worker**, `--proxy-headers` supaya IP pemain berasal dari Caddy. `AI_PROVIDER=api` |
+| `proxy` | Caddy 2 (`deployment/Caddyfile`), port 80 dan 443, sertifikat HTTPS otomatis untuk `BACKEND_DOMAIN`. Baru menyala bila backend sehat |
 
-Masuk ke MySQL dari root repository di VM:
+Image backend menyalin seluruh folder `backend/` kecuali `tests/` (lihat `backend/.dockerignore`). Artinya model
+IndoBERT di `backend/artifacts/indobert/{intent,target}` harus sudah ada di VM sebelum build, dan tes tidak ikut di
+image.
+
+Semua perintah di bawah dijalankan dari `~/GamesSilentTerror` dengan awalan Compose yang sama:
 
 ```bash
-sudo docker compose --env-file .env.azure -f docker-compose.azure.yml exec mysql sh -c 'exec mysql -uroot -p"$MYSQL_ROOT_PASSWORD" shadow_heist'
-```
-
-Periksa `SELECT version FROM schema_migrations;`, lalu jalankan berurutan file yang versinya belum ada,
-sebelum backend versi baru diaktifkan:
-
-| Versi di `schema_migrations` | Perintah |
-| --- | --- |
-| `V5__chat_history` | `SOURCE /docker-entrypoint-initdb.d/V05__chat_history.sql;` |
-| `V6__admin_panel` | `SOURCE /docker-entrypoint-initdb.d/V06__admin_panel.sql;` |
-| `V7__add_skin_preference` | `SOURCE /docker-entrypoint-initdb.d/V07__add_skin_preference.sql;` |
-| `V7__survey_and_npc` | `SOURCE /docker-entrypoint-initdb.d/V07__survey_and_npc.sql;` |
-| `V8__fix_role_stalker_enum` | `SOURCE /docker-entrypoint-initdb.d/V08__fix_role_stalker_enum.sql;` (pastikan dulu `SELECT COUNT(*) FROM players WHERE role = 'detective';` bernilai 0) |
-| `V9__chat_nlu` | `SOURCE /docker-entrypoint-initdb.d/V09__chat_nlu.sql;` |
-| `V10__match_participants` | `SOURCE /docker-entrypoint-initdb.d/V10__match_participants.sql;` |
-| `V11__survey_player_feedback` | `SOURCE /docker-entrypoint-initdb.d/V11__survey_player_feedback.sql;` (hanya menambah lima pertanyaan survei di paling bawah; tidak mengubah struktur tabel) |
-
-Nama file memakai nomor dua digit (V01, V05, …) agar MySQL menjalankannya berurutan pada volume kosong
-(tanpa itu V10 jalan sebelum V1). Versi yang dicatat di dalam file tetap nama lama (`V5__chat_history`)
-agar cocok dengan database yang sudah ada dan pemeriksaan `/ready`. Jika SQL gagal, periksa struktur kolom
-sebelum mengulang: ALTER TABLE MySQL bukan transaksi yang dapat dibatalkan bersama INSERT penanda migrasi.
-Jangan menghapus volume untuk migrasi.
-
-## Audit tabel
-
-| Tabel | Pemakaian backend |
-| --- | --- |
-| user_accounts | Login dan pendaftaran (`app/models/auth_queries.py`) |
-| auth_sessions | Validasi token dan logout (`app/models/auth_queries.py`) |
-| account_identities | Email dan identitas Google (`app/models/auth_queries.py`) |
-| game_sessions | Identitas room dan fase dalam persistence (`app/models/game_queries.py`) |
-| players | Peserta room, status, dan skor (`app/models/game_queries.py`) |
-| chat_messages | Pesan chat yang disimpan (`app/models/game_queries.py`) |
-| ai_analyses | Arsip hasil SVM/fuzzy dan balasan NOX lama; tidak ditulis lagi sejak analisis lama dihapus |
-| schema_migrations | Catatan versi skema; dipertahankan untuk administrasi migrasi |
-
-Semua tabel aplikasi masih digunakan. `players` berbeda dari `user_accounts`:
-satu akun dapat menjadi peserta beberapa room. State lengkap pertandingan,
-timer, dan voting masih di memori; volume tidak memulihkan match setelah restart.
-Migrasi tidak memasukkan akun ataupun data pertandingan.
-Kolom/enum lama tetap dipertahankan untuk kompatibilitas query saat ini. Kolom `players.aggressiveness`,
-`players.suspicion_score`, `chat_messages.intent`, dan `chat_messages.suspicion_score` tidak diisi lagi
-(analisis SVM/fuzzy lama sudah dihapus); datanya dibiarkan sebagai arsip.
-
-## Jalankan di VM
-
-Dari root repository, buat password acak pada file lokal yang diabaikan Git:
-
-```bash
-test ! -e .env.azure && (umask 077; printf 'MYSQL_PASSWORD=%s\nMYSQL_ROOT_PASSWORD=%s\n' "$(openssl rand -hex 24)" "$(openssl rand -hex 24)" > .env.azure)
-sudo docker volume create shadow_heist_mysql_data
-sudo docker compose --env-file .env.azure -f docker-compose.azure.yml up -d mysql
+cd ~/GamesSilentTerror
 sudo docker compose --env-file .env.azure -f docker-compose.azure.yml ps
 ```
 
-Jangan membagikan `.env.azure`. Password ini diperlukan backend nanti. Mengubah
-environment tidak merotasi password pada database yang sudah diinisialisasi.
+## Update rutin
 
-Volume eksternal harus dibuat lebih dulu dan dipertahankan oleh Compose saat
-`down`, termasuk `down -v`. Penghapusan volume manual atau disk VM tetap menghapus
-data. Volume bukan backup: simpan dump terpisah di luar VM sebelum upgrade.
-MySQL tidak membuka port host dan tidak menjalankan phpMyAdmin.
+1. **Pilih waktu tanpa pertandingan.** Membuat ulang backend menghapus pertandingan yang sedang berjalan; arsip chat
+   tetap ada.
+2. **Ambil kode:** `git pull --ff-only`.
+3. **Periksa migrasi baru.** Bandingkan file di `backend/migrations/` dengan isi `schema_migrations` (lihat
+   [Menjalankan migrasi](#menjalankan-migrasi-di-database-lama)). File baru **tidak** jalan sendiri karena volume
+   produksi sudah berisi data.
+4. **Bila ada migrasi baru:** [backup](#backup-database) dulu, lalu jalankan file yang belum tercatat, sebelum backend
+   versi baru menyala.
+5. **Build dan nyalakan backend:**
 
-Untuk melihat tabel, masuk dengan password root dari file lokal (jangan kirim
-password ke chat):
+   ```bash
+   sudo docker compose --env-file .env.azure -f docker-compose.azure.yml up -d --build backend
+   ```
 
-```bash
-sudo docker compose --env-file .env.azure -f docker-compose.azure.yml exec mysql mysql -uroot -p shadow_heist
-```
+   Build bisa memakan sekitar 10 menit bila cache kosong. Bila SSH mudah putus, jalankan di latar dan pantau lognya;
+   jangan menyalakan build kedua selama build pertama masih jalan. Contoh ini tanpa `sudo` (yang tidak bisa meminta
+   password di latar), jadi pengguna VM harus anggota grup `docker`.
 
-```sql
-SHOW TABLES;
-SELECT COUNT(*) FROM user_accounts;
-```
+   ```bash
+   nohup docker compose --env-file .env.azure -f docker-compose.azure.yml up -d --build backend \
+     > /tmp/deploy.log 2>&1 < /dev/null &
+   tail -f /tmp/deploy.log
+   ```
 
-Hasil awal: 15 tabel (termasuk `schema_migrations`) dan nol akun pemain.
+6. **Periksa hasil:**
 
-MySQL hanya mengeksekusi folder migrasi saat direktori data masih kosong. Jika volume
-sudah berisi database, berhenti dan audit isinya; jangan menghapus volume untuk
-memaksa inisialisasi ulang.
+   ```bash
+   sudo docker compose --env-file .env.azure -f docker-compose.azure.yml ps
+   sudo docker compose --env-file .env.azure -f docker-compose.azure.yml logs --tail=60 backend proxy
+   curl -fsS https://backendthesis.andylabs.site/ready
+   ```
 
+   `/ready` hanya memeriksa migrasi V5 dan V6. Coba juga login, buat room, dan chat dari frontend. Login yang gagal
+   dengan 503 sesudah update biasanya berarti ada migrasi yang belum dijalankan.
+7. **Bila disk VM menipis**, hapus image dan build cache yang tidak terpakai. Volume jangan disentuh.
 
-## Riwayat chat pemain dan bot
+   ```bash
+   sudo docker image prune -a
+   sudo docker builder prune -a
+   ```
 
-Pesan Socket.IO pemain disimpan sebelum echo dan sebelum menunggu AI. Balasan bot
-tersimpan sebagai baris terpisah dengan nama pengirim dan referensi pesan pemain.
-Metadata pertandingan, ronde, fase, dan waktu tersedia; urutan menggunakan ID database.
-Tidak ada penghapusan otomatis saat logout, keluar room, atau restart backend.
-Volume database harus tetap dipertahankan dan dibackup. Ini bukan pemulihan match aktif.
-Commit database mendahului broadcast: pesan tetap dapat tercatat jika proses berhenti
-sebelum browser menerima broadcast; arsip bukan bukti penerimaan oleh setiap browser.
+## Backup database
 
-Untuk melihat arsip, buka `/panel` pada origin backend melalui HTTPS dan login
-sebagai administrator.
-Semua API panel memakai sesi administrator terpisah dari akun pemain.
-
-Database lama tanpa `V5__chat_history`: jalankan `V05__chat_history.sql` (tabel migrasi di atas).
-Pesan lama tetap ada dan ditandai `legacy`; identitas bot/ronde lama tidak direka ulang.
-Balasan AI lama tetap tersimpan di ai_analyses dan belum dimasukkan ke tabel percakapan,
-karena kode lama tidak mencatat apakah respons benar-benar dipublikasikan.
-
-## Survei, NPC, dan avatar
-
-Database lama: jalankan file V07 sampai V11 yang versinya belum tercatat (tabel migrasi di atas).
-Tanpa V07 kolom `skin_id` dan tabel survei belum ada, tanpa V08 peserta Stalker gagal diarsipkan,
-dan tanpa V09 (kolom `chat_messages.nlu`) menu Riwayat chat di panel gagal dimuat. Tanpa V11 aplikasi
-tetap jalan, hanya lima pertanyaan survei pengalaman bermain yang belum ada. Jangan menghapus volume untuk menjalankan migrasi.
-
-`schema_migrations` menyimpan versi struktur yang sudah diterapkan dan waktunya.
-Saat ini project memakai SQL manual, belum ada migration runner otomatis; tabel ini
-adalah catatan audit untuk menentukan script mana yang sudah dijalankan, bukan chat.
-
-
-## Panel administrator (/panel)
-
-Tiga menu: konfigurasi AI, checker per room (live + arsip), dan riwayat percakapan.
-Room baru dicatat sejak dibuat, termasuk yang belum mempunyai pesan. Kode room
-lama tidak dipakai ulang. Room lama yang tidak pernah tercatat di DB tidak dapat
-direkonstruksi. Trace checker yang selesai dicatat sejak V6; trace sebelum fitur
-ini atau request yang terputus karena proses mati tidak otomatis dipulihkan.
-
-Database lama: sesudah V5, jalankan `SOURCE /docker-entrypoint-initdb.d/V06__admin_panel.sql;`
-sekali jika `V6__admin_panel` belum ada di schema_migrations. Migrasi ini menambah
-panel_configuration, panel_sessions, dan checker_traces tanpa menghapus chat.
-
-Siapkan login di VM dari root repository:
+Sandi root dibaca dari environment container, jadi tidak perlu diketik atau dicetak:
 
 ```bash
-python3 backend/scripts/setup_panel.py .env.azure
+sudo docker compose --env-file .env.azure -f docker-compose.azure.yml exec -T mysql \
+  sh -c 'exec mysqldump -uroot -p"$MYSQL_ROOT_PASSWORD" --single-transaction --routines --triggers shadow_heist' \
+  > backup_sebelum_VXX_$(date +%Y%m%d_%H%M).sql
 ```
 
-Masukkan password administrator yang ditentukan pemilik saat diminta dua kali.
-Script memakai library standar Python; hanya hash salted PBKDF2 yang disimpan.
-Set username tetap `administrator`. Jangan commit file .env.azure.
-Kirim environment `PANEL_USERNAME`, `PANEL_PASSWORD_HASH`, `OPENROUTER_API_KEY`,
-dan opsional `OLLAMA_TUNNEL_TOKEN` ke container backend, lalu restart backend.
-Compose Azure sudah memuat MySQL, backend satu worker, dan Caddy HTTPS. Lihat AZURE_SETUP.md untuk urutan deploy.
-Sesi admin berlaku 8 jam, dapat dicabut melalui logout, dan tidak valid setelah
-hash password di environment diganti. Token hanya berada di memori tab browser;
-refresh halaman memerlukan login ulang. Jalankan satu worker backend untuk engine game.
+Simpan salinan dump di luar VM. Volume eksternal tidak terhapus oleh `down` atau `down -v`, tetapi menghapus volume
+secara manual atau kehilangan disk VM tetap menghapus data. Volume bukan backup.
 
-API: OpenRouter `qwen/qwen3-14b`. API key dapat diisi langsung melalui menu
-Konfigurasi AI di /panel. Kolom kosong mempertahankan key; key baru mengganti yang
-tersimpan. Nilainya tidak dikembalikan oleh API panel dan input dibersihkan setelah simpan.
-Database menyimpan ciphertext Fernet di JSON panel_configuration (tanpa migrasi tambahan).
-OPENROUTER_API_KEY di environment tetap menjadi fallback jika belum ada key dari panel.
-Script setup_panel.py menyiapkan PANEL_ENCRYPTION_KEY sekali dan mempertahankannya
-saat password admin diganti. Kirim PANEL_ENCRYPTION_KEY ke container backend.
-Backup kunci ini terpisah dari database: key panel tidak bisa didekripsi jika kunci
-server hilang atau diganti. Pemakaian HTTPS wajib pada deployment publik.
-Token tunnel (LLM_TOKEN ai-docker) diisi di kolom yang sama dan disimpan terenkripsi dengan cara
-yang sama; token panel menimpa OLLAMA_TUNNEL_TOKEN dari environment, dan centang "Hapus token"
-mengembalikannya ke environment.
-Lokal: Qwen3 `qwen3:14b`, masukkan URL dasar tunnel HTTPS di panel. Endpoint harus
-meneruskan POST /api/chat ke Ollama dan model harus sudah diunduh pada mesin lokal.
-Jika tunnel menggunakan Bearer auth, set OLLAMA_TUNNEL_TOKEN pada backend.
-Konfigurasi provider/URL tersimpan di MySQL dan dimuat ulang saat startup.
-Tidak ada fallback otomatis ke provider lain untuk mode chat LLM lama. Rantai penulis kalimat
-otak NPC (menu Otak NPC) berbeda: jalurnya dicoba sesuai prioritas panel dan jalur yang ditolak
-dilewati; key OpenRouter dan URL tunnel di menu ini ikut dipakai rantai tersebut. Tombol Cek AI mengirim prompt pendek
-untuk benar-benar menguji jawaban; mode API memakai saldo OpenRouter.
+## Menjalankan migrasi di database lama
 
-Riwayat menampilkan semua pesan chat yang tercatat, pemain dan bot. Download
-menghasilkan CSV UTF-8 (BOM) dengan kolom format dataset NLU (`KOLOM_CSV` di
-`controllers/panel.py`), termasuk teks_chat dan chat_id. Filter tanggal
-opsional menggunakan hari WIB, batas awal inklusif dan akhir sampai penghujung hari.
-Download selalu semua room, meski tampilan sedang memilih satu room. CSV mempertahankan
-isi pesan persis termasuk tanda kutip dan baris baru; ketika mengimpor ke spreadsheet,
-perlakukan teks_chat sebagai teks agar isi pesan tidak dievaluasi sebagai formula.
-ID dipakai untuk urutan stabil; pesan baru selama export tidak ditambahkan ke snapshot export.
+1. Masuk ke MySQL:
 
-Di frontend Vercel, route /panel mengarah ke origin BACKEND_URL + /panel, jadi set
-BACKEND_URL ke origin HTTPS backend dan redeploy frontend setelah backend tersedia.
+   ```bash
+   sudo docker compose --env-file .env.azure -f docker-compose.azure.yml exec mysql \
+     sh -c 'exec mysql -uroot -p"$MYSQL_ROOT_PASSWORD" shadow_heist'
+   ```
 
+2. Lihat versi yang sudah tercatat: `SELECT version FROM schema_migrations;`
+3. Jalankan berurutan file yang versinya belum ada:
 
-### Pilihan key OpenRouter
+   | Versi di `schema_migrations` | Perintah |
+   | --- | --- |
+   | `V5__chat_history` | `SOURCE /docker-entrypoint-initdb.d/V05__chat_history.sql;` |
+   | `V6__admin_panel` | `SOURCE /docker-entrypoint-initdb.d/V06__admin_panel.sql;` |
+   | `V7__add_skin_preference` | `SOURCE /docker-entrypoint-initdb.d/V07__add_skin_preference.sql;` |
+   | `V7__survey_and_npc` | `SOURCE /docker-entrypoint-initdb.d/V07__survey_and_npc.sql;` |
+   | `V8__fix_role_stalker_enum` | `SOURCE /docker-entrypoint-initdb.d/V08__fix_role_stalker_enum.sql;` (pastikan dulu `SELECT COUNT(*) FROM players WHERE role = 'detective';` bernilai 0) |
+   | `V9__chat_nlu` | `SOURCE /docker-entrypoint-initdb.d/V09__chat_nlu.sql;` |
+   | `V10__match_participants` | `SOURCE /docker-entrypoint-initdb.d/V10__match_participants.sql;` |
+   | `V11__survey_player_feedback` | `SOURCE /docker-entrypoint-initdb.d/V11__survey_player_feedback.sql;` |
 
-Di Konfigurasi AI tersedia `Default dari server` dan `API key sendiri`.
-Default membaca `openrouter_default` (atau `OPENROUTER_DEFAULT`) dari environment;
-`OPENROUTER_API_KEY` lama tetap didukung jika key default belum diisi.
-API key sendiri menggunakan ciphertext yang disimpan melalui panel, tidak beralih
-ke key default jika key sendiri kosong atau tidak valid. Pilihan sumber tersimpan
-bersama konfigurasi dan berlaku untuk chat game maupun tombol Cek AI.
-Beralih ke Default tidak menghapus key sendiri; pilih kembali API key sendiri
-untuk memakainya lagi tanpa mengetik ulang. Tidak ada key mentah dalam respons API.
-Kedua pilihan tetap OpenRouter, model qwen/qwen3-14b. Restart backend setelah
-mengubah environment; perubahan pilihan di panel langsung berlaku untuk request berikutnya.
+   Cara lain tanpa masuk client: kirim file lewat stdin,
+   `sudo docker compose ... exec -T mysql sh -c 'exec mysql -uroot -p"$MYSQL_ROOT_PASSWORD" shadow_heist' < backend/migrations/V11__survey_player_feedback.sql`.
+
+Database Azure yang dibuat sebelum 26 Oktober 2026 berasal dari baseline lama: penanda `AZURE_BASELINE_1`
+menggantikan V1–V4, jadi **jangan jalankan V01–V04 di sana**. Jangan menghapus volume untuk memaksa migrasi. Bila SQL
+gagal di tengah, periksa struktur kolom sebelum mengulang, karena `ALTER TABLE` tidak bisa dibatalkan bersama
+`INSERT` penanda migrasi.
+
+## Audit tabel
+
+Skema lengkap berisi 15 tabel. `players` berbeda dari `user_accounts`: satu akun bisa menjadi peserta banyak room.
+
+| Tabel | Pemakaian backend |
+| --- | --- |
+| `user_accounts`, `auth_sessions`, `account_identities` | Akun, sesi login, email dan identitas Google (`models/auth_queries.py`) |
+| `game_sessions`, `players` | Identitas room dan peserta room (`models/game_queries.py`) |
+| `chat_messages` | Arsip chat manusia dan bot beserta bacaan NLU (`game_queries.py`, `panel_queries.py`) |
+| `checker_traces` | Jejak checker yang selesai (`game_queries.py`, `panel_queries.py`) |
+| `panel_configuration`, `panel_sessions` | Konfigurasi panel (baris 1 Konfigurasi AI, baris 2 Otak NPC) dan sesi admin (`panel_queries.py`) |
+| `survey_questions`, `survey_responses`, `match_bots`, `match_participants` | Survei, metode dan persona bot, peserta pertandingan selesai (`survey_queries.py`) |
+| `schema_migrations` | Catatan versi migrasi; dibaca `/ready` |
+| `ai_analyses` | Arsip analisis SVM/fuzzy dan balasan bot lama. Tidak ditulis lagi |
+
+Kolom lama `players.aggressiveness`, `players.suspicion_score`, `chat_messages.intent`, dan
+`chat_messages.suspicion_score` tidak diisi lagi sejak analisis lama dihapus; datanya dibiarkan sebagai arsip.
+
+**Riwayat chat.** Chat manusia disimpan sebelum disiarkan; chat bot disimpan sebagai baris sendiri. Karena commit
+mendahului broadcast, arsip bukan bukti bahwa setiap browser menerima pesannya. Tidak ada penghapusan otomatis saat
+logout, keluar room, atau restart. Pesan dari sebelum V5 ditandai `legacy`, dan identitas bot atau ronde lamanya tidak
+direka ulang. Room lama yang tidak pernah tercatat di database dan jejak sebelum V6 tidak bisa dipulihkan.
+
+## Panel dan secret di VM
+
+- `setup_azure.py` (pemasangan pertama) atau `python3 backend/scripts/setup_panel.py .env.azure` (ganti password)
+  menulis `PANEL_PASSWORD_HASH` dan membuat `PANEL_ENCRYPTION_KEY` sekali. Kunci itu dipertahankan saat password
+  diganti. Simpan cadangannya terpisah dari database: key yang disimpan dari panel tidak bisa didekripsi bila kunci
+  hilang.
+- Username panel tetap `administrator` (diset di Compose). Sesi admin berlaku 8 jam, bisa dicabut lewat logout, dan
+  tidak berlaku lagi sesudah hash password diganti. Token panel hanya di memori tab, jadi refresh halaman perlu login
+  ulang.
+- Variabel lain di `.env.azure`: `GOOGLE_CLIENT_ID`, `FRONTEND_ORIGIN` (menjadi `CORS_ORIGINS`), `BACKEND_DOMAIN`,
+  `openrouter_default`, opsional `OPENROUTER_API_KEY`, `OLLAMA_TUNNEL_TOKEN`, dan `NPC_*`. Arti tiap variabel ada di
+  [backend/README.md](../README.md#variabel-environment).
+- Sesudah mengubah `.env.azure`, terapkan dengan
+  `sudo docker compose --env-file .env.azure -f docker-compose.azure.yml up -d backend` (container dibuat ulang).
+- Key OpenRouter, link LLM sendiri, dan model penulis bisa diatur langsung dari panel tanpa restart (lihat
+  [backend/README.md](../README.md#pengaturan-dari-panel)). Produksi memakai Model OpenRouter `google/gemini-2.5-flash`
+  di menu Otak NPC. Link LLM dari laptop dikirim otomatis oleh `ai-docker/jalankan.bat`.
+- Frontend Vercel mengalihkan `/panel` ke `BACKEND_URL` + `/panel`. Panel wajib dibuka lewat HTTPS.

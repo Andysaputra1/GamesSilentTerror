@@ -1,92 +1,91 @@
 # Ollama lokal
 
-Server Ollama berjalan di container `shadow_ollama`.
-Pilih salah satu file mandiri: `docker-compose.yml` untuk CPU (termasuk Mac),
-atau `docker-compose.gpu.yml` untuk GPU NVIDIA. Jangan jalankan keduanya bersamaan.
-API dari host: `http://localhost:11435`.
-Alamat dari container dalam jaringan Compose: `http://ollama:11434`.
+File ini menjelaskan cara menjalankan Ollama di Docker lokal dan memakainya sebagai penulis kalimat bot. Untuk membuka
+LLM di laptop ke backend VM lewat tunnel, lihat [ai-docker/README.md](ai-docker/README.md). Langkah umum menjalankan
+aplikasi ada di [README.md](README.md).
 
 ## Menjalankan
 
+Ollama berjalan di container `shadow_ollama`. Pilih salah satu file Compose mandiri: `docker-compose.yml` untuk CPU
+(termasuk Mac) atau `docker-compose.gpu.yml` untuk GPU NVIDIA. Jangan menjalankan keduanya bersamaan.
+
 ```sh
+# CPU
 docker compose up -d ollama ollama-models
 docker compose logs -f ollama-models
 docker compose exec ollama ollama list
-```
 
-Untuk NVIDIA, gunakan file GPU pada setiap perintah:
-
-```sh
+# NVIDIA: pakai file GPU pada setiap perintah
 docker compose -f docker-compose.gpu.yml up -d ollama ollama-models
 docker compose -f docker-compose.gpu.yml logs -f ollama-models
 docker compose -f docker-compose.gpu.yml exec ollama ollama list
 ```
 
-Kedua versi menjalankan Ollama di Docker. Tidak perlu instalasi Ollama native
-untuk Mac. Versi CPU tidak meminta perangkat NVIDIA dan dapat jauh lebih lambat.
-Pastikan memori Docker cukup untuk model yang dipilih (bawaan 14B); bila kurang, pilih 8B atau gunakan API.
+| Alamat | Dari |
+| --- | --- |
+| `http://localhost:11435` | Host (hanya loopback 127.0.0.1, bukan jaringan publik) |
+| `http://ollama:11434` | Container lain di jaringan Compose, termasuk backend |
 
-Service `ollama-models` menunggu server sehat, lalu mengunduh model yang belum
-tersedia. `.env.example` dan fallback Compose mengunduh `qwen3:14b` saja. Setelah selesai,
-initializer keluar dengan
-kode 0; server tetap berjalan. Ubah `OLLAMA_MODELS_TO_PULL` di .env untuk mengganti
-daftar model. Model yang telah tersedia dilewati, bukan diunduh ulang.
-
-Model disimpan di named volume `games_ollama_data`, dipasang ke `/root/.ollama`.
-Volume proyek yang sudah ada dipakai ulang, termasuk model-model sebelumnya.
-`docker compose down`, `up`, restart, dan recreate container mempertahankan model.
-Jangan gunakan `docker compose down -v` atau menghapus volume jika model/data
-database masih diperlukan: opsi `-v` ikut menghapus named volume proyek.
+- Kedua versi menjalankan Ollama di Docker, jadi Mac tidak perlu instalasi Ollama native. Versi CPU bisa jauh lebih
+  lambat. Pastikan memori Docker cukup untuk model yang dipilih; model yang tidak muat bisa gagal, bukan hanya lambat.
+- Service `ollama-models` menunggu server sehat, mengunduh model di `OLLAMA_MODELS_TO_PULL` yang belum ada, lalu keluar
+  dengan kode 0. Model yang sudah ada dilewati. `.env.example` dan Compose mengunduh `qwen3:14b` saja.
+- Model disimpan di volume `games_ollama_data` (`/root/.ollama`). `down`, `up`, restart, dan recreate mempertahankan
+  model. **`docker compose down -v` menghapus volume ini beserta database.**
+- Ollama hanya menyediakan inference, bukan training atau fine-tuning.
 
 ## Pengaturan
 
-- `OLLAMA_CONTEXT_LENGTH=2048`: ukuran konteks default.
-- `OLLAMA_KEEP_ALIVE=10m`: mempertahankan model di memori setelah request.
-- Port host hanya di-bind ke loopback (127.0.0.1), bukan jaringan publik.
-- Reservation GPU NVIDIA hanya ada di `docker-compose.gpu.yml`.
-- RTX 3060 Laptop pada mesin ini memiliki VRAM 6 GB; model 14B dapat memakai
-  sebagian RAM/CPU, sehingga kecepatan perlu diuji sesuai kapasitas mesin.
+| Variabel | Dibaca | Arti |
+| --- | --- | --- |
+| `OLLAMA_MODELS_TO_PULL` | Container `ollama-models` | Daftar model yang diunduh, dipisah spasi (bawaan `qwen3:14b`) |
+| `OLLAMA_CONTEXT_LENGTH` | Container `ollama` | Ukuran konteks (bawaan 2048) |
+| `OLLAMA_KEEP_ALIVE` | Container `ollama` | Lama model tetap di memori sesudah request (bawaan `10m`) |
+| `OLLAMA_MODEL` | Backend | Model jalur link: `4` = `qwen3:4b-instruct`, `8` = `qwen3:8b`, `14` = `qwen3:14b` (bawaan). Nilai lain ditolak. Model itu harus ada di `OLLAMA_MODELS_TO_PULL` |
 
-Ollama menyediakan inference, bukan pipeline training/fine-tuning.
+Reservasi GPU NVIDIA hanya ada di `docker-compose.gpu.yml`. RTX 3060 Laptop pada mesin pengembang punya VRAM 6 GB,
+jadi model 14B memakai sebagian RAM dan CPU; kecepatannya perlu diuji di mesin masing-masing. Bila 14B terlalu berat,
+pakai 8B atau 4B, atau pakai OpenRouter.
 
-## Link LLM untuk penulis kalimat NPC
+## Penulis kalimat bot memakai Ollama
 
-Cara tercepat: `ai-docker/jalankan.bat` (Qwen3 4B + gerbang token + Cloudflare tunnel, lihat
-[ai-docker/README.md](ai-docker/README.md)). Cara manual di bawah memakai Ollama dari compose utama.
+Penulis kalimat bot memakai **rantai prioritas** (panel menu **Otak NPC**): OpenRouter dan "LLM sendiri lewat link"
+(`tautan`), lalu templat. Jalur link memakai URL dari panel **Konfigurasi AI**, atau `OLLAMA_BASE_URL` bila panel belum
+menyimpan URL.
 
-Rantai penulis kalimat NPC (panel **Otak NPC**, jalur "LLM sendiri lewat link") memakai URL
-tunnel yang sama dengan menu Konfigurasi AI:
+**Lokal.** Compose sudah mengisi `OLLAMA_BASE_URL=http://ollama:11434` untuk backend, jadi Ollama lokal langsung
+menjadi jalur link. Buka panel **Otak NPC**, lalu klik **Tes koneksi semua prioritas**. Atur urutan jalur (▲▼) bila
+jalur link ingin dipakai lebih dulu. Model jalur ini dipilih di **Model LLM link**; "Bawaan" memakai model dari
+Konfigurasi AI atau `OLLAMA_MODEL`.
+
+**Lewat tunnel** (mis. backend di VM). Cara tercepat `ai-docker/jalankan.bat` (Qwen3 + gerbang token + Cloudflare
+tunnel). Cara manual dengan Ollama dari Compose utama:
 
 1. Jalankan Ollama (lihat di atas) dan pastikan modelnya sudah diunduh.
 2. Buka tunnel HTTPS ke port host, misalnya
-   `cloudflared tunnel --url http://localhost:11435 --http-host-header localhost:11434`.
-   Jika link menjawab 403, header host inilah yang biasanya kurang (Ollama menolak host asing).
-3. Masukkan URL tunnel di panel → Konfigurasi AI (simpan), lalu klik **Cek ulang penulis** di
-   menu Otak NPC. Atur prioritas jalur ini di daftar rantai (▲▼) bila ingin dipakai lebih dulu.
+   `cloudflared tunnel --url http://localhost:11435 --http-host-header localhost:11434`. Bila link menjawab 403,
+   biasanya header host inilah yang kurang (Ollama menolak host asing).
+3. Isi URL tunnel di panel **Konfigurasi AI** dan simpan. URL harus HTTPS dengan alamat publik. Bearer token tunnel
+   diisi di kolom yang sama (tersimpan terenkripsi), atau lewat `OLLAMA_TUNNEL_TOKEN` sebagai cadangan.
+4. Klik **Tes koneksi semua prioritas** di menu Otak NPC.
 
-Backend mengenali Ollama (`/api/tags`, `/api/chat`) maupun server kompatibel OpenAI
-(`/v1/models`, `/v1/chat/completions`). Jika model yang dipilih tidak ada di link, dipakai model
-sekeluarga (mis. `qwen3:8b` untuk `qwen3:14b`) atau model pertama yang tersedia; panel
-menampilkan model yang benar-benar dipakai. Bearer token tunnel diisi di panel Konfigurasi AI (terenkripsi), atau `OLLAMA_TUNNEL_TOKEN` di environment sebagai cadangan.
-## Memilih provider chat backend
+Backend mengenali Ollama (`/api/tags`, `/api/chat`) maupun server kompatibel OpenAI (`/v1/models`,
+`/v1/chat/completions`). Bila model yang dipilih tidak ada di link, dipakai model sekeluarga (mis. `qwen3:8b` untuk
+`qwen3:14b`) atau model pertama yang tersedia; panel menampilkan model yang benar-benar dipakai.
 
-Isi file .env di root:
+Satu permintaan kalimat dibatasi 20 detik. Model yang lambat di CPU lebih sering jatuh ke jalur berikutnya atau ke
+templat. Bila jalur link gagal dan jalur OpenRouter aktif dengan key, kalimat ditulis lewat OpenRouter (berbayar);
+nonaktifkan jalur itu di panel bila tidak diinginkan.
 
-```dotenv
-AI_PROVIDER=docker
-OLLAMA_MODEL=14
-OLLAMA_TIMEOUT_SECONDS=180
-OLLAMA_MAX_OUTPUT_TOKENS=160
-```
+## `AI_PROVIDER` dan pemeriksaan status
 
-- `AI_PROVIDER=docker`: backend mengirim chat ke Ollama di `http://ollama:11434`.
-- `AI_PROVIDER=api`: backend memakai OpenRouter dengan key dari panel Konfigurasi AI atau `OPENROUTER_API_KEY`.
-- `OLLAMA_MODEL=8` memilih `qwen3:8b`; `OLLAMA_MODEL=14` memilih `qwen3:14b`.
-- Nilai lama `qwen3:8b` dan `qwen3:14b` tetap diterima; pilihan lain ditolak.
-- Tidak ada fallback otomatis dari Docker ke API berbayar.
+`AI_PROVIDER` tidak memilih jalur penulis; rantai di panel Otak NPC yang menentukannya.
 
-Setelah mengubah environment, recreate backend (restart saja tidak memuat ulang
-environment Docker Compose):
+- `AI_PROVIDER=docker`: menu Konfigurasi AI terbuka di pilihan Ollama atau tunnel, dan `/app-status` memeriksa
+  apakah model `OLLAMA_MODEL` tersedia (`ollama_ready`).
+- `AI_PROVIDER=api`: menu Konfigurasi AI terbuka di pilihan OpenRouter, dan `/app-status` melaporkan model OpenRouter.
+
+Sesudah mengubah environment, recreate backend (restart saja tidak memuat environment Compose baru):
 
 ```sh
 docker compose up -d ollama ollama-models
@@ -94,17 +93,8 @@ docker compose up -d --force-recreate ai-engine
 docker compose restart gateway
 ```
 
-Untuk mesin NVIDIA, ganti awalan perintah di atas menjadi
-`docker compose -f docker-compose.gpu.yml` agar service Ollama tetap mendapat GPU.
-Jangan memakai `up` versi CPU untuk memperbarui Ollama NVIDIA secara tidak sengaja.
-
-CPU yang lambat dapat memerlukan `OLLAMA_TIMEOUT_SECONDS=600`; terapkan dengan
-recreate backend. Timeout lebih panjang tidak menjamin model muat di RAM.
-
-Recreate diperlukan untuk mengganti environment backend. Restart gateway
-memperbarui resolusi alamat container backend jika alamatnya berubah.
-Periksa `http://localhost:8000/app-status`: `ai_provider`, `ai_model`, dan
-`ollama_ready` menunjukkan pilihan aktif dan ketersediaan model lokal.
-Mode API tidak memerlukan server Ollama untuk menjawab.
+Untuk mesin NVIDIA, pakai awalan `docker compose -f docker-compose.gpu.yml` agar Ollama tetap mendapat GPU; jangan
+memperbarui Ollama NVIDIA dengan file CPU secara tidak sengaja. Restart gateway memperbarui alamat container backend
+bila alamatnya berubah. Periksa http://localhost:8000/app-status: `ai_provider`, `ai_model`, dan `ollama_ready`.
 
 Referensi: [Ollama Docker](https://docs.ollama.com/docker).

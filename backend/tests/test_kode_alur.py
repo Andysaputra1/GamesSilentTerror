@@ -1,6 +1,6 @@
 """Kode asli flowchart: setiap kotak menunjuk kode yang ada dan setiap penanda baris inti ditemukan.
 
-Gagal di sini biasanya berarti notebook diekspor ulang dan nama fungsi atau baris intinya berubah.
+Gagal di sini biasanya berarti nama fungsi atau baris inti kode bot berubah; perbarui KODE_ALUR di controllers/panel_npc.py.
 """
 
 import re

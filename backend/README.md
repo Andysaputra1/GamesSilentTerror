@@ -1,91 +1,112 @@
-# Shadow Heist Python Backend
+# Backend Python
 
-Struktur API menggunakan controller, service, dan model berisi SQL langsung.
+File ini menjelaskan konfigurasi backend: variabel environment, pengaturan yang bisa ditimpa dari panel, cara
+menjalankan backend tanpa Docker, dan pola SQL di model. Susunan folder dan aturan lapisan ada di
+[CODE_GUIDE.md](../CODE_GUIDE.md); menjalankan seluruh aplikasi lewat Docker ada di [README.md](../README.md).
 
-```text
-backend/
-  app/
-    __init__.py
-    main.py                     # Entry point ASGI
-    config/
-      settings.py               # Pengaturan aplikasi/AI dan pembaca environment
-      mysql.py                  # Host, port, database, kredensial, pool
-      database.py               # Pool, sesi, jalankan_transaksi, PersistenceError, health probe
-      skins.py                  # Daftar skin pemain dan bot
-    controllers/                # API HTTP
-      routes.py                 # Menggabungkan router HTTP
-      auth.py
-      health.py
-      panel.py                  # Panel administrator (/panel)
-      panel_npc.py              # Panel Otak NPC, simulasi, dan peta kode
-      rooms.py                  # Lobby, start, snapshot privat, aksi/vote, checker
-      survey.py
-      users.py                  # Manajemen user di panel
-    middleware/
-      auth.py                   # Validasi bearer token sebelum controller
-      auth_limits.py            # Batas percobaan login
-      cors.py                   # Kebijakan cross-origin
-      safe_validation.py        # Respons 422 tanpa isi input
-    sockets/
-      server.py                 # Membuat sio dan mengirim ke room (emit_room)
-      chat.py                   # Event Socket.IO: connect, disconnect, send_chat (menerima dan mengirim system_alert)
-    services/                   # Logika login, password, room, chat, survei, panel, dan konfigurasi AI
-      auth_service.py           # Login, pendaftaran, login Google, dan sesi pemain
-      chat_service.py           # Tahap chat manusia: cek, simpan, kirim ke room, baca IndoBERT
-      panel_service.py          # Sesi admin, konfigurasi, arsip room, jejak, dan riwayat chat
-      persistence_service.py    # Penyimpanan chat, jejak, dan arsip room per transaksi
-      ollama_client.py          # Cek model di link Ollama
-    models/
-      auth_queries.py           # SELECT/INSERT/UPDATE/DELETE akun dan sesi
-      game_queries.py           # SELECT/INSERT/UPDATE pemain, chat, dan jejak checker
-      panel_queries.py          # Sesi panel, konfigurasi, arsip room, jejak, riwayat, kesiapan skema
-      survey_queries.py         # Survei akhir pertandingan dan catatan metode bot
-    game/
-      match_engine.py           # Engine pertandingan: role, fase, skill, vote, kemenangan, snapshot privat
-    bot/                        # Bot NPC; berpikir saja, tanpa SQL, bertindak lewat services/room_service.py
-      bot_controller.py         # Urutan satu langkah bot (NPCService) dan otak bersama (BrainRuntime)
-      nlu.py                    # IndoBERT membaca chat, aturan nama, memo bersama, pencatat NLU
-      ingatan.py                # Bahan: Ingatan bot, chat/vote/fakta -> angka bukti per pemain (tanpa fuzzy)
-      fuzzy_controller.py       # Main controller fuzzy: putuskan; [FUZZY 1] -> Tribunal -> Diskusi -> Malam -> bungkus
-      fuzzy/                    # Hanya fungsi fuzzy (input 0-1 -> keluaran 0-100), satu sistem = satu fungsi
-        mesin.py                # Kurva, bangun sistem Mamdani, centroid + cache, SEMUA_SISTEM, penjelasan
-        kecurigaan.py           # [FUZZY 1] 7 sistem kecurigaan warga
-        ancaman.py              # [FUZZY 1] 4 sistem ancaman dan kambing hitam Hitman
-        diskusi.py              # [FUZZY 2] 6 sistem chat
-        tribunal.py             # [FUZZY 2] 2 sistem vote warga
-        malam.py                # [FUZZY 2] 2 sistem aksi malam (Gag, Peek)
-      nlg.py                    # Kalimat: LLM atau templat, pemeriksa aturan, rantai penulis panel
-      penjelasan.py             # Penjelasan keputusan bot untuk checker panel
-      simulasi.py               # Simulasi panel dengan otak yang sama
-    schemas/                    # Validasi request/response API
-  artifacts/
-    indobert/                   # Model NLU intent dan target
-  deployment/                   # Dockerfile Azure dan proxy
-  migrations/                   # SQL untuk membuat/mengubah struktur tabel
-  public/                       # Panel administrator dan dokumen
-  scripts/                      # CLI akun, penyiapan deployment, dan simulasi keseimbangan
-  tests/
+Backend memakai FastAPI untuk HTTP dan Socket.IO untuk chat, dengan entry point `app.main:asgi_app`. Saat menyala,
+`app/main.py` memuat konfigurasi panel dari MySQL, memuat otak bot (IndoBERT, fuzzy, penulis kalimat) di latar, lalu
+menjalankan jam permainan tiap 0,5 detik.
+
+## Variabel environment
+
+`app/config/settings.py` membaca environment Docker atau file `.env` di root repo. Contoh lengkap ada di
+`.env.example`. Sesudah mengubah `.env`, recreate container backend; restart saja tidak memuat environment baru.
+
+**Database** (`app/config/mysql.py`)
+
+| Variabel | Bawaan | Guna |
+| --- | --- | --- |
+| `MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_DATABASE`, `MYSQL_USER` | `localhost`, `3306`, `shadow_heist`, `shadow_app` | Koneksi MySQL. Alias `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER` juga diterima; bila keduanya ada, `MYSQL_*` yang dipakai |
+| `MYSQL_PASSWORD` (alias `DB_PASSWORD`) | tanpa bawaan | **Wajib.** Backend gagal menyala bila kosong |
+| `DATABASE_URL` | kosong | Opsional; bila diisi dipakai apa adanya sebagai alamat SQLAlchemy |
+| `DATABASE_POOL_SIZE`, `DATABASE_MAX_OVERFLOW`, `SQL_ECHO` | `5`, `10`, `false` | Ukuran pool dan log SQL |
+
+Di Docker lokal, `MYSQL_HOST` dan port diisi Compose; alias `DB_*` harus diteruskan sendiri ke environment container
+bila dipakai.
+
+**Akun dan panel**
+
+| Variabel | Bawaan | Guna |
+| --- | --- | --- |
+| `AUTH_SESSION_HOURS` | `24` | Lama sesi pemain (1–720 jam) |
+| `GOOGLE_CLIENT_ID` | kosong | OAuth Web Client ID untuk login Google (publik, tanpa secret) |
+| `CORS_ORIGINS` | `http://localhost:4200,http://127.0.0.1:4200` | Origin frontend yang diizinkan untuk HTTP, Socket.IO, dan login Google. Di Azure diisi dari `FRONTEND_ORIGIN` |
+| `PANEL_USERNAME`, `PANEL_PASSWORD_HASH` | `administrator`, kosong | Login panel. Hash dibuat `scripts/setup_panel.py` |
+| `PANEL_ENCRYPTION_KEY` | kosong | Kunci Fernet untuk key dan token yang disimpan dari panel. Dibuat sekali oleh `setup_panel.py`; simpan cadangannya terpisah dari database |
+| `ADMIN_USERNAMES`, `HISTORY_ADMIN_USERNAMES` | `user1`, kosong | Hanya daftar username yang dicadangkan (tidak boleh dipakai akun game) |
+
+**LLM dan otak bot**
+
+| Variabel | Bawaan | Guna |
+| --- | --- | --- |
+| `AI_PROVIDER` | `api` (`.env.example`: `docker`) | Pilihan awal menu Konfigurasi AI: `api` = OpenRouter, `docker` = Ollama atau tunnel. Juga menentukan model yang dilaporkan `/app-status` dan apakah `ollama_ready` diperiksa |
+| `openrouter_default` (atau `OPENROUTER_DEFAULT`) | kosong | Key OpenRouter bawaan server untuk pilihan "Default dari server" |
+| `OPENROUTER_API_KEY` | kosong | Key OpenRouter lama; cadangan bila `openrouter_default` kosong |
+| `OLLAMA_BASE_URL` | `http://localhost:11435` (Compose lokal: `http://ollama:11434`) | Link LLM sendiri bila panel belum menyimpan URL tunnel |
+| `OLLAMA_MODEL` | `14` | Model link: `4` = `qwen3:4b-instruct`, `8` = `qwen3:8b`, `14` = `qwen3:14b`. Nilai lain ditolak |
+| `OLLAMA_TUNNEL_TOKEN` | kosong | Bearer token link; token yang disimpan di panel menimpanya |
+| `NPC_WRITER` | `otomatis` | `otomatis` = rantai penulis LLM lalu templat; `templat` = tanpa LLM |
+| `NPC_WRITER_ORDER` | `openrouter,tautan` | Prioritas awal rantai penulis; hanya `openrouter` dan `tautan` (link LLM sendiri) |
+| `NPC_OPENROUTER_MODEL` | kosong | Model OpenRouter penulis (`penyedia/model`). Kosong = `qwen/qwen3-14b` |
+| `NPC_NLU_DEVICE` | `cpu` | `cpu` atau `cuda` untuk IndoBERT |
+| `NPC_STEP_SECONDS` | `3` | Jarak langkah tiap bot (1–30 detik) |
+| `NPC_INTENT_MODEL_DIR`, `NPC_TARGET_MODEL_DIR` | kosong | Lokasi model IndoBERT bila tidak di `backend/artifacts/indobert/{intent,target}` |
+
+Variabel khusus Compose (`MYSQL_ROOT_PASSWORD`, `PMA_ABSOLUTE_URI`, `OLLAMA_CONTEXT_LENGTH`, `OLLAMA_KEEP_ALIVE`,
+`OLLAMA_MODELS_TO_PULL`) dibaca container MySQL, phpMyAdmin, atau Ollama, bukan backend. Lihat [OLLAMA.md](../OLLAMA.md)
+untuk tiga yang terakhir.
+
+## Pengaturan dari panel
+
+Panel menyimpan pengaturan di tabel `panel_configuration` dan memuatnya lagi saat backend menyala, jadi pengaturan
+panel menimpa `.env` tanpa restart. Selama baris panel kosong, `.env` yang dipakai.
+
+**Menu 01 Konfigurasi AI** (baris `id = 1`, `services/ai_config_service.py`)
+
+- **Sumber key OpenRouter.** "Default dari server" membaca `openrouter_default`, lalu `OPENROUTER_API_KEY` bila
+  kosong. "API key sendiri" memakai key yang diketik di panel dan tidak beralih ke key default bila key itu kosong
+  atau salah. Beralih ke Default tidak menghapus key sendiri. Kolom key yang dibiarkan kosong mempertahankan key lama.
+- **URL tunnel Ollama** harus HTTPS dengan alamat publik, tanpa password, query, atau fragment. Endpoint harus
+  meneruskan `/api/chat` ke Ollama, atau memakai server kompatibel OpenAI (`/v1/chat/completions`).
+- **Token tunnel** (`LLM_TOKEN` dari `ai-docker/.env`) menimpa `OLLAMA_TUNNEL_TOKEN`; centang "Hapus token"
+  mengembalikannya ke environment.
+- **Model lokal** dipakai jalur link bila "Model LLM link" di menu Otak NPC dibiarkan Bawaan.
+- Key dan token disimpan sebagai ciphertext Fernet dengan `PANEL_ENCRYPTION_KEY`. Nilainya tidak pernah dikembalikan
+  API panel. Bila kunci itu hilang atau diganti, key yang tersimpan tidak bisa didekripsi lagi.
+
+**Menu 05 Otak NPC** (baris `id = 2`, `services/npc_config_service.py`)
+
+- Penulis kalimat (`otomatis` atau `templat`), urutan dan jalur aktif rantai penulis, **Model OpenRouter**, dan
+  **Model LLM link**. Nilai awalnya dari `NPC_WRITER`, `NPC_WRITER_ORDER`, dan `NPC_OPENROUTER_MODEL`. Kolom Model
+  OpenRouter yang kosong berarti model OpenRouter dari Konfigurasi AI (bawaan `qwen/qwen3-14b`).
+  Model yang dipakai produksi tercatat di [deployment/README.md](deployment/README.md#panel-dan-secret-di-vm).
+- Rantai memakai key OpenRouter dan link dari Konfigurasi AI. Jalur tanpa key atau link dilewati; bila semua gagal,
+  bot memakai templat.
+- Tombol **Tes koneksi semua prioritas** mengirim pesan pendek ke setiap jalur aktif (OpenRouter memakai saldo).
+
+## Menjalankan backend tanpa Docker
+
+Butuh Python 3.11, MySQL yang sudah diberi migrasi, dan model IndoBERT (lihat [README.md](../README.md#langkah)).
+
+```sh
+cd backend
+python -m venv .venv
+# Windows: ganti .venv/bin/python dengan .venv\Scripts\python
+# PyTorch CPU dulu (seperti Dockerfile), supaya pip tidak mengunduh wheel CUDA yang besar.
+.venv/bin/python -m pip install torch==2.14.0 --index-url https://download.pytorch.org/whl/cpu
+.venv/bin/python -m pip install -r requirements-dev.txt
+.venv/bin/python -m uvicorn app.main:asgi_app --host 0.0.0.0 --port 8000
 ```
 
-Alur manusia: HTTP -> controllers, atau Socket.IO -> sockets, lalu services -> game/ dan models (SQL) -> MySQL.
-Alur bot: jam -> bot/bot_controller.py -> ingatan -> nlu -> fuzzy_controller (fuzzy/) -> services/ -> nlg -> services/
--> kirim ke room.
-Koneksi dan pool MySQL disediakan oleh `app/config/database.py`.
-Model tidak menyimpan aturan HTTP atau menulis respons API. Service mengatur
-transaksi agar beberapa query bisa commit/rollback bersama.
+Jalankan **satu worker** saja: ruangan, pertandingan, nonce Google, dan batas percobaan login hanya ada di memori satu
+proses. Migrasi tidak membuat akun; buat akun lewat halaman daftar atau `python scripts/create_user.py <username>
+--name "Nama"` dari folder `backend`. Perintah tes ada di [CODE_GUIDE.md](../CODE_GUIDE.md#tes-dan-simulasi).
 
-Engine murni ada di `app/game/match_engine.py`: role, fase, skill, cooldown,
-voting, kemenangan, serta snapshot privat. `app/services/room_service.py` membatasi
-akses anggota/host dan memegang lock. `app/main.py` menjalankan clock pertandingan;
-frontend hanya menampilkan keputusan server. Lihat [alur dan aturan game](../GAME_CONCEPT.md).
+## Pola SQL di model
 
-State pertandingan masih di memori satu proses, bukan snapshot MySQL. Reconnect
-browser aman selama proses hidup, tetapi restart backend menghilangkan match.
-Chat/analisis disimpan lewat model SQL yang sudah ada. Tes `tests/live_match_smoke.py`
-menjalankan pertandingan nyata empat akun sementara sampai selesai, dengan cleanup
-akun milik tes. Jangan menjalankannya pada deployment publik.
-
-## SQL langsung di model
+Query ditulis sebagai SQL langsung di `app/models/`, bukan query ORM. SQLAlchemy hanya dipakai sebagai konektor, pool,
+dan pengikat parameter.
 
 ```python
 # app/models/auth_queries.py
@@ -93,7 +114,7 @@ from sqlalchemy import text
 
 def account_by_username(database, username):
     sql = text("""
-        SELECT id, username, display_name, password_hash, is_active
+        SELECT id, username, display_name, password_hash, is_active, skin_id
         FROM user_accounts WHERE username = :username
     """)
     return database.execute(sql, {"username": username}).mappings().one_or_none()
@@ -106,49 +127,12 @@ from app.config.database import jalankan_transaksi
 from app.models.auth_queries import account_by_username
 
 account = jalankan_transaksi(lambda database: account_by_username(database, "user1"))
-# account berupa mapping: account["username"], atau None jika tidak ditemukan.
+# account berupa mapping (account["username"]) atau None bila tidak ditemukan.
 # Error SQL di-rollback lalu menjadi PersistenceError.
 ```
 
-SQLAlchemy digunakan sebagai konektor/pool dan pengikat parameter SQL; query
-aplikasi ditulis sebagai SQL langsung, bukan query ORM. Jangan interpolasi input
-pengguna ke SQL. Gunakan `:username` dan dictionary parameter, padanan placeholder
-`?` di mysql2. Exception diteruskan ke service untuk rollback dan diterjemahkan
-controller menjadi respons API. Pool ditutup hanya saat aplikasi berhenti,
-bukan setiap query. Semua perubahan tabel tetap melalui migrations.
-
-## Config
-
-Environment Docker atau file `.env` di root dibaca oleh `app/config/settings.py`.
-Pengaturan MySQL didefinisikan di `app/config/mysql.py`:
-`MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_DATABASE`, `MYSQL_USER`, `MYSQL_PASSWORD`.
-`MYSQL_PASSWORD` wajib diisi: backend gagal jalan kalau kosong.
-Alias `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` juga diterima;
-jika keduanya diberikan, nama MYSQL_* diprioritaskan. Nilai DB_* harus diteruskan
-ke environment container jika menjalankan backend lewat Docker.
-
-Secret tidak disimpan dalam mysql.json atau kode controller. Lihat `.env.example`.
-`OPENROUTER_API_KEY` dan `OLLAMA_TUNNEL_TOKEN` hanya dibaca backend.
-Default model dan batas respons tetap di settings.py.
-Pilih `AI_PROVIDER=docker` untuk Ollama (lokal/tunnel) atau `AI_PROVIDER=api` untuk OpenRouter.
-`OLLAMA_MODEL` memilih model lokal (default qwen3:14b). Recreate service ai-engine
-setelah mengubah .env; lihat ../OLLAMA.md untuk perintah dan pemeriksaan status.
-
-## Menjalankan dan menguji
-
-Jalankan `uvicorn app.main:asgi_app --host 0.0.0.0 --port 8000` dari backend.
-URL HTTP dan event Socket.IO tidak berubah karena refactor ini.
-Setelah memperbarui kode, jalankan `docker compose up -d --build` dari root repo
-agar image menggunakan entry point `app.main:asgi_app` yang baru.
-
-```sh
-python -m unittest discover -s tests -v
-# Khusus database MySQL sementara yang telah diberi migration:
-STRUCTURE_TEST_DB=1 python -m unittest discover -s tests -p mysql_smoke.py -v
-```
-
-Tes MySQL menulis data percobaan; jangan arahkan ke database pengguna. Tes
-controller memakai respons AI mock untuk memeriksa jalur API dan penyimpanan
-SQL, tanpa panggilan berbayar ke OpenAI.
-
-Migration tidak membuat akun; buat akun lewat halaman daftar atau CLI `scripts/create_user.py`.
+- Jangan menyisipkan input pengguna ke teks SQL. Pakai placeholder bernama (`:username`) dan dictionary parameter.
+- Service menentukan batas transaksi, sehingga beberapa query bisa commit atau rollback bersama. Controller
+  menerjemahkan error menjadi respons API.
+- Pool ditutup hanya saat aplikasi berhenti, bukan tiap query.
+- Semua perubahan tabel lewat [migrasi](migrations/README.md).

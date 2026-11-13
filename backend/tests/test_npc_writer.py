@@ -23,7 +23,7 @@ from app.bot import ingatan as ingatan_bot
 from app.bot.bot_controller import BrainRuntime, OtakBot
 from app.bot.nlg import JALUR_PENULIS, PenulisNPC
 from app.bot.nlu import NLUBersama
-from tests.nlu_palsu import NLUPalsu
+from tests.palsu.nlu_palsu import NLUPalsu
 
 RAHASIA = {
     "openrouter": "sk-or-rahasia-uji",

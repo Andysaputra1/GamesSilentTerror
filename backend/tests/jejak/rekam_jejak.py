@@ -36,7 +36,7 @@ from app.bot import fuzzy_controller, nlg  # noqa: E402
 from app.bot.ingatan import Ingatan  # noqa: E402
 from app.bot.bot_controller import BrainRuntime  # noqa: E402
 from app.bot.nlu import NLUBersama, baca_chat  # noqa: E402
-from tests.nlu_palsu import NLUPalsu  # noqa: E402
+from tests.palsu.nlu_palsu import NLUPalsu  # noqa: E402
 
 LETAK_ENGINE = "app.game.match_engine"
 SIDIK = Path(__file__).with_name("sidik.json")

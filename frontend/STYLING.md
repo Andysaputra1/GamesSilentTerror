@@ -1,5 +1,8 @@
 # Mengubah tampilan
 
+File ini menjelaskan tempat mengubah warna, font, padding, layout, dan tampilan responsif frontend: token di
+`src/styles.css` dan berkas CSS tiap halaman. Cara menjalankan frontend ada di [README utama](../README.md).
+
 Tema mengikuti kartu referensi lokal: kertas krem, tinta hitam, bingkai ganda,
 sudut membulat, dan aksen biru/peach lembut. Referensi di communicationfolder
 diabaikan Git dan tidak dijadikan aset publik.
@@ -29,30 +32,37 @@ Khusus auth sekarang memakai `auth.html` dan `auth.scss` dari desain Kimberly:
 meja kayu, kertas register, dan binder login. Asetnya di `public/assets/`.
 Ubah `--em`, padding `.register-sheet`/`.login-journal`, dan breakpoint 899px
 untuk proporsi desktop/mobile: di bawah 900px binder dilepas menjadi dua lembar kertas
-berdampingan, dan di HP (<= 640px) keduanya bertumpuk. Google memakai tombol resmi GIS. Jangan mengedit
-file `auth_kim.*` atau CSS lama karena sudah digantikan.
+berdampingan, dan di HP (<= 640px) keduanya bertumpuk. Google memakai tombol resmi GIS.
 Tidak ada style inline di template Main atau Lobby.
 CSS diformat multiline; bagian responsive ada di bawah file.
 
 Halaman **game** memakai bahasa visual login (meja kayu, kertas 9-slice
 `register-paper.png`, papan `btn-wood.png`, tombol kayu/kulit, font Fraunces dan
 Patrick Hand) dan selalu satu layar (100dvh) tanpa scroll halaman; hanya isi panel
-yang bergulir. Gayanya dibagi lima berkas karena batas 12 kB per stylesheet komponen:
-`game.css` (token `--pad`/`--game-gap`, kertas, papan, tombol, HUD, panel kiri, kartu role),
-`game-table.css` (papan tersangka, kartu pemain, efek vote, baki aksi, chat, tab HP),
-`game-screens.css` (transisi fase termasuk tirai mulai `[data-phase='start']`, layar persiapan `.splash`, ajakan membuka kartu `.reveal-nudge`, tombol pesan baru `.chat-jump`, hitung mundur 5 detik `.final-count`), `game-end.css` (pengumuman
-pemenang `.end-stage`, kuesioner `.survey`, modal aturan), dan `game-motion.css` (animasi,
-responsif, `prefers-reduced-motion`). Panas vote diatur `--heat` (0–1) per kartu; jumlah kolom
-meja dipilih `Game.tableColumns` dari ukuran papan. Karakter dan warna label pemain mengikuti
-urutan kursi, bukan role. Komposisi role room (`snapshot.composition`) tampil sebagai chip
-`.composition`/`.comp-chip` (gaya dasar di `game-screens.css`) di layar persiapan dan di tepi atas
-papan (`.felt-composition`, ruangnya dipesan lewat padding `.table-felt.has-composition`; di meja sempit
-tanpa ikon). Di room multi-Hitman chip Hitman di tepi meja menampilkan "tersisa/total" dari
-`snapshot.hitman_remaining` dan diberi kelas `.comp-chip.reduced` (merah) setelah ada Hitman yang
-tereksekusi; pembaca layar mendapat teks `.sr-only` "Hitman tersisa x dari n". Penanda rekan Syndicate
-hanya dirender untuk Hitman: `.ally-tag` di kartu rekan dan `.ally-pick` ("◆ Incaran") di kartu yang
-dipilih rekan saat malam (keduanya di `game-screens.css` karena budget `game-table.css` hampir penuh),
-serta `.ally-plan` di baki aksi (`game-table.css`).
+yang bergulir. Gayanya dibagi tujuh berkas karena budget stylesheet komponen di `angular.json`
+(peringatan 12 kB, error 16 kB per berkas). Urutan di `styleUrls` komponen `Game`:
+
+| Berkas | Isi |
+| --- | --- |
+| `game.css` | Token `--pad`/`--game-gap`, kertas, papan, tombol, HUD, panel kiri, kartu role, `.sr-only` |
+| `game-table.css` | Papan tersangka, kartu pemain, efek vote, baki aksi, chat, tab HP |
+| `game-cards.css` | Penanda di kartu pemain: hasil Intip, aura Jaga, label GAG, cap *Disandera* dan *Gagal*, huruf tahap bot |
+| `game-screens.css` | Transisi fase (termasuk tirai mulai `[data-phase='start']`), splash `.splash`, ajakan membuka kartu `.reveal-nudge`, tombol pesan baru `.chat-jump`, hitung mundur 5 detik `.final-count`, chip komposisi, penanda rekan |
+| `game-preparation.css` | Tiga kartu layar persiapan (`.prep-*`) |
+| `game-end.css` | Pengumuman pemenang `.end-stage`, kuesioner `.survey`, modal aturan |
+| `game-motion.css` | Animasi, aturan responsif, `prefers-reduced-motion` (dimuat terakhir agar menimpa aturan dasar) |
+
+Panas vote diatur `--heat` (0–1) per kartu; jumlah kolom meja dipilih `Game.tableColumns` dari
+ukuran papan. Karakter dan warna label pemain mengikuti urutan kursi, bukan role. Komposisi role
+room (`snapshot.composition`) tampil sebagai chip `.composition`/`.comp-chip` (gaya dasar di
+`game-screens.css`) di layar persiapan dan di tepi atas papan (`.felt-composition`, ruangnya dipesan
+lewat padding `.table-felt.has-composition`; di meja sempit tanpa ikon). Di room multi-Hitman chip
+Hitman di tepi meja menampilkan "tersisa/total" dari `snapshot.hitman_remaining` dan diberi kelas
+`.comp-chip.reduced` (merah) sesudah ada Hitman yang tersingkir; pembaca layar mendapat teks `.sr-only`
+"Hitman tersisa x dari n". Penanda rekan hanya dirender untuk pemain yang menerima daftar rekannya dari
+server: `.ally-tag` ("◆ Rekan") di kartu rekan Syndicate (untuk Hitman) atau rekan Spy (untuk Spy di
+room ≥ 2 Spy), dan `.ally-pick` di kartu yang dipilih rekan saat malam ("◆ Incaran" untuk Hostage,
+"◆ Dijaga" untuk Guard). Keduanya di `game-screens.css`.
 Breakpoint 1099px: meja + chat dengan tab Meja/Kartu (HUD: kotak akun hanya avatar); 899px: layar
 persiapan bergulir dan bilah mejanya bertumpuk; 759px: satu panel per tab (Meja/Chat/Kartu), tombol
 Keluar hanya ikon. HP landscape (tinggi <= 500px) memakai tab yang sama dengan baki aksi di samping
@@ -65,16 +75,19 @@ kayu), dan `.stamp-label` (label cap di atas kertas, ukuran lewat `--stamp-size`
 (`core/profile-menu.ts`) memakai token yang sama; induk boleh mengatur `--profile-name-max` dan
 `--profile-name-display: none` (avatar saja).
 
-**Main dan Room** memakai binder kulit yang sama (`main-page.css`, `lobby.css`); di HP (<= 640px)
+**Main dan Room** memakai binder kulit yang sama (`main-page.css`, `lobby.css`; panduan berkas kasus
+di Main ada di `main-page-case-file.css`); di HP (<= 640px)
 binder dilepas menjadi dua lembar kertas bertumpuk (`main-page-responsive.css`,
 `lobby-responsive.css`) dan halaman boleh bergulir vertikal. HP landscape (tinggi <= 480px) memakai
 kertas yang sama, tetapi berdampingan.
 
 **Layar loading awal**: markup `#boot-loader` ada di `src/index.html` (di luar `app-root`, jadi tampil
 pada paint pertama) dan gayanya di `styles.css`; `core/boot-loader.ts` menghapusnya setelah halaman
-pertama, font, dan gambar Main (`MAIN_PAGE_IMAGES` di `core/asset-preloader.ts`) siap, paling lama
-8 detik. Gambar besar di `public/assets` sudah diperkecil sesuai ukuran tampil; jaga agar aset baru
-tidak jauh lebih besar dari ukuran tampilnya.
+pertama, font, dan gambar penting Main (`MAIN_CRITICAL_IMAGES` di `core/asset-preloader.ts`) siap dan
+satu sapuan kaca pembesar selesai (`BOOT_LOADER_SCAN_MS`, 2,4 detik). Batas tunggunya
+`BOOT_LOADER_MAX_WAIT_MS` (4 detik), jadi jaringan lambat tetap masuk ke aplikasi. Gambar besar di
+`public/assets` sudah diperkecil sesuai ukuran tampil; jaga agar aset baru tidak jauh lebih besar dari
+ukuran tampilnya.
 
 Untuk mengecek perubahan, jalankan dari root repository ketika container frontend aktif:
 

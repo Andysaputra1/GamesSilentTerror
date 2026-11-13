@@ -67,7 +67,7 @@ class Settings(MySQLSettings):
         return models[selected]
 
 
-    # OTAK NPC (hasil ekspor notebook skripsi): penulis kalimat dan lokasi IndoBERT.
+    # OTAK NPC: penulis kalimat dan lokasi IndoBERT (kode bot di app/bot/).
     # otomatis = rantai penulis LLM (urutan di bawah, bisa diubah di panel), semua gagal → templat;
     # templat = tanpa LLM sama sekali.
     npc_writer: Literal["otomatis", "templat"] = "otomatis"

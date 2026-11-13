@@ -1,34 +1,74 @@
-# MySQL migrations
+# Migrasi MySQL
 
-File SQL di folder ini dipakai lokal **dan** Azure: image MySQL menjalankannya berurutan saat volume
-database dibuat untuk pertama kali. Beri nomor dua digit berikutnya, misalnya `V11__add_votes.sql`, agar
-urutan nama file sama dengan urutan versi. Versi yang dicatat di `schema_migrations` tetap ditulis di dalam
-file (file lama mencatat nama tanpa nol, mis. `V5__chat_history`). Folder ini tidak membuat akun apa pun.
+File ini menjelaskan folder SQL skema database: kapan file di sini dijalankan, isi tiap migrasi, dan cara menambah
+migrasi baru. Perintah menjalankan migrasi di server produksi ada di
+[backend/deployment/README.md](../deployment/README.md#menjalankan-migrasi-di-database-lama).
 
-Menambah file SQL tidak menjalankannya otomatis pada database yang sudah
-diinisialisasi. Backend juga tidak menjalankan migration saat startup. Untuk
-database lama, backup terlebih dahulu lalu terapkan SQL yang belum dijalankan
-melalui MySQL client atau phpMyAdmin, sesuai urutan versinya. Jangan mengulang
-semua SQL tanpa memeriksa perubahan dan data yang sudah ada.
+## Kapan migrasi dijalankan
 
-Jangan gunakan `docker compose down -v` untuk pemakaian sehari-hari: perintah
-itu menghapus volume database **dan model Ollama**, bukan hanya mengulang
-migration. Gunakan `docker compose down` biasa untuk mempertahankan data.
+- Folder ini dipakai lokal **dan** Azure. Compose memasangnya ke `/docker-entrypoint-initdb.d`, dan image MySQL
+  menjalankan semua file berurutan **hanya saat volume database dibuat pertama kali**.
+- Database yang sudah berisi data **tidak** menjalankan file baru. Backend juga tidak menjalankan migrasi saat
+  menyala. Backup dulu, lalu jalankan file yang belum tercatat lewat MySQL client atau menu Import phpMyAdmin, sesuai
+  urutan versi. Jangan mengulang semua SQL tanpa memeriksa isi database.
+- Jangan memakai `docker compose down -v` untuk "mengulang migrasi": perintah itu menghapus volume database **dan**
+  model Ollama. `docker compose down` biasa mempertahankan data.
+- Folder ini tidak membuat akun apa pun. Akun dibuat lewat halaman daftar, login Google, menu Manajemen user di panel,
+  atau `scripts/create_user.py`.
 
-Panduan setup database baru tersedia di [README utama](../../README.md).
+## Daftar migrasi
 
-`V04__account_identities.sql` menambah tabel email/Google subject, dengan constraint unik dan foreign key akun. Akun lama tetap bisa login username tanpa identitas tambahan. Jalankan pada database lama sebelum memakai registrasi atau login email/Google; tabel/akun lama tidak dihapus.
+Nama file memakai nomor dua digit supaya MySQL menjalankannya berurutan pada volume kosong (tanpa itu `V10` jalan
+sebelum `V1`). Versi yang dicatat di tabel `schema_migrations` ditulis di dalam file dan untuk file lama tanpa nol,
+mis. `V5__chat_history`, supaya cocok dengan database yang sudah ada.
 
-`V07__survey_and_npc.sql` menambah `survey_questions` (pertanyaan, jenis jawaban, skala, dan arti skala yang diatur dari panel), `survey_responses` (satu kiriman per akun per pertandingan, dengan salinan pertanyaan), dan `match_bots` (metode/persona tiap bot). Enam pertanyaan awal diisi dengan `INSERT IGNORE`. Cara menerapkannya di Azure: `backend/deployment/README.md`.
+| File | Versi tercatat | Isi |
+| --- | --- | --- |
+| `V01__initial_schema.sql` | `V1__initial_schema` | `schema_migrations`, `game_sessions`, `players`, `chat_messages`, `ai_analyses` |
+| `V02__add_authentication.sql` | `V2__add_authentication` | `user_accounts`, `auth_sessions` |
+| `V04__account_identities.sql` | `V4__account_identities` | `account_identities`: email dan Google `sub` dengan constraint unik dan foreign key akun. Akun lama tetap bisa login dengan username |
+| `V05__chat_history.sql` | `V5__chat_history` | Kolom riwayat di `chat_messages` (`sender_kind`, `match_id`, ronde, fase, …). Pesan lama ditandai `legacy` |
+| `V06__admin_panel.sql` | `V6__admin_panel` | `panel_configuration`, `panel_sessions`, `checker_traces` |
+| `V07__add_skin_preference.sql` | `V7__add_skin_preference` | Kolom `user_accounts.skin_id` (bawaan `dexter`) |
+| `V07__survey_and_npc.sql` | `V7__survey_and_npc` | `survey_questions`, `survey_responses` (satu kiriman per akun per pertandingan, dengan salinan pertanyaan), `match_bots` (metode dan persona tiap bot). Enam pertanyaan awal diisi dengan `INSERT IGNORE` |
+| `V08__fix_role_stalker_enum.sql` | `V8__fix_role_stalker_enum` | Enum role `players` memakai `stalker`, bukan `detective` |
+| `V09__chat_nlu.sql` | `V9__chat_nlu` | Kolom `chat_messages.nlu`: bacaan IndoBERT tiap pesan untuk menu Riwayat chat |
+| `V10__match_participants.sql` | `V10__match_participants` | `match_participants`: peserta manusia tiap pertandingan selesai, untuk survei kapan pun sesudahnya |
+| `V11__survey_player_feedback.sql` | `V11__survey_player_feedback` | Lima pertanyaan survei pengalaman bermain; tidak mengubah struktur tabel |
 
-`V11__survey_player_feedback.sql` menambahkan lima pertanyaan: pengalaman bermain, saran/kesan/pesan,
-kesenangan bersama Bot NPC (1–5), harapan untuk Bot NPC, dan kesenangan bermain individu (1–5).
-Harapan Bot NPC opsional, dengan pilihan `Lebih cepat`, `Lebih berempati`, dan `Lainnya`; empat
-pertanyaan lainnya wajib. Pertanyaan lama dan jawabannya tetap dipertahankan. Pada pertanyaan jenis
-`choice`, opsi bernama `Lainnya` membuka isian bebas dan disimpan sebagai `Lainnya: <jawaban>`.
-Kelima pertanyaan masuk paling bawah: posisinya posisi terbesar yang sudah ada ditambah 10, 20, …, 50
-(pada database baru 70–110), sama seperti pertanyaan baru dari panel. Urutan selanjutnya diatur dari
-menu Survei di panel (seret ⋮⋮ atau tombol ▲▼), yang menulis ulang posisi menjadi 10, 20, 30, ….
-Terapkan versi aplikasi yang mendukung isian ini bersama migrasi V11. Untuk database yang sudah
-ada, jalankan file V11 melalui MySQL client atau menu Import phpMyAdmin setelah backup;
-menyalakan ulang backend saja tidak menambahkan pertanyaan.
+Nomor V03 sudah tidak ada: dulu berisi akun demo yang dihapus pada 26 Oktober 2026. Hasil akhirnya 15 tabel,
+termasuk `schema_migrations`. Pemakaian tiap tabel oleh backend ada di
+[backend/deployment/README.md](../deployment/README.md#audit-tabel).
+
+`/ready` hanya memeriksa V5 dan V6. Migrasi lain yang terlewat tidak membuat `/ready` gagal, tetapi fitur yang
+memakainya gagal: tanpa V07 kolom `skin_id` dan tabel survei belum ada (login bisa gagal dengan 503), tanpa V08
+peserta Stalker gagal diarsipkan, tanpa V09 menu Riwayat chat gagal dimuat, dan tanpa V10 arsip peserta gagal
+disimpan sehingga survei sesudah keluar room hanya bisa dikirim selama 30 menit dari ingatan backend. Tanpa V11
+aplikasi tetap jalan, hanya lima pertanyaan baru yang belum ada.
+
+### Catatan V11
+
+V11 menambah lima pertanyaan: pengalaman bermain, saran/kesan/pesan, kesenangan bersama Bot NPC (1–5), harapan untuk
+Bot NPC, dan kesenangan bermain individu (1–5). Harapan Bot NPC opsional, dengan pilihan `Lebih cepat`,
+`Lebih berempati`, dan `Lainnya`; empat pertanyaan lain wajib. Pada pertanyaan jenis `choice`, opsi bernama `Lainnya`
+membuka isian bebas yang disimpan sebagai `Lainnya: <jawaban>`.
+
+Kelima pertanyaan masuk paling bawah: posisinya posisi terbesar yang sudah ada ditambah 10, 20, …, 50 (pada database
+baru 70–110), sama seperti pertanyaan baru dari panel. Urutan selanjutnya diatur dari menu Survei di panel (seret ⋮⋮
+atau tombol ▲▼), yang menulis ulang posisi menjadi 10, 20, 30, …. Kode unik pertanyaan mencegah duplikasi bila file
+dijalankan ulang. Pasang versi aplikasi yang mendukung isian `Lainnya` bersama migrasi ini; menyalakan ulang backend
+saja tidak menambahkan pertanyaan.
+
+## Menambah migrasi
+
+1. Buat file dengan nomor dua digit berikutnya, mis. `V12__nama_singkat.sql`.
+2. Tulis perubahan yang hanya menambah (`CREATE TABLE IF NOT EXISTS`, `ADD COLUMN`, `INSERT IGNORE`). Jangan
+   menghapus data.
+3. Akhiri dengan `INSERT IGNORE INTO schema_migrations (version) VALUES ('V12__nama_singkat');`.
+4. Uji pada database kosong (volume baru) dan pada salinan database lama.
+5. Catat file baru di tabel di atas, dan tambahkan perintahnya ke tabel migrasi di
+   [backend/deployment/README.md](../deployment/README.md#menjalankan-migrasi-di-database-lama).
+6. Ingatkan bahwa database lokal dan produksi yang sudah berisi harus menjalankan file ini secara manual.
+
+`ALTER TABLE` di MySQL tidak bisa dibatalkan bersama `INSERT` penanda migrasi. Bila SQL gagal di tengah, periksa
+struktur kolom sebelum mengulang.

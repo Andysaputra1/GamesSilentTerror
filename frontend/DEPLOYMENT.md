@@ -1,7 +1,9 @@
 # Frontend Vercel dari GitHub
 
-Frontend Angular dibuild menjadi file statis. Backend Python, Socket.IO,
-database, dan AI tetap dijalankan terpisah.
+File ini menjelaskan cara memasang frontend di Vercel. Frontend Angular dibuild menjadi file statis;
+backend Python, Socket.IO, database, dan AI tetap dijalankan terpisah (lihat
+[backend/deployment/README.md](../backend/deployment/README.md)). Route `/panel` di frontend hanya
+mengalihkan browser ke `BACKEND_URL` + `/panel`.
 
 ## Hubungkan sekali di Vercel
 
@@ -39,8 +41,10 @@ karena belum ada backend. Tidak ada server game atau database yang dibuat di Ver
 
 ## Lokal
 
-`npm start` dan `npm run build` mempertahankan perilaku lokal/LAN: API dan
-Socket.IO menggunakan hostname yang sama pada port `8000`.
+Dari folder `frontend`, `npm start` dan `npm run build` mempertahankan perilaku lokal/LAN: API dan
+Socket.IO menggunakan hostname yang sama pada port `8000`. (`npm start` dari root repo berbeda: ia
+menjalankan `frontend/docker/start.mjs` yang memakai `BACKEND_URL`, lihat
+[docker/README.md](docker/README.md).)
 
 `npm run build:vercel` menghasilkan `dist/frontend/browser`; konfigurasi
 environment Vercel dihasilkan otomatis dan diabaikan Git.

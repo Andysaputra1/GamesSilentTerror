@@ -1,7 +1,7 @@
 """Simulasi keseimbangan komposisi role dengan aturan engine terbaru.
 
 Semua kursi bot memakai otak Fuzzy (app/bot/ingatan.py, fuzzy_controller.py, dan fuzzy/), label NLU sempurna dari rencana
-pengirim, LANGKAH keputusan per fase, engine Match asli. Angka lama di GAME_CONCEPT diukur dengan metode campuran.
+pengirim, LANGKAH keputusan per fase, engine Match asli. Angka keseimbangan di GAME_CONCEPT.md diukur dengan skrip ini (semua bot Fuzzy).
 
 Pemakaian (dari folder backend, dengan dependensi backend di requirements.txt; app/bot/nlg.py membaca pengaturan app):
     python tests/simulasi/simulasi_keseimbangan.py . 200 6 "7:2/2/1" "8:2/2/1"

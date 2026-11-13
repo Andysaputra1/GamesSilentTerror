@@ -1,6 +1,6 @@
 # Frontend Docker untuk kerja bareng
 
-Frontend Angular berjalan di laptop teman; API, WebSocket, AI, dan database tetap memakai backend VPS `https://backendthesis.andylabs.site`. Perubahan CSS/HTML/TypeScript dalam `frontend/src` dan aset `frontend/public` otomatis dimuat ulang. Tidak perlu memasang Node.js, MySQL, atau model AI di laptop.
+File ini untuk pengembang frontend yang tidak perlu menjalankan backend sendiri. Frontend Angular berjalan di laptop teman; API, WebSocket, AI, dan database tetap memakai backend VPS `https://backendthesis.andylabs.site`. Perubahan CSS/HTML/TypeScript dalam `frontend/src` dan aset `frontend/public` otomatis dimuat ulang. Tidak perlu memasang Node.js, MySQL, atau model AI di laptop.
 
 ## 1. Persiapan laptop
 
@@ -66,7 +66,7 @@ Tunggu kompilasi Angular selesai, lalu buka **http://localhost:4200**. Ctrl+C pa
 
 Edit file di `frontend/src` atau `frontend/public` memakai editor di laptop. Docker membaca perubahan lewat bind mount dan Angular memperbarui halaman. Dependency dipasang di image, terpisah dari `node_modules` laptop. Konfigurasi ini untuk pengembangan lokal, bukan server publik.
 
-Jika mengubah package.json/package-lock.json, angular.json, script, atau Dockerfile, ulangi `up -d --build`. Jika mengubah `.env`, ulangi `up -d` agar container dibuat ulang. File `src/environments/environment.vercel.ts` dibuat otomatis saat container mulai dan diabaikan Git; jangan edit manual. Hindari menjalankan build Vercel pada checkout yang sama ketika container ini aktif karena memakai file generated yang sama.
+Jika mengubah package.json/package-lock.json, angular.json, script, atau Dockerfile, ulangi `up -d --build`. Jika mengubah `.env`, ulangi `up -d` agar container dibuat ulang. File `src/environments/environment.vercel.ts` dibuat otomatis saat container mulai dan diabaikan Git; jangan edit manual. Hindari menjalankan build Vercel pada checkout yang sama ketika container ini aktif, karena keduanya menulis file `environment.vercel.ts` yang sama.
 
 ## 4. Perintah harian
 
