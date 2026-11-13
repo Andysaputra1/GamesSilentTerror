@@ -1,5 +1,7 @@
 """Survei akhir: pertanyaan dan skala dari database, validasi jawaban, dan satu kali kirim per pertandingan."""
 
+import csv
+import io
 import time
 import unittest
 from datetime import datetime
@@ -454,8 +456,8 @@ class SurveyExportTests(unittest.TestCase):
         app.dependency_overrides[require_panel] = lambda: "fixture-token"
         self.client = TestClient(app)
 
-    # CSV: UTF-8 dengan BOM, kolom tetap, dan nilai persis (tanpa escape) seperti CSV riwayat chat.
-    def test_csv_has_bom_fixed_columns_and_exact_values(self):
+    # CSV: UTF-8 dengan BOM, kolom tetap, dan teks yang diawali karakter formula diberi awalan ' (injeksi CSV).
+    def test_csv_has_bom_fixed_columns_and_safe_formula_text(self):
         rows = [{"created_at": "2026-09-30 10:00:00", "match_id": "m1", "room_code": "ABC123",
                  "username": "alice", "role": "spy", "team": "civilians", "outcome": "won",
                  "code": "saran", "question_snapshot": '{"prompt": "Saran untuk game?"}',
@@ -469,7 +471,21 @@ class SurveyExportTests(unittest.TestCase):
         header, line = body.lstrip("﻿").splitlines()[:2]
         self.assertEqual(header, "created_at,match_id,room_code,username,role,team,outcome,code,"
                                  "prompt,value_number,value_text,bots")  # fmt: skip
-        self.assertIn(",Saran untuk game?,,=1+1 seru banget 👍,NOX:fuzzy:santai", line)
+        self.assertIn(",Saran untuk game?,,'=1+1 seru banget 👍,NOX:fuzzy:santai", line)
+
+    # Semua awalan formula diamankan; teks biasa, angka, dan kosong tetap persis.
+    def test_csv_escapes_every_formula_prefix_only(self):
+        dasar = {"created_at": "2026-09-30 10:00:00", "match_id": "m1", "room_code": "ABC123",
+                 "username": "alice", "role": "spy", "team": "civilians", "outcome": "won",
+                 "code": "saran", "question_snapshot": '{"prompt": "Saran?"}', "bots": ""}  # fmt: skip
+        teks = ["=SUM(A1)", "+1", "-2+3", "@cmd", "\tx", "biasa", "", None]
+        rows = [{**dasar, "value_number": 3 if t is None else None, "value_text": t} for t in teks]
+        with patch("app.controllers.survey.survey_service.export_rows", return_value=rows):
+            body = self.client.get("/api/panel/survey/responses.csv").content.decode("utf-8-sig")
+        hasil = [r["value_text"] for r in csv.DictReader(io.StringIO(body))]
+        self.assertEqual(hasil, ["'=SUM(A1)", "'+1", "'-2+3", "'@cmd", "'\tx", "biasa", "", ""])
+        angka = [r["value_number"] for r in csv.DictReader(io.StringIO(body))]
+        self.assertEqual(angka[-1], "3")
 
     def test_delete_endpoints_need_panel_login_and_map_errors(self):
         tanpa_login = FastAPI()

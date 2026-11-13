@@ -98,13 +98,14 @@ class AccountQueryTests(unittest.TestCase):
             self.assertIsNone(auth_queries.account_by_token(db, "test", now + timedelta(hours=2)))
             self.assertEqual(auth_queries.delete_session(db, "test"), 1)
             self.assertIsNone(auth_queries.account_by_token(db, "test", now))
-            # Membuat sesi baru membersihkan sesi yang sudah kedaluwarsa.
+            # Sesi kedaluwarsa dibersihkan lewat query sendiri, bukan di dalam create_session.
             auth_queries.create_session(
                 db, user_id=1, token_hash="lama", expires_at=datetime(2000, 1, 1)
             )
             auth_queries.create_session(
                 db, user_id=1, token_hash="baru", expires_at=datetime(2999, 1, 1)
             )
+            self.assertEqual(auth_queries.delete_expired_sessions(db, datetime.now()), 1)
             self.assertEqual(
                 db.execute(text("SELECT token_hash FROM auth_sessions")).scalars().all(), ["baru"]
             )

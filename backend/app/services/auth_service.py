@@ -9,6 +9,7 @@ from collections import OrderedDict
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 import hashlib
+import logging
 import secrets
 from threading import RLock
 import time
@@ -19,13 +20,30 @@ from google.oauth2 import id_token
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.config.database import jalankan_transaksi
+from app.config.database import PersistenceError, jalankan_transaksi
 from app.config.settings import settings
 from app.models import auth_queries
 from app.services.password_service import hash_password, verify_password
 
 # Controller auth mengirim teks ini ke klien sebagai detail HTTP 503.
 PESAN_LOGIN = "Layanan login sedang tidak tersedia."
+logger = logging.getLogger("shadow_heist.auth")
+
+
+# Bersihkan sesi kedaluwarsa di transaksinya sendiri, sesudah login, daftar, atau login Google berhasil.
+# Dipisah dari transaksi login supaya dua login bersamaan tidak saling mengunci. Gagal membersihkan tidak
+# menggagalkan login: sesi kedaluwarsa memang sudah ditolak saat token dicek, dan dibersihkan login berikutnya.
+# Alur: 1 hapus sesi yang expires_at-nya lewat -> 2 gagal: catat di log, login tetap berhasil
+def bersihkan_sesi_kedaluwarsa() -> None:
+    try:
+        jalankan_transaksi(
+            lambda database: auth_queries.delete_expired_sessions(
+                database, datetime.now(timezone.utc).replace(tzinfo=None)
+            ),
+            PESAN_LOGIN,
+        )
+    except PersistenceError:
+        logger.warning("Sesi kedaluwarsa belum terhapus; dicoba lagi pada login berikutnya.")
 
 
 class AuthenticationError(RuntimeError):
@@ -98,7 +116,9 @@ class AuthService:
                 ),
             )
 
-        return jalankan_transaksi(periksa_akun_lalu_buat_sesi, PESAN_LOGIN)
+        hasil = jalankan_transaksi(periksa_akun_lalu_buat_sesi, PESAN_LOGIN)
+        bersihkan_sesi_kedaluwarsa()
+        return hasil
 
     # Mengubah token dari browser menjadi data akun, dan menolak kalau tidak sah.
     # DB hanya menyimpan hash, jadi token asli tidak terbaca walau DB bocor.
@@ -235,7 +255,9 @@ def register_account(username, password, display_name=None, email=None):
             database.rollback()
             raise AccountConflict("Username atau email sudah digunakan. Silakan login.") from error
 
-    return jalankan_transaksi(simpan_akun_lalu_buat_sesi, PESAN_LOGIN)
+    hasil = jalankan_transaksi(simpan_akun_lalu_buat_sesi, PESAN_LOGIN)
+    bersihkan_sesi_kedaluwarsa()
+    return hasil
 
 
 def google_account(klaim):
@@ -274,7 +296,9 @@ def google_account(klaim):
                 "Email sudah terdaftar. Gunakan metode login awal; penautan akun belum tersedia."
             ) from error
 
-    return jalankan_transaksi(cari_atau_buat_akun_lalu_buat_sesi, PESAN_LOGIN)
+    hasil = jalankan_transaksi(cari_atau_buat_akun_lalu_buat_sesi, PESAN_LOGIN)
+    bersihkan_sesi_kedaluwarsa()
+    return hasil
 
 
 # Login Google memverifikasi ID token + nonce sekali pakai, bukan sekadar decode JWT.

@@ -1,6 +1,6 @@
 """SQL akun. Nilai selalu lewat parameter terikat; commit/rollback diatur pemanggil."""
 
-from datetime import datetime, timezone
+from datetime import datetime
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -60,15 +60,17 @@ def account_by_username(database: Session, username: str):
     return database.execute(sql, {"username": username}).mappings().one_or_none()
 
 
+# Hapus semua sesi yang sudah kedaluwarsa. Dijalankan service di transaksi sendiri sesudah login berhasil,
+# bukan di transaksi login: DELETE rentang lalu INSERT di satu transaksi membuat dua login bersamaan bisa
+# saling mengunci (deadlock) dan salah satunya gagal 503.
+def delete_expired_sessions(database: Session, waktu_sekarang: datetime) -> int:
+    return database.execute(
+        text("DELETE FROM auth_sessions WHERE expires_at <= :now"), {"now": waktu_sekarang}
+    ).rowcount
+
+
 # Simpan hash token dan waktu kedaluwarsa sesi; commit diatur oleh service pemanggil.
-# Semua jalur login lewat sini, jadi sesi kedaluwarsa ikut dibersihkan di sini.
 def create_session(database: Session, *, user_id: int, token_hash: str, expires_at: datetime):
-    # shortcut: DELETE dan INSERT satu transaksi, jadi dua login bersamaan saat tidak ada sesi aktif bisa
-    # deadlock dan satu login gagal 503. Pindahkan ke transaksi sendiri kalau itu pernah terjadi.
-    database.execute(
-        text("DELETE FROM auth_sessions WHERE expires_at <= :now"),
-        {"now": datetime.now(timezone.utc).replace(tzinfo=None)},
-    )
     sql = text("""
         INSERT INTO auth_sessions (user_id, token_hash, expires_at)
         VALUES (:user_id, :token_hash, :expires_at)

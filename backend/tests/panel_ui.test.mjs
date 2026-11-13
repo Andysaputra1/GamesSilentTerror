@@ -1018,6 +1018,7 @@ test('menu dokumen membuka semua dokumen sistem, AI, dan NLU di tab baru', async
   assert.deepEqual(
     links.map((a) => a.getAttribute('href')),
     [
+      '/panel/dokumen/peta-dokumen',
       '/panel/dokumen/arsitektur',
       '/panel/dokumen/erd',
       '/panel/dokumen/proses-ai',

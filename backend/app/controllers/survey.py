@@ -127,9 +127,17 @@ def panel_summary(token=Depends(require_panel)):
 
 @router.get("/api/panel/survey/responses.csv")
 # PANEL: ekspor seluruh jawaban untuk analisis penelitian. UTF-8 dengan BOM (dibaca benar oleh Excel).
-# Nilai disimpan persis demi data penelitian, sama seperti CSV riwayat chat: teks bebas pemain tidak
-# di-escape, jadi saat membuka di spreadsheet impor kolom teks sebagai teks (bukan formula).
+# File ini dibuka di spreadsheet, jadi teks yang diawali = + - @ tab atau CR diberi awalan ' supaya tidak
+# dijalankan sebagai formula (injeksi CSV). Angka tetap angka. CSV riwayat chat sengaja tidak diubah,
+# karena dipakai sebagai dataset NLU dan teksnya harus persis.
+# Alur: 1 ambil baris jawaban -> 2 isi teks pertanyaan dari salinan saat dijawab -> 3 amankan teks dari formula
+#       -> 4 tulis CSV ber-BOM
 def panel_export(token=Depends(require_panel)):
+    def aman_spreadsheet(nilai):
+        if isinstance(nilai, str) and nilai[:1] in ("=", "+", "-", "@", "\t", "\r"):
+            return "'" + nilai
+        return nilai
+
     daftar_baris = survey_call(survey_service.export_rows)
     penampung_csv = io.StringIO()
     kolom_csv = [
@@ -142,7 +150,8 @@ def panel_export(token=Depends(require_panel)):
         # Teks pertanyaan diambil dari salinan saat dijawab, bukan dari pertanyaan versi sekarang.
         salinan = baris.get("question_snapshot")
         salinan = json.loads(salinan) if isinstance(salinan, str) else (salinan or {})
-        penulis_csv.writerow({**baris, "prompt": salinan.get("prompt", "")})
+        isi = {**baris, "prompt": salinan.get("prompt", "")}
+        penulis_csv.writerow({kolom: aman_spreadsheet(isi.get(kolom)) for kolom in kolom_csv})
     return Response(
         "﻿" + penampung_csv.getvalue(),
         media_type="text/csv; charset=utf-8",

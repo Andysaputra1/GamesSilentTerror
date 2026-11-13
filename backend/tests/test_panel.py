@@ -63,6 +63,7 @@ class PanelTests(unittest.TestCase):
 
     def test_documents_are_whitelisted_and_sandboxed(self):
         for nama, judul in [
+            ("peta-dokumen", "Peta Dokumen"),
             ("erd", "ERD Silent Terror"),
             ("proses-ai", "Proses AI Silent Terror"),
             ("arsitektur", "Arsitektur Sistem Silent Terror"),
