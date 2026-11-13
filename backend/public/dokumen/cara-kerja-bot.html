@@ -265,7 +265,7 @@ td code { white-space: nowrap; }
 </nav>
 <main>
 <h1>Cara Kerja Bot</h1>
-<p class="subjudul">Jalur kode satu langkah bot, dari snapshot sampai kalimat terkirim. Kode dibaca dari <code>Games</code> (branch <code>main</code>, commit <code>46f0586</code>), dibangun 2026-11-13 08:18. Nomor baris dihitung dari nama fungsi saat halaman dibangun. Saat dibangun, ada perubahan yang belum di-commit di <code>backend/app/controllers/panel.py</code>, <code>backend/app/controllers/survey.py</code>, <code>backend/app/models/auth_queries.py</code> dan file lain.</p>
+<p class="subjudul">Jalur kode satu langkah bot, dari snapshot sampai kalimat terkirim. Kode dibaca dari <code>Games</code> (branch <code>main</code>, commit <code>10845c7</code>), dibangun 2026-11-13 10:16. Nomor baris dihitung dari nama fungsi saat halaman dibangun.</p>
 <div class="kotak"><p><strong>Cara membaca.</strong> Setiap bagian bernomor adalah satu tahap langkah bot,
 urut dari input sampai kirim. Di tiap bagian ada <b>alur kode</b> (nama yang bergaris bawah membuka kodenya), lalu satu
 <b>kartu</b> per fungsi yang dilewati. Tombol <b>Kode</b> di kartu membuka kode asli bernomor baris, letaknya, penjelasan per
@@ -448,9 +448,9 @@ Chat tim malam: siapkan_nlg_tim <span class="panah">-&gt;</span> tulis_kalimat_t
 <section class="kartu keluar"><div class="kepala-kartu"><h3 id="k-giliran"><span class="lencana-kartu keluar">OUTPUT</span><code>NPCService._ambil_giliran_bicara</code> · lantai bicara</h3><span class="letak">backend/app/bot/bot_controller.py:586</span></div><p>Lantai bicara: paling banyak LANTAI_MAKS bot menyusun/mengetik chat bersamaan per pertandingan (LLM menulis paralel). Ditolak bila lantai penuh, bila bot lain sedang menulis rencana kembar (intent dan target sama: tidak ada tuduhan atau pertanyaan serentak yang sama), atau bila rencana dibuat sebelum chat bot lain masuk. Bot yang ditolak memutuskan ulang di langkah berikutnya dengan chat terbaru.</p><p><strong>Hasil</strong> <code>True</code> bila bot boleh menyusun kalimat sekarang; <code>False</code> bila ditunda ke langkah berikutnya.</p></section>
 <section class="kartu keluar"><div class="kepala-kartu"><h3 id="k-tulis-kalimat"><span class="lencana-kartu keluar">OUTPUT</span><code>tulis_kalimat</code> · tulis dengan batas waktu</h3><span class="letak">backend/app/bot/bot_controller.py:410</span></div><p>NLG dengan batas waktu. Jika penulis LLM terlalu lama, kalimat tetap dikirim dari templat agar rencana bot tidak hilang. Thread LLM yang tertinggal selesai sendiri; rantai penulis mencatat hasilnya (mis. mengistirahatkan jalur yang lambat) untuk kalimat berikutnya. lapor(tahap): simulasi panel memantau tahap NLG (nlg, llm, aturan).</p><p><strong>Hasil</strong> Hasil <code>tulis_pesan</code> (kalimat, sumber, pelanggaran), atau kalimat templat bila LLM melewati batas waktu.</p></section>
 <section class="kartu keluar"><div class="kepala-kartu"><h3 id="k-tulis"><span class="lencana-kartu keluar">OUTPUT</span><code>BrainRuntime.tulis</code> · pilih penulis</h3><span class="letak">backend/app/bot/bot_controller.py:302</span></div><p>Rencana menjadi kalimat (thread penulis), dengan pengaman aturan. pakai_llm=False: hanya templat, dipakai sebagai cadangan cepat saat penulis LLM melewati batas waktu.</p><p><strong>Hasil</strong> Dict hasil <code>tulis_pesan</code> ditambah <code>llm_detik</code>.</p></section>
-<section class="kartu keluar"><div class="kepala-kartu"><h3 id="k-tulis-pesan"><span class="lencana-kartu keluar">OUTPUT</span><code>tulis_pesan</code> · kalimat akhir</h3><span class="letak">backend/app/bot/nlg.py:1134</span></div><p>Rencana chat → kalimat akhir. Selalu mengembalikan kalimat, apa pun yang gagal.</p><p><strong>Hasil</strong> Dict <code>{teks, sumber, lolos_aturan, pelanggaran, ...}</code>; selalu ada kalimat, apa pun yang gagal.</p></section>
-<section class="kartu keluar"><div class="kepala-kartu"><h3 id="k-templat"><span class="lencana-kartu keluar">OUTPUT</span><code>kalimat_templat</code> · templat cadangan</h3><span class="letak">backend/app/bot/nlg.py:386</span></div><p>Semua kalimat templat yang mungkin, sudah diberi persona. Kalimat yang mirip dengan yang baru terdengar di room diletakkan paling belakang dan tetap ikut dicoba, karena mengulang lebih baik daripada mengganti maksud rencana.</p><p><strong>Hasil</strong> Daftar semua varian templat untuk rencana itu. <code>tulis_pesan</code> memakai varian pertama yang lolos <code>periksa_aturan</code>; bila tidak ada yang lolos, varian pertama tetap dikirim.</p></section>
-<section class="kartu keluar"><div class="kepala-kartu"><h3 id="k-periksa"><span class="lencana-kartu keluar">OUTPUT</span><code>periksa_aturan</code> · pemeriksa aturan</h3><span class="letak">backend/app/bot/nlg.py:518</span></div><p>Daftar pelanggaran aturan; kosong berarti lolos. Aturan sama untuk semua role, karena yang dinilai role yang diakui rencana. boleh_sebut = nama dari chat pemicu (penuduh, pemilih, penanya) yang boleh disapa walau bukan target.</p><p><strong>Hasil</strong> Daftar pelanggaran (kosong = lolos).</p></section>
+<section class="kartu keluar"><div class="kepala-kartu"><h3 id="k-tulis-pesan"><span class="lencana-kartu keluar">OUTPUT</span><code>tulis_pesan</code> · kalimat akhir</h3><span class="letak">backend/app/bot/nlg.py:1347</span></div><p>Rencana chat → kalimat akhir. Selalu mengembalikan kalimat, apa pun yang gagal.</p><p><strong>Hasil</strong> Dict <code>{teks, sumber, lolos_aturan, pelanggaran, ...}</code>; selalu ada kalimat, apa pun yang gagal.</p></section>
+<section class="kartu keluar"><div class="kepala-kartu"><h3 id="k-templat"><span class="lencana-kartu keluar">OUTPUT</span><code>kalimat_templat</code> · templat cadangan</h3><span class="letak">backend/app/bot/nlg.py:591</span></div><p>Semua kalimat templat yang mungkin, sudah diberi persona, urut dari yang paling layak dikirim. hindari = kalimat yang baru terdengar, dari yang paling lama ke yang paling baru (kalimat bot ini lalu chat terbaru room, siapa pun pengirimnya). Kalimat yang persis atau hampir sama dengan salah satunya tetap ikut dicoba, karena mengulang lebih baik daripada mengganti maksud rencana, tetapi ditaruh di belakang: yang belum terdengar dulu, lalu yang hanya mirip, lalu yang persis sama. Di antara yang sudah terdengar, yang paling lama tidak terdengar didahulukan, jadi varian dipakai bergiliran.</p><p><strong>Hasil</strong> Daftar semua varian templat untuk rencana itu. <code>tulis_pesan</code> memakai varian pertama yang lolos <code>periksa_aturan</code>; bila tidak ada yang lolos, varian pertama tetap dikirim.</p></section>
+<section class="kartu keluar"><div class="kepala-kartu"><h3 id="k-periksa"><span class="lencana-kartu keluar">OUTPUT</span><code>periksa_aturan</code> · pemeriksa aturan</h3><span class="letak">backend/app/bot/nlg.py:731</span></div><p>Daftar pelanggaran aturan; kosong berarti lolos. Aturan sama untuk semua role, karena yang dinilai role yang diakui rencana. boleh_sebut = nama dari chat pemicu (penuduh, pemilih, penanya) yang boleh disapa walau bukan target.</p><p><strong>Hasil</strong> Daftar pelanggaran (kosong = lolos).</p></section>
 <p class="sub-kartu">Yang tidak terlihat dari kode</p>
 <ul class="catatan"><li>Kalimat templat cadangan bisa terkirim walau melanggar aturan, bila tidak ada varian yang lolos (<code>lolos_aturan</code> bernilai False di jejak).</li><li>Kalimat bot tidak dibaca ulang IndoBERT sebelum dikirim. Pemeriksanya hanya aturan teks (<code>periksa_aturan</code>) dan kemiripan dengan kalimat yang baru terdengar (<code>kalimat_mirip</code>).</li><li>Role asli bot tidak pernah masuk payload. LLM hanya menerima <code>role_diakui</code> dan <code>bukti_klaim</code> bila rencana memang membuka role.</li><li>Model penulis produksi (<code>google/gemini-2.5-flash</code>) dipilih di panel; nilai <code>MODEL_OPENROUTER</code> di kode hanya bawaan.</li></ul>
 <aside class="ringkasan" aria-label="Ringkasan bagian 9"><p class="ringkasan-judul">Ringkasan bagian 9</p><ul><li><code>siapkan_nlg</code> membuat payload tanpa role asli bot.</li><li>Lantai bicara membatasi bot yang menulis bersamaan dan menunda rencana kembar.</li><li><code>tulis_pesan</code>: LLM dicoba lebih dulu, lalu templat yang lolos aturan, lalu varian pertama.</li><li>Setiap kalimat diperiksa aturan teks dan kemiripan, bukan IndoBERT.</li></ul></aside>
@@ -2625,7 +2625,7 @@ NLU</a> (pelatihan IndoBERT), dan <a href="arsitektur">Arsitektur</a> (susunan a
 <h2 class="pk-judul">Kode: BrainRuntime.tulis (pilih penulis)</h2>
 <p class="pk-tujuan">Rencana menjadi kalimat (thread penulis), dengan pengaman aturan. pakai_llm=False: hanya templat, dipakai sebagai cadangan cepat saat penulis LLM melewati batas waktu.</p>
 <p class="pk-letak"><strong>Letak:</strong> <code>backend/app/bot/bot_controller.py:299–310</code></p>
-<p><strong>Alur di kode:</strong></p><ul class="pk-alur"><li><code>BrainRuntime.tulis</code> dipanggil oleh <code>tulis_pesan</code> (nlg.py:1152), <code>tulis_chat_tim</code> (nlg.py:1233), <code>PenulisNPC._cek</code> (nlg.py:1385)</li></ul>
+<p><strong>Alur di kode:</strong></p><ul class="pk-alur"><li><code>BrainRuntime.tulis</code> dipanggil oleh <code>tulis_pesan</code> (nlg.py:1365), <code>tulis_chat_tim</code> (nlg.py:1446), <code>PenulisNPC._cek</code> (nlg.py:1598)</li></ul>
 <p class="pk-file"><code>backend/app/bot/bot_controller.py</code>, baris 299–310</p><pre class="kode-asli" tabindex="0"><code><span class="no">299</span>    <span class="wc"># Rencana menjadi kalimat (thread penulis), dengan pengaman aturan. pakai_llm=False: hanya templat, dipakai sebagai</span>
 <span class="no">300</span>    <span class="wc"># cadangan cepat saat penulis LLM melewati batas waktu.</span>
 <span class="no">301</span>    <span class="wc"># Alur: 1 pilih rantai (atau templat) -&gt; 2 kalimat yang harus dihindari -&gt; 3 tulis_pesan -&gt; 4 catat lama LLM</span>
@@ -2644,164 +2644,176 @@ NLU</a> (pelatihan IndoBERT), dan <a href="arsitektur">Arsitektur</a> (susunan a
 <p><strong>Proses apa:</strong></p><ul><li>1 pilih rantai (atau templat)</li><li>2 kalimat yang harus dihindari</li><li>3 tulis_pesan</li><li>4 catat lama LLM</li></ul>
 <p><strong>Untuk apa:</strong> Dipanggil <code>tulis_kalimat</code>; memilih rantai LLM atau templat saja.</p>
 <p><strong>Jadi apa:</strong> Dict hasil <code>tulis_pesan</code> ditambah <code>llm_detik</code>.</p>
-<p><strong>Terhubung ke:</strong></p><div class="mini-alur"><div class="mk-kolom"><a class="mini-kotak aksi" data-kode="kode-tulis-kalimat" href="#k-tulis-kalimat"><span class="mk-nama">tulis dengan batas waktu</span><code class="mk-kode">tulis_kalimat</code><span class="mk-letak">bot_controller.py:410</span></a></div><span class="mk-panah" aria-hidden="true">→</span><div class="mk-kolom"><span class="mini-kotak aksi ini"><span class="mk-nama">pilih penulis</span><code class="mk-kode">BrainRuntime.tulis</code><span class="mk-letak">bot_controller.py:302</span></span></div><span class="mk-panah" aria-hidden="true">→</span><div class="mk-kolom"><a class="mini-kotak aksi" data-kode="kode-tulis-pesan" href="#k-tulis-pesan"><span class="mk-nama">kalimat akhir</span><code class="mk-kode">tulis_pesan</code><span class="mk-letak">nlg.py:1134</span></a></div></div></div>
+<p><strong>Terhubung ke:</strong></p><div class="mini-alur"><div class="mk-kolom"><a class="mini-kotak aksi" data-kode="kode-tulis-kalimat" href="#k-tulis-kalimat"><span class="mk-nama">tulis dengan batas waktu</span><code class="mk-kode">tulis_kalimat</code><span class="mk-letak">bot_controller.py:410</span></a></div><span class="mk-panah" aria-hidden="true">→</span><div class="mk-kolom"><span class="mini-kotak aksi ini"><span class="mk-nama">pilih penulis</span><code class="mk-kode">BrainRuntime.tulis</code><span class="mk-letak">bot_controller.py:302</span></span></div><span class="mk-panah" aria-hidden="true">→</span><div class="mk-kolom"><a class="mini-kotak aksi" data-kode="kode-tulis-pesan" href="#k-tulis-pesan"><span class="mk-nama">kalimat akhir</span><code class="mk-kode">tulis_pesan</code><span class="mk-letak">nlg.py:1347</span></a></div></div></div>
 </template>
 <template id="kode-tulis-pesan" data-untuk="k-tulis-pesan">
 <h2 class="pk-judul">Kode: tulis_pesan (kalimat akhir)</h2>
 <p class="pk-tujuan">Rencana chat → kalimat akhir. Selalu mengembalikan kalimat, apa pun yang gagal.</p>
-<p class="pk-letak"><strong>Letak:</strong> <code>backend/app/bot/nlg.py:1131–1185</code></p>
+<p class="pk-letak"><strong>Letak:</strong> <code>backend/app/bot/nlg.py:1344–1398</code></p>
 <p><strong>Alur di kode:</strong></p><ul class="pk-alur"><li><code>tulis_pesan</code> dipanggil oleh <code>BrainRuntime.tulis</code> (bot_controller.py:308)</li></ul>
-<p class="pk-file"><code>backend/app/bot/nlg.py</code>, baris 1131–1185</p><pre class="kode-asli" tabindex="0"><code><span class="no">1131</span><span class="wc"># Rencana chat → kalimat akhir. Selalu mengembalikan kalimat, apa pun yang gagal.</span>
-<span class="no">1132</span><span class="wc"># Alur: 1 LLM paling banyak MAKS_PERCOBAAN_LLM kali: prompt, tulis, nilai aturan, mirip, salin fakta</span>
-<span class="no">1133</span><span class="wc">#       -&gt; 2 templat: varian pertama yang lolos -&gt; 3 cadangan: varian pertama</span>
-<span class="no">1134</span><span class="wk">def</span> <span class="wf">tulis_pesan</span>(p, konteks, penulis=<span class="wk">None</span>, persona=<span class="ws">"santai"</span>, hindari=()):
-<span class="no">1135</span>    mulai, percobaan = perf_counter(), []
-<span class="no">1136</span>
-<span class="no">1137</span>    <span class="wk">def</span> <span class="wf">selesai</span>(nilai, sumber, jalur=<span class="wk">None</span>):
-<span class="no">1138</span>        <span class="wk">return</span> {<span class="ws">"teks"</span>: nilai[<span class="ws">"teks"</span>], <span class="ws">"sumber"</span>: sumber, <span class="ws">"penulis"</span>: jalur, <span class="ws">"lolos_aturan"</span>: <span class="wk">not</span> nilai[<span class="ws">"pelanggaran"</span>],
-<span class="no">1139</span>                <span class="ws">"pelanggaran"</span>: nilai[<span class="ws">"pelanggaran"</span>], <span class="ws">"persona"</span>: persona,
-<span class="no">1140</span>                <span class="ws">"percobaan"</span>: percobaan, <span class="ws">"detik"</span>: round(perf_counter() - mulai, <span class="wn">3</span>)}
-<span class="no">1141</span>
-<span class="no">1142</span>    <span class="wc"># 1) LLM, bila aktif. Kalimat yang hanya menyalin fakta disimpan sebagai cadangan, karena templat juga memuat fakta apa adanya.</span>
-<span class="no">1143</span>    alasan_tolak, salinan = <span class="wk">None</span>, <span class="wk">None</span>
-<span class="no">1144</span>    <span class="wk">for</span> ke <span class="wk">in</span> range(<span class="wn">1</span>, MAKS_PERCOBAAN_LLM + <span class="wn">1</span>):
-<span class="no">1145</span>        <span class="wk">if</span> penulis <span class="wk">is</span> <span class="wk">None</span> <span class="wk">or</span> <span class="wk">not</span> penulis.aktif:
-<span class="no">1146</span>            <span class="wk">break</span>
-<span class="no">1147</span>        <span class="wc"># Percobaan ulang hanya bila percobaan sebelumnya cepat: di game kalimat harus tetap tepat waktu.</span>
-<span class="no">1148</span>        <span class="wk">if</span> ke &gt; <span class="wn">1</span> <span class="wk">and</span> perf_counter() - mulai &gt; BATAS_WAKTU_DETIK:
-<span class="no">1149</span>            percobaan.append({<span class="ws">"sumber"</span>: <span class="ws">"llm"</span>, <span class="ws">"ke"</span>: ke, <span class="ws">"status"</span>: <span class="ws">"waktu habis"</span>})
-<span class="no">1150</span>            <span class="wk">break</span>
-<span class="no">1151</span>        sistem, pesan = buat_prompt(p, konteks, persona, alasan_tolak)
-<span class="no">1152</span>        mentah, status = penulis.tulis(sistem, pesan)
-<span class="no">1153</span>        <span class="wk">if</span> mentah <span class="wk">is</span> <span class="wk">None</span>:
-<span class="no">1154</span>            percobaan.append({<span class="ws">"sumber"</span>: <span class="ws">"llm"</span>, <span class="ws">"ke"</span>: ke, <span class="ws">"status"</span>: status})
-<span class="no">1155</span>            <span class="wk">continue</span>
-<span class="no">1156</span>        jalur = getattr(penulis, <span class="ws">"terakhir"</span>, <span class="wk">None</span>) <span class="wk">or</span> penulis.jalur  <span class="wc"># rantai: jalur yang benar-benar menulis</span>
-<span class="no">1157</span>        nilai = nilai_kalimat(bersihkan(mentah, p[<span class="ws">"pembicara"</span>]), p, konteks)
-<span class="no">1158</span>        <span class="wc"># Parafrase tipis dari kalimat yang baru terdengar (milik bot sendiri atau pemain lain) ikut ditolak.</span>
-<span class="no">1159</span>        mirip = kalimat_mirip(nilai[<span class="ws">"teks"</span>], hindari)
-<span class="no">1160</span>        salin = fakta_disalin(nilai[<span class="ws">"teks"</span>], p, persona) <span class="wk">if</span> nilai[<span class="ws">"lolos"</span>] <span class="wk">and</span> mirip <span class="wk">is</span> <span class="wk">None</span> <span class="wk">else</span> <span class="wk">None</span>
-<span class="no">1161</span>        percobaan.append({<span class="ws">"sumber"</span>: <span class="ws">"llm"</span>, <span class="ws">"ke"</span>: ke, <span class="ws">"penulis"</span>: jalur, <span class="ws">"status"</span>: status, <span class="ws">"teks"</span>: nilai[<span class="ws">"teks"</span>],
-<span class="no">1162</span>                          <span class="ws">"lolos"</span>: nilai[<span class="ws">"lolos"</span>], <span class="ws">"pelanggaran"</span>: nilai[<span class="ws">"pelanggaran"</span>], <span class="ws">"mirip"</span>: mirip, <span class="ws">"salin_fakta"</span>: salin})
-<span class="no">1163</span>        <span class="wk">if</span> nilai[<span class="ws">"lolos"</span>] <span class="wk">and</span> mirip <span class="wk">is</span> <span class="wk">None</span> <span class="wk">and</span> salin <span class="wk">is</span> <span class="wk">None</span>:
-<span class="no">1164</span>            <span class="wk">return</span> selesai(nilai, <span class="ws">"llm"</span>, jalur)
-<span class="no">1165</span>        <span class="wk">if</span> salin:
-<span class="no">1166</span>            salinan = salinan <span class="wk">or</span> (nilai, jalur)
-<span class="no">1167</span>            alasan_tolak = <span class="ws">"salin_fakta: fakta rencana disalin hampir utuh; tulis ulang dengan kata-katamu sendiri"</span>
-<span class="no">1168</span>        <span class="wk">elif</span> nilai[<span class="ws">"pelanggaran"</span>]:
-<span class="no">1169</span>            alasan_tolak = <span class="ws">", "</span>.join(nilai[<span class="ws">"pelanggaran"</span>])
-<span class="no">1170</span>        <span class="wk">else</span>:
-<span class="no">1171</span>            alasan_tolak = <span class="ws">f'terlalu mirip dengan kalimat yang baru terdengar ("{mirip}"); pakai susunan lain'</span>
-<span class="no">1172</span>    <span class="wk">if</span> salinan:
-<span class="no">1173</span>        <span class="wk">return</span> selesai(salinan[<span class="wn">0</span>], <span class="ws">"llm"</span>, salinan[<span class="wn">1</span>])
-<span class="no">1174</span>
-<span class="no">1175</span>    <span class="wc"># 2) Templat bervariasi.</span>
-<span class="no">1176</span>    dinilai = []
-<span class="no">1177</span>    <span class="wk">for</span> teks <span class="wk">in</span> kalimat_templat(p, persona, hindari):
-<span class="no">1178</span>        nilai = nilai_kalimat(teks, p, konteks)
-<span class="no">1179</span>        percobaan.append({<span class="ws">"sumber"</span>: <span class="ws">"templat"</span>, <span class="ws">"teks"</span>: teks, <span class="ws">"lolos"</span>: nilai[<span class="ws">"lolos"</span>], <span class="ws">"pelanggaran"</span>: nilai[<span class="ws">"pelanggaran"</span>]})
-<span class="no">1180</span>        <span class="wk">if</span> nilai[<span class="ws">"lolos"</span>]:
-<span class="no">1181</span>            <span class="wk">return</span> selesai(nilai, <span class="ws">"templat"</span>)
-<span class="no">1182</span>        dinilai.append(nilai)
-<span class="no">1183</span>
-<span class="no">1184</span>    <span class="wc"># 3) Cadangan: tidak ada varian yang lolos aturan, jadi varian pertama yang dikirim.</span>
-<span class="no">1185</span>    <span class="wk">return</span> selesai(dinilai[<span class="wn">0</span>], <span class="ws">"templat_cadangan"</span>)</code></pre>
-<p class="sub-kartu">Penjelasan per blok</p><ol class="pk-blok"><li><span class="pk-baris">baris 1134–1140</span> Rencana chat → kalimat akhir. Selalu mengembalikan kalimat, apa pun yang gagal.</li><li><span class="pk-baris">baris 1143–1146</span> 1) LLM, bila aktif. Kalimat yang hanya menyalin fakta disimpan sebagai cadangan, karena templat juga memuat fakta apa adanya.</li><li><span class="pk-baris">baris 1148–1157</span> Percobaan ulang hanya bila percobaan sebelumnya cepat: di game kalimat harus tetap tepat waktu.</li><li><span class="pk-baris">baris 1159–1173</span> Parafrase tipis dari kalimat yang baru terdengar (milik bot sendiri atau pemain lain) ikut ditolak.</li><li><span class="pk-baris">baris 1176–1182</span> 2) Templat bervariasi.</li><li><span class="pk-baris">baris 1185</span> 3) Cadangan: tidak ada varian yang lolos aturan, jadi varian pertama yang dikirim.</li></ol>
+<p class="pk-file"><code>backend/app/bot/nlg.py</code>, baris 1344–1398</p><pre class="kode-asli" tabindex="0"><code><span class="no">1344</span><span class="wc"># Rencana chat → kalimat akhir. Selalu mengembalikan kalimat, apa pun yang gagal.</span>
+<span class="no">1345</span><span class="wc"># Alur: 1 LLM paling banyak MAKS_PERCOBAAN_LLM kali: prompt, tulis, nilai aturan, mirip, salin fakta</span>
+<span class="no">1346</span><span class="wc">#       -&gt; 2 templat: varian pertama yang lolos -&gt; 3 cadangan: varian pertama</span>
+<span class="no">1347</span><span class="wk">def</span> <span class="wf">tulis_pesan</span>(p, konteks, penulis=<span class="wk">None</span>, persona=<span class="ws">"santai"</span>, hindari=()):
+<span class="no">1348</span>    mulai, percobaan = perf_counter(), []
+<span class="no">1349</span>
+<span class="no">1350</span>    <span class="wk">def</span> <span class="wf">selesai</span>(nilai, sumber, jalur=<span class="wk">None</span>):
+<span class="no">1351</span>        <span class="wk">return</span> {<span class="ws">"teks"</span>: nilai[<span class="ws">"teks"</span>], <span class="ws">"sumber"</span>: sumber, <span class="ws">"penulis"</span>: jalur, <span class="ws">"lolos_aturan"</span>: <span class="wk">not</span> nilai[<span class="ws">"pelanggaran"</span>],
+<span class="no">1352</span>                <span class="ws">"pelanggaran"</span>: nilai[<span class="ws">"pelanggaran"</span>], <span class="ws">"persona"</span>: persona,
+<span class="no">1353</span>                <span class="ws">"percobaan"</span>: percobaan, <span class="ws">"detik"</span>: round(perf_counter() - mulai, <span class="wn">3</span>)}
+<span class="no">1354</span>
+<span class="no">1355</span>    <span class="wc"># 1) LLM, bila aktif. Kalimat yang hanya menyalin fakta disimpan sebagai cadangan, karena templat juga memuat fakta apa adanya.</span>
+<span class="no">1356</span>    alasan_tolak, salinan = <span class="wk">None</span>, <span class="wk">None</span>
+<span class="no">1357</span>    <span class="wk">for</span> ke <span class="wk">in</span> range(<span class="wn">1</span>, MAKS_PERCOBAAN_LLM + <span class="wn">1</span>):
+<span class="no">1358</span>        <span class="wk">if</span> penulis <span class="wk">is</span> <span class="wk">None</span> <span class="wk">or</span> <span class="wk">not</span> penulis.aktif:
+<span class="no">1359</span>            <span class="wk">break</span>
+<span class="no">1360</span>        <span class="wc"># Percobaan ulang hanya bila percobaan sebelumnya cepat: di game kalimat harus tetap tepat waktu.</span>
+<span class="no">1361</span>        <span class="wk">if</span> ke &gt; <span class="wn">1</span> <span class="wk">and</span> perf_counter() - mulai &gt; BATAS_WAKTU_DETIK:
+<span class="no">1362</span>            percobaan.append({<span class="ws">"sumber"</span>: <span class="ws">"llm"</span>, <span class="ws">"ke"</span>: ke, <span class="ws">"status"</span>: <span class="ws">"waktu habis"</span>})
+<span class="no">1363</span>            <span class="wk">break</span>
+<span class="no">1364</span>        sistem, pesan = buat_prompt(p, konteks, persona, alasan_tolak)
+<span class="no">1365</span>        mentah, status = penulis.tulis(sistem, pesan)
+<span class="no">1366</span>        <span class="wk">if</span> mentah <span class="wk">is</span> <span class="wk">None</span>:
+<span class="no">1367</span>            percobaan.append({<span class="ws">"sumber"</span>: <span class="ws">"llm"</span>, <span class="ws">"ke"</span>: ke, <span class="ws">"status"</span>: status})
+<span class="no">1368</span>            <span class="wk">continue</span>
+<span class="no">1369</span>        jalur = getattr(penulis, <span class="ws">"terakhir"</span>, <span class="wk">None</span>) <span class="wk">or</span> penulis.jalur  <span class="wc"># rantai: jalur yang benar-benar menulis</span>
+<span class="no">1370</span>        nilai = nilai_kalimat(bersihkan(mentah, p[<span class="ws">"pembicara"</span>]), p, konteks)
+<span class="no">1371</span>        <span class="wc"># Parafrase tipis dari kalimat yang baru terdengar (milik bot sendiri atau pemain lain) ikut ditolak.</span>
+<span class="no">1372</span>        mirip = kalimat_mirip(nilai[<span class="ws">"teks"</span>], hindari)
+<span class="no">1373</span>        salin = fakta_disalin(nilai[<span class="ws">"teks"</span>], p, persona) <span class="wk">if</span> nilai[<span class="ws">"lolos"</span>] <span class="wk">and</span> mirip <span class="wk">is</span> <span class="wk">None</span> <span class="wk">else</span> <span class="wk">None</span>
+<span class="no">1374</span>        percobaan.append({<span class="ws">"sumber"</span>: <span class="ws">"llm"</span>, <span class="ws">"ke"</span>: ke, <span class="ws">"penulis"</span>: jalur, <span class="ws">"status"</span>: status, <span class="ws">"teks"</span>: nilai[<span class="ws">"teks"</span>],
+<span class="no">1375</span>                          <span class="ws">"lolos"</span>: nilai[<span class="ws">"lolos"</span>], <span class="ws">"pelanggaran"</span>: nilai[<span class="ws">"pelanggaran"</span>], <span class="ws">"mirip"</span>: mirip, <span class="ws">"salin_fakta"</span>: salin})
+<span class="no">1376</span>        <span class="wk">if</span> nilai[<span class="ws">"lolos"</span>] <span class="wk">and</span> mirip <span class="wk">is</span> <span class="wk">None</span> <span class="wk">and</span> salin <span class="wk">is</span> <span class="wk">None</span>:
+<span class="no">1377</span>            <span class="wk">return</span> selesai(nilai, <span class="ws">"llm"</span>, jalur)
+<span class="no">1378</span>        <span class="wk">if</span> salin:
+<span class="no">1379</span>            salinan = salinan <span class="wk">or</span> (nilai, jalur)
+<span class="no">1380</span>            alasan_tolak = <span class="ws">"salin_fakta: fakta rencana disalin hampir utuh; tulis ulang dengan kata-katamu sendiri"</span>
+<span class="no">1381</span>        <span class="wk">elif</span> nilai[<span class="ws">"pelanggaran"</span>]:
+<span class="no">1382</span>            alasan_tolak = <span class="ws">", "</span>.join(nilai[<span class="ws">"pelanggaran"</span>])
+<span class="no">1383</span>        <span class="wk">else</span>:
+<span class="no">1384</span>            alasan_tolak = <span class="ws">f'terlalu mirip dengan kalimat yang baru terdengar ("{mirip}"); pakai susunan lain'</span>
+<span class="no">1385</span>    <span class="wk">if</span> salinan:
+<span class="no">1386</span>        <span class="wk">return</span> selesai(salinan[<span class="wn">0</span>], <span class="ws">"llm"</span>, salinan[<span class="wn">1</span>])
+<span class="no">1387</span>
+<span class="no">1388</span>    <span class="wc"># 2) Templat bervariasi.</span>
+<span class="no">1389</span>    dinilai = []
+<span class="no">1390</span>    <span class="wk">for</span> teks <span class="wk">in</span> kalimat_templat(p, persona, hindari):
+<span class="no">1391</span>        nilai = nilai_kalimat(teks, p, konteks)
+<span class="no">1392</span>        percobaan.append({<span class="ws">"sumber"</span>: <span class="ws">"templat"</span>, <span class="ws">"teks"</span>: teks, <span class="ws">"lolos"</span>: nilai[<span class="ws">"lolos"</span>], <span class="ws">"pelanggaran"</span>: nilai[<span class="ws">"pelanggaran"</span>]})
+<span class="no">1393</span>        <span class="wk">if</span> nilai[<span class="ws">"lolos"</span>]:
+<span class="no">1394</span>            <span class="wk">return</span> selesai(nilai, <span class="ws">"templat"</span>)
+<span class="no">1395</span>        dinilai.append(nilai)
+<span class="no">1396</span>
+<span class="no">1397</span>    <span class="wc"># 3) Cadangan: tidak ada varian yang lolos aturan, jadi varian pertama yang dikirim.</span>
+<span class="no">1398</span>    <span class="wk">return</span> selesai(dinilai[<span class="wn">0</span>], <span class="ws">"templat_cadangan"</span>)</code></pre>
+<p class="sub-kartu">Penjelasan per blok</p><ol class="pk-blok"><li><span class="pk-baris">baris 1347–1353</span> Rencana chat → kalimat akhir. Selalu mengembalikan kalimat, apa pun yang gagal.</li><li><span class="pk-baris">baris 1356–1359</span> 1) LLM, bila aktif. Kalimat yang hanya menyalin fakta disimpan sebagai cadangan, karena templat juga memuat fakta apa adanya.</li><li><span class="pk-baris">baris 1361–1370</span> Percobaan ulang hanya bila percobaan sebelumnya cepat: di game kalimat harus tetap tepat waktu.</li><li><span class="pk-baris">baris 1372–1386</span> Parafrase tipis dari kalimat yang baru terdengar (milik bot sendiri atau pemain lain) ikut ditolak.</li><li><span class="pk-baris">baris 1389–1395</span> 2) Templat bervariasi.</li><li><span class="pk-baris">baris 1398</span> 3) Cadangan: tidak ada varian yang lolos aturan, jadi varian pertama yang dikirim.</li></ol>
 <div class="pk-ringkas"><p class="sub-kartu">Ringkasan alur</p>
 <p><span class="tahap-badge output">OUTPUT</span> <span class="kecil">keluaran ke game, kalimat, atau dokumen</span></p>
 <p><strong>Proses apa:</strong></p><ul><li>1 LLM paling banyak MAKS_PERCOBAAN_LLM kali: prompt, tulis, nilai aturan, mirip, salin fakta</li><li>2 templat: varian pertama yang lolos</li><li>3 cadangan: varian pertama</li></ul>
 <p><strong>Untuk apa:</strong> Satu-satunya pintu dari rencana chat ke kalimat, dipakai game dan simulasi.</p>
 <p><strong>Jadi apa:</strong> Dict <code>{teks, sumber, lolos_aturan, pelanggaran, ...}</code>; selalu ada kalimat, apa pun yang gagal.</p>
-<p><strong>Terhubung ke:</strong></p><div class="mini-alur"><div class="mk-kolom"><a class="mini-kotak aksi" data-kode="kode-tulis" href="#k-tulis"><span class="mk-nama">pilih penulis</span><code class="mk-kode">BrainRuntime.tulis</code><span class="mk-letak">bot_controller.py:302</span></a></div><span class="mk-panah" aria-hidden="true">→</span><div class="mk-kolom"><span class="mini-kotak aksi ini"><span class="mk-nama">kalimat akhir</span><code class="mk-kode">tulis_pesan</code><span class="mk-letak">nlg.py:1134</span></span></div><span class="mk-panah" aria-hidden="true">→</span><div class="mk-kolom"><a class="mini-kotak ambang" data-kode="kode-periksa" href="#k-periksa"><span class="mk-nama">pemeriksa aturan</span><code class="mk-kode">periksa_aturan</code><span class="mk-letak">nlg.py:518</span></a><a class="mini-kotak aksi" data-kode="kode-templat" href="#k-templat"><span class="mk-nama">templat cadangan</span><code class="mk-kode">kalimat_templat</code><span class="mk-letak">nlg.py:386</span></a></div></div></div>
+<p><strong>Terhubung ke:</strong></p><div class="mini-alur"><div class="mk-kolom"><a class="mini-kotak aksi" data-kode="kode-tulis" href="#k-tulis"><span class="mk-nama">pilih penulis</span><code class="mk-kode">BrainRuntime.tulis</code><span class="mk-letak">bot_controller.py:302</span></a></div><span class="mk-panah" aria-hidden="true">→</span><div class="mk-kolom"><span class="mini-kotak aksi ini"><span class="mk-nama">kalimat akhir</span><code class="mk-kode">tulis_pesan</code><span class="mk-letak">nlg.py:1347</span></span></div><span class="mk-panah" aria-hidden="true">→</span><div class="mk-kolom"><a class="mini-kotak ambang" data-kode="kode-periksa" href="#k-periksa"><span class="mk-nama">pemeriksa aturan</span><code class="mk-kode">periksa_aturan</code><span class="mk-letak">nlg.py:731</span></a><a class="mini-kotak aksi" data-kode="kode-templat" href="#k-templat"><span class="mk-nama">templat cadangan</span><code class="mk-kode">kalimat_templat</code><span class="mk-letak">nlg.py:591</span></a></div></div></div>
 </template>
 <template id="kode-templat" data-untuk="k-templat">
 <h2 class="pk-judul">Kode: kalimat_templat (templat cadangan)</h2>
-<p class="pk-tujuan">Semua kalimat templat yang mungkin, sudah diberi persona. Kalimat yang mirip dengan yang baru terdengar di room diletakkan paling belakang dan tetap ikut dicoba, karena mengulang lebih baik daripada mengganti maksud rencana.</p>
-<p class="pk-letak"><strong>Letak:</strong> <code>backend/app/bot/nlg.py:382–396</code></p>
-<p><strong>Alur di kode:</strong></p><ul class="pk-alur"><li><code>kalimat_templat</code> dipanggil oleh <code>tulis_pesan</code> (nlg.py:1177)</li></ul>
-<p class="pk-file"><code>backend/app/bot/nlg.py</code>, baris 382–396</p><pre class="kode-asli" tabindex="0"><code><span class="no">382</span><span class="wc"># Semua kalimat templat yang mungkin, sudah diberi persona. Kalimat yang mirip dengan yang baru terdengar di room</span>
-<span class="no">383</span><span class="wc"># diletakkan paling belakang dan tetap ikut dicoba, karena mengulang lebih baik daripada mengganti maksud rencana.</span>
-<span class="no">384</span><span class="wc"># Alur: 1 isi tiap varian sesuai rencana -&gt; 2 ubah kata ganti persona -&gt; 3 yang mirip kalimat</span>
-<span class="no">385</span><span class="wc">#       baru terdengar ditaruh paling belakang -&gt; 4 tanpa varian: kalimat cadangan</span>
-<span class="no">386</span><span class="wk">def</span> <span class="wf">kalimat_templat</span>(p, persona, hindari=()):
-<span class="no">387</span>    baru, ulang = [], []
-<span class="no">388</span>    <span class="wk">for</span> pola <span class="wk">in</span> urutan_varian(p):
-<span class="no">389</span>        teks = isi_templat(pola, p)
-<span class="no">390</span>        <span class="wk">if</span> teks <span class="wk">is</span> <span class="wk">None</span>:
-<span class="no">391</span>            <span class="wk">continue</span>
-<span class="no">392</span>        teks = ubah_kata_ganti(teks, persona)
-<span class="no">393</span>        <span class="wk">if</span> teks <span class="wk">in</span> baru <span class="wk">or</span> teks <span class="wk">in</span> ulang:
-<span class="no">394</span>            <span class="wk">continue</span>
-<span class="no">395</span>        (ulang <span class="wk">if</span> kalimat_mirip(teks, hindari) <span class="wk">else</span> baru).append(teks)
-<span class="no">396</span>    <span class="wk">return</span> baru + ulang <span class="wk">or</span> [ubah_kata_ganti(kalimat_cadangan(p), persona)]</code></pre>
-<p class="sub-kartu">Penjelasan per blok</p><ol class="pk-blok"><li><span class="pk-baris">baris 386–396</span> Semua kalimat templat yang mungkin, sudah diberi persona. Kalimat yang mirip dengan yang baru terdengar di room diletakkan paling belakang dan tetap ikut dicoba, karena mengulang lebih baik daripada mengganti maksud rencana.</li></ol>
+<p class="pk-tujuan">Semua kalimat templat yang mungkin, sudah diberi persona, urut dari yang paling layak dikirim. hindari = kalimat yang baru terdengar, dari yang paling lama ke yang paling baru (kalimat bot ini lalu chat terbaru room, siapa pun pengirimnya). Kalimat yang persis atau hampir sama dengan salah satunya tetap ikut dicoba, karena mengulang lebih baik daripada mengganti maksud rencana, tetapi ditaruh di belakang: yang belum terdengar dulu, lalu yang hanya mirip, lalu yang persis sama. Di antara yang sudah terdengar, yang paling lama tidak terdengar didahulukan, jadi varian dipakai bergiliran.</p>
+<p class="pk-letak"><strong>Letak:</strong> <code>backend/app/bot/nlg.py:583–609</code></p>
+<p><strong>Alur di kode:</strong></p><ul class="pk-alur"><li><code>kalimat_templat</code> dipanggil oleh <code>tulis_pesan</code> (nlg.py:1390)</li></ul>
+<p class="pk-file"><code>backend/app/bot/nlg.py</code>, baris 583–609</p><pre class="kode-asli" tabindex="0"><code><span class="no">583</span><span class="wc"># Semua kalimat templat yang mungkin, sudah diberi persona, urut dari yang paling layak dikirim. hindari = kalimat yang baru</span>
+<span class="no">584</span><span class="wc"># terdengar, dari yang paling lama ke yang paling baru (kalimat bot ini lalu chat terbaru room, siapa pun pengirimnya).</span>
+<span class="no">585</span><span class="wc"># Kalimat yang persis atau hampir sama dengan salah satunya tetap ikut dicoba, karena mengulang lebih baik daripada mengganti</span>
+<span class="no">586</span><span class="wc"># maksud rencana, tetapi ditaruh di belakang: yang belum terdengar dulu, lalu yang hanya mirip, lalu yang persis sama. Di</span>
+<span class="no">587</span><span class="wc"># antara yang sudah terdengar, yang paling lama tidak terdengar didahulukan, jadi varian dipakai bergiliran.</span>
+<span class="no">588</span><span class="wc"># Alur: 1 isi tiap varian sesuai rencana -&gt; 2 ubah kata ganti persona -&gt; 3 kapan terakhir terdengar kalimat yang persis</span>
+<span class="no">589</span><span class="wc">#       sama dan yang mirip -&gt; 4 urutkan: belum terdengar, mirip paling lama, persis paling lama -&gt; 5 tanpa varian:</span>
+<span class="no">590</span><span class="wc">#       kalimat cadangan</span>
+<span class="no">591</span><span class="wk">def</span> <span class="wf">kalimat_templat</span>(p, persona, hindari=()):
+<span class="no">592</span>    dasar_hindari = [bentuk_dasar(h) <span class="wk">for</span> h <span class="wk">in</span> hindari]
+<span class="no">593</span>    calon = {}
+<span class="no">594</span>    <span class="wk">for</span> pola <span class="wk">in</span> urutan_varian(p, persona):
+<span class="no">595</span>        teks = isi_templat(pola, p)
+<span class="no">596</span>        <span class="wk">if</span> teks <span class="wk">is</span> <span class="wk">None</span>:
+<span class="no">597</span>            <span class="wk">continue</span>
+<span class="no">598</span>        teks = ubah_kata_ganti(teks, persona)
+<span class="no">599</span>        <span class="wk">if</span> teks <span class="wk">in</span> calon:
+<span class="no">600</span>            <span class="wk">continue</span>
+<span class="no">601</span>        <span class="wc"># Letak terakhir di hindari, makin besar makin baru; -1 berarti belum terdengar. Persis dibandingkan pada bentuk</span>
+<span class="no">602</span>        <span class="wc"># dasarnya, jadi "Gw bukan Hitman" dari bot lain sama dengan "Aku bukan Hitman". Kalimat yang persis sama tidak</span>
+<span class="no">603</span>        <span class="wc"># perlu dihitung kemiripannya: dua kalimat dengan letak persis yang sama juga sama bentuk dasarnya.</span>
+<span class="no">604</span>        dasar = bentuk_dasar(teks)
+<span class="no">605</span>        persis = max((i <span class="wk">for</span> i, h <span class="wk">in</span> enumerate(dasar_hindari) <span class="wk">if</span> h == dasar), default=-<span class="wn">1</span>)
+<span class="no">606</span>        mirip = persis <span class="wk">if</span> persis &gt;= <span class="wn">0</span> <span class="wk">else</span> next(
+<span class="no">607</span>            (i <span class="wk">for</span> i <span class="wk">in</span> range(len(hindari) - <span class="wn">1</span>, -<span class="wn">1</span>, -<span class="wn">1</span>) <span class="wk">if</span> kemiripan(teks, hindari[i]) &gt;= MIRIP_MAKS), -<span class="wn">1</span>)
+<span class="no">608</span>        calon[teks] = (persis, mirip, len(calon))
+<span class="no">609</span>    <span class="wk">return</span> sorted(calon, key=calon.get) <span class="wk">or</span> [ubah_kata_ganti(kalimat_cadangan(p), persona)]</code></pre>
+<p class="sub-kartu">Penjelasan per blok</p><ol class="pk-blok"><li><span class="pk-baris">baris 591–600</span> Semua kalimat templat yang mungkin, sudah diberi persona, urut dari yang paling layak dikirim. hindari = kalimat yang baru terdengar, dari yang paling lama ke yang paling baru (kalimat bot ini lalu chat terbaru room, siapa pun pengirimnya). Kalimat yang persis atau hampir sama dengan salah satunya tetap ikut dicoba, karena mengulang lebih baik daripada mengganti maksud rencana, tetapi ditaruh di belakang: yang belum terdengar dulu, lalu yang hanya mirip, lalu yang persis sama. Di antara yang sudah terdengar, yang paling lama tidak terdengar didahulukan, jadi varian dipakai bergiliran.</li><li><span class="pk-baris">baris 604–609</span> Letak terakhir di hindari, makin besar makin baru; -1 berarti belum terdengar. Persis dibandingkan pada bentuk dasarnya, jadi &quot;Gw bukan Hitman&quot; dari bot lain sama dengan &quot;Aku bukan Hitman&quot;. Kalimat yang persis sama tidak perlu dihitung kemiripannya: dua kalimat dengan letak persis yang sama juga sama bentuk dasarnya.</li></ol>
 <div class="pk-ringkas"><p class="sub-kartu">Ringkasan alur</p>
 <p><span class="tahap-badge output">OUTPUT</span> <span class="kecil">keluaran ke game, kalimat, atau dokumen</span></p>
-<p><strong>Proses apa:</strong></p><ul><li>1 isi tiap varian sesuai rencana</li><li>2 ubah kata ganti persona</li><li>3 yang mirip kalimat baru terdengar ditaruh paling belakang</li><li>4 tanpa varian: kalimat cadangan</li></ul>
+<p><strong>Proses apa:</strong></p><ul><li>1 isi tiap varian sesuai rencana</li><li>2 ubah kata ganti persona</li><li>3 kapan terakhir terdengar kalimat yang persis sama dan yang mirip</li><li>4 urutkan: belum terdengar, mirip paling lama, persis paling lama</li><li>5 tanpa varian: kalimat cadangan</li></ul>
 <p><strong>Untuk apa:</strong> Dipakai <code>tulis_pesan</code> bila LLM mati atau semua percobaannya ditolak.</p>
 <p><strong>Jadi apa:</strong> Daftar semua varian templat untuk rencana itu. <code>tulis_pesan</code> memakai varian pertama yang lolos <code>periksa_aturan</code>; bila tidak ada yang lolos, varian pertama tetap dikirim.</p>
-<p><strong>Terhubung ke:</strong></p><div class="mini-alur"><div class="mk-kolom"><a class="mini-kotak aksi" data-kode="kode-tulis-pesan" href="#k-tulis-pesan"><span class="mk-nama">kalimat akhir</span><code class="mk-kode">tulis_pesan</code><span class="mk-letak">nlg.py:1134</span></a></div><span class="mk-panah" aria-hidden="true">→</span><div class="mk-kolom"><span class="mini-kotak aksi ini"><span class="mk-nama">templat cadangan</span><code class="mk-kode">kalimat_templat</code><span class="mk-letak">nlg.py:386</span></span></div><span class="mk-panah" aria-hidden="true">→</span><div class="mk-kolom"><a class="mini-kotak ambang" data-kode="kode-periksa" href="#k-periksa"><span class="mk-nama">pemeriksa aturan</span><code class="mk-kode">periksa_aturan</code><span class="mk-letak">nlg.py:518</span></a></div></div></div>
+<p><strong>Terhubung ke:</strong></p><div class="mini-alur"><div class="mk-kolom"><a class="mini-kotak aksi" data-kode="kode-tulis-pesan" href="#k-tulis-pesan"><span class="mk-nama">kalimat akhir</span><code class="mk-kode">tulis_pesan</code><span class="mk-letak">nlg.py:1347</span></a></div><span class="mk-panah" aria-hidden="true">→</span><div class="mk-kolom"><span class="mini-kotak aksi ini"><span class="mk-nama">templat cadangan</span><code class="mk-kode">kalimat_templat</code><span class="mk-letak">nlg.py:591</span></span></div><span class="mk-panah" aria-hidden="true">→</span><div class="mk-kolom"><a class="mini-kotak ambang" data-kode="kode-periksa" href="#k-periksa"><span class="mk-nama">pemeriksa aturan</span><code class="mk-kode">periksa_aturan</code><span class="mk-letak">nlg.py:731</span></a></div></div></div>
 </template>
 <template id="kode-periksa" data-untuk="k-periksa">
 <h2 class="pk-judul">Kode: periksa_aturan (pemeriksa aturan)</h2>
 <p class="pk-tujuan">Daftar pelanggaran aturan; kosong berarti lolos. Aturan sama untuk semua role, karena yang dinilai role yang diakui rencana. boleh_sebut = nama dari chat pemicu (penuduh, pemilih, penanya) yang boleh disapa walau bukan target.</p>
-<p class="pk-letak"><strong>Letak:</strong> <code>backend/app/bot/nlg.py:516–563</code></p>
-<p><strong>Alur di kode:</strong></p><ul class="pk-alur"><li><code>periksa_aturan</code> dipanggil oleh <code>nilai_kalimat</code> (nlg.py:1119), <code>tulis_chat_tim</code> (nlg.py:1242)</li></ul>
-<p class="pk-file"><code>backend/app/bot/nlg.py</code>, baris 516–563</p><pre class="kode-asli" tabindex="0"><code><span class="no">516</span><span class="wc"># Daftar pelanggaran aturan; kosong berarti lolos. Aturan sama untuk semua role, karena yang dinilai role yang diakui rencana.</span>
-<span class="no">517</span><span class="wc"># boleh_sebut = nama dari chat pemicu (penuduh, pemilih, penanya) yang boleh disapa walau bukan target.</span>
-<span class="no">518</span><span class="wk">def</span> <span class="wf">periksa_aturan</span>(teks, p, roster, boleh_sebut=()):
-<span class="no">519</span>    kecil, langgar = teks.casefold(), []
-<span class="no">520</span>    <span class="wk">if</span> <span class="wk">not</span> teks:
-<span class="no">521</span>        <span class="wk">return</span> [<span class="ws">"kosong"</span>]
-<span class="no">522</span>    kalimat = [k <span class="wk">for</span> k <span class="wk">in</span> re.split(<span class="ws">r"(?&lt;=[.!?])\s+"</span>, teks) <span class="wk">if</span> k]
-<span class="no">523</span>    <span class="wk">if</span> len(teks) &gt; PANJANG_MAKS <span class="wk">or</span> len(kalimat) &gt; KALIMAT_MAKS:
-<span class="no">524</span>        langgar.append(<span class="ws">"terlalu_panjang"</span>)
-<span class="no">525</span>    <span class="wk">if</span> re.search(POLA_AI, kecil):
-<span class="no">526</span>        langgar.append(<span class="ws">"menyebut_ai"</span>)
-<span class="no">527</span>    <span class="wk">if</span> re.search(POLA_ANGKA, kecil):
-<span class="no">528</span>        langgar.append(<span class="ws">"angka_internal"</span>)
-<span class="no">529</span>    klaim = klaim_diri(kecil)
-<span class="no">530</span>    aksi = {m.group(<span class="wn">1</span>) <span class="wk">for</span> m <span class="wk">in</span> re.finditer(POLA_AKSI_SENDIRI, kecil)}
-<span class="no">531</span>    tim = p.get(<span class="ws">"aksi"</span>) == <span class="ws">"chat_tim"</span>
-<span class="no">532</span>    <span class="wc"># Chat tim hanya sampai ke rekan, jadi role dan aksi tim sendiri boleh disebut. Chat publik tidak pernah memuat tim.</span>
-<span class="no">533</span>    <span class="wk">if</span> tim:
-<span class="no">534</span>        <span class="wk">if</span> klaim - {p[<span class="ws">"tim"</span>]}:
-<span class="no">535</span>            langgar.append(<span class="ws">"klaim_salah"</span>)
-<span class="no">536</span>        <span class="wk">if</span> aksi - AKSI_TIM[p[<span class="ws">"tim"</span>]]:
-<span class="no">537</span>            langgar.append(<span class="ws">"aksi_sendiri"</span>)
-<span class="no">538</span>        <span class="wk">if</span> re.search(KATA_DILARANG.get(<span class="ws">f"chat_tim/{p['tim']}"</span>, <span class="ws">r"(?!)"</span>), kecil):
-<span class="no">539</span>            langgar.append(<span class="ws">"kata_dilarang"</span>)
-<span class="no">540</span>    <span class="wk">else</span>:
-<span class="no">541</span>        role = p.get(<span class="ws">"role_diakui"</span>)
-<span class="no">542</span>        <span class="wk">if</span> klaim <span class="wk">and</span> <span class="wk">not</span> role:
-<span class="no">543</span>            langgar.append(<span class="ws">"klaim_tak_direncanakan"</span>)
-<span class="no">544</span>        <span class="wk">elif</span> klaim - {role}:
-<span class="no">545</span>            langgar.append(<span class="ws">"klaim_salah"</span>)
-<span class="no">546</span>        <span class="wk">if</span> aksi - (AKSI_KLAIM.get(role, set()) <span class="wk">if</span> p.get(<span class="ws">"bukti_klaim"</span>) <span class="wk">else</span> set()):
-<span class="no">547</span>            langgar.append(<span class="ws">"aksi_sendiri"</span>)
-<span class="no">548</span>        <span class="wk">if</span> re.search(KATA_DILARANG.get(p.get(<span class="ws">"jenis"</span>), <span class="ws">r"(?!)"</span>), kecil):
-<span class="no">549</span>            langgar.append(<span class="ws">"kata_dilarang"</span>)
-<span class="no">550</span>    disebut = nama_disebut(teks, roster)
-<span class="no">551</span>    <span class="wc"># Jawaban hanya menjawab yang ditanyakan, jadi tersangka di paket tidak wajib disebut.</span>
-<span class="no">552</span>    <span class="wk">if</span> p[<span class="ws">"target"</span>] <span class="wk">and</span> p[<span class="ws">"target"</span>] != p[<span class="ws">"pembicara"</span>] <span class="wk">and</span> p[<span class="ws">"target"</span>] <span class="wk">not</span> <span class="wk">in</span> disebut <span class="wk">and</span> p[<span class="ws">"aksi"</span>] != <span class="ws">"jawab"</span>:
-<span class="no">553</span>        langgar.append(<span class="ws">"target_hilang"</span>)
-<span class="no">554</span>    <span class="wk">if</span> p[<span class="ws">"intent"</span>] != <span class="ws">"neutral"</span> <span class="wk">and</span> disebut - nama_boleh(p, roster, boleh_sebut):
-<span class="no">555</span>        langgar.append(<span class="ws">"nama_lain"</span>)
-<span class="no">556</span>    <span class="wk">if</span> <span class="wk">not</span> tim <span class="wk">and</span> any(menuduh_nama(kecil, n) <span class="wk">for</span> n <span class="wk">in</span> disebut - nama_boleh_dituduh(p) - {p[<span class="ws">"pembicara"</span>]}):
-<span class="no">557</span>        langgar.append(<span class="ws">"tuduh_lain"</span>)
-<span class="no">558</span>    <span class="wc"># Jawaban tidak boleh tiba-tiba membela pemain yang dicurigai atau divote bot, maupun pemain yang tidak dipercaya di paket.</span>
-<span class="no">559</span>    <span class="wk">if</span> p[<span class="ws">"aksi"</span>] == <span class="ws">"jawab"</span> <span class="wk">and</span> any(membela_nama(kecil, n) <span class="wk">for</span> n <span class="wk">in</span> disebut - nama_boleh_dibela(p, disebut)):
-<span class="no">560</span>        langgar.append(<span class="ws">"bela_lain"</span>)
-<span class="no">561</span>    <span class="wk">if</span> re.search(POLA_INJEKSI, kecil):
-<span class="no">562</span>        langgar.append(<span class="ws">"injeksi"</span>)
-<span class="no">563</span>    <span class="wk">return</span> langgar</code></pre>
-<p class="sub-kartu">Penjelasan per blok</p><ol class="pk-blok"><li><span class="pk-baris">baris 518–531</span> Daftar pelanggaran aturan; kosong berarti lolos. Aturan sama untuk semua role, karena yang dinilai role yang diakui rencana. boleh_sebut = nama dari chat pemicu (penuduh, pemilih, penanya) yang boleh disapa walau bukan target.</li><li><span class="pk-baris">baris 533–550</span> Chat tim hanya sampai ke rekan, jadi role dan aksi tim sendiri boleh disebut. Chat publik tidak pernah memuat tim.</li><li><span class="pk-baris">baris 552–557</span> Jawaban hanya menjawab yang ditanyakan, jadi tersangka di paket tidak wajib disebut.</li><li><span class="pk-baris">baris 559–563</span> Jawaban tidak boleh tiba-tiba membela pemain yang dicurigai atau divote bot, maupun pemain yang tidak dipercaya di paket.</li></ol>
+<p class="pk-letak"><strong>Letak:</strong> <code>backend/app/bot/nlg.py:729–776</code></p>
+<p><strong>Alur di kode:</strong></p><ul class="pk-alur"><li><code>periksa_aturan</code> dipanggil oleh <code>nilai_kalimat</code> (nlg.py:1332), <code>tulis_chat_tim</code> (nlg.py:1455)</li></ul>
+<p class="pk-file"><code>backend/app/bot/nlg.py</code>, baris 729–776</p><pre class="kode-asli" tabindex="0"><code><span class="no">729</span><span class="wc"># Daftar pelanggaran aturan; kosong berarti lolos. Aturan sama untuk semua role, karena yang dinilai role yang diakui rencana.</span>
+<span class="no">730</span><span class="wc"># boleh_sebut = nama dari chat pemicu (penuduh, pemilih, penanya) yang boleh disapa walau bukan target.</span>
+<span class="no">731</span><span class="wk">def</span> <span class="wf">periksa_aturan</span>(teks, p, roster, boleh_sebut=()):
+<span class="no">732</span>    kecil, langgar = teks.casefold(), []
+<span class="no">733</span>    <span class="wk">if</span> <span class="wk">not</span> teks:
+<span class="no">734</span>        <span class="wk">return</span> [<span class="ws">"kosong"</span>]
+<span class="no">735</span>    kalimat = [k <span class="wk">for</span> k <span class="wk">in</span> re.split(<span class="ws">r"(?&lt;=[.!?])\s+"</span>, teks) <span class="wk">if</span> k]
+<span class="no">736</span>    <span class="wk">if</span> len(teks) &gt; PANJANG_MAKS <span class="wk">or</span> len(kalimat) &gt; KALIMAT_MAKS:
+<span class="no">737</span>        langgar.append(<span class="ws">"terlalu_panjang"</span>)
+<span class="no">738</span>    <span class="wk">if</span> re.search(POLA_AI, kecil):
+<span class="no">739</span>        langgar.append(<span class="ws">"menyebut_ai"</span>)
+<span class="no">740</span>    <span class="wk">if</span> re.search(POLA_ANGKA, kecil):
+<span class="no">741</span>        langgar.append(<span class="ws">"angka_internal"</span>)
+<span class="no">742</span>    klaim = klaim_diri(kecil)
+<span class="no">743</span>    aksi = {m.group(<span class="wn">1</span>) <span class="wk">for</span> m <span class="wk">in</span> re.finditer(POLA_AKSI_SENDIRI, kecil)}
+<span class="no">744</span>    tim = p.get(<span class="ws">"aksi"</span>) == <span class="ws">"chat_tim"</span>
+<span class="no">745</span>    <span class="wc"># Chat tim hanya sampai ke rekan, jadi role dan aksi tim sendiri boleh disebut. Chat publik tidak pernah memuat tim.</span>
+<span class="no">746</span>    <span class="wk">if</span> tim:
+<span class="no">747</span>        <span class="wk">if</span> klaim - {p[<span class="ws">"tim"</span>]}:
+<span class="no">748</span>            langgar.append(<span class="ws">"klaim_salah"</span>)
+<span class="no">749</span>        <span class="wk">if</span> aksi - AKSI_TIM[p[<span class="ws">"tim"</span>]]:
+<span class="no">750</span>            langgar.append(<span class="ws">"aksi_sendiri"</span>)
+<span class="no">751</span>        <span class="wk">if</span> re.search(KATA_DILARANG.get(<span class="ws">f"chat_tim/{p['tim']}"</span>, <span class="ws">r"(?!)"</span>), kecil):
+<span class="no">752</span>            langgar.append(<span class="ws">"kata_dilarang"</span>)
+<span class="no">753</span>    <span class="wk">else</span>:
+<span class="no">754</span>        role = p.get(<span class="ws">"role_diakui"</span>)
+<span class="no">755</span>        <span class="wk">if</span> klaim <span class="wk">and</span> <span class="wk">not</span> role:
+<span class="no">756</span>            langgar.append(<span class="ws">"klaim_tak_direncanakan"</span>)
+<span class="no">757</span>        <span class="wk">elif</span> klaim - {role}:
+<span class="no">758</span>            langgar.append(<span class="ws">"klaim_salah"</span>)
+<span class="no">759</span>        <span class="wk">if</span> aksi - (AKSI_KLAIM.get(role, set()) <span class="wk">if</span> p.get(<span class="ws">"bukti_klaim"</span>) <span class="wk">else</span> set()):
+<span class="no">760</span>            langgar.append(<span class="ws">"aksi_sendiri"</span>)
+<span class="no">761</span>        <span class="wk">if</span> re.search(KATA_DILARANG.get(p.get(<span class="ws">"jenis"</span>), <span class="ws">r"(?!)"</span>), kecil):
+<span class="no">762</span>            langgar.append(<span class="ws">"kata_dilarang"</span>)
+<span class="no">763</span>    disebut = nama_disebut(teks, roster)
+<span class="no">764</span>    <span class="wc"># Jawaban hanya menjawab yang ditanyakan, jadi tersangka di paket tidak wajib disebut.</span>
+<span class="no">765</span>    <span class="wk">if</span> p[<span class="ws">"target"</span>] <span class="wk">and</span> p[<span class="ws">"target"</span>] != p[<span class="ws">"pembicara"</span>] <span class="wk">and</span> p[<span class="ws">"target"</span>] <span class="wk">not</span> <span class="wk">in</span> disebut <span class="wk">and</span> p[<span class="ws">"aksi"</span>] != <span class="ws">"jawab"</span>:
+<span class="no">766</span>        langgar.append(<span class="ws">"target_hilang"</span>)
+<span class="no">767</span>    <span class="wk">if</span> p[<span class="ws">"intent"</span>] != <span class="ws">"neutral"</span> <span class="wk">and</span> disebut - nama_boleh(p, roster, boleh_sebut):
+<span class="no">768</span>        langgar.append(<span class="ws">"nama_lain"</span>)
+<span class="no">769</span>    <span class="wk">if</span> <span class="wk">not</span> tim <span class="wk">and</span> any(menuduh_nama(kecil, n) <span class="wk">for</span> n <span class="wk">in</span> disebut - nama_boleh_dituduh(p) - {p[<span class="ws">"pembicara"</span>]}):
+<span class="no">770</span>        langgar.append(<span class="ws">"tuduh_lain"</span>)
+<span class="no">771</span>    <span class="wc"># Jawaban tidak boleh tiba-tiba membela pemain yang dicurigai atau divote bot, maupun pemain yang tidak dipercaya di paket.</span>
+<span class="no">772</span>    <span class="wk">if</span> p[<span class="ws">"aksi"</span>] == <span class="ws">"jawab"</span> <span class="wk">and</span> any(membela_nama(kecil, n) <span class="wk">for</span> n <span class="wk">in</span> disebut - nama_boleh_dibela(p, disebut)):
+<span class="no">773</span>        langgar.append(<span class="ws">"bela_lain"</span>)
+<span class="no">774</span>    <span class="wk">if</span> re.search(POLA_INJEKSI, kecil):
+<span class="no">775</span>        langgar.append(<span class="ws">"injeksi"</span>)
+<span class="no">776</span>    <span class="wk">return</span> langgar</code></pre>
+<p class="sub-kartu">Penjelasan per blok</p><ol class="pk-blok"><li><span class="pk-baris">baris 731–744</span> Daftar pelanggaran aturan; kosong berarti lolos. Aturan sama untuk semua role, karena yang dinilai role yang diakui rencana. boleh_sebut = nama dari chat pemicu (penuduh, pemilih, penanya) yang boleh disapa walau bukan target.</li><li><span class="pk-baris">baris 746–763</span> Chat tim hanya sampai ke rekan, jadi role dan aksi tim sendiri boleh disebut. Chat publik tidak pernah memuat tim.</li><li><span class="pk-baris">baris 765–770</span> Jawaban hanya menjawab yang ditanyakan, jadi tersangka di paket tidak wajib disebut.</li><li><span class="pk-baris">baris 772–776</span> Jawaban tidak boleh tiba-tiba membela pemain yang dicurigai atau divote bot, maupun pemain yang tidak dipercaya di paket.</li></ol>
 <div class="pk-ringkas"><p class="sub-kartu">Ringkasan alur</p>
 <p><span class="tahap-badge output">OUTPUT</span> <span class="kecil">keluaran ke game, kalimat, atau dokumen</span></p>
 <p><strong>Proses apa:</strong></p><ul><li>Chat tim hanya sampai ke rekan, jadi role dan aksi tim sendiri boleh disebut. Chat publik tidak pernah memuat tim.</li><li>Jawaban hanya menjawab yang ditanyakan, jadi tersangka di paket tidak wajib disebut.</li><li>Jawaban tidak boleh tiba-tiba membela pemain yang dicurigai atau divote bot, maupun pemain yang tidak dipercaya di paket.</li></ul>
 <p><strong>Untuk apa:</strong> Dipakai <code>tulis_pesan</code> untuk kalimat LLM dan setiap varian templat.</p>
 <p><strong>Jadi apa:</strong> Daftar pelanggaran (kosong = lolos).</p>
-<p><strong>Terhubung ke:</strong></p><div class="mini-alur"><div class="mk-kolom"><a class="mini-kotak aksi" data-kode="kode-tulis-pesan" href="#k-tulis-pesan"><span class="mk-nama">kalimat akhir</span><code class="mk-kode">tulis_pesan</code><span class="mk-letak">nlg.py:1134</span></a><a class="mini-kotak aksi" data-kode="kode-templat" href="#k-templat"><span class="mk-nama">templat cadangan</span><code class="mk-kode">kalimat_templat</code><span class="mk-letak">nlg.py:386</span></a></div><span class="mk-panah" aria-hidden="true">→</span><div class="mk-kolom"><span class="mini-kotak ambang ini"><span class="mk-nama">pemeriksa aturan</span><code class="mk-kode">periksa_aturan</code><span class="mk-letak">nlg.py:518</span></span></div><span class="mk-panah" aria-hidden="true">→</span><div class="mk-kolom"><a class="mini-kotak aksi" data-kode="kode-chat-bot" href="#k-chat-bot"><span class="mk-nama">chat bot disimpan</span><code class="mk-kode">RoomService.chat_bot</code><span class="mk-letak">services/room_service.py:563</span></a></div></div></div>
+<p><strong>Terhubung ke:</strong></p><div class="mini-alur"><div class="mk-kolom"><a class="mini-kotak aksi" data-kode="kode-tulis-pesan" href="#k-tulis-pesan"><span class="mk-nama">kalimat akhir</span><code class="mk-kode">tulis_pesan</code><span class="mk-letak">nlg.py:1347</span></a><a class="mini-kotak aksi" data-kode="kode-templat" href="#k-templat"><span class="mk-nama">templat cadangan</span><code class="mk-kode">kalimat_templat</code><span class="mk-letak">nlg.py:591</span></a></div><span class="mk-panah" aria-hidden="true">→</span><div class="mk-kolom"><span class="mini-kotak ambang ini"><span class="mk-nama">pemeriksa aturan</span><code class="mk-kode">periksa_aturan</code><span class="mk-letak">nlg.py:731</span></span></div><span class="mk-panah" aria-hidden="true">→</span><div class="mk-kolom"><a class="mini-kotak aksi" data-kode="kode-chat-bot" href="#k-chat-bot"><span class="mk-nama">chat bot disimpan</span><code class="mk-kode">RoomService.chat_bot</code><span class="mk-letak">services/room_service.py:563</span></a></div></div></div>
 </template>
 <template id="kode-kirim-aksi" data-untuk="k-kirim-aksi">
 <h2 class="pk-judul">Kode: NPCService._kirim_vote_atau_aksi (kirim vote/aksi)</h2>
@@ -2915,7 +2927,7 @@ NLU</a> (pelatihan IndoBERT), dan <a href="arsitektur">Arsitektur</a> (susunan a
 <p><strong>Proses apa:</strong></p><ul><li>1 cek fase dan izin chat</li><li>2 simpan ke MySQL</li><li>3 masuk chat pertandingan</li><li>4 awan berpikir hilang</li><li>cabang 2.2 gagal simpan: catat di log, tidak dikirim</li></ul>
 <p><strong>Untuk apa:</strong> Chat publik bot disimpan lalu masuk pertandingan, hanya bila fase masih sama dan bot masih boleh bicara. Pesan yang gagal disimpan tidak masuk pertandingan, jadi tidak pernah disiarkan. Hasil: (pesan, id pesan) atau (None, None).</p>
 <p><strong>Jadi apa:</strong> <code>(pesan, id pesan)</code> bila tersimpan dan masuk pertandingan, selain itu <code>(None, None)</code>.</p>
-<p><strong>Terhubung ke:</strong></p><div class="mini-alur"><div class="mk-kolom"><a class="mini-kotak ambang" data-kode="kode-periksa" href="#k-periksa"><span class="mk-nama">pemeriksa aturan</span><code class="mk-kode">periksa_aturan</code><span class="mk-letak">nlg.py:518</span></a></div><span class="mk-panah" aria-hidden="true">→</span><div class="mk-kolom"><span class="mini-kotak aksi ini"><span class="mk-nama">chat bot disimpan</span><code class="mk-kode">RoomService.chat_bot</code><span class="mk-letak">services/room_service.py:563</span></span></div><span class="mk-panah" aria-hidden="true">→</span><div class="mk-kolom"><a class="mini-kotak aksi" data-kode="kode-add-message" href="#k-add-message"><span class="mk-nama">chat masuk pertandingan</span><code class="mk-kode">Match.add_message</code><span class="mk-letak">game/match_engine.py:780</span></a></div></div></div>
+<p><strong>Terhubung ke:</strong></p><div class="mini-alur"><div class="mk-kolom"><a class="mini-kotak ambang" data-kode="kode-periksa" href="#k-periksa"><span class="mk-nama">pemeriksa aturan</span><code class="mk-kode">periksa_aturan</code><span class="mk-letak">nlg.py:731</span></a></div><span class="mk-panah" aria-hidden="true">→</span><div class="mk-kolom"><span class="mini-kotak aksi ini"><span class="mk-nama">chat bot disimpan</span><code class="mk-kode">RoomService.chat_bot</code><span class="mk-letak">services/room_service.py:563</span></span></div><span class="mk-panah" aria-hidden="true">→</span><div class="mk-kolom"><a class="mini-kotak aksi" data-kode="kode-add-message" href="#k-add-message"><span class="mk-nama">chat masuk pertandingan</span><code class="mk-kode">Match.add_message</code><span class="mk-letak">game/match_engine.py:780</span></a></div></div></div>
 </template>
 <template id="kode-add-message" data-untuk="k-add-message">
 <h2 class="pk-judul">Kode: Match.add_message (chat masuk pertandingan)</h2>
