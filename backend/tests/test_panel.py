@@ -9,6 +9,7 @@ from pydantic import SecretStr
 from sqlalchemy.exc import OperationalError
 from app.config.settings import settings
 from app.controllers.panel import router, require_panel
+from app.services.checker_service import checker_service
 from app.services.panel_service import history_filter, validate_endpoint
 from app.services.password_service import hash_password
 
@@ -47,11 +48,25 @@ class PanelTests(unittest.TestCase):
             "/api/panel/history",
             "/api/panel/history.csv",
             "/api/panel/checker/ABC123",
+            "/api/panel/checker/ABC123/proses",
         ]:
             self.assertEqual(self.client.get(path).status_code, 401)
         self.assertEqual(
             self.client.put("/api/panel/config", json={"provider": "api"}).status_code, 401
         )
+
+    # Data live Checker: langkah bot yang sedang berjalan, chat yang belum selesai, kondisi bot, dan antrean thread.
+    def test_live_checker_data_lists_running_steps_and_queues(self):
+        self.app.dependency_overrides[require_panel] = lambda: "test-admin"
+        langkah = checker_service.mulai_langkah("LIVE01", "m1", "NOX", 3)
+        self.addCleanup(checker_service.selesai_langkah, langkah)
+        langkah.lapor("llm")
+        data = self.client.get("/api/panel/checker/LIVE01/proses").json()
+        self.assertEqual(set(data), {"bot", "chat", "kondisi", "antrean"})
+        self.assertEqual([(b["nama"], b["tahap"]) for b in data["bot"]], [("NOX", "llm")])
+        self.assertEqual(data["kondisi"], [])  # room tidak ada di memori server
+        self.assertTrue({"otak", "penulis"} <= set(data["antrean"]))
+        self.assertEqual(self.client.get(f"/api/panel/checker/{'A' * 37}/proses").status_code, 422)
 
     def test_html_has_no_embedded_password_and_csp(self):
         page = self.client.get("/panel")

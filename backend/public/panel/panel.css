@@ -782,3 +782,136 @@ body > footer {
   content: '✓'; position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
 }
 .pilih-opsi[aria-disabled='true'] { opacity: 0.45; cursor: not-allowed; }
+
+/* --------------------------------------------------------------------------
+   Checker per room: bagian bernomor, legenda keadaan, alur proses per item,
+   kolom kondisi live, item live/error di chat room, dan kotak Antrean.
+   -------------------------------------------------------------------------- */
+#menu-checker .toolbar { margin: 12px 0 0; }
+.checker-bagian { margin: 0 0 22px; padding: 0 0 22px; border-bottom: 1px solid #222c3a; min-width: 0; }
+.checker-bagian:last-child { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }
+.bagian-judul { display: flex; align-items: center; gap: 10px; margin: 0 0 4px; font-size: 16px; }
+.bagian-no {
+  display: inline-grid; place-items: center; flex: none; width: 24px; height: 24px; border-radius: 50%;
+  background: #202e24; color: #baf578; font-size: 12px; font-weight: 700;
+}
+.bagian-petunjuk { margin: 0 0 10px; max-width: 900px; }
+.kolom-judul { margin: 0 0 8px; font-size: 13px; color: #c9d8e9; }
+.checker-bagian .chat-split { margin: 12px 0 14px; }
+.checker-teknis { margin-top: 4px; }
+
+/* Keadaan: warna dan ikon sama di legenda, alur proses, kolom kondisi, item chat, dan antrean. */
+.keadaan-sedang { --warna-keadaan: #f6d79c; }
+.keadaan-selesai { --warna-keadaan: #baf578; }
+.keadaan-menunggu { --warna-keadaan: #9cc8ff; }
+.keadaan-gagal { --warna-keadaan: #ffb5b5; }
+.keadaan-tidakbisa { --warna-keadaan: #8d9eb2; }
+.keadaan-lewat, .keadaan-belum { --warna-keadaan: #7f91a9; }
+.alur-tanda { flex: none; color: var(--warna-keadaan, #9aacbf); font-weight: 700; }
+@keyframes denyut-kotak {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(246, 215, 156, 0.35); }
+  50% { box-shadow: 0 0 0 5px rgba(246, 215, 156, 0.08); border-color: #ffe9bd; }
+}
+@keyframes denyut-teks { 50% { opacity: 0.35; } }
+.legenda-keadaan, .legenda-item {
+  display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 12px 0 0; padding: 0; list-style: none;
+  font-size: 12px; color: #c9d4e2;
+}
+.legenda-keadaan li { display: inline-flex; align-items: center; gap: 5px; color: #c9d4e2; }
+.legenda-keadaan .keadaan-sedang .alur-tanda { animation: denyut-teks 1.2s ease-in-out infinite; }
+.legenda-keadaan .keadaan-lewat { opacity: 0.6; }
+.legenda-item { margin: 0 0 8px; font-size: 11px; color: #9aacbf; gap: 4px 12px; }
+.legenda-item li { display: inline-flex; align-items: center; gap: 6px; }
+.legenda-item li::before {
+  content: ''; display: inline-block; width: 16px; height: 10px; border: 1px solid #303e52; border-radius: 3px;
+  background: #192333;
+}
+.legenda-item .legenda-manusia::before { background: #1d2a1d; border-color: #3d5a33; }
+.legenda-item .legenda-langkah::before { background: transparent; border-style: dashed; border-color: #4a5a70; }
+.legenda-item .legenda-error::before { background: #2a1719; border-color: #a35a5a; }
+
+/* Item chat room: terpilih jelas, error merah, langkah yang sedang diproses berbingkai terang berdenyut. */
+.chat-room .trace.selected { border-color: #baf578; box-shadow: 0 0 0 2px rgba(186, 245, 120, 0.35); }
+.chat-error { border-color: #a35a5a; border-style: solid; background: #2a1719; }
+.chat-info-error { color: #ffb5b5; }
+.chat-live { border-style: solid; border-color: #f6d79c; animation: denyut-kotak 1.4s ease-in-out infinite; }
+.chat-live .chat-info { color: #f6d79c; }
+.chat-live-list { display: contents; }
+
+/* Alur proses di atas detail: kotak tahap berpanah, lama tiap tahap di bawah kotaknya. */
+.alur { margin: 0 0 14px; padding: 12px 18px 12px 12px; background: #0a121d; border: 1px solid #253249; border-radius: 10px; }
+.alur-kepala { margin: 0 0 10px; font-size: 12px; color: #c9d8e9; }
+/* 5 kotak per baris: langkah bot = berpikir + engine di baris 1, menulis + output di baris 2; chat manusia satu baris. */
+.alur-baris {
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px 22px; margin: 0; padding: 0; list-style: none;
+}
+.alur-tahap { position: relative; display: grid; align-content: start; gap: 4px; min-width: 0; }
+.alur-tahap:not(:last-child)::after {
+  content: '→'; position: absolute; top: 16px; right: -17px; color: #5f7088; font-size: 13px; line-height: 1;
+}
+.alur-kotak {
+  display: grid; align-content: start; gap: 3px; min-height: 54px; padding: 7px 9px; background: #192333;
+  border: 1px solid #303e52; border-radius: 8px;
+}
+.alur-judul { display: flex; align-items: center; gap: 5px; font-size: 12px; color: #e1eaf6; }
+.alur-isi { color: #8fa3bb; font-size: 10.5px; line-height: 1.35; overflow-wrap: anywhere; }
+.alur-waktu { color: #baf578; font-size: 12px; font-weight: 650; text-align: center; overflow-wrap: anywhere; }
+.alur-catatan { color: #9aacbf; font-size: 10.5px; line-height: 1.35; text-align: center; overflow-wrap: anywhere; }
+.alur-keterangan { margin: 12px 0 0; font-size: 11.5px; line-height: 1.6; }
+.alur-tahap.keadaan-selesai .alur-kotak { border-color: #3d5a33; }
+.alur-tahap.keadaan-sedang .alur-kotak { border-color: #f6d79c; animation: denyut-kotak 1.4s ease-in-out infinite; }
+.alur-tahap.keadaan-sedang .alur-waktu { color: #f6d79c; }
+.alur-tahap.keadaan-gagal .alur-kotak { border-color: #c56b6b; background: #2a1719; }
+.alur-tahap.keadaan-gagal .alur-waktu { color: #ffb5b5; }
+.alur-tahap.keadaan-belum, .alur-tahap.keadaan-lewat { opacity: 0.45; }
+.alur-tahap.keadaan-belum .alur-waktu, .alur-tahap.keadaan-lewat .alur-waktu { color: #9aacbf; font-weight: 500; }
+.alur-sisa .alur-kotak { border-style: dashed; background: transparent; }
+
+/* Kotak error langkah bot. */
+.kotak-error { margin: 0 0 14px; padding: 12px 14px; border: 1px solid #a35a5a; border-radius: 10px; background: #2a1719; }
+.kotak-error > strong { display: block; margin-bottom: 10px; color: #ffb5b5; line-height: 1.5; overflow-wrap: anywhere; }
+.kotak-error .status-list { margin-bottom: 0; }
+
+/* Kolom Kondisi sekarang di ringkasan room. */
+.kondisi { display: grid; gap: 3px; min-width: 190px; }
+.kondisi-utama { display: inline-flex; align-items: baseline; gap: 5px; color: var(--warna-keadaan, #dce4ef); font-weight: 600; }
+.kondisi-utama.keadaan-sedang .alur-tanda { animation: denyut-teks 1.2s ease-in-out infinite; }
+.kondisi-utama.keadaan-lewat { color: #9aacbf; font-weight: 500; }
+.kondisi-kedua { display: block; color: #9aacbf; font-size: 11px; line-height: 1.5; }
+.kondisi-kedua.keadaan-selesai { color: #9fcf6c; }
+.kondisi .chip { justify-self: start; }
+.room-summary td.keadaan-tidakbisa { color: #8d9eb2; }
+
+/* Antrean thread (paling bawah): satu baris memanjang per thread, kotak kecil per pekerjaan berderet sesuai urutan. */
+.antrean { display: grid; gap: 12px; }
+.antrean-baris {
+  display: grid; grid-template-columns: minmax(180px, 250px) minmax(0, 1fr); gap: 10px 16px; align-items: start;
+  min-width: 0; padding: 12px; background: #0a121d; border: 1px solid #253249; border-radius: 10px;
+}
+.antrean-info { min-width: 0; }
+.antrean-judul { margin: 0 0 2px; font-size: 13px; color: #e1eaf6; }
+.antrean-ringkas { margin: 0; }
+.antrean-daftar { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; min-width: 0; }
+.antrean-tugas {
+  display: grid; align-content: start; gap: 4px; flex: 0 1 250px; padding: 8px 10px; background: #192333;
+  border: 1px solid #303e52; border-left: 3px solid var(--warna-keadaan, #303e52); border-radius: 8px; min-width: 0;
+}
+.antrean-tugas.keadaan-sedang { border-color: #f6d79c; animation: denyut-kotak 1.4s ease-in-out infinite; }
+.antrean-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 11px; }
+.antrean-urutan { font-weight: 700; color: #e1eaf6; }
+.antrean-status { color: var(--warna-keadaan, #9aacbf); font-weight: 650; }
+.antrean-kerja { margin: 0; font-size: 12.5px; color: #dce4ef; line-height: 1.5; overflow-wrap: anywhere; }
+.antrean-waktu { font-size: 11px; color: #9aacbf; }
+.antrean-kosong { margin: 0; padding: 10px; border: 1px dashed #334055; border-radius: 8px; color: #8d9eb2; font-size: 12px; text-align: center; }
+@media (prefers-reduced-motion: reduce) {
+  .alur-tahap.keadaan-sedang .alur-kotak, .chat-live, .antrean-tugas.keadaan-sedang,
+  .legenda-keadaan .keadaan-sedang .alur-tanda, .kondisi-utama.keadaan-sedang .alur-tanda { animation: none; }
+}
+@media (max-width: 760px) {
+  .antrean-baris { grid-template-columns: 1fr; }
+  .antrean-tugas { flex-basis: 100%; }
+  .alur { padding: 10px 14px 10px 10px; }
+  .alur-baris { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 18px; }
+  .alur-tahap:not(:last-child)::after { right: -15px; }
+  .kondisi { min-width: 160px; }
+}

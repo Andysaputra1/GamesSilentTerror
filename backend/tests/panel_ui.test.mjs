@@ -669,7 +669,14 @@ test('checker room shows bots, filters per bot, and explains decisions as text',
   const tabs = [...detail.querySelectorAll('.decision-tab')];
   assert.deepEqual(
     tabs.map((b) => b.textContent),
-    ['Proses', 'Keputusan', 'Parameter', 'Penalaran Fuzzy Mamdani', 'NLG', 'Teknis'],
+    [
+      'Rincian proses',
+      'Keputusan',
+      'Bahan bukti',
+      'Penalaran Fuzzy Mamdani',
+      'Kalimat (NLG)',
+      'Teknis',
+    ],
   );
   tabs[3].click();
   assert.match(detail.textContent, /kecurigaan_publik=tinggi DAN dukungan_suara=tinggi/);
@@ -683,7 +690,9 @@ test('checker room shows bots, filters per bot, and explains decisions as text',
   assert.match(detail.textContent, /Penalaran Behavior Tree/);
   assert.match(detail.textContent, /✗Syarat: bot dituduh baru/);
   assert.match(detail.textContent, /aksi terpilih: tuduh \(kuat\)/);
-  [...detail.querySelectorAll('.decision-tab')].find((b) => b.textContent === 'NLG').click();
+  [...detail.querySelectorAll('.decision-tab')]
+    .find((b) => b.textContent === 'Kalimat (NLG)')
+    .click();
   assert.match(detail.textContent, /openrouter/);
   assert.equal(w.document.querySelector('#menu-checker img'), null);
   // Refresh dan kembali ke NOX tidak memuat ulang penjelasan yang sudah ada di cache.
@@ -693,6 +702,424 @@ test('checker room shows bots, filters per bot, and explains decisions as text',
   await settle();
   assert.equal(detailCalls, 1);
   assert.equal(w.document.querySelectorAll('#traces .trace').length, 3);
+});
+
+test('checker: alur proses per item, langkah live, error, kondisi bot, dan antrean tampil rapi sebagai teks', async (t) => {
+  const evil = '<img src=x onerror=alert(1)>';
+  const bot = (nama, role, langkah) => ({
+    nama,
+    role,
+    metode: 'fuzzy',
+    persona: 'santai',
+    ronde: 2,
+    fase: 'day',
+    langkah,
+  });
+  const jejakBot = (id, nama, role, langkah, extra) => ({
+    id: id.repeat(32),
+    created_at: '2026-11-13T10:00:00+00:00',
+    sender: nama,
+    message: 'wait',
+    stage: 'npc_brain',
+    provider: 'otak:fuzzy',
+    match_id: 'm1',
+    ...extra,
+    ringkas: {
+      bot: bot(nama, role, langkah),
+      keputusan: [],
+      nlg: 'tidak ada chat',
+      ...extra.ringkas,
+    },
+  });
+  const manusia = {
+    id: 'c'.repeat(32),
+    created_at: '2026-11-13T10:00:09+00:00',
+    sender: 'Kimberly',
+    message: `aku curiga NOX ${evil}`,
+    stage: 'delivered',
+    match_id: 'm1',
+    timings: { persistence_ms: 18, broadcast_ms: 2 },
+  };
+  const nox = jejakBot('a', 'NOX', 'hitman', 14, {
+    message: 'Bukan aku.',
+    duration_ms: 5770,
+    output: JSON.stringify({
+      action: 'wait',
+      target: null,
+      nlg: { sumber: 'llm', pelanggaran: [] },
+    }),
+    timings: {
+      nlu_ms: 3,
+      logika_ms: 41,
+      penjelasan_ms: 12,
+      nlg_ms: 2310,
+      llm_ms: 2205,
+      aturan_ms: 105,
+      antre_otak_ms: 1840,
+      engine_ms: 0.4,
+      antre_nlg_ms: 0.3,
+      ketik_ms: 1500,
+      simpan_ms: 12,
+    },
+    ringkas: { keputusan: ['chat bela_diri → ECHO'], nlg: 'terkirim' },
+  });
+  const raven = jejakBot('b', 'RAVEN', 'civilian', 12, {
+    duration_ms: 70,
+    timings: { nlu_ms: 1, logika_ms: 40, penjelasan_ms: 13, antre_otak_ms: 15, engine_ms: 0.3 },
+    ringkas: { keputusan: ['chat tuduh → NOX'], nlg: 'ditunda', usulan: 'Aku curiga NOX.' },
+  });
+  const veil = {
+    id: 'e'.repeat(32),
+    created_at: '2026-11-13T09:59:00+00:00',
+    sender: 'VEIL',
+    message: 'NPC brain',
+    stage: 'npc_brain_error',
+    provider: 'otak:fuzzy',
+    match_id: 'm1',
+    error: 'TimeoutError',
+    error_pesan: '',
+    error_tahap: 'berpikir',
+    tahap_live: 'antre',
+    tahap_ms: { antre: 25000 },
+    batas_detik: 25,
+    langkah: 11,
+    duration_ms: 25003,
+  };
+  const ash = {
+    ...veil,
+    id: 'f'.repeat(32),
+    sender: 'ASH',
+    error: 'RuntimeError',
+    error_pesan: `otak rusak ${evil}`,
+    tahap_live: 'logika',
+    tahap_ms: { antre: 10, nlu: 2, logika: 5 },
+    batas_detik: undefined,
+    langkah: 7,
+  };
+  const dusk = jejakBot('d', 'DUSK', 'stalker', 13, {
+    duration_ms: 4800,
+    timings: { nlu_ms: 2, logika_ms: 38, penjelasan_ms: 10 },
+  });
+  const penjelasan = (b, extra = {}) => ({
+    bot: b,
+    keputusan: {},
+    engine: { action: 'wait', target: null, ditolak: null },
+    nlg: { status: 'tidak ada chat', keterangan: 'Diam.' },
+    ...extra,
+  });
+  const detailJejak = {
+    [nox.id]: penjelasan(nox.ringkas.bot, {
+      nlg: {
+        status: 'terkirim',
+        teks: 'Bukan aku.',
+        sumber: 'llm',
+        penulis: 'openrouter',
+        pelanggaran: [],
+        percobaan_llm: ['ok'],
+      },
+      nlu_dibaca: [
+        { pengirim: 'Kimberly', teks: 'NOX?', intent: 'offend', confidence: 0.9, target: [] },
+      ],
+      tersangka: { judul: 'Tersangka', kolom: ['pemain', 'kecurigaan'], baris: [['NOX', 0.6]] },
+    }),
+    [raven.id]: penjelasan(raven.ringkas.bot, {
+      nlg: { status: 'ditunda', keterangan: 'Lantai penuh.' },
+    }),
+    [dusk.id]: penjelasan(dusk.ringkas.bot),
+  };
+  const langkahDusk = (tahap, lama) => ({
+    id: '9'.repeat(32),
+    match_id: 'm1',
+    nama: 'DUSK',
+    langkah: 13,
+    dibuat: '2026-11-13T10:00:06+00:00',
+    tahap,
+    tahap_ms: 2100,
+    total_ms: 4300,
+    lama,
+  });
+  const kondisi = (nama, o) => ({
+    nama,
+    status: 'aktif',
+    fase: 'day',
+    otak: true,
+    sibuk: false,
+    segera: false,
+    berikutnya_detik: 1.5,
+    lantai: { terisi: 1, maks: 3, saya: false },
+    hak: { chat: true, vote: false, aksi: null, chat_tim: false },
+    terakhir: null,
+    ...o,
+  });
+  let traces = [manusia, nox, raven, veil, ash];
+  let proses = {
+    bot: [
+      langkahDusk('llm', {
+        antre: 1200,
+        nlu: 2,
+        logika: 38,
+        penjelasan: 10,
+        engine: 0.3,
+        antre_nlg: 0.2,
+        nlg: 1,
+      }),
+    ],
+    chat: [{ ...manusia, berjalan_ms: 2400 }],
+    kondisi: [
+      kondisi('DUSK', { sibuk: true, berikutnya_detik: null }),
+      kondisi('RAVEN', {
+        terakhir: { match_id: 'm1', langkah: 12, hasil: 'ditunda', error: null },
+      }),
+      kondisi('VEIL', {
+        status: 'disandera',
+        terakhir: { match_id: 'm1', langkah: 11, hasil: 'error', error: 'TimeoutError' },
+      }),
+    ],
+    antrean: {
+      otak: {
+        thread: 1,
+        tugas: [
+          {
+            nomor: 1,
+            urutan: 1,
+            room: 'ROOM01',
+            siapa: 'Kimberly',
+            kerja: 'IndoBERT membaca chat',
+            teks: `aku curiga ${evil}`,
+            status: 'dikerjakan',
+            menunggu_ms: 2200,
+            berjalan_ms: 180,
+          },
+          {
+            nomor: 2,
+            urutan: 2,
+            room: 'LAIN99',
+            siapa: 'ONYX',
+            kerja: 'berpikir (NLU + Fuzzy)',
+            teks: null,
+            status: 'menunggu',
+            menunggu_ms: 900,
+            berjalan_ms: null,
+          },
+        ],
+      },
+      penulis: { thread: 3, tugas: [] },
+    },
+  };
+  const room = {
+    kode: 'ROOM01',
+    status: 'live',
+    ronde: 2,
+    fase: 'day',
+    komposisi: { hitman: 2, civilian: 2 },
+    manusia: 1,
+    bot: ['DUSK', 'NOX', 'RAVEN', 'VEIL'].map((nama) => ({
+      nama,
+      role: 'civilian',
+      metode: 'fuzzy',
+      persona: 'santai',
+      status: nama === 'VEIL' ? 'disandera' : 'aktif',
+    })),
+  };
+  const w = setup(t, (path) => {
+    if (path.startsWith('/api/panel/rooms'))
+      return response({ rooms: [{ room_code: 'ROOM01', message_count: 3, live: true }] });
+    if (path === '/api/panel/checker/ROOM01')
+      return response({ traces, events: [], room, has_more: false });
+    if (path === '/api/panel/checker/ROOM01/proses') return response(proses);
+    const m = path.match(/\/jejak\/(\w+)$/);
+    if (m) return response({ ...traces.find((x) => x.id === m[1]), penjelasan: detailJejak[m[1]] });
+    return undefined;
+  });
+  const doc = w.document;
+  await login(w);
+  await doc.querySelector('[data-menu=checker]').onclick({ preventDefault() {} });
+  const select = doc.querySelector('#checker-room');
+  select.value = 'ROOM01';
+  await select.onchange({ preventDefault() {} });
+  await settle();
+  const detail = doc.querySelector('#trace-detail');
+  const kotak = (judul) =>
+    [...detail.querySelectorAll('.alur-tahap')].find((li) =>
+      li.querySelector('.alur-judul').textContent.endsWith(judul),
+    );
+  const waktuKotak = (judul) => kotak(judul).querySelector('.alur-waktu').textContent;
+  const item = (teks) =>
+    [...doc.querySelectorAll('#traces .trace')].find((b) => b.textContent.includes(teks));
+  const refresh = async () => {
+    await doc.querySelector('#refresh-checker').onclick({ preventDefault() {} });
+    await settle();
+  };
+
+  // Susunan halaman: 1 pilih room → 2 ringkasan → 3 chat dan detail → 4 antrean (paling bawah), plus legenda keadaan.
+  assert.deepEqual(
+    [...doc.querySelectorAll('#menu-checker .bagian-judul')].map((h) =>
+      h.textContent.replace(/\s+/g, ' ').trim(),
+    ),
+    ['1 Pilih room', '2 Ringkasan room', '3 Chat room dan detail', '4 Antrean'],
+  );
+  assert.equal(
+    doc.querySelector('#menu-checker > .checker-bagian:last-child #checker-antrean') !== null,
+    true,
+  );
+  assert.equal(doc.querySelectorAll('#menu-checker .legenda-keadaan li').length, 6);
+
+  // Default: chat manusia terbaru yang masih diproses. NLU sedang berjalan (berdetak), tahap sebelumnya selesai ✓.
+  assert.match(item('Kimberly').textContent, /sedang diproses: NLU IndoBERT/);
+  assert.match(item('Kimberly').textContent, /berjalan 2\.\d\d dtk/);
+  assert.equal(detail.querySelector('.alur') === detail.children[1], true); // alur tepat di bawah judul detail
+  assert.ok(kotak('Simpan DB').classList.contains('keadaan-selesai'));
+  assert.equal(kotak('Simpan DB').querySelector('.alur-tanda').textContent, '✓');
+  assert.equal(waktuKotak('Simpan DB'), '18.0 ms');
+  assert.ok(kotak('NLU IndoBERT').classList.contains('keadaan-sedang'));
+  assert.match(waktuKotak('NLU IndoBERT'), /^sedang antre\/IndoBERT · ±2\.\d\d dtk$/);
+  assert.ok(kotak('Output').classList.contains('keadaan-belum'));
+
+  // Chat bot selesai: lama tiap tahap di bawah kotaknya, Antre + mengetik = total − tahap terukur, dirinci.
+  item('Bukan aku').click();
+  await settle();
+  assert.deepEqual(
+    [...detail.querySelectorAll('.alur-judul')].map((j) => j.textContent.slice(1)),
+    [
+      'Input',
+      'NLU',
+      'Fuzzy',
+      'Penjelasan',
+      'Engine',
+      'LLM',
+      'Cek aturan',
+      'Antre + mengetik',
+      'Output',
+    ],
+  );
+  for (const li of detail.querySelectorAll('.alur-tahap'))
+    assert.deepEqual(
+      [li.children[0].className, li.children[1].className],
+      ['alur-kotak', 'alur-waktu'],
+    );
+  assert.equal(waktuKotak('LLM'), '2.21 dtk');
+  assert.equal(waktuKotak('Fuzzy'), '41.0 ms');
+  assert.equal(waktuKotak('Antre + mengetik'), '3.40 dtk');
+  assert.match(
+    kotak('Antre + mengetik').textContent,
+    /antre thread otak 1\.84 dtk.*jeda mengetik 1\.50 dtk.*lainnya 51\.3 ms/,
+  );
+  assert.equal(waktuKotak('Output'), 'total 5.77 dtk');
+  assert.equal(detail.querySelectorAll('.alur-tahap.keadaan-selesai').length, 9);
+
+  // Chat ditunda: LLM dan cek aturan redup (tidak dilalui) dengan alasannya.
+  item('RAVEN').click();
+  await settle();
+  assert.ok(kotak('LLM').classList.contains('keadaan-lewat'));
+  assert.equal(waktuKotak('LLM'), 'chat ditunda (lantai bicara penuh/rencana basi)');
+  // Tab tanpa isi disembunyikan.
+  assert.ok(
+    ![...detail.querySelectorAll('.decision-tab')].some((b) => b.textContent === 'Bahan bukti'),
+  );
+
+  // Langkah bot yang sedang berjalan: item live terang, kotak LLM berdenyut, tahap sesudahnya belum.
+  const live = item('DUSK');
+  assert.ok(live.classList.contains('chat-live'));
+  assert.match(live.textContent, /sedang menunggu LLM · 2\.\d\d dtk/);
+  live.click();
+  await settle();
+  assert.ok(kotak('LLM').classList.contains('keadaan-sedang'));
+  assert.match(waktuKotak('LLM'), /^sedang menunggu LLM · 2\.\d\d dtk$/);
+  assert.match(kotak('NLU').textContent, /antre thread otak 1\.20 dtk/);
+  assert.ok(kotak('Cek aturan').classList.contains('keadaan-belum'));
+  // Tahap berubah: hanya alur yang diganti, judul detail tidak dirender ulang.
+  const judulDetail = detail.querySelector('.decision-head');
+  proses = { ...proses, bot: [langkahDusk('aturan', { ...proses.bot[0].lama, llm: 1900 })] };
+  await refresh();
+  assert.equal(detail.querySelector('.decision-head'), judulDetail);
+  assert.ok(kotak('Cek aturan').classList.contains('keadaan-sedang'));
+  assert.equal(waktuKotak('LLM'), '1.90 dtk');
+  // Langkah selesai: pilihan pindah ke jejak langkah yang sama.
+  traces = [dusk, ...traces];
+  proses = { ...proses, bot: [] };
+  await refresh();
+  await settle();
+  assert.match(doc.querySelector('#traces .selected').textContent, /DUSK/);
+  assert.equal(doc.querySelector('#traces .chat-live'), null);
+
+  // Error: chip merah, satu baris "Error: jenis — penjelasan", kotak error di detail, tahap gagal ✗.
+  const timeout = item('VEIL');
+  assert.ok(timeout.classList.contains('chat-error'));
+  assert.equal(timeout.querySelector('.chip.status-bad').textContent, 'error');
+  assert.match(
+    timeout.textContent,
+    /Error: TimeoutError — langkah bot melewati batas 25 detik \(termasuk antre di thread otak\/IndoBERT\)/,
+  );
+  item('ASH').click();
+  await settle();
+  assert.match(
+    item('ASH').textContent,
+    /Error: RuntimeError — otak rusak <img src=x onerror=alert\(1\)>/,
+  );
+  const kotakError = detail.querySelector('.kotak-error').textContent;
+  assert.match(kotakError, /JenisRuntimeError/);
+  assert.match(kotakError, /Pesanotak rusak <img/);
+  assert.match(kotakError, /Tahap gagalberpikir \(thread otak\) · tahap live: berpikir: Fuzzy/);
+  assert.match(kotakError, /BotASH/);
+  assert.ok(kotak('Fuzzy').classList.contains('keadaan-gagal'));
+  assert.equal(kotak('Fuzzy').querySelector('.alur-tanda').textContent, '✗');
+  assert.ok(kotak('Engine').classList.contains('keadaan-lewat'));
+
+  // Kolom Kondisi sekarang: tahap live, chat ditunda, tidak bisa bertindak, dan chip error.
+  const summary = doc.querySelector('#room-summary');
+  const sel = (nama) => summary.querySelector(`[data-kondisi="${nama}"]`);
+  assert.equal(summary.querySelectorAll('th')[1].textContent, 'kondisi sekarang');
+  assert.match(
+    sel('RAVEN').textContent,
+    /chat ditunda \(lantai bicara penuh\/rencana basi\), lantai 1\/3/,
+  );
+  assert.match(sel('RAVEN').textContent, /langkah berikutnya ±1\.\d\d dtk/);
+  assert.ok(sel('VEIL').querySelector('.kondisi-utama').classList.contains('keadaan-tidakbisa'));
+  assert.match(sel('VEIL').textContent, /tidak bisa bertindak: disandera/);
+  assert.equal(sel('VEIL').querySelector('.chip.status-bad').textContent, 'error: TimeoutError');
+  proses = { ...proses, bot: [langkahDusk('antre', {})] };
+  await refresh();
+  assert.ok(sel('DUSK').querySelector('.kondisi-utama').classList.contains('keadaan-sedang'));
+  assert.match(sel('DUSK').textContent, /antre \(menunggu thread otak\) · 2\.\d\d dtk/);
+  // Sibuk di luar alur live: menutup langkah (jejak sudah dibuat) atau baru dijadwalkan. Sudah vote dan tidak ada
+  // tindakan lain; hitung mundur di bawah 0,5 dtk ditulis "sebentar lagi".
+  const kondisiLama = proses.kondisi;
+  proses = {
+    ...proses,
+    bot: [],
+    kondisi: [
+      kondisi('DUSK', { sibuk: true, menutup: true, langkah: 13, berikutnya_detik: null }),
+      kondisi('NOX', { sibuk: true, berikutnya_detik: null }),
+      kondisi('RAVEN', {
+        fase: 'tribunal',
+        berikutnya_detik: 0.2,
+        hak: { chat: false, vote: false, sudah_vote: true, aksi: null, chat_tim: false },
+      }),
+      kondisiLama[2],
+    ],
+  };
+  await refresh();
+  assert.ok(sel('DUSK').querySelector('.kondisi-utama').classList.contains('keadaan-sedang'));
+  assert.match(sel('DUSK').textContent, /menutup langkah: kirim chat dan arsip jejak/);
+  assert.ok(sel('NOX').querySelector('.kondisi-utama').classList.contains('keadaan-menunggu'));
+  assert.match(sel('NOX').textContent, /langkah baru dijadwalkan/);
+  assert.match(sel('RAVEN').textContent, /sudah vote; fase ini tidak ada tindakan lain/);
+  assert.match(sel('RAVEN').textContent, /langkah berikutnya sebentar lagi/);
+
+  // Antrean: yang dikerjakan terang, yang menunggu berurutan, label room lain, dan teks kosong.
+  const antrean = doc.querySelector('#checker-antrean');
+  const tugas = [...antrean.querySelectorAll('.antrean-tugas')];
+  assert.equal(antrean.querySelectorAll('.antrean-baris').length, 2); // satu baris memanjang per thread
+  assert.ok(tugas[0].classList.contains('keadaan-sedang'));
+  assert.match(
+    tugas[0].textContent,
+    /#1● dikerjakanIndoBERT membaca chat “aku curiga <img src=x onerror=alert\(1\)>” dari Kimberly/,
+  );
+  assert.match(tugas[1].textContent, /#2… menunggu.*room LAIN99.*ONYX berpikir \(NLU \+ Fuzzy\)/);
+  assert.match(antrean.textContent, /Thread penulis · 3 thread.*Tidak ada antrean\./);
+
+  // Semua isi server dipasang sebagai teks.
+  assert.equal(doc.querySelector('#menu-checker img'), null);
 });
 
 test('jejak lama Utility AI dan Behavior Tree tetap terbuka walau metodenya sudah diarsipkan', async (t) => {
@@ -911,16 +1338,16 @@ test('jejak lama dengan validasi IndoBERT tetap terbaca, jejak baru tidak memuat
     await settle();
   };
   await pilih('NOX');
-  tab('Proses');
+  tab('Rincian proses');
   assert.match(detail.textContent, /Aturan \+ templat4\.00 dtk/);
-  tab('NLG');
+  tab('Kalimat (NLG)');
   assert.match(detail.textContent, /Lolos validasi IndoBERT/);
   assert.match(detail.textContent, /Intent terbacaneutral \(0\.7\)/);
   assert.match(detail.textContent, /VEIL: offend/);
   await pilih('ECHO');
-  tab('Proses');
+  tab('Rincian proses');
   assert.match(detail.textContent, /Aturan \+ templat1\.0 ms/);
-  tab('NLG');
+  tab('Kalimat (NLG)');
   assert.match(detail.textContent, /Lolos aturan/);
   assert.doesNotMatch(detail.textContent, /validasi IndoBERT|Intent terbaca|Target terbaca/);
 });
@@ -1080,13 +1507,13 @@ test('simulation shows chat with NLU, live bot positions on the flowchart, and n
   assert.equal(chat.querySelector('img'), null);
   assert.match(
     chat.querySelector('.chat-human').textContent,
-    /NLU: offend 0.91 · target NOX \(offend 0.88\)/,
+    /dibaca IndoBERT: menuduh \(yakin 0\.91\) → NOX \(menuduh\)/,
   );
   assert.match(chat.querySelector('.chat-bot').textContent, /Aku bukan Hitman/);
   assert.match(chat.querySelector('.chat-step').textContent, /diam/);
   const detail = doc.querySelector('#sim-detail');
   assert.match(detail.textContent, /Reaksi bot sesudah pesan ini/);
-  assert.match(detail.textContent, /NOX \(FL\): chat bela_diri/);
+  assert.match(detail.textContent, /NOX \(FL\): chat bela diri/);
   // Klik reaksi NOX: tab Proses dan waktu tiap kotak flowchart mengikuti langkah NOX.
   [...detail.querySelectorAll('.room-bot')].find((b) => b.textContent.startsWith('NOX')).click();
   assert.match(detail.textContent, /4\. NLG: rencana chat menjadi kalimat/);

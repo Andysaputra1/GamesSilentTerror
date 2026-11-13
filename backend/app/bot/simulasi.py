@@ -16,7 +16,7 @@ from app.bot.bot_controller import (
 )  # fmt: skip
 from app.bot.nlu import baca_chat
 from app.game.match_engine import Match, label_unik, snapshot_berlabel
-from app.services.checker_service import jejak_baru
+from app.services.checker_service import jejak_baru, label_antrean
 from app.services.room_service import BOT_NAMES, terapkan_pilihan_bot
 
 KODE = "SIMULASI"
@@ -81,13 +81,16 @@ class Simulasi:
         self.events = baru
         return [{**jejak_baru(KODE, "SISTEM", teks), "stage": "sistem"} for teks in baru[j:]]
 
-    # Pencatat NLU simulasi: chat dibaca di thread keputusan, sama seperti catat_nlu di room asli.
+    # Pencatat NLU simulasi: chat dibaca di thread keputusan, sama seperti catat_nlu di room asli. Label antrean: kotak
+    # Antrean Checker ikut menampilkan pekerjaan simulasi, karena threadnya sama.
     async def _baca(self, pengirim, teks):
         loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(
-            brain_runtime.eksekutor_keputusan, baca_chat, brain_runtime.nlu, self.riwayat,
-            self.match.labels[pengirim], teks, roster_label(self.match),
-        )  # fmt: skip
+        with label_antrean(KODE, self.match.labels[pengirim], "IndoBERT membaca chat", teks):
+            tugas = loop.run_in_executor(
+                brain_runtime.eksekutor_keputusan, baca_chat, brain_runtime.nlu, self.riwayat,
+                self.match.labels[pengirim], teks, roster_label(self.match),
+            )  # fmt: skip
+        return await tugas
 
     # Satu langkah bot persis seperti NPCService.brain_turn: keputusan → vote/aksi ke engine → kalimat. Chat tim
     # tidak ditulis, karena admin simulasi tidak punya layar untuk membacanya.
@@ -96,11 +99,10 @@ class Simulasi:
         lapor = self._lapor(m.labels[otak.nama])
         otak.langkah += 1
         snapshot = snapshot_berlabel(m.snapshot(otak.nama), m.labels)
-        view, hasil, konteks = await asyncio.wait_for(
-            loop.run_in_executor(brain_runtime.eksekutor_keputusan, brain_runtime.langkah, otak,
-                                 snapshot, jam, True, lapor),
-            timeout=BATAS_LANGKAH_DETIK,
-        )  # fmt: skip
+        with label_antrean(KODE, m.labels[otak.nama], "berpikir (NLU + Fuzzy)"):
+            tugas = loop.run_in_executor(brain_runtime.eksekutor_keputusan, brain_runtime.langkah, otak,
+                                         snapshot, jam, True, lapor)  # fmt: skip
+        view, hasil, konteks = await asyncio.wait_for(tugas, timeout=BATAS_LANGKAH_DETIK)
         npc, rencana = hasil["npc_decision"], hasil["rencana_chat"]
         m.npc_decisions.add((m.round, m.phase, otak.nama))
         penolakan = tulisan = nlu = None
@@ -112,7 +114,9 @@ class Simulasi:
         except ValueError as error:
             penolakan = str(error)
         if hasil["nlg"] is not None:
-            tulisan = await tulis_kalimat(brain_runtime, otak, hasil["nlg"], konteks, lapor)
+            penulis = "LLM" if brain_runtime.penulis_npc.dipakai() is not None else "templat"
+            with label_antrean(KODE, m.labels[otak.nama], f"menulis kalimat ({penulis})"):
+                tulisan = await tulis_kalimat(brain_runtime, otak, hasil["nlg"], konteks, lapor)
             if tulisan["teks"] and m.can_chat(otak.nama):
                 lapor("kirim")
                 m.add_message(otak.nama, tulisan["teks"], now=jam)

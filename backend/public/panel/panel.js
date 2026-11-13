@@ -291,6 +291,18 @@ let checkerRoom = null,
   detailTab = 'proses',
   renderedDetail = ''; // jejak yang sedang tampil: tidak dirender ulang tiap auto-refresh
 const traceDetails = new Map(); // id → jejak lengkap (dengan penjelasan), dimuat saat dibuka
+// DATA LIVE Checker (polling /proses tiap detik): langkah bot yang sedang berjalan, chat manusia yang belum selesai,
+// kondisi tiap bot, dan antrean thread. Waktu berjalan berdetak di browser dari data terakhir (liveDiterima).
+let liveBot = [],
+  liveChat = new Map(), // id jejak → jejak chat manusia yang belum selesai (dengan berjalan_ms)
+  liveKondisi = new Map(), // nama bot → kondisi
+  liveAntrean = null,
+  liveDiterima = 0,
+  liveBusy = false,
+  livePilihan = null, // item live yang dipilih: {b, hilang, segar} sampai jejaknya ditemukan
+  perluSegar = false, // langkah/chat live selesai: daftar jejak perlu dimuat ulang
+  segarKe = 0; // berapa kali daftar jejak sudah dimuat (penanda urutan untuk livePilihan)
+const liveBox = node('div', undefined, 'chat-live-list'); // item "sedang diproses" di ujung chat room
 // Game hanya memakai Fuzzy (dan LLM sebagai pembanding). Utility AI dan Behavior Tree sudah diarsipkan;
 // label, arti parameter, dan tampilan penalarannya tetap ada agar jejak lama di database bisa dibuka.
 const METODE_LABEL = {
@@ -485,8 +497,13 @@ function renderLegend() {
   );
 }
 renderLegend();
+// Nama bot pemilik jejak: dari ringkasan penjelasan, provider otak:<metode>, item live, atau jejak error langkah bot.
 function traceBot(trace) {
-  return trace.ringkas?.bot?.nama || (trace.provider?.startsWith('otak:') ? trace.sender : null);
+  if (trace.live) return trace.sender;
+  return (
+    trace.ringkas?.bot?.nama ||
+    (trace.provider?.startsWith('otak:') || trace.stage === 'npc_brain_error' ? trace.sender : null)
+  );
 }
 function visibleTraces() {
   if (!traceFilter) return traces;
@@ -511,12 +528,275 @@ function tanggal(iso) {
         timeStyle: 'short',
       });
 }
+// ISTILAH untuk orang awam. Istilah teknisnya tetap ada di tooltip (title) dan tab Teknis.
+const STAGE_LABEL = {
+  npc_brain: 'langkah bot',
+  npc_brain_rejected: 'ditolak engine',
+  npc_brain_error: 'error',
+  received: 'diterima server',
+  delivered: 'terkirim',
+  complete: 'selesai',
+  discarded_state_changed: 'dibuang: fase sudah berubah',
+  persistence_error: 'gagal disimpan ke database',
+};
+const AKSI_LABEL = {
+  vote: 'vote',
+  gag: 'Gag (bungkam)',
+  hostage: 'Hostage (sandera)',
+  guard: 'Guard (jaga)',
+  peek: 'Peek (intip)',
+  wait: 'diam',
+  tunggu: 'diam',
+  abstain: 'abstain',
+  tidak_bisa: 'tidak bisa',
+};
+const INTENT_LABEL = { offend: 'menuduh', defend: 'membela', neutral: 'netral' };
+const TEKS_DITUNDA = 'chat ditunda (lantai bicara penuh/rencana basi)';
+const HASIL_LANGKAH = {
+  bertindak: 'bertindak',
+  diam: 'diam',
+  ditunda: 'chat ditunda',
+  ditolak: 'ditolak engine',
+  basi: 'keputusan dibuang karena fase berganti',
+  error: 'error',
+};
+// Tanda keadaan, sama di alur, kolom kondisi, antrean, dan legenda: aktif, selesai, menunggu, error, tidak bisa
+// bertindak, dan tidak dilalui (redup).
+const TANDA = { sedang: '●', selesai: '✓', menunggu: '…', gagal: '✗', tidakbisa: '⊘', lewat: '–' };
+// Tahap live langkah bot (dilaporkan bot_controller lewat lapor): [kotak alur yang menyala, keterangan].
+// Antre menyala di kotak yang sedang ditunggu (NLU atau LLM); lamanya masuk kotak Antre + mengetik.
+const TAHAP_LIVE = {
+  antre: ['nlu', 'antre thread otak'],
+  nlu: ['nlu', 'NLU membaca chat'],
+  logika: ['fuzzy', 'Fuzzy menimbang'],
+  penjelasan: ['penjelasan', 'menyusun penjelasan'],
+  engine: ['engine', 'vote/aksi ke engine'],
+  tim: ['engine', 'menulis chat tim'],
+  antre_nlg: ['llm', 'antre thread penulis'],
+  nlg: ['llm', 'menyiapkan prompt'],
+  llm: ['llm', 'menunggu LLM'],
+  aturan: ['aturan', 'cek aturan'],
+  giliran: ['llm', 'memeriksa giliran bicara'],
+  ketik: ['sisa', 'jeda mengetik'],
+  simpan: ['output', 'menyimpan chat'],
+  jejak: ['output', 'mencatat jejak'],
+};
+// Teks tahap live untuk kolom Kondisi sekarang.
+const KONDISI_TAHAP = {
+  antre: 'antre (menunggu thread otak)',
+  nlu: 'berpikir: NLU',
+  logika: 'berpikir: Fuzzy',
+  penjelasan: 'berpikir: penjelasan panel',
+  engine: 'vote/aksi ke engine',
+  tim: 'chat tim',
+  giliran: 'memeriksa giliran bicara',
+  antre_nlg: 'menulis kalimat: antre thread penulis',
+  nlg: 'menulis kalimat: prompt',
+  llm: 'menulis kalimat: LLM',
+  aturan: 'cek aturan',
+  ketik: 'mengetik',
+  simpan: 'menyimpan chat',
+  jejak: 'mencatat jejak',
+};
+// Tahap brain_turn tempat langkah bot gagal (error_tahap jejak npc_brain_error).
+const TAHAP_GAGAL = {
+  lihat: 'melihat snapshot permainan',
+  berpikir: 'berpikir (thread otak)',
+  vote_aksi: 'mengirim vote/aksi ke engine',
+  chat_tim: 'menulis chat tim',
+  tulis: 'menulis kalimat',
+  kirim: 'menyimpan/mengirim chat',
+  jejak: 'mencatat jejak',
+};
+// Keputusan ringkas dari server ("chat bela_diri → ECHO", "gag → Kimberly") dalam bahasa awam.
+function teksKeputusan(k) {
+  const [kata, ...sisa] = String(k).split(' ');
+  return [AKSI_LABEL[kata] || kata, ...sisa].join(' ').replaceAll('_', ' ');
+}
+// Keputusan terakhir bot di tabel ringkasan room: jejak terbarunya (error ditulis sebagai error).
 function lastDecision(nama) {
   const trace = traces.find((t) => traceBot(t) === nama);
   if (!trace) return '—';
-  return trace.ringkas?.keputusan?.length ? trace.ringkas.keputusan.join(' · ') : trace.message;
+  if (trace.stage === 'npc_brain_error') return `error: ${trace.error || 'tidak diketahui'}`;
+  return trace.ringkas?.keputusan?.length
+    ? trace.ringkas.keputusan.map(teksKeputusan).join(' · ')
+    : trace.message;
 }
-// Ringkasan room: status pertandingan, komposisi role, dan tabel bot (klik nama untuk memfilter).
+// WAKTU LIVE: lama berjalan = nilai dari polling terakhir + waktu sejak data itu diterima (jeda, ms). Kunci:
+// bot|id|tahap atau total, chat|id|ms tahap yang sudah selesai, turun|nama (hitung mundur), antre|nomor|bagian.
+function waktuLive(kunci, jeda) {
+  const [jenis, id, bagian] = kunci.split('|');
+  if (jenis === 'bot') {
+    const b = liveBot.find((x) => x.id === id);
+    return b ? (bagian === 'total' ? b.total_ms : b.tahap_ms) + jeda : null;
+  }
+  if (jenis === 'chat') {
+    const c = liveChat.get(id);
+    return typeof c?.berjalan_ms === 'number'
+      ? Math.max(0, c.berjalan_ms - Number(bagian || 0)) + jeda
+      : null;
+  }
+  if (jenis === 'turun') {
+    const k = liveKondisi.get(id);
+    return typeof k?.berikutnya_detik === 'number'
+      ? Math.max(0, k.berikutnya_detik * 1000 - jeda)
+      : null;
+  }
+  if (jenis === 'antre') {
+    const t = Object.values(liveAntrean || {})
+      .flatMap((a) => a.tugas || [])
+      .find((x) => String(x.nomor) === id);
+    if (!t) return null;
+    return (bagian === 'berjalan' ? t.berjalan_ms : t.menunggu_ms) + jeda;
+  }
+  return null;
+}
+// Teks satu waktu live. Hitung mundur langkah berikutnya di bawah 0,5 dtk ditulis "sebentar lagi", karena jam bot
+// memeriksa jadwal tiap 0,5 dtk.
+function teksWaktuLive(kunci, ms) {
+  if (ms === null) return '—';
+  if (kunci.startsWith('turun|')) return ms < 500 ? 'sebentar lagi' : `±${duration(ms)}`;
+  return duration(ms);
+}
+// Teks waktu yang ikut berdetak: awalan + lama + akhiran; detakLive memperbaruinya dari data polling terakhir.
+function waktuBerdetak(kunci, awalan = '', akhiran = '', className = 'waktu-live') {
+  const el = node('span', undefined, className);
+  Object.assign(el.dataset, { live: kunci, awalan, akhiran });
+  const ms = waktuLive(kunci, performance.now() - liveDiterima);
+  el.textContent = `${awalan}${teksWaktuLive(kunci, ms)}${akhiran}`;
+  return el;
+}
+// Detak 250 ms: hanya teks waktu yang berubah, elemen lain tidak dirender ulang.
+function detakLive() {
+  const jeda = performance.now() - liveDiterima;
+  for (const el of $('menu-checker').querySelectorAll('[data-live]')) {
+    const kunci = el.dataset.live,
+      ms = waktuLive(kunci, jeda);
+    if (ms !== null)
+      el.textContent = `${el.dataset.awalan}${teksWaktuLive(kunci, ms)}${el.dataset.akhiran}`;
+  }
+}
+// KONDISI SEKARANG tiap bot (kolom ringkasan room), dari data live server: tahap langkah yang sedang berjalan
+// (checker_service), atau alasan bot tidak melangkah (NPCService.kondisi_bot: status dan hak di engine, otak sibuk,
+// jadwal langkah, lantai bicara, hasil langkah terakhir).
+// Alur: 1 sedang melangkah: tahap + lama -> 2 tidak bisa bertindak, belum siap, atau sibuk di luar alur live
+//       (menutup langkah / baru dijadwalkan) -> 3 alasan menunggu + jadwal -> 4 hasil langkah terakhir dan error
+function dataKondisi(nama) {
+  const b = liveBot.find((x) => x.nama === nama),
+    k = liveKondisi.get(nama);
+  const error = k?.terakhir?.hasil === 'error' ? k.terakhir.error || 'tidak diketahui' : null;
+  if (b)
+    return {
+      keadaan: 'sedang',
+      teks: `${KONDISI_TAHAP[b.tahap] || b.tahap} · `,
+      live: `bot|${b.id}|tahap`,
+      kedua: `langkah ${b.langkah} · total `,
+      liveKedua: `bot|${b.id}|total`,
+      error,
+    };
+  if (!k)
+    return {
+      keadaan: 'lewat',
+      teks: '—',
+      tip: 'Kondisi live hanya ada untuk room yang sedang berjalan di server.',
+    };
+  if (k.status === 'dieksekusi')
+    return { keadaan: 'tidakbisa', teks: 'tidak bisa bertindak: dieksekusi', error };
+  if (!k.otak)
+    return { keadaan: 'tidakbisa', teks: 'otak belum siap: engine memakai aksi cadangan', error };
+  if (k.menutup)
+    return {
+      keadaan: 'sedang',
+      teks: 'menutup langkah: kirim chat dan arsip jejak',
+      kedua: `langkah ${k.langkah} · jejaknya sudah tampil`,
+      tip: 'Siaran chat dan penyimpanan jejak ke database berjalan sesudah jejak dibuat (di luar total proses).',
+      error,
+    };
+  if (k.sibuk)
+    return {
+      keadaan: 'menunggu',
+      teks: 'langkah baru dijadwalkan, sebentar lagi mulai',
+      tip: 'Penjadwal sudah menandai bot sibuk (otak.sibuk), tetapi langkahnya belum melapor tahap pertama.',
+      error,
+    };
+  const hak = k.hak || {};
+  let keadaan = 'menunggu',
+    teksUtama = 'menunggu giliran';
+  if (k.status === 'disandera')
+    [keadaan, teksUtama] = ['tidakbisa', 'tidak bisa bertindak: disandera'];
+  else if (k.status === 'dibungkam')
+    [keadaan, teksUtama] = [
+      'tidakbisa',
+      hak.vote || hak.aksi || hak.chat_tim
+        ? 'tidak bisa chat: dibungkam (Gag)'
+        : 'tidak bisa bertindak: dibungkam (Gag)',
+    ];
+  else if (k.terakhir?.hasil === 'ditunda')
+    teksUtama = `${TEKS_DITUNDA}, lantai ${k.lantai?.terisi ?? '?'}/${k.lantai?.maks ?? '?'}`;
+  else if (k.hak && !hak.chat && !hak.vote && !hak.aksi && !hak.chat_tim)
+    [keadaan, teksUtama] = [
+      'lewat',
+      hak.sudah_vote
+        ? 'sudah vote; fase ini tidak ada tindakan lain'
+        : hak.sudah_aksi
+          ? 'aksi malam sudah dikirim; tidak ada tindakan lain'
+          : 'fase ini tidak ada tindakan',
+    ];
+  const jadwal =
+    typeof k.berikutnya_detik === 'number'
+      ? { kedua: 'langkah berikutnya ', liveKedua: `turun|${nama}` }
+      : {
+          kedua:
+            k.fase === 'preparing'
+              ? 'persiapan: otak sedang dimuat'
+              : k.fase === 'finished'
+                ? 'permainan selesai'
+                : 'langkah berikutnya di fase sesudahnya',
+        };
+  const akhir =
+    k.terakhir && k.terakhir.hasil !== 'error'
+      ? `✓ langkah ${k.terakhir.langkah}: ${HASIL_LANGKAH[k.terakhir.hasil] || k.terakhir.hasil}`
+      : '';
+  return { keadaan, teks: teksUtama, ...jadwal, akhir, error };
+}
+// Sel kondisi satu bot: teks utama bertanda keadaan, baris kedua (jadwal atau total), hasil langkah terakhir, dan chip
+// error. dataset.kunci = isi tanpa waktu berdetak, dipakai perbaruiKondisi.
+function kondisiSel(nama) {
+  const d = dataKondisi(nama);
+  const box = node('div', undefined, 'kondisi');
+  box.dataset.kunci = JSON.stringify([
+    d.keadaan,
+    d.teks,
+    d.kedua,
+    d.akhir,
+    d.error,
+    d.live,
+    d.liveKedua,
+  ]);
+  if (d.tip) box.title = d.tip;
+  const utama = node('span', undefined, `kondisi-utama keadaan-${d.keadaan}`);
+  if (TANDA[d.keadaan]) utama.append(node('span', TANDA[d.keadaan], 'alur-tanda'));
+  utama.append(d.live ? waktuBerdetak(d.live, d.teks) : node('span', d.teks));
+  box.append(utama);
+  if (d.kedua)
+    box.append(
+      d.liveKedua
+        ? waktuBerdetak(d.liveKedua, d.kedua, '', 'kondisi-kedua')
+        : node('small', d.kedua, 'kondisi-kedua'),
+    );
+  if (d.akhir) box.append(node('small', d.akhir, 'kondisi-kedua keadaan-selesai'));
+  if (d.error) box.append(chip(`error: ${d.error}`, 'status-bad'));
+  return box;
+}
+// Polling: hanya sel kondisi yang isinya berubah yang diganti (waktu berdetak sendiri), jadi tabel tidak berkedip.
+function perbaruiKondisi() {
+  for (const td of document.querySelectorAll('#room-summary [data-kondisi]')) {
+    const baru = kondisiSel(td.dataset.kondisi);
+    if (td.firstElementChild?.dataset.kunci !== baru.dataset.kunci) td.replaceChildren(baru);
+  }
+}
+// Ringkasan room: status pertandingan, komposisi role, dan tabel bot. Kolom kondisi live tepat di sebelah nama supaya
+// tetap terlihat di HP (tabel lebar digulir); klik nama untuk memfilter.
 function renderRoomSummary() {
   const box = $('room-summary'),
     room = checkerRoom;
@@ -545,29 +825,48 @@ function renderRoomSummary() {
     box.append(node('p', 'Belum ada data bot untuk room ini.', 'hint'));
     return;
   }
+  const live = room.status === 'live';
   const table = dataTable({
-    kolom: ['bot', 'role', 'metode', 'persona', 'status', 'keputusan terakhir'],
+    kolom: [
+      'bot',
+      ...(live ? ['kondisi sekarang'] : []),
+      'role',
+      'status',
+      'keputusan terakhir',
+      'persona',
+      'metode',
+    ],
     baris: room.bot.map((b) => [
       b.nama,
+      ...(live ? [''] : []),
       ROLE_LABEL[b.role] || b.role,
-      METODE_LABEL[b.metode] || b.metode,
-      b.persona,
       b.status,
       lastDecision(b.nama),
+      b.persona,
+      METODE_LABEL[b.metode] || b.metode,
     ]),
   });
-  // Nama bot menjadi tombol filter linimasa.
+  if (live)
+    table.querySelectorAll('th')[1].title =
+      'Live tiap detik: tahap langkah yang sedang berjalan beserta lamanya, atau alasan bot sedang tidak melangkah.';
+  // Nama bot menjadi tombol filter linimasa; status selain aktif tampil abu-abu (tidak bisa bertindak penuh).
   table.querySelectorAll('tbody tr').forEach((tr, index) => {
-    const nama = room.bot[index].nama;
-    const button = node('button', nama, 'room-bot');
+    const bot = room.bot[index];
+    const button = node('button', bot.nama, 'room-bot');
     button.type = 'button';
-    button.title = `Tampilkan jejak ${nama} saja`;
+    button.title = `Tampilkan jejak ${bot.nama} saja`;
     button.onclick = () => {
-      traceFilter = `bot:${nama}`;
+      traceFilter = `bot:${bot.nama}`;
       selectedTrace = '';
       renderTraces();
     };
     tr.cells[0].replaceChildren(button);
+    if (bot.status && bot.status !== 'aktif')
+      tr.cells[live ? 3 : 2].classList.add('keadaan-tidakbisa');
+    if (live) {
+      tr.cells[1].dataset.kondisi = bot.nama;
+      tr.cells[1].replaceChildren(kondisiSel(bot.nama));
+    }
   });
   box.append(table);
 }
@@ -588,16 +887,28 @@ function renderFilter() {
   select.value = traceFilter;
 }
 // CHAT ROOM: jejak ditampilkan seperti chat di game (lama di atas). Chat manusia dan bot menjadi gelembung;
-// langkah bot tanpa chat (vote, aksi, diam) menjadi baris kecil; pengumuman engine menjadi baris sistem.
-// Klik satu item untuk melihat prosesnya. Chat manusia membawa bacaan NLU IndoBERT-nya.
+// langkah bot tanpa chat (vote, aksi, diam) menjadi baris kecil; error berbingkai merah; langkah yang sedang
+// diproses (belum punya jejak) berbingkai terang di ujung bawah. Klik satu item untuk melihat prosesnya.
 const isSistem = (t) => t.stage === 'sistem';
-const isHuman = (t) => Boolean(t.manusia || (!t.provider && !t.ringkas && !isSistem(t)));
+const isHuman = (t) =>
+  Boolean(
+    t.manusia ||
+    (!t.provider && !t.ringkas && !isSistem(t) && t.stage !== 'npc_brain_error' && !t.live),
+  );
 function nluTeks(nlu) {
   if (!nlu) return '—';
   const target = (nlu.target || []).map(
     (t) => `${t.pemain} (${t.relasi}${t.prob == null ? '' : ` ${teks(t.prob)}`})`,
   );
   return `${nlu.intent} ${teks(nlu.confidence)}${target.length ? ` · target ${target.join(', ')}` : ''}`;
+}
+// Bacaan IndoBERT satu chat dalam bahasa awam (intent teknis tetap di detail).
+function ringkasNlu(nlu) {
+  if (!nlu) return null;
+  const sasaran = (nlu.target || [])
+    .map((t) => `${t.pemain} (${INTENT_LABEL[t.relasi] || t.relasi})`)
+    .join(', ');
+  return `dibaca IndoBERT: ${INTENT_LABEL[nlu.intent] || nlu.intent} (yakin ${teks(nlu.confidence)})${sasaran ? ` → ${sasaran}` : ''}`;
 }
 // Sel riwayat chat: chat sebelumnya yang ikut dibaca IndoBERT sebagai konteks (maks 12, tersimpan sejak pencatat
 // NLU menyimpan konteks). Target baru berbentuk {pemain, relasi}, yang lama berupa teks. Isi chat dipasang sebagai
@@ -624,59 +935,284 @@ function konteksSel(nlu) {
   td.append(rincian);
   return td;
 }
+// Alur chat manusia (chat_service): persistence_ms, broadcast_ms, nlu_ms (antre thread otak + IndoBERT + simpan
+// bacaan; nlu.ms = IndoBERT saja), duration_ms seluruhnya. Selama chat masih diproses (data live), tahap pertama yang
+// belum punya waktu adalah yang sedang berjalan; lamanya ± lama berjalan dikurangi tahap yang sudah selesai.
+// Alur: 1 tahap yang sedang berjalan -> 2 kotak simpan, kirim, NLU -> 3 diterima = total − tahap terukur -> 4 output
+function alurManusia(trace) {
+  const live = liveChat.has(trace.id),
+    j = liveChat.get(trace.id) || trace;
+  const t = j.timings || {},
+    n = j.nlu;
+  const gagal = ['discarded_state_changed', 'persistence_error'].includes(j.stage);
+  const selesai = typeof j.duration_ms === 'number';
+  const urutan = [t.persistence_ms, t.broadcast_ms, t.nlu_ms];
+  const iSedang = live && !gagal ? urutan.findIndex((v) => typeof v !== 'number') : -1;
+  const kurang = urutan.slice(0, Math.max(0, iSedang)).reduce((a, v) => a + v, 0);
+  const tahap = (i, nilai, label, tidak) =>
+    typeof nilai === 'number'
+      ? { keadaan: 'selesai', waktu: duration(nilai) }
+      : i === iSedang
+        ? { keadaan: 'sedang', waktu: `sedang ${label} · ±`, live: `chat|${trace.id}|${kurang}` }
+        : live && !gagal
+          ? { keadaan: 'belum', waktu: 'belum' }
+          : { keadaan: 'lewat', waktu: gagal ? 'tidak dilalui' : tidak };
+  const nlu = tahap(
+    2,
+    t.nlu_ms,
+    'antre/IndoBERT',
+    j.match_id == null ? 'lobby: tidak dibaca' : 'tidak tercatat',
+  );
+  if (typeof t.nlu_ms === 'number' && !n)
+    Object.assign(nlu, { keadaan: 'lewat', waktu: 'otak belum siap' });
+  if (n)
+    nlu.catatan = [
+      typeof n.ms === 'number' && `IndoBERT ${duration(n.ms)}`,
+      typeof n.ms === 'number' &&
+        typeof t.nlu_ms === 'number' &&
+        t.nlu_ms - n.ms > 0.05 &&
+        `antre + simpan bacaan ${duration(t.nlu_ms - n.ms)}`,
+      `${INTENT_LABEL[n.intent] || n.intent}${n.target?.length ? ` → ${n.target.map((x) => x.pemain).join(', ')}` : ''}`,
+    ];
+  const simpan = tahap(0, t.persistence_ms, 'menyimpan', 'tidak tercatat');
+  if (gagal)
+    Object.assign(simpan, {
+      keadaan: 'gagal',
+      catatan: [`${STAGE_LABEL[j.stage]}${j.error ? `: ${j.error}` : ''}`],
+    });
+  const terukur = urutan.reduce((a, v) => a + (typeof v === 'number' ? v : 0), 0);
+  return [
+    {
+      judul: 'Diterima',
+      isi: 'cek pesan + izin chat',
+      keadaan: 'selesai',
+      waktu: selesai ? duration(Math.max(0, j.duration_ms - terukur)) : 'sudah diterima',
+      tip: 'Total dikurangi tahap terukur: validasi pesan, cek izin chat (fase, Gag, Hostage), dan catatan aktivitas.',
+    },
+    { judul: 'Simpan DB', isi: 'MySQL + chat pertandingan', tip: 'persistence_ms', ...simpan },
+    {
+      judul: 'Kirim ke pemain',
+      isi: 'siaran ke semua di room',
+      tip: 'broadcast_ms',
+      ...tahap(1, t.broadcast_ms, 'mengirim', 'tidak tercatat'),
+    },
+    {
+      judul: 'NLU IndoBERT',
+      isi: 'antre thread otak + IndoBERT',
+      tip: 'nlu_ms: antre thread otak + IndoBERT membaca maksud (intent) dan sasaran (target) + simpan bacaan.',
+      ...nlu,
+    },
+    {
+      judul: 'Output',
+      isi: gagal ? STAGE_LABEL[j.stage] : n ? 'terkirim dan terbaca' : 'terkirim',
+      keadaan: selesai ? (gagal ? 'gagal' : 'selesai') : live ? 'belum' : n ? 'selesai' : 'lewat',
+      waktu: selesai ? `total ${duration(j.duration_ms)}` : live ? 'belum' : 'total tidak tercatat',
+      tip: 'duration_ms: dari pesan masuk sampai selesai dibaca IndoBERT.',
+    },
+  ];
+}
+// Penjelasan singkat error langkah bot: batas waktu dijelaskan dalam bahasa awam, error lain memakai pesannya.
+function penjelasanError(trace) {
+  if (trace.error === 'TimeoutError') {
+    const batas = trace.batas_detik ?? '?';
+    if (trace.error_tahap === 'berpikir')
+      return `langkah bot melewati batas ${batas} detik (termasuk antre di thread otak/IndoBERT)`;
+    if (trace.error_tahap === 'tulis')
+      return `templat cadangan melewati batas ${batas} detik sesudah LLM melewati batasnya`;
+    if (trace.error_tahap === 'chat_tim')
+      return `chat tim (templat cadangan) melewati batas ${batas} detik`;
+    return `${TAHAP_GAGAL[trace.error_tahap] || 'langkah bot'} melewati batas waktu`;
+  }
+  if (trace.error_pesan) return trace.error_pesan;
+  return trace.error_pesan === '' ? 'tanpa pesan' : 'pesan tidak tercatat (jejak lama)';
+}
+// Role bot dari ringkasan room (jejak error dan item live tidak membawa role).
+function roleBot(nama) {
+  return (checkerRoom?.bot || []).find((x) => x.nama === nama)?.role;
+}
+// Item chat untuk langkah bot yang sedang diproses (belum punya jejak): tahap sekarang dan lamanya berdetak.
+function itemLive(trace, selected, onSelect) {
+  const b = trace.live,
+    role = roleBot(b.nama);
+  const el = node(
+    'button',
+    undefined,
+    `trace chat-item chat-step chat-live${selected ? ' selected' : ''}`,
+  );
+  el.type = 'button';
+  const head = node('span', undefined, 'trace-head');
+  head.append(
+    node('strong', b.nama),
+    chip(trace.selesai ? 'selesai' : 'sedang diproses', 'status-pending'),
+  );
+  if (role) head.append(chip(ROLE_LABEL[role] || role, roleClass(role)));
+  const [, label] = TAHAP_LIVE[b.tahap] || [null, b.tahap];
+  const info = node('small', undefined, 'chat-info');
+  info.append(
+    trace.selesai
+      ? node('span', 'langkah selesai, jejaknya sedang dimuat')
+      : waktuBerdetak(`bot|${b.id}|tahap`, `${TANDA.sedang} sedang ${label} · `),
+  );
+  const meta = node('small', undefined, 'chat-meta');
+  meta.append(
+    trace.selesai
+      ? node('span', `langkah ${b.langkah}`)
+      : waktuBerdetak(`bot|${b.id}|total`, `langkah ${b.langkah} · berjalan `),
+  );
+  el.append(head, info, meta);
+  el.onclick = () => onSelect(trace.id);
+  return el;
+}
 function chatItem(trace, selected, onSelect) {
   if (isSistem(trace)) return node('p', trace.message, 'chat-system');
+  if (trace.live) return itemLive(trace, selected, onSelect);
   const r = trace.ringkas,
     bot = r?.bot,
+    error = trace.stage === 'npc_brain_error',
     human = isHuman(trace),
     bubble = human || r?.nlg === 'terkirim';
-  const kind = human ? 'chat-human' : bubble ? 'chat-bot' : 'chat-step';
+  const kind = error
+    ? 'chat-step chat-error'
+    : human
+      ? 'chat-human'
+      : bubble
+        ? 'chat-bot'
+        : 'chat-step';
   const b = node('button', undefined, `trace chat-item ${kind}${selected ? ' selected' : ''}`);
   b.type = 'button';
+  if (trace.stage) b.title = `Tahap teknis: ${trace.stage}`;
   const head = node('span', undefined, 'trace-head');
   head.append(node('strong', bot?.nama || trace.sender));
+  const role = bot?.role || (error ? roleBot(trace.sender) : null);
   if (human) head.append(chip('manusia', 'status-muted'));
-  if (bot?.metode) head.append(chip(METODE_SINGKAT[bot.metode] || bot.metode, 'status-good'));
-  if (bot?.role) head.append(chip(ROLE_LABEL[bot.role] || bot.role, roleClass(bot.role)));
+  if (error) head.append(chip('error', 'status-bad'));
+  if (bot?.metode && bot.metode !== 'fuzzy')
+    head.append(chip(METODE_SINGKAT[bot.metode] || bot.metode, 'status-good'));
+  if (role) head.append(chip(ROLE_LABEL[role] || role, roleClass(role)));
+  if (r?.ditolak) head.append(chip('ditolak engine', 'status-bad'));
+  if (human && liveChat.has(trace.id)) head.append(chip('sedang diproses', 'status-pending'));
   b.append(head);
   if (bubble) b.append(node('span', trace.message, 'chat-text'));
   const info = [];
-  if (human && trace.nlu) info.push(`NLU: ${nluTeks(trace.nlu)}`);
-  if (r?.nlg === 'ditunda' && r.usulan) info.push(`akan ditulis: “${r.usulan}”`);
+  if (error) info.push(`Error: ${trace.error || 'tidak diketahui'} — ${penjelasanError(trace)}`);
+  else if (human) {
+    const sedang = liveChat.has(trace.id) && alurManusia(trace).find((k) => k.keadaan === 'sedang');
+    info.push(
+      ringkasNlu(trace.nlu) ||
+        (sedang
+          ? `${TANDA.sedang} sedang diproses: ${sedang.judul}`
+          : liveChat.has(trace.id)
+            ? 'sedang diproses server'
+            : 'belum dibaca IndoBERT'),
+    );
+  }
+  if (r?.nlg === 'ditunda')
+    info.push(`${TEKS_DITUNDA}${r.usulan ? `: akan ditulis “${r.usulan}”` : ''}`);
   if (r) {
     // Chat sudah tampil sebagai gelembung; sisanya vote/aksi rahasia langkah yang sama.
-    const lain = (r.keputusan || []).filter((k) => !bubble || !k.startsWith('chat '));
+    const lain = (r.keputusan || [])
+      .filter((k) => !bubble || !k.startsWith('chat '))
+      .map(teksKeputusan);
     if (lain.length) info.push(lain.join(' · '));
     else if (!bubble) info.push('diam: tidak chat, vote, atau beraksi');
-  } else if (!human) info.push(`${trace.message} · ${trace.stage}`);
+  } else if (!human && !error)
+    info.push(`${trace.message} · ${STAGE_LABEL[trace.stage] || trace.stage}`);
   const meta = [
     bot?.ronde && `R${bot.ronde} ${FASE_LABEL[bot.fase] || bot.fase || ''}`.trim(),
     waktu(trace.created_at),
-    typeof trace.duration_ms === 'number' && `proses ${duration(trace.duration_ms)}`,
-    r?.ditolak && 'ditolak engine',
-    r?.nlg === 'ditunda' && 'chat ditunda',
+    typeof trace.duration_ms === 'number' &&
+      `${error ? 'gagal sesudah' : 'proses'} ${duration(trace.duration_ms)}`,
+    error && trace.error_tahap && `saat ${TAHAP_GAGAL[trace.error_tahap] || trace.error_tahap}`,
   ].filter(Boolean);
-  for (const line of info) b.append(node('small', line, 'chat-info'));
-  b.append(node('small', meta.join(' · '), 'chat-meta'));
+  for (const line of info)
+    b.append(node('small', line, error ? 'chat-info chat-info-error' : 'chat-info'));
+  const baris = node('small', meta.join(' · '), 'chat-meta');
+  // Chat manusia yang masih diproses: lama berjalannya ikut berdetak.
+  if (human && liveChat.has(trace.id))
+    baris.append(waktuBerdetak(`chat|${trace.id}|0`, ' · berjalan '));
+  b.append(baris);
   b.onclick = () => onSelect(trace.id);
   return b;
 }
-// Render ulang chat; tetap menempel di bawah bila sebelumnya sudah di bawah (seperti chat game).
-function renderChat(box, list, selectedId, onSelect) {
+// Render ulang chat; tetap menempel di bawah bila sebelumnya sudah di bawah (seperti chat game). ekor: elemen tetap
+// di ujung bawah (item live Checker), dipasang ulang tanpa dibuat ulang.
+function renderChat(box, list, selectedId, onSelect, ekor = []) {
   const bawah = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
-  box.replaceChildren(...list.map((t) => chatItem(t, t.id === selectedId, onSelect)));
+  box.replaceChildren(...list.map((t) => chatItem(t, t.id === selectedId, onSelect)), ...ekor);
+  if (bawah) box.scrollTop = box.scrollHeight;
+}
+// Langkah live dan jejaknya sama bila bot, pertandingan, dan nomor langkahnya sama.
+function cocokLive(trace, b) {
+  return (
+    traceBot(trace) === b.nama &&
+    trace.match_id === b.match_id &&
+    (trace.ringkas?.bot?.langkah ?? trace.langkah) === b.langkah
+  );
+}
+// Item live yang tampil (sesuai filter): langkah bot yang sedang berjalan dan belum punya jejak, ditambah item
+// terpilih yang baru selesai sampai jejaknya dimuat.
+function liveTerlihat() {
+  const daftar = liveBot.map((b) => ({ id: `live:${b.id}`, live: b, sender: b.nama }));
+  if (livePilihan?.hilang)
+    daftar.push({
+      id: `live:${livePilihan.b.id}`,
+      live: livePilihan.b,
+      sender: livePilihan.b.nama,
+      selesai: true,
+    });
+  return daftar.filter(
+    (l) =>
+      !traces.some((t) => cocokLive(t, l.live)) &&
+      (!traceFilter || traceFilter === 'bot' || traceFilter === `bot:${l.sender}`),
+  );
+}
+// Item live terpilih yang sudah selesai pindah ke jejak langkah yang sama. Langkah diam tidak punya jejak: sesudah
+// daftar dimuat ulang, pilihan kembali ke item terbaru dengan pemberitahuan.
+function selesaikanPilihanLive() {
+  if (!livePilihan) return;
+  if (selectedTrace !== `live:${livePilihan.b.id}`) {
+    livePilihan = null;
+    return;
+  }
+  const b = livePilihan.b,
+    jejak = traces.find((t) => cocokLive(t, b));
+  if (jejak) {
+    selectedTrace = jejak.id;
+    livePilihan = null;
+  } else if (livePilihan.hilang && segarKe > livePilihan.segar) {
+    notice(
+      `Langkah ${b.nama} ke-${b.langkah} selesai tanpa jejak: langkah diam (tanpa chat, vote, atau aksi) tidak dicatat.`,
+    );
+    selectedTrace = '';
+    livePilihan = null;
+  }
+}
+// Isi ujung bawah chat room dengan item live; tetap menempel di bawah bila sebelumnya di bawah.
+function isiLiveBox() {
+  const box = $('traces'),
+    bawah = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+  liveBox.replaceChildren(
+    ...liveTerlihat().map((l) => chatItem(l, l.id === selectedTrace, selectTrace)),
+  );
   if (bawah) box.scrollTop = box.scrollHeight;
 }
 function selectTrace(id) {
   selectedTrace = id;
+  if (!(livePilihan && `live:${livePilihan.b.id}` === id)) {
+    const live = id.startsWith('live:') ? liveTerlihat().find((l) => l.id === id) : null;
+    livePilihan = live ? { b: live.live, hilang: false, segar: segarKe } : null;
+  }
   renderTraces();
 }
 // Render chat room (sesuai filter) dan detail item terpilih; default item terbaru.
 function renderTraces() {
   renderFilter();
+  selesaikanPilihanLive();
   const box = $('traces');
-  const list = visibleTraces();
-  if (!list.length) {
+  const list = visibleTraces(),
+    live = liveTerlihat();
+  if (!list.length && !live.length) {
+    liveBox.replaceChildren();
     box.textContent = traces.length
       ? 'Tidak ada jejak untuk filter ini.'
       : 'Belum ada jejak AI di room ini.';
@@ -684,9 +1220,14 @@ function renderTraces() {
     renderedDetail = '';
     return;
   }
-  const active = list.find((t) => t.id === selectedTrace) || list[0];
+  const active =
+    live.find((l) => l.id === selectedTrace) ||
+    list.find((t) => t.id === selectedTrace) ||
+    list[0] ||
+    live[0];
   selectedTrace = active.id;
-  renderChat(box, [...list].reverse(), active.id, selectTrace);
+  renderChat(box, [...list].reverse(), active.id, selectTrace, [liveBox]);
+  isiLiveBox();
   showDetail(active).catch((error) => notice(error.message));
 }
 // Penjelasan langkah sebelumnya dari bot yang sama (untuk kolom perubahan), bila sudah dimuat.
@@ -696,12 +1237,444 @@ function sebelumnya(trace, urut, ambil) {
   for (let j = i - 1; j >= 0; j--) if (traceBot(urut[j]) === nama) return ambil(urut[j]);
   return null;
 }
-// Jejak otak bot dimuat lengkap sekali (cache); chat manusia memakai kartu NLU; jejak lain laporan lama.
+// ALUR PROSES di atas detail tiap item: kotak tahap berpanah, lama tiap tahap di bawah kotaknya. Keadaan kotak:
+// selesai ✓, sedang (berdenyut, waktunya berdetak), belum (redup), lewat (redup: tidak dilalui), gagal ✗.
+// k = {judul, isi, keadaan, waktu, live?, catatan?, tip?, sisa?}
+function kotakAlur(k) {
+  const li = node('li', undefined, `alur-tahap keadaan-${k.keadaan}${k.sisa ? ' alur-sisa' : ''}`);
+  if (k.tip) li.title = k.tip;
+  const kotak = node('div', undefined, 'alur-kotak');
+  const judul = node('strong', undefined, 'alur-judul');
+  if (TANDA[k.keadaan]) judul.append(node('span', TANDA[k.keadaan], 'alur-tanda'));
+  judul.append(node('span', k.judul));
+  kotak.append(judul);
+  if (k.isi) kotak.append(node('small', k.isi, 'alur-isi'));
+  li.append(
+    kotak,
+    k.live ? waktuBerdetak(k.live, k.waktu, '', 'alur-waktu') : node('span', k.waktu, 'alur-waktu'),
+  );
+  for (const c of k.catatan || []) if (c) li.append(node('small', c, 'alur-catatan'));
+  return li;
+}
+// Kotak "Alur proses": judul, deret kotak tahap, dan keterangan. dataset.kunci = isi tanpa waktu berdetak (pasangAlur).
+function alurProses(daftar, keterangan) {
+  const box = node('section', undefined, 'alur');
+  box.setAttribute('aria-label', 'Alur proses');
+  const ol = node('ol', undefined, 'alur-baris');
+  for (const k of daftar) ol.append(kotakAlur(k));
+  box.append(node('h4', 'Alur proses', 'alur-kepala'), ol);
+  if (keterangan) box.append(node('p', keterangan, 'hint alur-keterangan'));
+  box.dataset.kunci = JSON.stringify(
+    daftar.map((k) => [k.keadaan, k.judul, k.isi, k.waktu, k.live, k.catatan]),
+  );
+  return box;
+}
+// Polling: alur yang tampil diganti hanya bila isinya berubah (waktu yang berdetak tidak ikut dihitung).
+function pasangAlur(container, alur) {
+  const lama = container.querySelector('.alur');
+  if (lama && lama.dataset.kunci !== alur.dataset.kunci) lama.replaceWith(alur);
+}
+// Kotak alur langkah bot: judul dan keterangan singkat, urut sesuai brain_turn.
+const KOTAK_BOT = {
+  input: ['Input', 'snapshot permainan'],
+  nlu: ['NLU', 'IndoBERT + sinkron ingatan'],
+  fuzzy: ['Fuzzy', 'menimbang bukti, memutuskan'],
+  penjelasan: ['Penjelasan', 'disusun untuk panel'],
+  engine: ['Engine', 'vote / aksi rahasia'],
+  llm: ['LLM', 'penulis kalimat'],
+  aturan: ['Cek aturan', 'aturan, prompt, templat'],
+  sisa: ['Antre + mengetik', 'sisa di luar tahap terukur'],
+  output: ['Output', 'hasil langkah'],
+};
+// Tahap live yang lamanya masuk tiap kotak.
+const BAGIAN_LIVE = {
+  input: [],
+  nlu: ['nlu'],
+  fuzzy: ['logika'],
+  penjelasan: ['penjelasan'],
+  engine: ['engine', 'tim'],
+  llm: ['nlg', 'llm'],
+  aturan: ['aturan'],
+  sisa: ['antre', 'giliran', 'antre_nlg', 'ketik', 'simpan', 'jejak'],
+  output: [],
+};
+const KET_LIVE =
+  'Kotak terang = tahap yang sedang berjalan; waktunya berdetak. Antre thread otak dan antre thread penulis menyala di kotak yang sedang ditunggu (NLU atau LLM); lamanya dihitung ke kotak Antre + mengetik.';
+const KET_BOT =
+  'Waktu di bawah kotak dijumlah = total. Antre + mengetik = total dikurangi tahap yang diukur sendiri, dirinci menjadi antre thread otak (1 thread untuk semua room, juga dipakai IndoBERT membaca chat), antre thread penulis, jeda mengetik, simpan chat, dan lainnya (snapshot, giliran bicara, menyusun jejak, menunggu event loop).';
+const KET_MANUSIA =
+  'Waktu di bawah kotak = lama tiap tahap di server. NLU = antre thread otak (dipakai bersama langkah semua bot) + IndoBERT + simpan bacaan.';
+const KET_ERROR = 'Kotak merah ✗ = tahap tempat langkah gagal; kotak sesudahnya tidak dilalui.';
+// Alur langkah bot dari tahap live (langkah yang sedang berjalan) atau dari tahap gagal (jejak error).
+// aktif = kotak yang menyala; lama = ms tiap tahap live yang sudah lewat;
+// akhir = {live: kunci waktu} | {gagal: true, ms} | {selesai: true}.
+// Alur: 1 kotak sebelum aktif: selesai/tidak dilalui -> 2 kotak aktif: sedang/gagal -> 3 kotak sesudahnya: belum
+//       -> 4 catatan antre di kotak yang ditunggu
+function alurLangkah(aktif, label, lama, akhir) {
+  const ids = Object.keys(KOTAK_BOT),
+    iAktif = Math.max(0, ids.indexOf(aktif));
+  const jumlah = (id) => BAGIAN_LIVE[id].reduce((s, t) => s + (lama[t] || 0), 0);
+  const pernah = (id) => BAGIAN_LIVE[id].some((t) => t in lama);
+  return ids.map((id, i) => {
+    const [judul, isi] = KOTAK_BOT[id];
+    // Antre yang sudah lewat dicatat di kotak yang ditunggunya (bukan bila antre itu sendiri tahap yang menyala).
+    const catatan = [
+      id === 'nlu' && typeof lama.antre === 'number' && `antre thread otak ${duration(lama.antre)}`,
+      id === 'llm' &&
+        typeof lama.antre_nlg === 'number' &&
+        `antre thread penulis ${duration(lama.antre_nlg)}`,
+    ].filter((c) => c && !c.startsWith(label));
+    const k = { judul, isi, sisa: id === 'sisa', catatan };
+    if (i === iAktif) {
+      if (akhir.gagal)
+        return {
+          ...k,
+          keadaan: 'gagal',
+          waktu: `gagal saat ${label}${typeof akhir.ms === 'number' ? ` · ${duration(akhir.ms)}` : ''}`,
+        };
+      if (akhir.selesai) return { ...k, keadaan: 'selesai', waktu: `terakhir: ${label}` };
+      return { ...k, keadaan: 'sedang', waktu: `sedang ${label} · `, live: akhir.live };
+    }
+    if (i > iAktif)
+      return akhir.gagal
+        ? { ...k, catatan: [], keadaan: 'lewat', waktu: 'tidak dilalui' }
+        : { ...k, catatan: [], keadaan: 'belum', waktu: 'belum' };
+    if (id === 'input') return { ...k, keadaan: 'selesai', waktu: 'snapshot diambil' };
+    if (!pernah(id)) return { ...k, keadaan: 'lewat', waktu: 'tidak dilalui' };
+    return { ...k, keadaan: 'selesai', waktu: duration(jumlah(id)) };
+  });
+}
+// Alur langkah yang sedang berjalan: kotak tahap live menyala; item terpilih yang baru selesai berhenti di tahap
+// terakhirnya sampai jejaknya dimuat.
+function alurLive(l) {
+  const [aktif, label] = TAHAP_LIVE[l.live.tahap] || ['input', l.live.tahap];
+  return alurLangkah(
+    aktif,
+    label,
+    l.live.lama || {},
+    l.selesai ? { selesai: true } : { live: `bot|${l.live.id}|tahap` },
+  );
+}
+// Alur jejak error: kotak tahap gagal ditandai ✗. Tahap live (mis. masih antre thread otak) lebih tepat daripada
+// tahap brain_turn untuk berpikir dan menulis; jejak lama tanpa keduanya tidak punya alur.
+function alurError(trace) {
+  const KOTAK_GAGAL = {
+    lihat: 'input',
+    berpikir: 'fuzzy',
+    vote_aksi: 'engine',
+    chat_tim: 'engine',
+    tulis: 'llm',
+    kirim: 'output',
+    jejak: 'output',
+  };
+  const lama = trace.tahap_ms || {};
+  const tepat =
+    ['berpikir', 'tulis', 'chat_tim'].includes(trace.error_tahap) && TAHAP_LIVE[trace.tahap_live];
+  const [aktif, label] = tepat || [
+    KOTAK_GAGAL[trace.error_tahap] || 'input',
+    TAHAP_GAGAL[trace.error_tahap] || 'tahap tidak tercatat',
+  ];
+  return alurLangkah(aktif, label, lama, {
+    gagal: true,
+    ms: tepat ? lama[trace.tahap_live] : undefined,
+  });
+}
+// Kolom output jejak (JSON teks: action, target, chat tim); jejak rusak atau lama menjadi objek kosong.
+function keluaranJejak(trace) {
+  try {
+    return JSON.parse(trace.output || '{}') || {};
+  } catch {
+    return {};
+  }
+}
+// Alur langkah bot yang sudah selesai. Arti angka (timings, ms) mengikuti bot_controller: nlu_ms, logika_ms, dan
+// penjelasan_ms dari BrainRuntime.langkah; nlg_ms, llm_ms, dan aturan_ms dari waktu_jejak; antre, engine, chat tim,
+// mengetik, dan simpan dari LangkahBerjalan (checker_service); duration_ms = brain_turn sampai jejak dibuat.
+// Alur: 1 kotak tahap terukur -> 2 LLM dan cek aturan menurut status kalimat -> 3 sisa = total − tahap terukur
+//       -> 4 output
+function alurBot(trace) {
+  const t = trace.timings || {},
+    p = trace.penjelasan || {},
+    r = trace.ringkas || {};
+  const nlg = p.nlg || {},
+    e = p.engine,
+    keluaran = keluaranJejak(trace);
+  const status = nlg.status || r.nlg;
+  const terkirim = status === 'terkirim';
+  const percobaan = (nlg.percobaan_llm || []).map(String);
+  const lewatBatas = percobaan.some((s) => s.includes('melewati batas'));
+  const llmDipakai = terkirim && ((t.llm_ms || 0) > 0 || percobaan.length > 0);
+  const aksi = e?.action ?? keluaran.action,
+    target = e?.target ?? keluaran.target;
+  const metode = (p.bot || r.bot || {}).metode;
+  const ms = (x) => (typeof x === 'number' ? duration(x) : 'tidak tercatat');
+  const tanpaKalimat =
+    {
+      ditunda: TEKS_DITUNDA,
+      'tidak ada chat': 'tidak ada chat',
+      'tidak terkirim': 'kalimat tidak terkirim',
+    }[status] || 'tidak dilalui';
+  // Sisa hanya dihitung bila semua tahap yang lama bisa diukur ada angkanya; chat tim (bisa detik-an, LLM) wajib punya
+  // tim_ms, karena tanpa itu sisa tidak lagi berarti antre + mengetik.
+  const terukur = [
+    t.nlu_ms,
+    t.logika_ms,
+    t.penjelasan_ms,
+    ...(terkirim ? [t.nlg_ms] : []),
+    ...(keluaran.chat_tim ? [t.tim_ms] : []),
+  ];
+  const sisa =
+    typeof trace.duration_ms === 'number' && terukur.every((x) => typeof x === 'number')
+      ? Math.max(0, trace.duration_ms - terukur.reduce((a, b) => a + b, 0) - (t.engine_ms || 0))
+      : null;
+  const rincian = [
+    ['antre thread otak', t.antre_otak_ms],
+    ['antre thread penulis', t.antre_nlg_ms],
+    ['jeda mengetik', t.ketik_ms],
+    ['simpan chat', t.simpan_ms],
+  ].filter(([, v]) => typeof v === 'number');
+  const catatanSisa = rincian.map(([n, v]) => `${n} ${duration(v)}`);
+  if (sisa !== null && rincian.length)
+    catatanSisa.push(
+      `lainnya ${duration(Math.max(0, sisa - rincian.reduce((a, [, v]) => a + v, 0)))}`,
+    );
+  if (sisa !== null && typeof t.engine_ms !== 'number')
+    catatanSisa.push('termasuk vote/aksi ke engine (jejak lama)');
+  if (lewatBatas) catatanSisa.push('termasuk menunggu LLM sampai batas');
+  if (status === 'tidak terkirim') catatanSisa.push('termasuk menulis kalimat yang tidak terkirim');
+  const llm = !terkirim
+    ? { keadaan: 'lewat', waktu: tanpaKalimat }
+    : lewatBatas
+      ? { keadaan: 'gagal', waktu: 'melewati batas', catatan: ['kalimat dari templat cadangan'] }
+      : llmDipakai
+        ? {
+            keadaan: 'selesai',
+            waktu: ms(t.llm_ms),
+            catatan: [
+              nlg.sumber && nlg.sumber !== 'llm' && 'ditolak aturan → templat',
+              percobaan.length > 1 && `${percobaan.length} percobaan`,
+            ],
+          }
+        : { keadaan: 'lewat', waktu: 'tidak dipakai', catatan: ['kalimat dari templat'] };
+  return [
+    {
+      judul: 'Input',
+      isi: 'snapshot permainan',
+      keadaan: 'selesai',
+      waktu: 'seketika',
+      tip: 'Bot mengambil keadaan permainan miliknya (tanpa role pemain lain); lamanya masuk "lainnya".',
+    },
+    {
+      judul: 'NLU',
+      isi: KOTAK_BOT.nlu[1],
+      keadaan: 'selesai',
+      waktu: ms(t.nlu_ms),
+      catatan: [
+        p.nlu_dibaca &&
+          (p.nlu_dibaca.length ? `${p.nlu_dibaca.length} chat baru dibaca` : 'tanpa chat baru'),
+      ],
+      tip: 'nlu_ms: ingatan mencatat snapshot dan IndoBERT membaca chat baru (mendekati 0 bila diambil dari memo).',
+    },
+    {
+      judul: metode && metode !== 'fuzzy' ? METODE_LABEL[metode] || metode : 'Fuzzy',
+      isi: KOTAK_BOT.fuzzy[1],
+      keadaan: 'selesai',
+      waktu: ms(t.logika_ms),
+      tip: 'logika_ms: fuzzy_controller.putuskan memilih chat, vote, dan aksi.',
+    },
+    {
+      judul: 'Penjelasan',
+      isi: KOTAK_BOT.penjelasan[1],
+      keadaan: 'selesai',
+      waktu: ms(t.penjelasan_ms),
+      tip: 'penjelasan_ms: hanya untuk panel admin; tidak memengaruhi keputusan.',
+    },
+    {
+      judul: 'Engine',
+      isi:
+        aksi && aksi !== 'wait'
+          ? `${AKSI_LABEL[aksi] || aksi}${target ? ` → ${target}` : ''}`
+          : 'tidak ada vote/aksi',
+      keadaan: e?.ditolak ? 'gagal' : 'selesai',
+      waktu: typeof t.engine_ms === 'number' ? duration(t.engine_ms) : 'tidak diukur',
+      catatan: [
+        e?.ditolak && `ditolak engine: ${e.ditolak}`,
+        keluaran.chat_tim &&
+          `chat tim ${keluaran.chat_tim.status}${typeof t.tim_ms === 'number' ? ` · ${duration(t.tim_ms)}` : ''}`,
+      ],
+      tip: 'engine_ms: vote atau aksi rahasia diterapkan ke game (jejak lama: masuk Antre + mengetik).',
+    },
+    {
+      judul: 'LLM',
+      isi: llmDipakai || lewatBatas ? nlg.penulis || 'penulis LLM' : KOTAK_BOT.llm[1],
+      tip: 'llm_ms: total lama panggilan LLM untuk kalimat ini, termasuk percobaan ulang.',
+      ...llm,
+    },
+    {
+      judul: 'Cek aturan',
+      isi: KOTAK_BOT.aturan[1],
+      keadaan: terkirim ? 'selesai' : 'lewat',
+      waktu: terkirim ? ms(waktuAturan(t)) : tanpaKalimat,
+      catatan: [terkirim && nlg.pelanggaran?.length && `pelanggaran: ${teks(nlg.pelanggaran)}`],
+      tip: 'aturan_ms = lama menulis kalimat − lama LLM: menyusun prompt, memeriksa aturan, dan templat.',
+    },
+    {
+      judul: 'Antre + mengetik',
+      isi: KOTAK_BOT.sisa[1],
+      sisa: true,
+      keadaan: sisa === null ? 'lewat' : 'selesai',
+      waktu: sisa === null ? 'data tidak cukup' : duration(sisa),
+      catatan: catatanSisa,
+      tip: 'Total dikurangi NLU, Fuzzy, penjelasan, engine, chat tim, dan menulis kalimat. "Data tidak cukup" bila salah satunya tidak tercatat.',
+    },
+    {
+      judul: 'Output',
+      isi: terkirim
+        ? 'chat terkirim'
+        : status === 'ditunda'
+          ? 'chat ditunda'
+          : r.keputusan?.length
+            ? r.keputusan.map(teksKeputusan).join(' · ')
+            : 'diam',
+      keadaan: 'selesai',
+      waktu:
+        typeof trace.duration_ms === 'number'
+          ? `total ${duration(trace.duration_ms)}`
+          : 'tidak tercatat',
+      catatan: [
+        trace.stage === 'npc_brain_rejected' && 'vote/aksi ditolak engine (lihat kotak Engine)',
+      ],
+      tip: 'duration_ms: dari langkah dimulai sampai jejak dibuat (siaran chat dan arsip database tidak ikut).',
+    },
+  ];
+}
+// Detail langkah bot yang sedang berjalan: alur live (tahap sekarang berdenyut, waktunya berdetak).
+function renderLiveDetail(container, l) {
+  const b = l.live,
+    role = roleBot(b.nama);
+  container.replaceChildren();
+  container.classList.remove('empty-state');
+  const head = node('div', undefined, 'decision-head');
+  head.append(
+    node('strong', b.nama),
+    chip(l.selesai ? 'selesai' : 'sedang diproses', 'status-pending'),
+  );
+  if (role) head.append(chip(ROLE_LABEL[role] || role, roleClass(role)));
+  head.append(
+    l.selesai
+      ? node('span', `langkah ${b.langkah}`, 'room-meta')
+      : waktuBerdetak(`bot|${b.id}|total`, `langkah ${b.langkah} · berjalan `, '', 'room-meta'),
+  );
+  container.append(
+    head,
+    alurProses(alurLive(l), KET_LIVE),
+    node(
+      'p',
+      l.selesai
+        ? 'Langkah selesai; jejaknya sedang dimuat. Langkah diam (tanpa chat, vote, atau aksi) tidak dicatat.'
+        : 'Langkah ini belum punya jejak. Rincian keputusan muncul setelah langkah selesai; langkah diam (tanpa chat, vote, atau aksi) tidak dicatat.',
+      'hint',
+    ),
+  );
+}
+// Detail jejak error langkah bot: alur dengan tahap gagal ✗, lalu kotak error (jenis, pesan, tahap, waktu, bot).
+function renderError(container, trace) {
+  container.replaceChildren();
+  container.classList.remove('empty-state');
+  const role = roleBot(trace.sender);
+  const head = node('div', undefined, 'decision-head');
+  head.append(node('strong', trace.sender), chip('error', 'status-bad'));
+  if (role) head.append(chip(ROLE_LABEL[role] || role, roleClass(role)));
+  head.append(
+    node(
+      'span',
+      [trace.langkah && `langkah ${trace.langkah}`, waktu(trace.created_at)]
+        .filter(Boolean)
+        .join(' · '),
+      'room-meta',
+    ),
+  );
+  container.append(head);
+  if (trace.error_tahap || trace.tahap_live)
+    container.append(alurProses(alurError(trace), KET_ERROR));
+  const kotak = node('section', undefined, 'kotak-error');
+  kotak.setAttribute('aria-label', 'Error langkah bot');
+  kotak.append(
+    node('strong', `Error: ${trace.error || 'tidak diketahui'} — ${penjelasanError(trace)}`),
+    keyValues(
+      [
+        ['Jenis', trace.error || 'tidak tercatat'],
+        [
+          'Pesan',
+          trace.error_pesan ||
+            (trace.error_pesan !== ''
+              ? 'tidak tercatat (jejak lama)'
+              : trace.error === 'TimeoutError'
+                ? 'tanpa pesan (TimeoutError memang tidak berpesan)'
+                : 'tanpa pesan'),
+        ],
+        [
+          'Tahap gagal',
+          TAHAP_GAGAL[trace.error_tahap]
+            ? `${TAHAP_GAGAL[trace.error_tahap]}${trace.tahap_live ? ` · tahap live: ${KONDISI_TAHAP[trace.tahap_live] || trace.tahap_live}` : ''}`
+            : 'tidak tercatat (jejak lama)',
+        ],
+        [
+          'Waktu',
+          [
+            tanggal(trace.created_at),
+            typeof trace.duration_ms === 'number' && `gagal sesudah ${duration(trace.duration_ms)}`,
+          ]
+            .filter(Boolean)
+            .join(' · '),
+        ],
+        ['Batas waktu', trace.batas_detik ? `${trace.batas_detik} detik` : null],
+        [
+          'Bot',
+          `${trace.sender}${role ? ` (${ROLE_LABEL[role] || role})` : ''}${trace.langkah ? `, langkah ${trace.langkah}` : ''}`,
+        ],
+      ].filter(([, v]) => v !== null),
+    ),
+  );
+  const teknis = node('details'),
+    box = node('div', undefined, 'report');
+  renderReport(box, trace);
+  teknis.append(node('summary', 'Teknis: seluruh jejak'), box);
+  container.append(kotak, teknis);
+}
+// Polling live: alur item terpilih diganti bila tahapnya berubah, tanpa merender ulang detail (tab dan rincian yang
+// sedang terbuka tetap).
+function perbaruiAlurTerpilih() {
+  const container = $('trace-detail');
+  const live = liveTerlihat().find((l) => l.id === selectedTrace);
+  if (live) {
+    pasangAlur(container, alurProses(alurLive(live), KET_LIVE));
+    return;
+  }
+  const trace = traces.find((t) => t.id === selectedTrace);
+  if (trace && isHuman(trace) && liveChat.has(trace.id))
+    pasangAlur(container, alurProses(alurManusia(trace), KET_MANUSIA));
+}
+// Jejak otak bot dimuat lengkap sekali (cache); chat manusia dan error memakai kartunya sendiri; jejak lain laporan
+// lama. Item live dirender sekali per item; tahapnya diperbarui perbaruiAlurTerpilih.
 async function showDetail(trace) {
   const container = $('trace-detail');
-  const key = `${trace.id}|${trace.stage}|${trace.duration_ms}|${traces.length}`;
-  if (renderedDetail === key) return;
+  const key = trace.live
+    ? `live|${trace.id}|${trace.selesai ? 1 : 0}`
+    : `${trace.id}|${trace.stage}|${trace.duration_ms}|${traces.length}|${liveChat.has(trace.id)}`;
+  if (renderedDetail === key) {
+    perbaruiAlurTerpilih();
+    return;
+  }
   renderedDetail = key;
+  if (trace.live) {
+    renderLiveDetail(container, trace);
+    return;
+  }
+  if (trace.stage === 'npc_brain_error') {
+    renderError(container, trace);
+    return;
+  }
   const urut = [...visibleTraces()].reverse();
   const lama = () => sebelumnya(trace, urut, (t) => traceDetails.get(t.id)?.penjelasan);
   if (isHuman(trace)) {
@@ -749,39 +1722,30 @@ function processSteps(steps) {
   }
   return ol;
 }
-// Chat manusia: langkah server, bacaan NLU IndoBERT (intent, target), dan reaksi bot sesudahnya.
+// Chat manusia: alur proses di atas, isi chat, bacaan NLU IndoBERT (intent, target), dan reaksi bot sesudahnya.
 function renderHuman(container, trace, urut, onSelect) {
   container.replaceChildren();
   container.classList.remove('empty-state');
+  const live = liveChat.has(trace.id),
+    n = (liveChat.get(trace.id) || trace).nlu;
   const head = node('div', undefined, 'decision-head');
   head.append(node('strong', trace.sender), chip('manusia', 'status-muted'));
+  if (live) head.append(chip('sedang diproses', 'status-pending'));
   head.append(node('span', waktu(trace.created_at), 'room-meta'));
-  const t = trace.timings || {},
-    n = trace.nlu;
-  const steps = [['Diterima server dan izin chat diperiksa', null]];
-  if (t.persistence_ms !== undefined) steps.push(['Disimpan ke database', t.persistence_ms]);
-  if (t.broadcast_ms !== undefined) steps.push(['Dikirim ke semua pemain di room', t.broadcast_ms]);
-  const sasaran = n?.target?.length
-    ? `target ${n.target.map((x) => x.pemain).join(', ')}`
-    : 'tanpa target';
-  steps.push([
-    'NLU IndoBERT membaca maksud (intent) dan sasaran (target)',
-    t.nlu_ms ?? n?.ms ?? null,
-    n
-      ? `Hasil: intent ${n.intent} (keyakinan ${teks(n.confidence)}) · ${sasaran}`
-      : 'Belum dibaca: otak NPC belum siap saat pesan masuk, atau pesan dari versi lama.',
-  ]);
   container.append(
     head,
+    alurProses(alurManusia(trace), KET_MANUSIA),
+    node('h4', 'Isi chat', 'report-title'),
     node('pre', trace.message || '', 'output'),
-    node('h4', 'Langkah proses pesan', 'report-title'),
-    processSteps(steps),
   );
   if (n) {
     container.append(
-      node('h4', 'Bacaan NLU', 'report-title'),
+      node('h4', 'Bacaan NLU IndoBERT', 'report-title'),
       keyValues([
-        ['Intent', `${n.intent} (keyakinan ${teks(n.confidence)})`],
+        [
+          'Maksud (intent)',
+          `${INTENT_LABEL[n.intent] || n.intent} · ${n.intent} (keyakinan ${teks(n.confidence)})`,
+        ],
         ['Model', n.sumber],
       ]),
       dataTable({
@@ -794,7 +1758,16 @@ function renderHuman(container, trace, urut, onSelect) {
         'hint',
       ),
     );
-  }
+  } else
+    container.append(
+      node(
+        'p',
+        live
+          ? 'IndoBERT belum selesai membaca chat ini.'
+          : 'Belum dibaca IndoBERT: otak NPC belum siap saat pesan masuk, room masih lobby, atau pesan dari versi lama.',
+        'hint',
+      ),
+    );
   const i = urut.findIndex((x) => x.id === trace.id),
     reaksi = [];
   for (const x of urut.slice(i + 1)) {
@@ -805,7 +1778,9 @@ function renderHuman(container, trace, urut, onSelect) {
     const ul = node('ul', undefined, 'decision-list');
     for (const x of reaksi) {
       const bot = x.ringkas.bot || {},
-        keputusan = x.ringkas.keputusan?.length ? x.ringkas.keputusan.join(' · ') : 'diam';
+        keputusan = x.ringkas.keputusan?.length
+          ? x.ringkas.keputusan.map(teksKeputusan).join(' · ')
+          : 'diam';
       const b = node(
         'button',
         `${bot.nama} (${METODE_SINGKAT[bot.metode] || bot.metode || '?'}): ${keputusan} · ${duration(x.duration_ms)}`,
@@ -828,8 +1803,8 @@ function renderHuman(container, trace, urut, onSelect) {
   teknis.append(node('summary', 'Teknis: seluruh jejak'), box);
   container.append(teknis);
 }
-// Kartu keputusan bertab: Proses · Keputusan · Parameter · Penalaran metode · NLG · Teknis.
-// lama: penjelasan langkah sebelumnya bot yang sama (kolom perubahan di tab Proses), bila ada.
+// Kartu keputusan: alur proses di atas, lalu tab Rincian proses · Keputusan · Bahan bukti · Penalaran · Kalimat (NLG)
+// · Teknis. Tab tanpa isi disembunyikan. lama: penjelasan langkah sebelumnya bot yang sama (kolom perubahan).
 function renderDecision(container, trace, lama = null) {
   const p = trace.penjelasan;
   container.replaceChildren();
@@ -843,6 +1818,7 @@ function renderDecision(container, trace, lama = null) {
   head.append(node('strong', bot.nama || trace.sender));
   if (bot.role) head.append(chip(ROLE_LABEL[bot.role] || bot.role, roleClass(bot.role)));
   if (bot.metode) head.append(chip(METODE_LABEL[bot.metode] || bot.metode, 'status-good'));
+  if (trace.stage === 'npc_brain_rejected') head.append(chip('ditolak engine', 'status-bad'));
   const meta = [
     bot.persona && `persona ${bot.persona}`,
     bot.ronde && `ronde ${bot.ronde}`,
@@ -851,14 +1827,19 @@ function renderDecision(container, trace, lama = null) {
     waktu(trace.created_at),
   ].filter(Boolean);
   head.append(node('span', meta.join(' · '), 'room-meta'));
-  container.append(head);
+  container.append(head, alurProses(alurBot(trace), KET_BOT));
   if (p.catatan?.length) container.append(node('p', p.catatan.join(' '), 'hint status-pending'));
+  const ada = {
+    parameter: p.tersangka || p.khusus_peran || p.konteks || p.pengetahuan,
+    penalaran: Object.keys(p.penalaran || {}).length,
+    nlg: p.nlg,
+  };
   const tabs = [
-    ['proses', 'Proses', () => prosesTab(trace, p, lama)],
+    ['proses', 'Rincian proses', () => prosesTab(trace, p, lama)],
     ['keputusan', 'Keputusan', () => decisionTab(p)],
-    ['parameter', 'Parameter', () => parameterTab(p)],
+    ['parameter', 'Bahan bukti', () => parameterTab(p)],
     ['penalaran', `Penalaran ${METODE_LABEL[bot.metode] || ''}`.trim(), () => reasoningTab(p)],
-    ['nlg', 'NLG', () => nlgTab(p)],
+    ['nlg', 'Kalimat (NLG)', () => nlgTab(p)],
     [
       'teknis',
       'Teknis',
@@ -868,7 +1849,7 @@ function renderDecision(container, trace, lama = null) {
         return box;
       },
     ],
-  ];
+  ].filter(([id]) => !(id in ada) || ada[id]);
   const bar = node('div', undefined, 'decision-tabs');
   bar.setAttribute('role', 'tablist');
   const panel = node('div', undefined, 'decision-panel');
@@ -990,7 +1971,7 @@ function prosesTab(trace, p, lama) {
         `2. Logika ${METODE_LABEL[bot.metode] || bot.metode || ''}: menimbang bukti`,
         t.logika_ms ?? null,
         penalaran.length ? listOf(penalaran) : 'Tidak ada ringkasan penalaran.',
-        'Rincian hitungan ada di tab Parameter dan Penalaran.',
+        'Rincian hitungan (bila tercatat) ada di tab Bahan bukti dan Penalaran.',
       ],
       [
         '3. Keputusan',
@@ -1232,13 +2213,173 @@ function nlgTab(p) {
   );
   return box;
 }
-// Muat jejak terbaru/lama; tolak respons basi setelah logout atau pergantian ruangan.
+// ANTREAN THREAD (kotak paling bawah): pekerjaan yang menunggu atau sedang dikerjakan di thread otak dan thread penulis
+// semua room, dari registri EksekutorTercatat di server.
+const ANTREAN_JUDUL = {
+  otak: ['Thread otak', 'langkah berpikir bot dan IndoBERT membaca chat'],
+  penulis: ['Thread penulis', 'menulis kalimat bot (LLM atau templat)'],
+};
+// Satu kotak pekerjaan: urutan, status, room (bila beda room), siapa mengerjakan apa, dan lamanya (berdetak).
+function kotakAntrean(t, room) {
+  const dikerjakan = t.status === 'dikerjakan';
+  const li = node('li', undefined, `antrean-tugas keadaan-${dikerjakan ? 'sedang' : 'menunggu'}`);
+  const head = node('div', undefined, 'antrean-head');
+  head.append(
+    node('span', `#${t.urutan}`, 'antrean-urutan'),
+    node('span', `${TANDA[dikerjakan ? 'sedang' : 'menunggu']} ${t.status}`, 'antrean-status'),
+  );
+  if (t.room && t.room !== room) head.append(chip(`room ${t.room}`, 'status-muted'));
+  const siapa = t.siapa || 'tanpa nama';
+  li.append(
+    head,
+    node(
+      'p',
+      t.teks ? `${t.kerja} “${t.teks}” dari ${siapa}` : `${siapa} ${t.kerja}`,
+      'antrean-kerja',
+    ),
+    dikerjakan
+      ? waktuBerdetak(
+          `antre|${t.nomor}|berjalan`,
+          'dikerjakan ',
+          ` · sesudah antre ${duration(t.menunggu_ms)}`,
+          'antrean-waktu',
+        )
+      : waktuBerdetak(`antre|${t.nomor}|menunggu`, 'sudah menunggu ', '', 'antrean-waktu'),
+  );
+  return li;
+}
+// Render ulang hanya bila isi antrean berubah (masuk, mulai, keluar); lamanya berdetak sendiri.
+function renderAntrean() {
+  const box = $('checker-antrean');
+  if (!liveAntrean) {
+    if (box.dataset.kunci !== '') {
+      box.dataset.kunci = '';
+      box.textContent = 'Belum ada data antrean.';
+    }
+    return;
+  }
+  const room = $('checker-room').value;
+  const kunci = JSON.stringify(
+    Object.entries(liveAntrean).map(([nama, a]) => [
+      nama,
+      a.thread,
+      (a.tugas || []).map((t) => [t.nomor, t.urutan, t.status, t.room === room]),
+    ]),
+  );
+  if (box.dataset.kunci === kunci) return;
+  box.dataset.kunci = kunci;
+  box.replaceChildren(
+    ...Object.entries(liveAntrean).map(([nama, a]) => {
+      const [judul, isi] = ANTREAN_JUDUL[nama] || [nama, ''];
+      const tugas = a.tugas || [];
+      const menunggu = tugas.filter((t) => t.status !== 'dikerjakan').length;
+      // Satu baris memanjang per thread: keterangan di kiri, kotak pekerjaan berderet sesuai urutan di kanan.
+      const baris = node('section', undefined, 'antrean-baris'),
+        info = node('div', undefined, 'antrean-info');
+      info.append(
+        node('h4', `${judul} · ${a.thread} thread`, 'antrean-judul'),
+        node(
+          'p',
+          `${isi}. ${tugas.length - menunggu} dikerjakan, ${menunggu} menunggu.`,
+          'hint antrean-ringkas',
+        ),
+      );
+      baris.append(info);
+      if (!tugas.length) baris.append(node('p', 'Tidak ada antrean.', 'antrean-kosong'));
+      else {
+        const daftar = node('ol', undefined, 'antrean-daftar');
+        for (const t of tugas) daftar.append(kotakAntrean(t, room));
+        baris.append(daftar);
+      }
+      return baris;
+    }),
+  );
+}
+// Buang data live (ganti room atau logout).
+function kosongkanLive() {
+  liveBot = [];
+  liveChat = new Map();
+  liveKondisi = new Map();
+  liveAntrean = null;
+  livePilihan = null;
+  perluSegar = false;
+  liveBox.replaceChildren();
+  renderAntrean();
+}
+// Tanda tangan item live yang tampil: id berubah → daftar chat dirender ulang; tahap berubah → item live saja.
+function kunciLive() {
+  const live = liveTerlihat();
+  return {
+    ids: live.map((l) => l.id).join(','),
+    tahap: live.map((l) => `${l.live.tahap}${l.selesai ? '!' : ''}`).join(','),
+  };
+}
+// Terima hasil polling live dan render seperlunya supaya tidak berkedip: item live baru/hilang → daftar chat dirender
+// ulang (detail tetap), tahap berubah → item live dan alur terpilih saja, kondisi bot dan antrean → yang berubah saja.
+// Langkah yang selesai dengan jejak (bukan diam atau basi menurut hasil langkah terakhirnya), chat yang selesai, atau
+// item terpilih yang selesai memicu muat ulang daftar jejak supaya jejak akhirnya langsung tampil.
+// Alur: 1 simpan data -> 2 item live terpilih yang selesai ditandai -> 3 perlu muat ulang? -> 4 render bagian yang
+//       berubah -> 5 muat ulang daftar jejak
+function terimaLive(data) {
+  const kunciLama = kunciLive(),
+    botLama = liveBot,
+    chatLama = [...liveChat.keys()],
+    pilihanAda = Boolean(livePilihan && !livePilihan.hilang);
+  liveBot = data.bot || [];
+  liveChat = new Map((data.chat || []).map((c) => [c.id, c]));
+  liveKondisi = new Map((data.kondisi || []).map((k) => [k.nama, k]));
+  liveAntrean = data.antrean || null;
+  liveDiterima = performance.now();
+  if (livePilihan && !livePilihan.hilang) {
+    const kini = liveBot.find((b) => b.id === livePilihan.b.id);
+    if (kini) livePilihan.b = kini;
+    else Object.assign(livePilihan, { hilang: true, segar: segarKe });
+  }
+  const berjejak = (b) => {
+    const t = liveKondisi.get(b.nama)?.terakhir;
+    return !(t && t.langkah === b.langkah && ['diam', 'basi'].includes(t.hasil));
+  };
+  if (
+    botLama.some((b) => !liveBot.some((x) => x.id === b.id) && berjejak(b)) ||
+    (pilihanAda && livePilihan.hilang) ||
+    chatLama.some((id) => !liveChat.has(id)) ||
+    [...liveChat.keys()].some((id) => !traces.some((t) => t.id === id))
+  )
+    perluSegar = true;
+  const kunciBaru = kunciLive();
+  if (kunciBaru.ids !== kunciLama.ids) renderTraces();
+  else {
+    if (kunciBaru.tahap !== kunciLama.tahap) isiLiveBox();
+    perbaruiAlurTerpilih();
+  }
+  perbaruiKondisi();
+  renderAntrean();
+  if (perluSegar && !busy) checker().catch((error) => notice(error.message));
+}
+// Polling live tiap detik untuk room terpilih (tanpa database selain cek sesi).
+async function muatLive() {
+  const code = $('checker-room').value;
+  if (!code || liveBusy) return;
+  liveBusy = true;
+  const epoch = generation;
+  try {
+    const data = await request(`/api/panel/checker/${encodeURIComponent(code)}/proses`);
+    if (epoch === generation && token && code === $('checker-room').value) terimaLive(data);
+  } catch {
+    // Data live hanya tampilan; satu polling yang gagal tidak menghentikan Checker.
+  } finally {
+    liveBusy = false;
+  }
+}
+// Muat jejak terbaru/lama; tolak respons basi setelah logout atau pergantian ruangan. Sesudah halaman pertama dimuat,
+// data live langsung diambil supaya langkah yang sedang berjalan tidak menunggu polling berikutnya.
 async function checker(older = false) {
   if (busy) return;
   const code = $('checker-room').value;
   if (!code) {
     traces = [];
     checkerRoom = null;
+    kosongkanLive();
     renderRoomSummary();
     renderTraces();
     $('events').textContent = 'Pilih room.';
@@ -1260,20 +2401,24 @@ async function checker(older = false) {
     if (!older) {
       $('events').textContent = JSON.stringify(data.events, null, 2);
       checkerRoom = data.room || null;
+      segarKe++;
+      perluSegar = false;
     }
     renderRoomSummary();
     renderTraces();
+    if (!older) await muatLive();
   } finally {
     busy = false;
   }
 }
-// Pergantian room atau sesi: buang filter, cache penjelasan, dan tampilan detail lama.
+// Pergantian room atau sesi: buang filter, cache penjelasan, data live, dan tampilan detail lama.
 function resetChecker() {
   checkerRoom = null;
   traceFilter = '';
   selectedTrace = '';
   renderedDetail = '';
   traceDetails.clear();
+  kosongkanLive();
   $('room-summary').replaceChildren();
   $('room-summary').hidden = true;
 }
@@ -1346,9 +2491,9 @@ const ALUR_AI = {
     tujuan: 'Mengubah riwayat permainan menjadi angka 0–1 per pemain.',
     proses:
       'Dari chat ber-NLU dan vote dihitung tekanan, dukungan, plin plan, alihkan tuduhan, klaim role bermasalah, diam, dll. Hitman juga menilai ancaman; Spy menilai siapa yang perlu di-Guard.',
-    keluaran: 'Tabel bukti (lihat tab Parameter).',
+    keluaran: 'Tabel bukti (lihat tab Bahan bukti).',
     alasan:
-      'Penalaran menerima angka, bukan teks chat, jadi nilainya bisa diperiksa di tab Parameter.',
+      'Penalaran menerima angka, bukan teks chat, jadi nilainya bisa diperiksa di tab Bahan bukti.',
   },
   fl: {
     metode: 'fuzzy',
@@ -1416,7 +2561,7 @@ const ALUR_AI = {
     kode: 'penjelasan.jelaskan',
     tujuan: 'Mencatat alasan keputusan untuk admin.',
     proses: 'Parameter, penalaran, dan keputusan diringkas (maks 12 KB).',
-    keluaran: 'Isi tab Parameter, Penalaran, dan Keputusan.',
+    keluaran: 'Isi tab Bahan bukti, Penalaran, dan Keputusan.',
     alasan: 'Keputusan bot bisa diperiksa; tidak memengaruhi keputusan.',
   },
   engine: {
@@ -3168,6 +4313,13 @@ setInterval(() => {
   if (token && menu === 'checker' && $('auto-checker').checked && !document.hidden)
     checker().catch((error) => notice(error.message));
 }, 5000);
+// Data live Checker tiap detik (langkah berjalan, kondisi bot, antrean) dan detak waktu berjalan tiap 250 ms.
+setInterval(() => {
+  if (token && menu === 'checker' && $('auto-checker').checked && !document.hidden) muatLive();
+}, 1000);
+setInterval(() => {
+  if (menu === 'checker' && !document.hidden) detakLive();
+}, 250);
 
 // PILIHAN KUSTOM: dropdown bawaan browser diganti tombol + daftar bergaya panel. <select> asli tetap ada dan
 // disembunyikan, jadi nilai form, event change, dan kode lain yang membaca/menyetel .value tidak berubah.

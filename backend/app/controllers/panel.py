@@ -177,6 +177,15 @@ def checker_trace(code: str, trace_id: str, token=Depends(require_panel)):
     return jejak
 
 
+# Alur live Checker: langkah bot yang sedang berjalan, chat yang belum selesai, kondisi bot, dan antrean thread.
+# Async: dibaca di event loop yang sama dengan pengisi jejak, jadi tidak berebut dengan chat yang sedang diproses.
+@router.get("/api/panel/checker/{code}/proses")
+async def checker_proses(code: str, token=Depends(require_panel)):
+    if len(code) > 36:
+        raise HTTPException(422, "Kode room terlalu panjang.")
+    return panel_service.proses_checker(code)
+
+
 # Ambil halaman pesan sesuai filter tanpa memuat seluruh arsip.
 @router.get("/api/panel/history")
 def history(

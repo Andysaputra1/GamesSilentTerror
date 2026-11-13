@@ -501,7 +501,7 @@
                 Atur koneksi model, lalu uji satu putaran keputusan NPC dari teks hingga output.
               </p>
             </div>
-            <span class="badge">Qwen3 &middot; 14B</span>
+            <span class="badge">Koneksi bersama</span>
           </div>
           <div class="ai-layout ai-layout--tunggal">
             <section class="config-panel" aria-label="Pengaturan koneksi">
@@ -572,7 +572,7 @@
                     </p>
                   </div>
                   <p class="info">
-                    Model otomatis: <strong>qwen/qwen3-14b</strong><br /><span id="key-status"
+                    Model otomatis menu ini: <strong>qwen/qwen3-14b</strong>. Model penulis kalimat bot diatur di menu <strong>05 Otak NPC</strong>.<br /><span id="key-status"
                       >Memeriksa konfigurasi key...</span
                     >
                   </p>
@@ -590,62 +590,111 @@
         <section id="menu-checker" class="card" hidden>
           <div class="section-head">
             <div>
-              <span class="eyebrow">LIVE & ARCHIVED</span>
+              <span class="eyebrow">LIVE &amp; ARSIP</span>
               <h2>Checker per room</h2>
               <p>
-                Pilih room untuk melihat setiap bot: role, metode (Fuzzy; room lama bisa memuat Utility
-                AI atau Behavior Tree), parameter yang dibaca, cara metodenya menalar, dan keputusan
-                yang diambil.
+                Lihat apa yang terjadi di satu room: kondisi tiap bot, setiap chat dan langkah bot,
+                tahap mana yang sedang berjalan, dan berapa lama tiap tahap.
               </p>
             </div>
             <button id="refresh-checker" class="secondary">Refresh</button>
           </div>
-          <div class="toolbar">
-            <label
-              >Ruangan<select id="checker-room">
-                <option value="">Pilih ruangan</option>
-              </select></label
-            ><label
-              >Tampilkan<select id="checker-filter">
-                <option value="">Semua jejak</option>
-              </select></label
-            ><label class="check"
-              ><input id="auto-checker" type="checkbox" checked /> Update otomatis / 5 detik</label
-            >
-          </div>
-          <section
-            id="room-summary"
-            class="room-summary"
-            aria-label="Ringkasan room"
-            hidden
-          ></section>
-          <details class="room-legend">
-            <summary>Arti parameter dan cara membaca tiap metode</summary>
-            <div id="checker-legend"></div>
-          </details>
-          <p class="hint">
-            Room tampil seperti chat di game: gelembung = chat pemain atau bot, baris kecil =
-            langkah bot tanpa chat (vote, aksi rahasia, diam). Klik satu item untuk melihat
-            prosesnya: bacaan NLU, lama tiap tahap, penalaran metode, dan kalimat NLG. Jejak selesai
-            tersimpan; aktivitas fungsi adalah buffer live.
-          </p>
-          <div class="split chat-split">
-            <div>
-              <h3>Chat room</h3>
-              <button id="older-traces" class="secondary" hidden>Jejak lebih lama</button>
-              <div id="traces" class="chat-room"></div>
+          <section class="checker-bagian" aria-labelledby="judul-checker-room">
+            <h3 id="judul-checker-room" class="bagian-judul">
+              <span class="bagian-no">1</span> Pilih room
+            </h3>
+            <p class="hint bagian-petunjuk">
+              Room yang masih berjalan diperbarui otomatis; room lama dibaca dari arsip database.
+            </p>
+            <div class="toolbar">
+              <label
+                >Ruangan<select id="checker-room">
+                  <option value="">Pilih ruangan</option>
+                </select></label
+              ><label
+                >Tampilkan<select id="checker-filter">
+                  <option value="">Semua jejak</option>
+                </select></label
+              ><label class="check"
+                ><input id="auto-checker" type="checkbox" checked /> Update otomatis (jejak tiap 5
+                detik, proses live tiap 1 detik)</label
+              >
             </div>
-            <div>
-              <h3>Detail</h3>
-              <div id="trace-detail" class="report empty-state">
-                Pilih room dan jejak untuk melihat detail.
+            <ul class="legenda-keadaan" aria-label="Arti warna dan ikon">
+              <li class="keadaan-sedang"><span class="alur-tanda">●</span> sedang berjalan</li>
+              <li class="keadaan-selesai"><span class="alur-tanda">✓</span> selesai</li>
+              <li class="keadaan-menunggu"><span class="alur-tanda">…</span> menunggu</li>
+              <li class="keadaan-gagal"><span class="alur-tanda">✗</span> error / ditolak</li>
+              <li class="keadaan-tidakbisa">
+                <span class="alur-tanda">⊘</span> tidak bisa bertindak
+              </li>
+              <li class="keadaan-lewat">
+                <span class="alur-tanda">–</span> redup = belum dimulai / tidak dilalui
+              </li>
+            </ul>
+          </section>
+          <section class="checker-bagian" aria-labelledby="judul-checker-ringkasan">
+            <h3 id="judul-checker-ringkasan" class="bagian-judul">
+              <span class="bagian-no">2</span> Ringkasan room
+            </h3>
+            <p class="hint bagian-petunjuk">
+              Fase, ronde, komposisi role, dan kondisi tiap bot saat ini. Klik nama bot untuk
+              menampilkan jejak bot itu saja.
+            </p>
+            <section
+              id="room-summary"
+              class="room-summary"
+              aria-label="Ringkasan room"
+              hidden
+            ></section>
+            <details class="room-legend">
+              <summary>Arti parameter dan cara membaca tiap metode</summary>
+              <div id="checker-legend"></div>
+            </details>
+          </section>
+          <section class="checker-bagian" aria-labelledby="judul-checker-chat">
+            <h3 id="judul-checker-chat" class="bagian-judul">
+              <span class="bagian-no">3</span> Chat room dan detail
+            </h3>
+            <p class="hint bagian-petunjuk">
+              Chat dan langkah bot tampil seperti di game (lama di atas, terbaru di bawah). Klik satu
+              item: detailnya dimulai dengan alur proses, lalu rinciannya per tab.
+            </p>
+            <div class="split chat-split">
+              <div>
+                <h4 class="kolom-judul">Chat room</h4>
+                <ul class="legenda-item" aria-label="Jenis item chat">
+                  <li class="legenda-manusia">chat manusia</li>
+                  <li class="legenda-bot">chat bot</li>
+                  <li class="legenda-langkah">langkah bot tanpa chat</li>
+                  <li class="legenda-error">error</li>
+                </ul>
+                <button id="older-traces" class="secondary" hidden>Jejak lebih lama</button>
+                <div id="traces" class="chat-room"></div>
+              </div>
+              <div>
+                <h4 class="kolom-judul">Detail item terpilih</h4>
+                <div id="trace-detail" class="report empty-state">
+                  Pilih room dan jejak untuk melihat detail.
+                </div>
               </div>
             </div>
-          </div>
-          <details>
-            <summary>Aktivitas fungsi di room</summary>
-            <pre id="events">Belum ada aktivitas.</pre>
-          </details>
+            <details class="checker-teknis">
+              <summary>Teknis: aktivitas fungsi di room (buffer live)</summary>
+              <pre id="events">Belum ada aktivitas.</pre>
+            </details>
+          </section>
+          <section class="checker-bagian" aria-labelledby="judul-checker-antrean">
+            <h3 id="judul-checker-antrean" class="bagian-judul">
+              <span class="bagian-no">4</span> Antrean
+            </h3>
+            <p class="hint bagian-petunjuk">
+              Siapa sedang antre untuk apa. Thread otak (1 thread) mengerjakan langkah berpikir bot dan
+              IndoBERT membaca setiap chat; thread penulis (3 thread) menulis kalimat bot. Keduanya
+              dipakai bersama semua room, jadi pekerjaan room lain ikut tampil dengan label room-nya.
+            </p>
+            <div id="checker-antrean" class="antrean">Belum ada data antrean.</div>
+          </section>
         </section>
         <section id="menu-history" class="card" hidden>
           <div class="section-head">

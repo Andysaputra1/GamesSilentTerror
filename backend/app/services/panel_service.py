@@ -20,7 +20,7 @@ from urllib.parse import urlsplit
 from app.config.database import PersistenceError, jalankan_transaksi
 from app.config.settings import settings
 from app.models import panel_queries
-from app.bot.bot_controller import brain_runtime
+from app.bot.bot_controller import brain_runtime, npc_service
 from app.bot.nlg.pengaturan import POLA_MODEL_TAUTAN
 from app.services.activity_service import activity
 from app.services.ai_config_service import ai_runtime, simpan_konfigurasi_ai
@@ -293,6 +293,12 @@ def jejak_checker(code, trace_id):
         lambda database: panel_queries.checker_trace(database, trace_id, code)
     )
     return None if jejak_arsip is None else _baca_kolom_json(jejak_arsip)
+
+
+# Data live Checker (polling tiap detik, tanpa database): langkah bot yang sedang berjalan, chat manusia yang belum
+# selesai diproses, antrean thread otak/penulis semua room, dan kondisi tiap bot room ini.
+def proses_checker(code):
+    return {**checker_service.proses_berjalan(code), "kondisi": npc_service.kondisi_bot(code)}
 
 
 # Periksa rentang tanggal WIB, konversi ke UTC, lalu bangun kondisi SQL berparameter.
