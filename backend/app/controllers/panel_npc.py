@@ -334,9 +334,11 @@ KODE_ALUR = {
     ],
     "nlg_templat": [
         (NLG, "kalimat_templat", [
-            ("kalimat_mirip(teks, hindari)", "kalimat yang mirip dengan yang baru terdengar dipakai paling akhir"),
-            ("urutan_varian(p)", "varian sesuai rencana"),
+            ("urutan_varian(p, persona)", "varian bersama dan varian persona, diputar per bot dan rencana"),
             ("ubah_kata_ganti(teks, persona)", "gaya bahasa persona"),
+            ("persis = max(", "kapan kalimat yang persis sama terakhir terdengar"),
+            ("kemiripan(teks, hindari[i]) >= MIRIP_MAKS", "kapan kalimat yang mirip terakhir terdengar"),
+            ("sorted(calon, key=calon.get)", "yang belum terdengar dulu, lalu yang paling lama tidak terdengar"),
         ]),
     ],
     "kirim": [

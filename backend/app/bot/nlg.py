@@ -11,7 +11,8 @@ Alurnya
        meminta tulis ulang bila fakta panjang disalin hampir utuh
    2.3 Lolos: kalimat dipakai. Ditolak: alasannya ikut ke percobaan berikutnya. Salinan fakta tetap dipakai bila
        percobaan ulang gagal
-3. Templat: kalimat_templat dicoba satu per satu, varian pertama yang lolos aturan dipakai
+3. Templat: kalimat_templat dicoba satu per satu, varian pertama yang lolos aturan dipakai. Varian yang belum terdengar
+   dicoba lebih dulu, lalu yang paling lama tidak terdengar
 4. Cadangan: tidak ada varian yang lolos, varian pertama tetap dipakai
 5. tulis_chat_tim menulis paket siapkan_nlg_tim: LLM, lalu templat, tanpa IndoBERT; kalimatnya boleh kosong
 6. Rantai penulis (PenulisNPC): urutan jalur dan model dari panel, cek tiap jalur di latar, dan status untuk panel
@@ -288,6 +289,202 @@ VARIASI = {
     ],
 }
 
+# Varian tambahan per persona untuk kelompok yang paling sering diucapkan berulang oleh bot yang sama, terutama bela diri di
+# Tribunal: rencana yang sama bisa datang sampai sepuluh kali dalam satu fase. Ditulis langsung dengan kata ganti persona,
+# bentuknya sengaja berbeda dari varian bersama, dan dipilih dari bacaan IndoBERT di ketiga persona seperti varian di atas.
+# Bela diri tetap memuat "bukan Hitman", dan bela orang tetap memuat penolakan vote di depan nama, supaya labelnya sama.
+VARIASI_PERSONA = {
+    "bela_diri/tanpa_bukti": {
+        "santai": [
+            "Aku bukan Hitman, sumpah. Nuduh tanpa bukti gitu cuma bikin kita salah pilih.",
+            "Lho kok aku? Aku bukan Hitman, buktinya mana coba?",
+            "Aku bukan Hitman kok. Tuduhannya cuma tebakan, belum ada bukti apa-apa.",
+            "Beneran deh, aku bukan Hitman. Jangan nuduh orang tanpa bukti ya.",
+            "Aku bukan Hitman, dan sampai sekarang nggak ada bukti yang nunjuk ke aku.",
+            "Santai dulu, aku bukan Hitman. Tuduhan ke aku itu nggak ada dasarnya.",
+            "Aku ngerti kalian curiga, tapi aku bukan Hitman. Buktinya belum ada sama sekali.",
+            "Aku bukan Hitman, nggak ada satu pun bukti soal itu.",
+        ],
+        "gaul": [
+            "Gw bukan Hitman, sumpah. Nuduh tanpa bukti gitu malah bikin kita salah pilih.",
+            "Lah kok gw? Gw bukan Hitman, buktinya mana?",
+            "Gw bukan Hitman, bro. Tuduhan lu cuma tebakan, gak ada buktinya.",
+            "Serius, gw bukan Hitman. Jangan asal nuduh tanpa bukti dong.",
+            "Gw bukan Hitman, dan sampe sekarang gak ada bukti yang ngarah ke gw.",
+            "Santai dulu, gw bukan Hitman. Tuduhan ke gw tuh gak ada dasarnya.",
+            "Gw ngerti kalian curiga, tapi gw bukan Hitman. Buktinya belum ada sama sekali.",
+            "Gw bukan Hitman, gak ada bukti satu pun soal itu.",
+        ],
+        "kalem": [
+            "Saya bukan Hitman. Menuduh tanpa bukti hanya akan membuat kita salah pilih.",
+            "Mengapa saya? Saya bukan Hitman, dan belum ada bukti yang menunjukkan sebaliknya.",
+            "Saya bukan Hitman. Tuduhan itu masih dugaan, belum ada buktinya.",
+            "Saya mohon jangan menuduh tanpa bukti, karena saya bukan Hitman.",
+            "Saya bukan Hitman, dan sampai sekarang tidak ada bukti yang mengarah ke saya.",
+            "Tenang dulu, saya bukan Hitman. Tuduhan kepada saya belum punya dasar.",
+            "Saya mengerti kalian curiga, tetapi saya bukan Hitman. Buktinya belum ada sama sekali.",
+            "Saya bukan Hitman, tidak ada satu pun bukti soal itu.",
+        ],
+    },
+    "bela_diri/bahaya_salah_vote": {
+        "santai": [
+            "Tolong jangan vote aku ya, sekali salah pilih kita bisa kalah.",
+            "Aku bukan Hitman, jadi jangan vote aku. Kita nggak punya ruang buat salah vote.",
+        ],
+        "gaul": [
+            "Plis jangan vote gw, sekali salah pilih kita langsung kalah.",
+            "Gw bukan Hitman, jangan vote gw. Kita gak bisa salah vote lagi sekarang.",
+        ],
+        "kalem": [
+            "Mohon jangan vote saya, karena satu salah pilih bisa membuat kita kalah.",
+            "Saya bukan Hitman, jadi jangan vote saya. Kita tidak punya ruang untuk salah vote.",
+        ],
+    },
+    "bela_diri/tunjuk_orang": {
+        "santai": [
+            "Aku bukan Hitman kok, malah {t} yang dari tadi aneh.",
+            "Aku bukan Hitman, beneran. Yang patut dicurigai itu {t}, bukan aku.",
+            "Aku bukan Hitman lho, yang aneh malah {t}.",
+            "Aku bukan Hitman, aku malah curiga sama {t}.",
+            "Sumpah, aku bukan Hitman. Justru {t} yang dari tadi mencurigakan.",
+        ],
+        "gaul": [
+            "Gw bukan Hitman, yang aneh tuh malah {t}.",
+            "Gw bukan Hitman, gw malah curiga sama {t}.",
+            "Gw bukan Hitman kok, malah {t} yang dari tadi aneh banget.",
+            "Gw bukan Hitman, mending curigain {t} aja.",
+            "Gw bukan Hitman. Yang lebih mencurigakan tuh {t}, bukan gw.",
+        ],
+        "kalem": [
+            "Saya tegaskan saya bukan Hitman, justru sikap {t} yang lebih mencurigakan.",
+            "Mohon dipertimbangkan, saya bukan Hitman. Yang lebih mencurigakan adalah {t}.",
+            "Saya bukan Hitman, saya justru curiga kepada {t}.",
+            "Saya bukan Hitman, dan menurut saya yang lebih aneh adalah {t}.",
+            "Saya bukan Hitman. Kalau boleh jujur, justru {t} yang lebih patut dicurigai.",
+        ],
+    },
+    "bela_diri/tunjuk_orang_bahaya": {
+        "santai": [
+            "Kita nggak boleh salah vote sekarang, bisa kalah. Aku bukan Hitman, yang patut dicurigai itu {t}.",
+            "Aku bukan Hitman kok, beneran. {t} malah yang aneh dari tadi, jangan sampai suara kita salah sasaran.",
+            "Tolong jangan salah pilih ya, taruhannya kita kalah. Aku bukan Hitman, coba curigai {t} aja.",
+            "Aku bukan Hitman, jadi jangan buang suara ke aku. {t} lebih pantas dicurigai, salah vote bisa fatal.",
+            "Ini genting lho, satu salah vote bisa bikin kalah. Aku bukan Hitman, sementara {t} justru mencurigakan.",
+            "Aku bukan Hitman, justru aku curiga sama {t}. Hati-hati, salah vote bisa bikin kita kalah.",
+            "Aku bukan Hitman lho. Justru {t} yang mencurigakan, jangan sampai kita kalah gara-gara salah vote.",
+        ],
+        "gaul": [
+            "Gw bukan Hitman, serius. Mending curigain {t}, salah vote dikit aja kita bisa kalah.",
+            "Gw bukan Hitman, jadi jangan buang suara ke gw. {t} lebih layak dicurigain, salah vote bisa fatal.",
+            "Gw bukan Hitman, sumpah, justru {t} yang mencurigakan. Salah vote sekarang kita bisa kalah.",
+            "Gw bukan Hitman, yang aneh tuh malah {t}. Jangan sampe kita salah vote terus kalah.",
+            "Hati-hati, salah vote bisa bikin kalah. Gw bukan Hitman, justru {t} yang lebih aneh.",
+            "Gw bukan Hitman. Yang lebih mencurigakan tuh {t}, jangan sampe kita kalah gara-gara salah vote.",
+            "Gw bukan Hitman kok, malah {t} yang dari tadi aneh banget. Salah vote sekarang bahaya.",
+        ],
+        "kalem": [
+            "Mohon hati-hati, salah vote bisa membuat kita kalah. Saya bukan Hitman, justru {t} yang patut dicurigai.",
+            "Saya tegaskan saya bukan Hitman. Sikap {t} justru lebih mencurigakan, jadi mari jangan sampai salah vote.",
+            "Saya bukan Hitman, jadi jangan sia-siakan suara untuk saya. Yang lebih mencurigakan adalah {t}, dan salah vote bisa membuat kita kalah.",
+            "Saya bukan Hitman, sungguh. Kecurigaan saya ke {t}, dan saya khawatir kita kalah kalau salah vote.",
+            "Satu salah vote bisa membuat kita kalah. Saya bukan Hitman, dan menurut saya yang lebih mencurigakan adalah {t}.",
+            "Saya bukan Hitman. Justru {t} yang menurut saya lebih mencurigakan, dan kita tidak boleh salah vote sekarang.",
+            "Saya bukan Hitman, saya justru curiga kepada {t}. Mohon hati-hati, salah vote bisa membuat kita kalah.",
+        ],
+    },
+    "bela_orang/terlalu_awal": {
+        "santai": [
+            "Jangan vote {t} dulu deh, kita belum tahu banyak.",
+            "Jangan vote {t} dulu ya, kita baru mulai dan belum ada petunjuk.",
+        ],
+        "gaul": [
+            "Jangan vote {t} dulu, masih kepagian, bro.",
+            "Jangan vote {t} dulu, info kita masih dikit banget.",
+        ],
+        "kalem": [
+            "Sebaiknya jangan vote {t} dulu, kita belum punya cukup informasi.",
+            "Mohon tahan dulu, jangan vote {t}. Masih terlalu dini untuk memutuskan.",
+        ],
+    },
+    "bela_orang/ada_pembela": {
+        "santai": [
+            "Tunggu dulu, jangan vote {t}. Tuduhannya masih pendapat, dan ada yang belain dia juga.",
+            "Jangan buru-buru vote {t} ya, masih ada yang belain dia. Tuduhannya juga baru sebatas pendapat.",
+            "Masih ada yang membela {t}, jadi jangan vote dia dulu deh.",
+        ],
+        "gaul": [
+            "Tahan dulu, jangan vote {t}. Tuduhannya masih opini, ada yang belain dia juga.",
+            "Jangan main vote {t} dulu lah, masih ada yang belain dia.",
+            "Jangan vote {t} dulu, bro. Tuduhannya cuma opini, masih ada yang belain dia.",
+        ],
+        "kalem": [
+            "Mohon jangan buru-buru vote {t}. Tuduhan kepadanya masih pendapat, dan ada yang membelanya.",
+            "Sebaiknya kita jangan vote {t} dulu, karena masih ada yang membela dia.",
+            "Jangan vote {t} dulu, tuduhan kepadanya belum kuat dan masih ada pembelanya.",
+        ],
+    },
+    "bela_orang/ada_pembela_bahaya": {
+        "santai": [
+            "Jangan vote {t} dulu ya, masih ada yang belain dia. Salah vote sekarang bisa bikin kita kalah.",
+            "Jangan buru-buru vote {t}, ada yang membela dia. Kita nggak boleh salah vote sekarang.",
+        ],
+        "gaul": [
+            "Jangan vote {t} dulu, masih ada yang belain. Salah vote sekarang kita bisa kalah.",
+            "Jangan main vote {t}, dia masih dibelain orang. Salah dikit aja kita kalah.",
+        ],
+        "kalem": [
+            "Mohon jangan vote {t} dulu, masih ada yang membelanya. Salah vote sekarang bisa membuat kita kalah.",
+            "Sebaiknya jangan buru-buru vote {t}, karena masih ada yang membela dan salah vote bisa berakibat kalah.",
+        ],
+    },
+    # Nama penuduh tetap sesudah sangkalan, seperti varian bersama balik_tuduh.
+    "tuduh/balik_tuduh": {
+        "santai": [
+            "Aku bukan Hitman, dan yang bikin curiga malah {t}, nuduh aku tanpa dasar.",
+            "Lho, aku bukan Hitman. {t} justru yang aneh, nuduh aku tanpa bukti apa-apa.",
+        ],
+        "gaul": [
+            "Gw bukan Hitman, yang aneh malah {t}, asal nuduh gw doang.",
+            "Gw bukan Hitman, bro. Justru {t} yang aneh, nuduh gw tanpa bukti gitu.",
+        ],
+        "kalem": [
+            "Saya bukan Hitman, dan sikap {t} yang menuduh saya tanpa bukti justru mencurigakan.",
+            "Saya tegaskan saya bukan Hitman. Yang lebih aneh adalah {t}, menuduh saya tanpa dasar.",
+        ],
+    },
+    "tanya_info/ruangan_hening": {
+        "santai": [
+            "Sepi banget nih dari tadi. Ada yang mau mulai cerita?",
+            "Kok pada hening sih? Ayo dong, siapa yang punya cerita?",
+        ],
+        "gaul": [
+            "Sepi amat nih. Ada yang mau buka obrolan?",
+            "Pada ke mana nih, kok sepi? Ayo ngobrol.",
+        ],
+        "kalem": [
+            "Suasananya sepi sekali. Ada yang ingin memulai cerita?",
+            "Belum ada yang bercerita sejak tadi. Silakan, siapa yang mau berbagi?",
+        ],
+    },
+    "tanya_info/pertanyaan_umum": {
+        "santai": [
+            "Kalian curiga sama siapa nih? Ceritain dong alasannya.",
+            "Yuk tukar pikiran, siapa yang menurut kalian paling patut dicurigai dan kenapa?",
+            "Aku pengen dengar pendapat kalian, siapa yang kalian curigai dan apa alasannya?",
+        ],
+        "gaul": [
+            "Ada yang punya clue? Siapa yang kalian curigain, kasih alasannya juga dong.",
+            "Ayo share, siapa yang menurut kalian paling patut dicurigain, terus kenapa?",
+            "Gw pengen denger dari kalian, siapa yang kalian curigain dan alasannya apa?",
+        ],
+        "kalem": [
+            "Siapa yang kalian curigai sejauh ini? Mohon sertakan alasannya.",
+            "Saya ingin mendengar pendapat kalian, siapa yang paling patut dicurigai dan mengapa?",
+            "Mari kita berbagi pendapat, siapa yang kalian curigai dan apa alasannya?",
+        ],
+    },
+}
+
 TEMPLAT_TIM = {
     "hitman": {
         "pilih_target": ["Aku incar {t}. {b1}", "Malam ini aku pilih {t}. {b1}", "Malam ini aku pilih {t}.",
@@ -341,9 +538,13 @@ def isi_templat(pola, p):
             pola = pola.replace(slot, nilai)
     return re.sub(r"\s+", " ", pola).strip()
 
-# Urutan varian deterministik per pesan; bot/rencana berbeda mendapat urutan berbeda.
-def urutan_varian(p):
-    daftar = VARIASI[kelompok_varian(p)]
+# Urutan dasar varian satu pesan: varian bersama kelompok lalu varian persona, diputar sebanyak sidik sha256 dari pembicara
+# dan rencana. Bot atau rencana berbeda mendapat urutan berbeda; masukan yang sama selalu mendapat urutan yang sama.
+# Ronde dan fase sengaja tidak ikut: giliran varian untuk rencana yang berulang sudah diatur kalimat_templat dari kalimat
+# yang baru terdengar, jadi pilihan varian hanya berubah bila memang ada pengulangan.
+def urutan_varian(p, persona="santai"):
+    kelompok = kelompok_varian(p)
+    daftar = VARIASI[kelompok] + VARIASI_PERSONA.get(kelompok, {}).get(persona, [])
     kunci = json.dumps([p["pembicara"], p["aksi"], p.get("jenis"), p["target"], p["bukti"]], ensure_ascii=False)
     geser = int(hashlib.sha256(kunci.encode("utf-8")).hexdigest(), 16) % len(daftar)
     return daftar[geser:] + daftar[:geser]
@@ -379,21 +580,33 @@ def kalimat_cadangan(p):
     return {"offend": f"Aku curiga sama {t}.", "defend": f"{t} bukan Hitman menurutku.",
             "neutral": f"{t}, pendapatmu gimana?"}[p["intent"]]
 
-# Semua kalimat templat yang mungkin, sudah diberi persona. Kalimat yang mirip dengan yang baru terdengar di room
-# diletakkan paling belakang dan tetap ikut dicoba, karena mengulang lebih baik daripada mengganti maksud rencana.
-# Alur: 1 isi tiap varian sesuai rencana -> 2 ubah kata ganti persona -> 3 yang mirip kalimat
-#       baru terdengar ditaruh paling belakang -> 4 tanpa varian: kalimat cadangan
+# Semua kalimat templat yang mungkin, sudah diberi persona, urut dari yang paling layak dikirim. hindari = kalimat yang baru
+# terdengar, dari yang paling lama ke yang paling baru (kalimat bot ini lalu chat terbaru room, siapa pun pengirimnya).
+# Kalimat yang persis atau hampir sama dengan salah satunya tetap ikut dicoba, karena mengulang lebih baik daripada mengganti
+# maksud rencana, tetapi ditaruh di belakang: yang belum terdengar dulu, lalu yang hanya mirip, lalu yang persis sama. Di
+# antara yang sudah terdengar, yang paling lama tidak terdengar didahulukan, jadi varian dipakai bergiliran.
+# Alur: 1 isi tiap varian sesuai rencana -> 2 ubah kata ganti persona -> 3 kapan terakhir terdengar kalimat yang persis
+#       sama dan yang mirip -> 4 urutkan: belum terdengar, mirip paling lama, persis paling lama -> 5 tanpa varian:
+#       kalimat cadangan
 def kalimat_templat(p, persona, hindari=()):
-    baru, ulang = [], []
-    for pola in urutan_varian(p):
+    dasar_hindari = [bentuk_dasar(h) for h in hindari]
+    calon = {}
+    for pola in urutan_varian(p, persona):
         teks = isi_templat(pola, p)
         if teks is None:
             continue
         teks = ubah_kata_ganti(teks, persona)
-        if teks in baru or teks in ulang:
+        if teks in calon:
             continue
-        (ulang if kalimat_mirip(teks, hindari) else baru).append(teks)
-    return baru + ulang or [ubah_kata_ganti(kalimat_cadangan(p), persona)]
+        # Letak terakhir di hindari, makin besar makin baru; -1 berarti belum terdengar. Persis dibandingkan pada bentuk
+        # dasarnya, jadi "Gw bukan Hitman" dari bot lain sama dengan "Aku bukan Hitman". Kalimat yang persis sama tidak
+        # perlu dihitung kemiripannya: dua kalimat dengan letak persis yang sama juga sama bentuk dasarnya.
+        dasar = bentuk_dasar(teks)
+        persis = max((i for i, h in enumerate(dasar_hindari) if h == dasar), default=-1)
+        mirip = persis if persis >= 0 else next(
+            (i for i in range(len(hindari) - 1, -1, -1) if kemiripan(teks, hindari[i]) >= MIRIP_MAKS), -1)
+        calon[teks] = (persis, mirip, len(calon))
+    return sorted(calon, key=calon.get) or [ubah_kata_ganti(kalimat_cadangan(p), persona)]
 
 AKHIRAN_NAMA_NLG = ("nya", "lah", "kah", "pun", "mu", "ku")
 
