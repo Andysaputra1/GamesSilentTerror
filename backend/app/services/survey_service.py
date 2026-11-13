@@ -10,6 +10,7 @@ import time
 
 from sqlalchemy.exc import IntegrityError
 
+from app.models import auth_queries
 from app.models import survey_queries as queries
 from app.config.database import PersistenceError, jalankan_transaksi
 from app.services.room_service import room_service
@@ -470,20 +471,31 @@ class SurveyService:
         return jalankan_transaksi(queries.export_rows)
 
     # PANEL: pengisi survei. Jawaban dikelompokkan per kiriman (satu akun di satu pertandingan), kiriman terbaru
-    # di atas, ditambah jumlah kiriman, orang, dan pertandingan. Teks pertanyaan diambil dari salinan saat dijawab.
-    # Alur: 1 baris jawaban (berkelompok per kiriman, urut posisi pertanyaan) -> 2 satu kiriman per (pertandingan,
+    # di atas, ditambah jumlah kiriman, orang, dan pertandingan. Teks pertanyaan diambil dari salinan saat dijawab;
+    # nama yang tampil adalah nama tampilan akun (username bila akunnya sudah tidak ada).
+    # Alur: 1 baris jawaban dan nama tampilan pengisinya dalam satu transaksi -> 2 satu kiriman per (pertandingan,
     #       akun) -> 3 jawaban dengan salinan pertanyaannya -> 4 terbaru dulu -> 5 jumlah kiriman, orang, pertandingan
     def respondents(self):
+        def ambil_jawaban_dan_nama(database):
+            daftar_baris = queries.export_rows(database)
+            daftar_username = sorted({baris["username"] for baris in daftar_baris})
+            profil = (
+                auth_queries.account_profiles(database, daftar_username) if daftar_username else []
+            )
+            return daftar_baris, {baris.username: baris.display_name for baris in profil}
+
+        daftar_baris, nama_tampilan = jalankan_transaksi(ambil_jawaban_dan_nama)
         kolom_kiriman = ("match_id", "room_code", "username", "role", "team", "outcome")
         kolom_salinan = ("prompt", "kind", "scale_min", "scale_max", "label_min", "label_max")
         kiriman = {}
-        for baris in jalankan_transaksi(queries.export_rows):
+        for baris in daftar_baris:
             waktu = baris["created_at"]
             waktu = waktu.isoformat() if hasattr(waktu, "isoformat") else str(waktu)
             satu_kiriman = kiriman.setdefault(
                 (baris["match_id"], baris["username"]),
-                {**{kolom: baris[kolom] for kolom in kolom_kiriman}, "created_at": waktu,
-                 "bots": baris.get("bots") or "", "answers": []},
+                {**{kolom: baris[kolom] for kolom in kolom_kiriman},
+                 "display_name": nama_tampilan.get(baris["username"]) or baris["username"],
+                 "created_at": waktu, "bots": baris.get("bots") or "", "answers": []},
             )  # fmt: skip
             satu_kiriman["created_at"] = min(satu_kiriman["created_at"], waktu)
             salinan = baris.get("question_snapshot")

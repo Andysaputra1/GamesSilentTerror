@@ -506,7 +506,8 @@ class SurveyExportTests(unittest.TestCase):
             {**dasar, "created_at": datetime(2026, 11, 13, 4, 30), "match_id": "m1", "username": "cici",
              "value_number": 2},
         ]  # fmt: skip
-        with patch("app.services.survey_service.jalankan_transaksi", return_value=rows):
+        nama = {"budi": "Budi Santoso"}  # cici tidak punya akun lagi: tampil sebagai username
+        with patch("app.services.survey_service.jalankan_transaksi", return_value=(rows, nama)):
             hasil = SurveyService().respondents()
         self.assertEqual(
             (hasil["total_submissions"], hasil["total_people"], hasil["total_matches"]), (3, 2, 2)
@@ -517,6 +518,9 @@ class SurveyExportTests(unittest.TestCase):
                                                                 ("m1", "budi")]
         )  # fmt: skip
         budi_m1 = kiriman[2]
+        self.assertEqual(
+            [k["display_name"] for k in kiriman], ["Budi Santoso", "cici", "Budi Santoso"]
+        )
         self.assertEqual(budi_m1["created_at"], "2026-11-13T04:00:00")
         self.assertEqual(budi_m1["bots"], "NOX:fuzzy:santai")
         self.assertEqual(kiriman[0]["bots"], "")

@@ -2361,7 +2361,7 @@ function lipatanIsianSurvei(judul, daftarJawaban) {
   const lipatan = node('details', undefined, 'survey-isian');
   const daftar = node('ul');
   for (const jawaban of daftarJawaban)
-    daftar.append(node('li', `${jawaban.username}: ${jawaban.value_text}`));
+    daftar.append(node('li', `${jawaban.nama}: ${jawaban.value_text}`));
   lipatan.append(node('summary', `${judul} (${daftarJawaban.length})`), daftar);
   return lipatan;
 }
@@ -2379,7 +2379,7 @@ function diagramSurvei(nomor, pertanyaan, daftarKiriman) {
           jawaban.question_id === pertanyaan.id &&
           (berskala ? jawaban.value_number != null : (jawaban.value_text ?? '') !== ''),
       )
-      .map((jawaban) => ({ ...jawaban, username: kiriman.username })),
+      .map((jawaban) => ({ ...jawaban, nama: kiriman.display_name ?? kiriman.username })),
   );
 
   // 2 judul dengan jumlah jawaban, rata-rata untuk skala, dan tanda nonaktif
@@ -2438,11 +2438,11 @@ function teksBotSurvei(bots) {
 }
 // Satu kiriman di daftar pengisi: baris ringkas dan baris rincian tersembunyi berisi semua isiannya.
 // Klik nama membuka atau menutup rinciannya.
-// Alur: 1 baris ringkas (waktu, nama, room, role, hasil, jumlah jawaban) -> 2 baris rincian: pertanyaan
-//       dan jawaban, bot, nomor pertandingan -> 3 tombol nama membuka/menutup rincian
+// Alur: 1 baris ringkas (waktu, nama tampilan, room, role, hasil, jumlah jawaban) -> 2 baris rincian: pertanyaan
+//       dan jawaban, bot, username dan nomor pertandingan -> 3 tombol nama membuka/menutup rincian
 function barisPengisiSurvei(kiriman) {
   // 1 baris ringkas
-  const tombolNama = node('button', kiriman.username, 'tombol-nama');
+  const tombolNama = node('button', kiriman.display_name ?? kiriman.username, 'tombol-nama');
   tombolNama.type = 'button';
   tombolNama.setAttribute('aria-expanded', 'false');
   const selNama = node('td');
@@ -2474,7 +2474,9 @@ function barisPengisiSurvei(kiriman) {
   selRincian.append(daftarJawaban);
   if (kiriman.bots)
     selRincian.append(node('p', `Bot di pertandingan ini: ${teksBotSurvei(kiriman.bots)}`, 'hint'));
-  selRincian.append(node('p', `Pertandingan ${kiriman.match_id}`, 'hint'));
+  selRincian.append(
+    node('p', `Akun ${kiriman.username} · pertandingan ${kiriman.match_id}`, 'hint'),
+  );
   rincian.append(selRincian);
 
   // 3 buka/tutup rincian

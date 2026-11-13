@@ -295,11 +295,12 @@ test('survei: jumlah pengisi, diagram per pertanyaan, dan isian tiap nama dibuka
     total_people: 2,
     total_matches: 1,
     respondents: [
-      { match_id: 'm1', room_code: 'ABC123', username: evil, role: 'spy', team: 'civilians',
+      { match_id: 'm1', room_code: 'ABC123', username: 'akun_evil', display_name: evil, role: 'spy',
+        team: 'civilians',
         outcome: 'won', created_at: '2026-11-13T05:00:00', bots: 'NOX:fuzzy:santai | RAVEN:fuzzy:tegas',
         answers: [jawab(kemiripan, 5, null), jawab(aspek, null, `Lainnya: lebih ${evil}`),
           jawab(saran, null, evil)] },
-      { match_id: 'm1', room_code: 'ABC123', username: 'budi', role: 'hitman', team: 'hitman',
+      { match_id: 'm1', room_code: 'ABC123', username: 'budi', role: 'hitman', team: 'hitman', // tanpa nama tampilan
         outcome: 'lost', created_at: '2026-11-13T04:59:00', bots: '',
         answers: [jawab(kemiripan, 4, null), jawab(aspek, null, 'Kewajaran bahasa'),
           jawab(saran, null, null)] },
@@ -336,9 +337,9 @@ test('survei: jumlah pengisi, diagram per pertanyaan, dan isian tiap nama dibuka
   assert.match(diagram[1].querySelector('.survey-isian').textContent, /Isian Lainnya \(1\)/);
   // Teks bebas: isian kosong tidak dihitung.
   assert.match(diagram[2].querySelector('figcaption').textContent, /1 jawaban/);
-  assert.match(diagram[2].querySelector('.survey-isian li').textContent, /onerror/);
+  assert.match(diagram[2].querySelector('.survey-isian li').textContent, /^<img .*onerror.*: </);
 
-  // Daftar pengisi: klik nama membuka dan menutup semua isiannya.
+  // Daftar pengisi memakai nama tampilan (username bila tidak ada); klik nama membuka dan menutup isiannya.
   const tombol = [...doc.querySelectorAll('#survey-respondent-rows .tombol-nama')];
   assert.deepEqual(teks(tombol), [evil, 'budi']);
   const rincian = tombol[0].closest('tr').nextElementSibling;
@@ -350,6 +351,7 @@ test('survei: jumlah pengisi, diagram per pertanyaan, dan isian tiap nama dibuka
     '5 dari 5 (Sangat setuju)', `Lainnya: lebih ${evil}`, evil,
   ]); // prettier-ignore
   assert.match(rincian.textContent, /NOX \(fuzzy, santai\), RAVEN \(fuzzy, tegas\)/);
+  assert.match(rincian.textContent, /Akun akun_evil · pertandingan m1/);
   tombol[0].onclick();
   assert.equal(rincian.hidden, true);
   assert.match(tombol[1].closest('tr').textContent, /Hitman · kalah2 dari 3/);
