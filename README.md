@@ -34,8 +34,8 @@ Game ini bagian dari skripsi. Naskah penelitiannya:
 
 **Dokumen web** ada di panel administrator, menu **08 Dokumen** (berkas `backend/public/dokumen/`). Mulailah dari
 **Peta Dokumen**, yang menjelaskan isi dan urutan baca dokumen lain: Arsitektur Sistem, ERD, Proses AI, Bedah Alur
-Backend, Diagram Alir NLU, Kode NLU Intent, Kode NLU Target, Diagram Alir Fuzzy Logic, Bedah Otak Fuzzy, Cara Kerja
-Bot, dan Kode Fuzzy Logic. Berkas HTML di repo adalah salinan hasil pembangun dokumen di
+Backend, Dataset NLU, Diagram Alir NLU, Kode NLU Intent, Kode NLU Target, Diagram Alir Fuzzy Logic, Bedah Otak
+Fuzzy, Cara Kerja Bot, Kode Fuzzy Logic, dan Kode NLG. Berkas HTML di repo adalah salinan hasil pembangun dokumen di
 `communicationfolder/<topik>-<tanggal>/`, folder lokal yang tidak ikut Git. Ubah sumbernya, bangun ulang, lalu
 salin hasilnya ke `backend/public/dokumen/`.
 

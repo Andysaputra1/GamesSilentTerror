@@ -132,12 +132,17 @@ Semua logika bot ada di `backend/app/bot/`. Kode inilah sumber logika game; note
 | `ingatan.py` | Bahan: `Ingatan` satu bot, lalu chat, vote, dan fakta menjadi angka bukti 0–1 per pemain (`hitung_bukti`, `pengetahuan_peran`, `fitur_hitman`, `fitur_lindung`). Tidak ada fuzzy di sini |
 | `fuzzy_controller.py` | Main controller: `putuskan` dan semua logika di sekitar pemanggilan fuzzy, berurutan [FUZZY 1] → Tribunal → Diskusi → Malam → bungkus keputusan |
 | `fuzzy/` | Fungsi fuzzy saja: satu sistem = satu fungsi. `mesin.py` berisi kurva, pembangun sistem Mamdani, cache, dan `SEMUA_SISTEM` |
-| `nlg.py` | Penulis kalimat: rantai LLM (OpenRouter, lalu link LLM sendiri), templat, pemeriksa aturan, chat tim |
+| `nlg_controller.py` | Main controller NLG: `tulis_pesan` (chat publik) dan `tulis_chat_tim` (chat tim) menyusun urutan tahap [PROMPT] → [PENULIS LLM] → [PERIKSA ATURAN], paling banyak 2 percobaan LLM, lalu [TEMPLAT] dan cadangan |
+| `nlg/` | Isi penulis kalimat, satu file per tahap: `prompt.py` [PROMPT] perintah untuk LLM, `penulis.py` [PENULIS LLM] rantai OpenRouter lalu link LLM sendiri, `aturan.py` [PERIKSA ATURAN] pemeriksa aturan, `templat.py` [TEMPLAT] persona dan varian templat, `pengaturan.py` [PANEL] rantai penulis yang diatur panel (`PenulisNPC`) |
 | `penjelasan.py` | Penjelasan keputusan bot untuk panel Checker |
 | `simulasi.py` | Simulasi panel menu 07 dengan engine, otak, NLU, dan NLG yang sama |
 
 Arah impor: `fuzzy_controller` mengimpor `ingatan` dan `fuzzy/`; `ingatan` tidak mengimpor file bot lain; file di
-`fuzzy/` hanya mengimpor `fuzzy/mesin.py`. `BrainRuntime._muat` memuat modul otak saat server menyala.
+`fuzzy/` hanya mengimpor `fuzzy/mesin.py`. Polanya sama di NLG: `nlg_controller` mengimpor tahap di `nlg/` dan
+memanggilnya lewat nama modul (`prompt.buat_prompt`, `aturan.periksa_aturan`, `templat.kalimat_templat`); antartahap
+hanya `prompt` → `aturan` dan `templat`, `penulis` → `aturan`, serta `pengaturan` → `penulis`. `BrainRuntime._muat`
+memuat modul otak saat server menyala. Penjelasan susunan NLG ada di dokumen Bedah Otak Fuzzy, bagian NLG
+(*Susunan kode NLG*).
 
 ### Satu langkah bot
 
@@ -150,8 +155,8 @@ waktunya:
 3. `room_service.pilihan_bot`: vote atau aksi rahasia diterapkan hanya bila fase yang dilihat bot belum berganti.
 4. Chat tim bila ada rekan manusia (`room_service.chat_tim_bot`), tanpa lantai bicara, database, siaran, atau NLU.
 5. Chat publik: `NPCService._ambil_giliran_bicara` (lantai bicara, paling banyak `LANTAI_MAKS` = 3 bot menyusun
-   bersamaan tanpa rencana kembar) → kalimat `nlg.py` yang dicek aturan → `room_service.chat_bot` (simpan) →
-   `emit_room("receive_chat")`.
+   bersamaan tanpa rencana kembar) → kalimat dari `nlg_controller.tulis_pesan` yang dicek aturan →
+   `room_service.chat_bot` (simpan) → `emit_room("receive_chat")`.
 6. Jejak untuk panel (`isi_jejak`), lalu IndoBERT membaca kalimat bot itu.
 
 ### Urutan `putuskan`
