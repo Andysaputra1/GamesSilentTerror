@@ -51,7 +51,7 @@ backend/
   public/panel/             Halaman panel administrator (HTML, CSS, JS)
   public/dokumen/           Dokumen web panel menu 08 (salinan dari communicationfolder/)
   artifacts/indobert/       Model IndoBERT intent dan target (disalin manual, diabaikan Git)
-  migrations/               Skema SQL V01–V11
+  migrations/               Skema SQL V01–V12
   deployment/               Dockerfile.azure dan Caddyfile
   scripts/                  Alat operasional: create_user.py, setup_panel.py, setup_azure.py
   tests/                    Tes, tiruan, rekaman jejak, simulasi (lihat Tes dan simulasi)

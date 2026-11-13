@@ -5,129 +5,836 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Diagram Alir NLU</title>
 <style>
-/* Laporan teknis satu kolom; bagan alir lebar penuh dengan scroll sendiri di layar kecil. Tanpa sumber luar. */
 :root {
-  --bg: #f6f8f7; --surface: #ffffff; --fg: #1c2421; --muted: #5a6964; --rule: #d3dcd8;
-  --accent: #0c6668; --accent-soft: #e0efee; --note: #7a5200; --note-soft: #fbf0d9; --code-bg: #edf1ef;
-  --font-body: "Segoe UI", system-ui, sans-serif; --font-head: Georgia, "Times New Roman", serif;
-  --font-mono: Consolas, "Courier New", monospace;
+  --bg: #f7f6f2; --panel: #ffffff; --fg: #20242a; --muted: #5d6570; --rule: #d9d6cc;
+  --accent: #0b6b6b; --accent-soft: #dcedeb; --code: #eeeadf; --kode: #e7e3d6; --kode-fg: #4c4a3c;
+  --setuju: #d8eedd; --setuju-fg: #1c5a2d; --usul: #fbe9c6; --usul-fg: #71500b;
+  --live: #d6e6f7; --live-fg: #164a7a; --tolak: #f6d9d6; --tolak-fg: #7c2a22;
+  --wc: #5b6b5b; --ws: #1a7f37; --wk: #b42318; --wn: #0b5cad; --wd: #6f42c1; --wf: #0b5cad;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #101715; --surface: #161f1c; --fg: #e2eae7; --muted: #98a9a3; --rule: #2b3935;
-    --accent: #5ec4bf; --accent-soft: #15302d; --note: #f0bb5a; --note-soft: #2f2610; --code-bg: #1b2522;
+    --bg: #14181c; --panel: #1c2228; --fg: #e4e8ec; --muted: #a0aab4; --rule: #333c45;
+    --accent: #5ec4bf; --accent-soft: #173431; --code: #262d34; --kode: #333a40; --kode-fg: #d6d9cf;
+    --setuju: #1f3c29; --setuju-fg: #a9dfb7; --usul: #443414; --usul-fg: #f2d290;
+    --live: #1b3550; --live-fg: #aed2f4; --tolak: #472421; --tolak-fg: #f0b9b3;
+    --wc: #9aa79a; --ws: #7ee2a8; --wk: #ff9b8f; --wn: #8cc4ff; --wd: #c8a8ff; --wf: #8cc4ff;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #101715; --surface: #161f1c; --fg: #e2eae7; --muted: #98a9a3; --rule: #2b3935;
-  --accent: #5ec4bf; --accent-soft: #15302d; --note: #f0bb5a; --note-soft: #2f2610; --code-bg: #1b2522;
+  --bg: #14181c; --panel: #1c2228; --fg: #e4e8ec; --muted: #a0aab4; --rule: #333c45;
+  --accent: #5ec4bf; --accent-soft: #173431; --code: #262d34; --kode: #333a40; --kode-fg: #d6d9cf;
+  --setuju: #1f3c29; --setuju-fg: #a9dfb7; --usul: #443414; --usul-fg: #f2d290;
+  --live: #1b3550; --live-fg: #aed2f4; --tolak: #472421; --tolak-fg: #f0b9b3;
+  --wc: #9aa79a; --ws: #7ee2a8; --wk: #ff9b8f; --wn: #8cc4ff; --wd: #c8a8ff; --wf: #8cc4ff;
   color-scheme: dark;
 }
+/* Nama lama yang dipakai komponen khusus tiap dokumen, diarahkan ke token yang sama. */
+:root { --surface: var(--panel); --ink: var(--fg); --line: var(--rule); --code-bg: var(--code);
+        --lo: var(--setuju-fg); --lo-soft: var(--setuju); --mid: var(--usul-fg); --mid-soft: var(--usul);
+        --hi: var(--tolak-fg); --hi-soft: var(--tolak); --note: var(--usul-fg); --note-soft: var(--usul);
+        --mono: ui-monospace, SFMono-Regular, Consolas, monospace; --body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        --font-mono: var(--mono); --font-body: var(--body); --font-head: var(--body); --display: var(--body);
+        --jarak-h1: 4.5rem; --jarak-h2: 2.6rem; --jarak-kartu: 1.6rem; --lebar-isi: 980px; --lebar-di: 280px; }
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--fg); font: 15.5px/1.65 var(--font-body);
-  padding: 40px max(16px, env(safe-area-inset-right, 0px)) 80px max(16px, env(safe-area-inset-left, 0px)); }
-main { max-width: 900px; margin: 0 auto; display: grid; gap: 8px; }
-h1, h2, h3 { font-family: var(--font-head); font-weight: 600; text-wrap: balance; line-height: 1.25; margin: 0; }
-h1 { font-size: 2rem; }
-h2 { font-size: 1.45rem; margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--rule); }
-h3 { font-size: 1.08rem; margin-top: 4px; font-family: var(--font-body); }
-p, ul, ol { margin: 6px 0; max-width: 72ch; }
-li { margin: 4px 0; }
-.eyebrow { font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
-.lede { color: var(--muted); font-size: 1.02rem; }
-.meta { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; font-size: 0.92rem; margin-top: 10px; }
-.meta dt { color: var(--muted); }
-.meta dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
-code { font-family: var(--font-mono); font-size: 0.88em; background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
-nav ol { display: flex; flex-wrap: wrap; gap: 6px 20px; padding: 0; list-style: none; margin: 14px 0 0; max-width: none; }
-nav a { color: var(--accent); text-decoration: none; font-weight: 500; }
-nav a:hover, nav a:focus-visible { text-decoration: underline; }
-.note { background: var(--note-soft); border-left: 3px solid var(--note); padding: 10px 14px; border-radius: 0 6px 6px 0; }
-.note b { color: var(--note); }
-figure { margin: 16px 0 8px; background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 16px; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.6 var(--body); overflow-wrap: break-word; }
+main { max-width: var(--lebar-isi); margin: 0 auto; padding: 24px 16px 64px; min-width: 0; }
+p { margin: .6em 0; }
+a { color: var(--accent); }
+code { background: var(--code); padding: .1em .35em; border-radius: 4px; font: .88em var(--mono); overflow-wrap: anywhere; }
+pre { background: var(--code); padding: 12px 14px; border-radius: 8px; overflow-x: auto; font: .84rem/1.5 var(--mono); max-width: 100%; }
+pre code { background: none; padding: 0; }
+.tabel { overflow-x: auto; margin: .7em 0 1em; max-width: 100%; }
+table { border-collapse: collapse; width: 100%; background: var(--panel); font-size: .93rem; }
+th, td { border: 1px solid var(--rule); padding: 7px 9px; text-align: left; vertical-align: top; }
+th { background: var(--code); font-weight: 600; }
+caption { text-align: left; font-weight: 600; padding: 0 0 6px; }
+ul, ol { padding-left: 1.4em; }
+li { margin: .25em 0; }
+.kecil { color: var(--muted); font-size: .9rem; }
+.kotak { background: var(--panel); border: 1px solid var(--rule); border-left: 5px solid var(--accent); border-radius: 6px; padding: 10px 16px; margin: 1em 0; }
+.kotak.tunda { border-left-color: var(--usul-fg); }
+.b { display: inline-block; padding: .05em .55em; border-radius: 999px; font-size: .78rem; font-weight: 600; white-space: nowrap; }
+.b.k { background: var(--kode); color: var(--kode-fg); } .b.s { background: var(--setuju); color: var(--setuju-fg); }
+.b.u { background: var(--usul); color: var(--usul-fg); } .b.l { background: var(--live); color: var(--live-fg); }
+.b.t { background: var(--tolak); color: var(--tolak-fg); }
+/* Tingkatan: Title, Subtitle, Heading 1 (bagian bernomor), Heading 2 (subbagian), kartu (isi berulang) */
+h1 { font-size: 2.4rem; line-height: 1.2; margin: .3em 0 .2em; text-wrap: balance; }
+.subjudul { color: var(--muted); font-size: 1rem; margin: 0 0 1.6em; }
+h2 { display: flex; flex-wrap: nowrap; align-items: center; gap: .6em; font-size: 1.6rem; line-height: 1.25; margin: var(--jarak-h1) 0 1rem;
+     padding: .55em .8em; border-left: 8px solid var(--accent); border-radius: 8px; background: var(--code); scroll-margin-top: 12px; }
+h2 > .tombol-kode, h2 > .panah-lipat { flex: none; }
+h2 .nomor { flex: none; min-width: 1.7em; text-align: center; border-radius: 6px; background: var(--accent); color: var(--panel); }
+h3 { font-size: 1.25rem; line-height: 1.3; margin: var(--jarak-h2) 0 .6rem; padding-bottom: .3em; border-bottom: 2px solid var(--rule);
+     scroll-margin-top: 12px; }
+h4 { font-size: 1.05rem; margin: 1.3em 0 .3em; scroll-margin-top: 12px; }
+h5, h6 { font-size: 1rem; margin: 1.1em 0 .3em; }
+.kartu { margin: var(--jarak-kartu) 0; padding: 2px 18px 12px; background: var(--panel); border: 1px solid var(--rule); border-radius: 10px;
+         min-width: 0; scroll-margin-top: 12px; }
+.kartu.f1 { border-top: 5px solid var(--live-fg); } .kartu.f2 { border-top: 5px solid var(--setuju-fg); }
+.kartu.rumus { border-top: 5px dashed var(--kode-fg); } .kartu.aksen { border-top: 5px solid var(--accent); }
+.kartu.masuk { border-top: 5px solid var(--muted); } .kartu.keluar { border-top: 5px solid var(--accent); }
+.kartu.proses { border-top: 5px solid var(--usul-fg); }
+.kartu > h3, .kartu > h4, .kartu > .kepala-kartu > h3 { margin: .9em 0 .5em; padding: 0; border: 0; font-size: 1.15rem; }
+.kartu p > strong:first-child, .kartu li > strong:first-child { font-size: .78rem; letter-spacing: .04em; text-transform: uppercase; color: var(--accent); }
+.kepala-kartu { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.letak { font: .78rem var(--mono); color: var(--muted); overflow-wrap: anywhere; }
+.lencana-kartu { display: inline-block; margin-right: .35em; padding: .05em .55em; border-radius: 999px; font: 700 .72rem/1.5 var(--body); vertical-align: .15em; }
+.lencana-kartu.f1 { background: var(--live-fg); color: var(--panel); } .lencana-kartu.f2 { background: var(--setuju-fg); color: var(--panel); }
+.lencana-kartu.rumus { background: var(--kode-fg); color: var(--panel); }
+.lencana-kartu.masuk { background: var(--muted); color: var(--panel); } .lencana-kartu.proses { background: var(--usul-fg); color: var(--panel); }
+.lencana-kartu.keluar { background: var(--accent); color: var(--panel); }
+.grid-kartu { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 14px; margin: var(--jarak-kartu) 0; }
+.grid-kartu > .kartu { margin: 0; }
+.ringkasan { margin: 2.2rem 0 0; padding: 10px 18px 8px; background: var(--panel); border: 1px solid var(--rule); border-left: 7px solid var(--accent);
+             border-radius: 8px; }
+.ringkasan-judul { margin: 0 0 .2em; font-weight: 700; color: var(--accent); }
+.ringkasan-judul::before { content: "≡ "; }
+.ringkasan ul { margin: .2em 0 .4em; }
+.sub-kartu { margin: 1.1em 0 .3em; font-size: .78rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--accent); }
+/* Pop-up kotak diagram: dari mana, artinya, dipakai untuk */
+#pohon-pop { position: absolute; z-index: 80; width: max-content; max-width: min(340px, calc(100vw - 16px)); padding: 8px 12px;
+             background: var(--panel); color: var(--fg); border: 1px solid var(--rule); border-left: 4px solid var(--accent);
+             border-radius: 8px; box-shadow: 0 6px 24px rgba(0, 0, 0, .28); font-size: .86rem; line-height: 1.4; }
+#pohon-pop[hidden] { display: none; }
+#pohon-pop p { margin: .25em 0; }
+#pohon-pop .pop-judul { font-weight: 700; }
+#pohon-pop a, #pohon-pop button.pop-kode { display: inline-block; margin-top: .2em; font-weight: 600; }
+#pohon-pop button.pop-kode { margin-left: .6em; padding: 0 8px; border: 1px solid var(--accent); border-radius: 6px; background: var(--panel);
+                             color: var(--accent); font: 600 .8rem/1.6 var(--body); cursor: pointer; }
+[data-p-judul] { cursor: help; }
+svg [data-p-judul]:focus { outline: none; }
+svg [data-p-judul]:hover > :is(rect, polygon, path:first-child), svg [data-p-judul]:focus-visible > :is(rect, polygon, path:first-child) {
+  stroke: var(--accent); stroke-width: 3; }
+.pop-kotak { outline-offset: 2px; }
+.pop-kotak:focus-visible { outline: 2px solid var(--accent); }
+/* Daftar isi kiri */
+.tata { max-width: calc(var(--lebar-isi) + var(--lebar-di) + 64px); margin: 0 auto; }
+#daftar-isi { font-size: .9rem; }
+#daftar-isi ul { list-style: none; margin: 0; padding: 0; }
+#daftar-isi a { display: block; padding: 3px 8px; border-radius: 6px; color: var(--fg); text-decoration: none; }
+#daftar-isi a:hover { background: var(--code); }
+#daftar-isi a.aktif { background: var(--live); color: var(--live-fg); font-weight: 600; }
+#daftar-isi .di-h1 > a { font-weight: 600; margin-top: 4px; }
+#daftar-isi .di-h1 .nomor { display: inline-block; min-width: 1.6em; color: var(--accent); }
+#daftar-isi details > summary { list-style: none; cursor: pointer; padding: 1px 8px 1px 30px; color: var(--muted); font-size: .8rem; }
+#daftar-isi details > summary::-webkit-details-marker { display: none; }
+#daftar-isi details > summary::before { content: "▸ "; } #daftar-isi details[open] > summary::before { content: "▾ "; }
+#daftar-isi details a { padding-left: 30px; color: var(--muted); font-size: .84rem; }
+.di-tombol { font: inherit; font-weight: 600; padding: 6px 14px; border: 1px solid var(--rule); border-radius: 8px; background: var(--panel);
+             color: var(--fg); cursor: pointer; }
+@media (min-width: 1100px) {
+  .tata { display: grid; grid-template-columns: var(--lebar-di) minmax(0, 1fr); gap: 32px; }
+  #daftar-isi { position: sticky; top: 0; height: 100vh; overflow-y: auto; padding: 22px 8px 40px 16px; border-right: 1px solid var(--rule); }
+  .di-tombol { display: none; }
+  main { margin: 0; }
+}
+@media (max-width: 1099px) {
+  #daftar-isi { position: sticky; top: 0; z-index: 40; padding: 8px 16px; background: var(--bg); border-bottom: 1px solid var(--rule); }
+  #daftar-isi .di-isi { display: none; max-height: 70vh; overflow-y: auto; margin-top: 8px; }
+  #daftar-isi.buka .di-isi { display: block; }
+}
+/* Panel Kode: tombol, panel, potongan kode, ringkasan alur, mini-alur */
+.tombol-kode { margin-left: auto; padding: 2px 10px; border: 1px solid var(--accent); border-radius: 6px; background: var(--panel);
+               color: var(--accent); font: 700 .78rem/1.5 var(--body); cursor: pointer; vertical-align: .2em; white-space: nowrap; }
+.tombol-kode::before { content: "</> "; }
+.tombol-kode:hover, .tombol-kode:focus-visible { background: var(--accent); color: var(--panel); outline: none; }
+h3 .tombol-kode, h4 .tombol-kode, .kepala-kartu .tombol-kode { margin-left: .5em; }
+body.panel-buka { overflow: hidden; }
+.panel-kode { position: fixed; inset: 0; z-index: 70; display: flex; align-items: center; justify-content: center; padding: 3vh 16px;
+              background: rgba(0, 0, 0, .5); }
+.panel-kode[hidden] { display: none; }
+.panel-isi { position: relative; display: flex; flex-direction: column; width: min(980px, 100%); max-height: 94vh; background: var(--bg);
+             color: var(--fg); border: 1px solid var(--rule); border-radius: 12px; box-shadow: 0 12px 48px rgba(0, 0, 0, .35); }
+.panel-tutup { position: absolute; top: 8px; right: 10px; z-index: 1; width: 38px; height: 38px; border: 1px solid var(--rule);
+               border-radius: 8px; background: var(--panel); color: var(--fg); font: 1.4rem/1 var(--body); cursor: pointer; }
+.panel-tutup:focus-visible, .panel-kembali:focus-visible { outline: 2px solid var(--accent); }
+.panel-kembali { align-self: flex-start; margin: 10px 0 0 22px; padding: 2px 10px; border: 1px solid var(--rule); border-radius: 6px;
+                 background: var(--panel); color: var(--accent); font: 600 .82rem/1.6 var(--body); cursor: pointer; }
+.panel-kembali[hidden] { display: none; }
+.panel-badan { overflow: auto; overscroll-behavior: contain; padding: 18px 22px 22px; }
+.pk-judul { display: block; margin: 0 52px .4em 0; padding: 0; border: 0; background: none; font: 700 1.3rem/1.3 var(--body); color: var(--accent); }
+.pk-tujuan { font-size: 1.02rem; }
+.pk-letak code, .pk-file code { overflow-wrap: anywhere; }
+.pk-file { margin: 1em 0 .2em; font-size: .85rem; color: var(--muted); }
+pre.kode-asli { max-height: 380px; overflow: auto; margin: .2em 0 .8em; font-size: .8rem; line-height: 1.55; background: var(--code); }
+pre.kode-asli code { white-space: pre; }
+pre.kode-asli .no { display: inline-block; width: 3.4em; margin-right: .9em; color: var(--muted); text-align: right; user-select: none; }
+.wc { color: var(--wc); font-style: italic; } .ws { color: var(--ws); } .wk { color: var(--wk); font-weight: 600; }
+.wn { color: var(--wn); } .wd { color: var(--wd); } .wf { color: var(--wf); font-weight: 700; }
+.pk-alur, .pk-blok { padding-left: 1.3em; font-size: .92rem; }
+.pk-blok li { margin: .35em 0; }
+.pk-baris { display: inline-block; margin-right: .4em; padding: 0 .4em; border-radius: 4px; background: var(--code);
+            font: .76rem/1.6 var(--mono); white-space: nowrap; }
+.pk-ringkas { margin-top: 1.4em; padding: 12px 16px 14px; background: var(--panel); border: 1px solid var(--rule);
+              border-left: 6px solid var(--accent); border-radius: 8px; }
+.pk-ringkas ul { margin: .2em 0 .5em; }
+.tahap-badge { display: inline-block; margin-right: .4em; padding: .1em .9em; border-radius: 8px; border: 2px solid;
+               font: 800 1.05rem/1.5 var(--body); letter-spacing: .08em; }
+.tahap-badge.input { background: var(--panel); border-color: var(--muted); color: var(--fg); }
+.tahap-badge.proses { background: var(--usul); border-color: var(--usul-fg); color: var(--usul-fg); }
+.tahap-badge.output { background: var(--panel); border-color: var(--accent); color: var(--accent); }
+.mini-alur { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 8px;
+             margin-top: .4em; }
+.mk-kolom { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.mk-panah { font-size: 1.5rem; color: var(--muted); }
+.mk-kosong { font-size: .8rem; color: var(--muted); text-align: center; }
+.mini-kotak { display: block; padding: 5px 9px; border: 1.5px solid var(--muted); border-radius: 6px; background: var(--panel);
+              color: var(--fg); font-size: .82rem; line-height: 1.3; text-decoration: none; overflow-wrap: anywhere; }
+.mini-kotak .mk-nama { display: block; font-weight: 600; }
+.mini-kotak .mk-kode { display: block; padding: 0; background: none; font-size: .72rem; opacity: .85; }
+.mini-kotak .mk-letak { display: block; color: var(--muted); font: .7rem/1.4 var(--mono); }
+.mini-kotak.tegas { border-style: dashed; border-color: var(--kode-fg); }
+.mini-kotak.f1 { background: var(--live); border-color: var(--live-fg); color: var(--live-fg); }
+.mini-kotak.f2 { background: var(--setuju); border-color: var(--setuju-fg); color: var(--setuju-fg); }
+.mini-kotak.ambang { background: var(--usul); border-color: var(--usul-fg); color: var(--usul-fg); }
+.mini-kotak.aksi { border-color: var(--accent); color: var(--accent); }
+.mini-kotak.ini { border-width: 3px; box-shadow: 0 0 0 4px var(--code); }
+a.mini-kotak:hover, a.mini-kotak:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+/* Lipat: panah ▸/▾ di setiap judul dan kepala kartu, isi menjorok bertingkat dengan garis tipis */
+.panah-lipat { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 1.55em; height: 1.55em;
+               margin: 0 .35em 0 0; padding: 0; border: 1px solid var(--rule); border-radius: 6px; background: var(--panel);
+               color: var(--accent); font: 700 .78rem/1 var(--body); cursor: pointer; vertical-align: .12em; }
+.panah-lipat::before { content: "▾"; } .panah-lipat[aria-expanded="false"]::before { content: "▸"; }
+.panah-lipat:hover { border-color: var(--accent); } .panah-lipat:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+h2 .panah-lipat { font-size: .9rem; width: 1.7em; height: 1.7em; }
+.lipat, .isi-lipat { min-width: 0; }
+.lipat.l1 > .isi-lipat { margin-left: 10px; padding-left: 16px; border-left: 1px solid var(--rule); }
+.lipat.l2 > .isi-lipat { margin-left: 8px; padding-left: 14px; border-left: 1px dashed var(--rule); }
+.lipat.l3 > .isi-lipat { margin-left: 6px; padding-left: 12px; border-left: 1px dotted var(--rule); }
+.kartu.tertutup { padding-bottom: 4px; }
+.lipat-semua { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
+.lipat-semua button { padding: 2px 9px; border: 1px solid var(--rule); border-radius: 6px; background: var(--panel); color: var(--accent);
+                      font: 600 .78rem/1.6 var(--body); cursor: pointer; }
+.lipat-semua button:hover { border-color: var(--accent); } .lipat-semua button:focus-visible { outline: 2px solid var(--accent); }
+@media (max-width: 1099px) { #daftar-isi { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+  #daftar-isi .lipat-semua { margin: 0; } #daftar-isi .di-isi { flex-basis: 100%; } }
+@media (max-width: 600px) {
+  .lipat.l1 > .isi-lipat { margin-left: 2px; padding-left: 6px; }
+  .lipat.l2 > .isi-lipat { margin-left: 2px; padding-left: 6px; }
+  .lipat.l3 > .isi-lipat { margin-left: 0; padding-left: 0; border-left: 0; }
+}
+@media print {
+  .isi-lipat { display: block !important; content-visibility: visible !important; height: auto !important; }
+  .panah-lipat, .lipat-semua, #daftar-isi, .tombol-kode { display: none !important; }
+}
+/* Alur kotak: tahap berpanah yang membungkus di layar sempit; tiap kotak punya pop-up dan menaut ke bagiannya */
+.alur-kotak { display: flex; flex-wrap: wrap; gap: 8px 6px; align-items: stretch; margin: 1em 0; padding: 0; list-style: none; }
+.alur-kotak > li { display: flex; align-items: center; gap: 6px; margin: 0; flex: 1 1 150px; min-width: 0; }
+.alur-kotak > li + li::before { content: "→"; color: var(--accent); font-weight: 700; }
+.alur-kotak .ak { flex: 1; display: block; min-width: 0; padding: 8px 10px; border: 1.5px solid var(--muted); border-radius: 8px;
+                  background: var(--panel); color: var(--fg); text-decoration: none; }
+.alur-kotak .ak b { display: block; font: 700 .78rem/1.4 var(--mono); color: var(--accent); overflow-wrap: anywhere; }
+.alur-kotak .ak span { display: block; font-size: .82rem; line-height: 1.35; }
+.alur-kotak .ak.f1 { background: var(--live); border-color: var(--live-fg); } .alur-kotak .ak.f1 b { color: var(--live-fg); }
+.alur-kotak .ak.f2 { background: var(--setuju); border-color: var(--setuju-fg); } .alur-kotak .ak.f2 b { color: var(--setuju-fg); }
+.alur-kotak .ak.tegas { border-style: dashed; border-color: var(--kode-fg); }
+.alur-kotak .ak.aksi { border-color: var(--accent); border-width: 2px; }
+.alur-kotak .ak:hover, .alur-kotak .ak:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+pre.alur { background: var(--accent-soft); }
+pre.alur .panah { color: var(--accent); font-weight: 700; } pre.alur .cabang { color: var(--usul-fg); font-weight: 700; }
+pre.alur a { font-weight: 600; text-decoration: none; } pre.alur a:hover { text-decoration: underline; }
+@media (max-width: 600px) {
+  h1 { font-size: 1.9rem; } h2 { flex-wrap: wrap; row-gap: .3em; font-size: 1.3rem; padding: .5em .6em; } h3 { font-size: 1.12rem; }
+  .alur-kotak > li { flex-basis: 100%; } .alur-kotak > li + li::before { content: "↓"; }
+  .kartu { padding: 2px 12px 10px; }
+  .panel-kode { padding: 0; }
+  .panel-isi { width: 100%; height: 100%; max-height: 100vh; border-radius: 0; }
+  .panel-badan { padding: 14px 12px 24px; }
+  .panel-kembali { margin-left: 12px; }
+  .mini-alur { grid-template-columns: minmax(0, 1fr); }
+  .mk-panah { justify-self: center; transform: rotate(90deg); }
+}
+
+.bagan { margin: 1em 0 .6em; background: var(--panel); border: 1px solid var(--rule); border-radius: 10px; padding: 14px; }
 .fig-scroll { overflow-x: auto; }
-figure svg { display: block; width: 100%; height: auto; min-width: 640px; color: var(--fg); margin: 0 auto; }
-figcaption { font-size: 0.9rem; color: var(--muted); margin-top: 10px; max-width: 76ch; }
-figcaption b { color: var(--fg); }
-.fc-node { fill: var(--surface); stroke: var(--fg); stroke-width: 1.3; }
-.fc-term { fill: var(--code-bg); stroke: var(--fg); stroke-width: 1.3; }
+.bagan svg { display: block; width: 100%; height: auto; min-width: 640px; color: var(--fg); margin: 0 auto; }
+.bagan figcaption { font-size: .92rem; color: var(--muted); margin-top: 10px; }
+.bagan figcaption b { color: var(--fg); }
+.fc-node { fill: var(--panel); stroke: var(--fg); stroke-width: 1.3; }
+.fc-term { fill: var(--code); stroke: var(--fg); stroke-width: 1.3; }
 .fc-sub { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.6; }
-.fc-dec { fill: var(--surface); stroke: var(--fg); stroke-width: 1.3; }
+.fc-dec { fill: var(--panel); stroke: var(--fg); stroke-width: 1.3; }
 .fc-line { fill: none; stroke: var(--fg); stroke-width: 1.3; }
 .fc-brk { fill: none; stroke: var(--muted); stroke-width: 1.2; }
 .fc-dot { fill: var(--fg); }
-.fc-t { fill: var(--fg); font: 12.5px var(--font-body); }
-.fc-tb { fill: var(--fg); font: 600 12.5px var(--font-body); }
-.fc-ts { fill: var(--accent); font: 600 12.5px var(--font-body); }
-.fc-lbl { fill: var(--muted); font: italic 11.5px var(--font-body); }
-.fc-ann { fill: var(--muted); font: 11.5px var(--font-body); }
-.fc-annb { fill: var(--fg); font: 600 12px var(--font-body); }
-.legend { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 0.86rem; color: var(--muted); margin: 14px 0 0; }
-.legend span { display: inline-flex; align-items: center; gap: 6px; }
-.legend svg { width: 34px; height: 18px; color: var(--fg); flex: none; }
-.table-wrap { overflow-x: auto; margin: 10px 0; }
-table { border-collapse: collapse; font-size: 0.92rem; min-width: 100%; }
-caption { text-align: left; font-weight: 600; padding-bottom: 6px; }
-th, td { text-align: left; padding: 7px 12px; border-bottom: 1px solid var(--rule); vertical-align: top; }
-th { font-weight: 600; color: var(--muted); font-size: 0.82rem; }
-td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fc-t { fill: var(--fg); font: 12.5px var(--body); }
+.fc-tb { fill: var(--fg); font: 600 12.5px var(--body); }
+.fc-ts { fill: var(--accent); font: 600 12.5px var(--body); }
+.fc-lbl { fill: var(--muted); font: italic 11.5px var(--body); }
+.fc-ann { fill: var(--muted); font: 11.5px var(--body); }
+.fc-annb { fill: var(--fg); font: 600 12px var(--body); }
+.fc-simpul { cursor: help; }
+.fc-simpul:focus-visible > :first-child { stroke: var(--accent); stroke-width: 3.2; }
+.legenda { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: .88rem; color: var(--muted); margin: .6em 0 0; }
+.legenda span { display: inline-flex; align-items: center; gap: 6px; }
+.legenda svg { width: 34px; height: 18px; color: var(--fg); flex: none; }
 .grid-aturan { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 12px; margin: 10px 0; }
-.grid-aturan table { min-width: 0; font-size: 0.84rem; background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; }
+.grid-aturan table { min-width: 0; font-size: .84rem; }
 .grid-aturan caption { padding: 8px 8px 4px; font-weight: 400; }
 .grid-aturan th, .grid-aturan td { padding: 4px 8px; }
-.assume { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 14px; margin-top: 10px; }
-.assume section { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 12px 16px; }
-.assume ul { padding-left: 18px; }
-.step { display: grid; grid-template-columns: 34px 1fr; gap: 12px; background: var(--surface); border: 1px solid var(--rule);
-  border-radius: 8px; padding: 14px 16px; margin: 10px 0; }
-.step .num { width: 30px; height: 30px; border-radius: 50%; background: var(--accent); color: var(--surface);
-  display: grid; place-items: center; font-weight: 600; }
-.rumus { font-family: var(--font-mono); font-size: 0.9rem; background: var(--code-bg); padding: 8px 10px; border-radius: 6px;
-  max-width: none; overflow-wrap: anywhere; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rumus { font-family: var(--mono); font-size: .9rem; background: var(--code); padding: 8px 10px; border-radius: 6px; overflow-wrap: anywhere; }
+.kartu.langkah > .kepala-kartu h3 .nomor-langkah { display: inline-block; min-width: 1.7em; margin-right: .3em; padding: 0 .4em; border-radius: 6px;
+  background: var(--accent); color: var(--panel); text-align: center; font-size: .9rem; }
 </style>
 </head>
 <body>
+<div class="tata">
+<nav id="daftar-isi" aria-label="Daftar isi">
+<button type="button" class="di-tombol" aria-expanded="false" aria-controls="di-isi">Daftar isi</button>
+<span class="lipat-semua"><button type="button" data-lipat-semua="buka">Buka semua</button><button type="button" data-lipat-semua="tutup">Tutup semua</button></span>
+<div class="di-isi" id="di-isi"></div>
+</nav>
 <main>
-
-<header>
-  <p class="eyebrow">Skripsi · Silent Terror · NLU</p>
-  <h1>Diagram Alir NLU</h1>
-  <p class="lede">Alur training dua model NLU IndoBERT yang dipakai bot: Model 1 membaca intent chat, Model 2 membaca
-  siapa yang dituju beserta relasinya. Lengkap dengan asumsi dan cara hitung tiap langkah.</p>
-  <dl class="meta">
-    <dt>Kode</dt><dd><code>nlu_baru.ipynb</code> (intent) dan <code>nlu_target.ipynb</code> (target); kodenya ada di dokumen
-      Kode NLU Intent dan Kode NLU Target</dd>
-    <dt>Angka</dt><dd>Artefak run 27 Okt 2026 sesudah relabel: intent (<code>models/notebook_standalone/</code>) dan target
-      (<code>models/target_classifier/</code>); SVM/NB dari run 25 Sep (label lama); tidak ada training ulang saat dokumen dibangun</dd>
-    <dt>Dibuat</dt><dd>2026-11-12 15:01</dd>
-  </dl>
-  <nav><ol>
-    <li><a href="#n1">Intent</a></li><li><a href="#n2">Model klasik</a></li><li><a href="#n3">Fine-tuning</a></li>
-    <li><a href="#n4">Target</a></li><li><a href="#asumsi">Asumsi</a></li><li><a href="#hitung">Cara hitung</a></li>
-  </ol></nav>
-</header>
-<div class="legend" aria-label="Legenda simbol">
-  <span><svg viewBox="0 0 34 18"><rect class="fc-term" x="1" y="2" width="32" height="14" rx="7"/></svg>Mulai / selesai</span>
-  <span><svg viewBox="0 0 34 18"><polygon class="fc-node" points="6,2 33,2 28,16 1,16"/></svg>Masukan / keluaran</span>
-  <span><svg viewBox="0 0 34 18"><rect class="fc-node" x="1" y="2" width="32" height="14" rx="2"/></svg>Proses</span>
-  <span><svg viewBox="0 0 34 18"><polygon class="fc-dec" points="17,1 33,9 17,17 1,9"/></svg>Keputusan</span>
-  <span><svg viewBox="0 0 34 18"><rect class="fc-sub" x="1" y="2" width="32" height="14"/><line class="fc-sub" x1="5" y1="2" x2="5" y2="16"/><line class="fc-sub" x1="29" y1="2" x2="29" y2="16"/></svg>Subproses (dirinci di gambar lain)</span>
-</div>
-<h2 id="n1">Gambar 1 · Alur training Model 1 (intent)</h2><figure><div class="fig-scroll"><svg viewBox="0 0 849 954" role="img" aria-label="Gambar 1 · Alur training Model 1 (intent)" xmlns="http://www.w3.org/2000/svg"><defs><marker id="panah-n1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="fc-dot"/></marker></defs><path class="fc-line" d="M228.0,48 L228.0,78" marker-end="url(#panah-n1)"/><path class="fc-line" d="M228.0,142 L228.0,172" marker-end="url(#panah-n1)"/><path class="fc-line" d="M228.0,236 L228.0,266" marker-end="url(#panah-n1)"/><path class="fc-line" d="M228.0,298 L228.0,328" marker-end="url(#panah-n1)"/><path class="fc-line" d="M228.0,376 L228.0,406" marker-end="url(#panah-n1)"/><path class="fc-line" d="M228.0,454 L228.0,484" marker-end="url(#panah-n1)"/><path class="fc-line" d="M228.0,548 L228.0,578" marker-end="url(#panah-n1)"/><path class="fc-line" d="M228.0,626 L228.0,656" marker-end="url(#panah-n1)"/><path class="fc-line" d="M228.0,720 L228.0,750" marker-end="url(#panah-n1)"/><path class="fc-line" d="M228.0,798 L228.0,828" marker-end="url(#panah-n1)"/><path class="fc-line" d="M228.0,876 L228.0,906" marker-end="url(#panah-n1)"/><rect class="fc-term" x="78.0" y="16" width="300" height="32" rx="16.0"/><text class="fc-t" x="228.0" y="36.5" text-anchor="middle">Mulai notebook nlu_baru (Model 1: intent)</text><polygon class="fc-node" points="92.0,78 378.0,78 364.0,142 78.0,142"/><text class="fc-t" x="228.0" y="98.5" text-anchor="middle">dataset_final3.csv</text><text class="fc-ann" x="228.0" y="114.5" text-anchor="middle">teks_chat + label_intent</text><text class="fc-ann" x="228.0" y="130.5" text-anchor="middle">label sesuai ATURAN_LABEL.md</text><rect class="fc-node" x="78.0" y="172" width="300" height="64" rx="3"/><text class="fc-t" x="228.0" y="192.5" text-anchor="middle">Pembersihan data</text><text class="fc-ann" x="228.0" y="208.5" text-anchor="middle">buang kosong, duplikat persis, dan teks</text><text class="fc-ann" x="228.0" y="224.5" text-anchor="middle">yang berlabel lebih dari satu</text><rect class="fc-node" x="78.0" y="266" width="300" height="32" rx="3"/><text class="fc-t" x="228.0" y="286.5" text-anchor="middle">EDA: distribusi kelas dan panjang chat</text><rect class="fc-node" x="78.0" y="328" width="300" height="48" rx="3"/><text class="fc-t" x="228.0" y="348.5" text-anchor="middle">Bagi data: test 20% (stratified, seed 42)</text><text class="fc-ann" x="228.0" y="364.5" text-anchor="middle">IndoBERT: validation 15% dari seluruh data</text><rect class="fc-sub" x="78.0" y="406" width="300" height="48"/><line class="fc-sub" x1="87.0" y1="406" x2="87.0" y2="454"/><line class="fc-sub" x1="369.0" y1="406" x2="369.0" y2="454"/><text class="fc-ts" x="228.0" y="426.5" text-anchor="middle">SVM dan Naive Bayes (Gambar 2)</text><text class="fc-ann" x="228.0" y="442.5" text-anchor="middle">TF-IDF; baseline, Grid Search, Optuna</text><rect class="fc-node" x="78.0" y="484" width="300" height="64" rx="3"/><text class="fc-t" x="228.0" y="504.5" text-anchor="middle">Tambah ke train IndoBERT saja:</text><text class="fc-ann" x="228.0" y="520.5" text-anchor="middle">100 chat tambahan + pesan sesi dari</text><text class="fc-ann" x="228.0" y="536.5" text-anchor="middle">sesi train dataset target</text><rect class="fc-sub" x="78.0" y="578" width="300" height="48"/><line class="fc-sub" x1="87.0" y1="578" x2="87.0" y2="626"/><line class="fc-sub" x1="369.0" y1="578" x2="369.0" y2="626"/><text class="fc-ts" x="228.0" y="598.5" text-anchor="middle">Fine-tuning IndoBERT (Gambar 3)</text><text class="fc-ann" x="228.0" y="614.5" text-anchor="middle">3 learning rate, pilih lewat validation</text><rect class="fc-node" x="78.0" y="656" width="300" height="64" rx="3"/><text class="fc-t" x="228.0" y="676.5" text-anchor="middle">Evaluasi test sekali per model</text><text class="fc-ann" x="228.0" y="692.5" text-anchor="middle">accuracy, macro-F1, weighted-F1,</text><text class="fc-ann" x="228.0" y="708.5" text-anchor="middle">confusion matrix, 10 contoh chat</text><rect class="fc-node" x="78.0" y="750" width="300" height="48" rx="3"/><text class="fc-t" x="228.0" y="770.5" text-anchor="middle">Simpan model dan laporan;</text><text class="fc-t" x="228.0" y="786.5" text-anchor="middle">bandingkan semua model</text><polygon class="fc-node" points="92.0,828 378.0,828 364.0,876 78.0,876"/><text class="fc-t" x="228.0" y="848.5" text-anchor="middle">intent_classifier_transformer</text><text class="fc-ann" x="228.0" y="864.5" text-anchor="middle">dimuat game sebagai Model 1</text><rect class="fc-term" x="78.0" y="906" width="300" height="32" rx="16.0"/><text class="fc-t" x="228.0" y="926.5" text-anchor="middle">Selesai</text><path class="fc-brk" d="M668,174 H674 V296 H668"/><text class="fc-annb" x="682" y="232.0">Sel 3–17</text><text class="fc-ann" x="682" y="246.0">EDA</text><path class="fc-brk" d="M668,330 H674 V374 H668"/><text class="fc-annb" x="682" y="349.0">Sel 19–32</text><text class="fc-ann" x="682" y="363.0">pengaturan eksperimen</text><path class="fc-brk" d="M668,408 H674 V452 H668"/><text class="fc-annb" x="682" y="427.0">Sel 33–128</text><text class="fc-ann" x="682" y="441.0">SVM, Naive Bayes</text><path class="fc-brk" d="M668,486 H674 V624 H668"/><text class="fc-annb" x="682" y="552.0">Sel 129–159</text><text class="fc-ann" x="682" y="566.0">IndoBERT</text><path class="fc-brk" d="M668,658 H674 V796 H668"/><text class="fc-annb" x="682" y="724.0">Sel 160–173</text><text class="fc-ann" x="682" y="738.0">perbandingan</text></svg></div><figcaption><b>Gambar 1.</b> Notebook <code>nlu_baru.ipynb</code>. SVM, Naive Bayes, dan IndoBERT memakai pembagian data yang sama, lalu dibandingkan pada test. Saklar <code>LATIH_SVM</code>/<code>LATIH_NB</code>/<code>LATIH_INDOBERT</code> memilih model yang dilatih; run 27 Okt hanya melatih IndoBERT. Model IndoBERT yang tersimpan dipakai game. Kurung di kanan menunjukkan sel notebook.</figcaption></figure>
-<h2 id="n2">Gambar 2 · Subproses model klasik (SVM / Naive Bayes)</h2><figure><div class="fig-scroll"><svg viewBox="0 0 849 732" role="img" aria-label="Gambar 2 · Subproses model klasik (SVM / Naive Bayes)" xmlns="http://www.w3.org/2000/svg"><defs><marker id="panah-n2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="fc-dot"/></marker></defs><path class="fc-line" d="M228.0,48 L228.0,78" marker-end="url(#panah-n2)"/><path class="fc-line" d="M228.0,126 L228.0,156" marker-end="url(#panah-n2)"/><path class="fc-line" d="M228.0,204 L228.0,234" marker-end="url(#panah-n2)"/><path class="fc-line" d="M228.0,282 L228.0,312" marker-end="url(#panah-n2)"/><path class="fc-line" d="M228.0,344 L228.0,374" marker-end="url(#panah-n2)"/><path class="fc-line" d="M228.0,406 L228.0,436" marker-end="url(#panah-n2)"/><path class="fc-line" d="M228.0,530 L228.0,560" marker-end="url(#panah-n2)"/><text class="fc-lbl" x="234.0" y="545">Ya</text><path class="fc-line" d="M228.0,592 L228.0,622" marker-end="url(#panah-n2)"/><path class="fc-line" d="M228.0,654 L228.0,684" marker-end="url(#panah-n2)"/><path class="fc-line" d="M78.0,483.0 L52,483.0 L52,328.0 L78.0,328.0" marker-end="url(#panah-n2)"/><text class="fc-lbl" x="48.0" y="477.0">Tidak</text><rect class="fc-term" x="78.0" y="16" width="300" height="32" rx="16.0"/><text class="fc-t" x="228.0" y="36.5" text-anchor="middle">Mulai satu model klasik (SVM atau NB)</text><rect class="fc-node" x="78.0" y="78" width="300" height="48" rx="3"/><text class="fc-t" x="228.0" y="98.5" text-anchor="middle">Pipeline: TF-IDF → SVM linear terkalibrasi</text><text class="fc-ann" x="228.0" y="114.5" text-anchor="middle">atau Multinomial Naive Bayes</text><rect class="fc-node" x="78.0" y="156" width="300" height="48" rx="3"/><text class="fc-t" x="228.0" y="176.5" text-anchor="middle">Baseline: parameter tetap,</text><text class="fc-t" x="228.0" y="192.5" text-anchor="middle">latih di train, evaluasi test</text><rect class="fc-node" x="78.0" y="234" width="300" height="48" rx="3"/><text class="fc-t" x="228.0" y="254.5" text-anchor="middle">Grid Search: setiap kombinasi parameter</text><text class="fc-ann" x="228.0" y="270.5" text-anchor="middle">dinilai 5-fold CV (macro-F1 rata-rata)</text><rect class="fc-node" x="78.0" y="312" width="300" height="32" rx="3"/><text class="fc-t" x="228.0" y="332.5" text-anchor="middle">Optuna (TPE) mengusulkan kombinasi</text><rect class="fc-node" x="78.0" y="374" width="300" height="32" rx="3"/><text class="fc-t" x="228.0" y="394.5" text-anchor="middle">5-fold CV di data train → macro-F1</text><polygon class="fc-dec" points="228.0,436 378.0,483.0 228.0,530 78.0,483.0"/><text class="fc-t" x="228.0" y="471.5" text-anchor="middle">≥ 100 trial, lalu 30</text><text class="fc-t" x="228.0" y="487.5" text-anchor="middle">trial tanpa naik</text><text class="fc-t" x="228.0" y="503.5" text-anchor="middle">≥ 0,001; atau 500?</text><rect class="fc-node" x="78.0" y="560" width="300" height="32" rx="3"/><text class="fc-t" x="228.0" y="580.5" text-anchor="middle">Refit kombinasi terbaik di seluruh train</text><rect class="fc-node" x="78.0" y="622" width="300" height="32" rx="3"/><text class="fc-t" x="228.0" y="642.5" text-anchor="middle">Evaluasi test + 10 contoh chat</text><rect class="fc-term" x="78.0" y="684" width="300" height="32" rx="16.0"/><text class="fc-t" x="228.0" y="704.5" text-anchor="middle">Kembali ke alur utama</text><path class="fc-brk" d="M668,80 H674 V202 H668"/><text class="fc-annb" x="682" y="138.0">Baseline</text><text class="fc-ann" x="682" y="152.0">sel 40–52 (SVM)</text><path class="fc-brk" d="M668,236 H674 V280 H668"/><text class="fc-annb" x="682" y="255.0">Grid Search</text><text class="fc-ann" x="682" y="269.0">sel 53–67</text><path class="fc-brk" d="M668,314 H674 V652 H668"/><text class="fc-annb" x="682" y="480.0">Optuna</text><text class="fc-ann" x="682" y="494.0">sel 68–80</text></svg></div><figcaption><b>Gambar 2.</b> Dijalankan untuk SVM dan Naive Bayes. Grid Search mencoba seluruh kombinasi; Optuna mencoba kombinasi pilihan TPE sampai aturan berhenti terpenuhi. Nomor sel di kurung untuk SVM; Naive Bayes ada di sel 81–128.</figcaption></figure>
-<h2 id="n3">Gambar 3 · Subproses fine-tuning IndoBERT</h2><figure><div class="fig-scroll"><svg viewBox="0 0 849 866" role="img" aria-label="Gambar 3 · Subproses fine-tuning IndoBERT" xmlns="http://www.w3.org/2000/svg"><defs><marker id="panah-n3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="fc-dot"/></marker></defs><path class="fc-line" d="M228.0,48 L228.0,78" marker-end="url(#panah-n3)"/><path class="fc-line" d="M228.0,126 L228.0,156" marker-end="url(#panah-n3)"/><path class="fc-line" d="M228.0,204 L228.0,234" marker-end="url(#panah-n3)"/><path class="fc-line" d="M228.0,282 L228.0,312" marker-end="url(#panah-n3)"/><path class="fc-line" d="M228.0,360 L228.0,390" marker-end="url(#panah-n3)"/><path class="fc-line" d="M228.0,438 L228.0,468" marker-end="url(#panah-n3)"/><path class="fc-line" d="M228.0,544 L228.0,574" marker-end="url(#panah-n3)"/><text class="fc-lbl" x="234.0" y="559">Ya</text><path class="fc-line" d="M228.0,632 L228.0,662" marker-end="url(#panah-n3)"/><text class="fc-lbl" x="234.0" y="647">Tidak</text><path class="fc-line" d="M228.0,710 L228.0,740" marker-end="url(#panah-n3)"/><path class="fc-line" d="M228.0,788 L228.0,818" marker-end="url(#panah-n3)"/><path class="fc-line" d="M78.0,506.0 L52,506.0 L52,336.0 L78.0,336.0" marker-end="url(#panah-n3)"/><text class="fc-lbl" x="48.0" y="500.0">Tidak</text><path class="fc-line" d="M78.0,603.0 L36,603.0 L36,180.0 L78.0,180.0" marker-end="url(#panah-n3)"/><text class="fc-lbl" x="48.0" y="597.0">Ya</text><rect class="fc-term" x="78.0" y="16" width="300" height="32" rx="16.0"/><text class="fc-t" x="228.0" y="36.5" text-anchor="middle">Mulai fine-tuning IndoBERT</text><rect class="fc-node" x="78.0" y="78" width="300" height="48" rx="3"/><text class="fc-t" x="228.0" y="98.5" text-anchor="middle">Tokenisasi teks</text><text class="fc-ann" x="228.0" y="114.5" text-anchor="middle">intent: max 128 token; target: max 512</text><rect class="fc-node" x="78.0" y="156" width="300" height="48" rx="3"/><text class="fc-t" x="228.0" y="176.5" text-anchor="middle">Ambil learning rate berikutnya</text><text class="fc-ann" x="228.0" y="192.5" text-anchor="middle">1×10⁻⁵, 2×10⁻⁵, 3×10⁻⁵</text><rect class="fc-node" x="78.0" y="234" width="300" height="48" rx="3"/><text class="fc-t" x="228.0" y="254.5" text-anchor="middle">Muat ulang indobert-base-p1 pralatih</text><text class="fc-ann" x="228.0" y="270.5" text-anchor="middle">+ kepala klasifikasi baru, seed 42</text><rect class="fc-node" x="78.0" y="312" width="300" height="48" rx="3"/><text class="fc-t" x="228.0" y="332.5" text-anchor="middle">Latih satu epoch: AdamW, batch efektif 16,</text><text class="fc-ann" x="228.0" y="348.5" text-anchor="middle">warmup 10% lalu learning rate turun linear</text><rect class="fc-node" x="78.0" y="390" width="300" height="48" rx="3"/><text class="fc-t" x="228.0" y="410.5" text-anchor="middle">Evaluasi validation → macro-F1;</text><text class="fc-t" x="228.0" y="426.5" text-anchor="middle">simpan checkpoint</text><polygon class="fc-dec" points="228.0,468 378.0,506.0 228.0,544 78.0,506.0"/><text class="fc-t" x="228.0" y="502.5" text-anchor="middle">Tidak naik ≥ 0,001 selama</text><text class="fc-t" x="228.0" y="518.5" text-anchor="middle">3 epoch, atau epoch = 12?</text><polygon class="fc-dec" points="228.0,574 378.0,603.0 228.0,632 78.0,603.0"/><text class="fc-t" x="228.0" y="607.5" text-anchor="middle">Masih ada learning rate?</text><rect class="fc-node" x="78.0" y="662" width="300" height="48" rx="3"/><text class="fc-t" x="228.0" y="682.5" text-anchor="middle">Pilih checkpoint dengan macro-F1</text><text class="fc-t" x="228.0" y="698.5" text-anchor="middle">validation tertinggi</text><rect class="fc-node" x="78.0" y="740" width="300" height="48" rx="3"/><text class="fc-t" x="228.0" y="760.5" text-anchor="middle">Evaluasi sekali pada test</text><text class="fc-ann" x="228.0" y="776.5" text-anchor="middle">test tidak dipakai memilih</text><rect class="fc-term" x="78.0" y="818" width="300" height="32" rx="16.0"/><text class="fc-t" x="228.0" y="838.5" text-anchor="middle">Kembali ke alur utama</text><path class="fc-brk" d="M668,80 H674 V124 H668"/><text class="fc-annb" x="682" y="99.0">Tahap 2–3</text><text class="fc-ann" x="682" y="113.0">split, tokenizer</text><path class="fc-brk" d="M668,158 H674 V630 H668"/><text class="fc-annb" x="682" y="391.0">Tahap 5</text><text class="fc-ann" x="682" y="405.0">melatih kandidat LR</text><path class="fc-brk" d="M668,664 H674 V786 H668"/><text class="fc-annb" x="682" y="722.0">Tahap 6–7</text><text class="fc-ann" x="682" y="736.0">checkpoint, evaluasi</text></svg></div><figcaption><b>Gambar 3.</b> Sama untuk intent dan target, berbeda di panjang token dan pembagian batch (intent 8 × 2, target 4 × 4; keduanya batch efektif 16). Lingkaran kiri dalam adalah epoch, lingkaran luar adalah learning rate.</figcaption></figure>
-<h2 id="n4">Gambar 4 · Alur training Model 2 (target)</h2><figure><div class="fig-scroll"><svg viewBox="0 0 849 1016" role="img" aria-label="Gambar 4 · Alur training Model 2 (target)" xmlns="http://www.w3.org/2000/svg"><defs><marker id="panah-n4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="fc-dot"/></marker></defs><path class="fc-line" d="M228.0,48 L228.0,78" marker-end="url(#panah-n4)"/><path class="fc-line" d="M228.0,158 L228.0,188" marker-end="url(#panah-n4)"/><path class="fc-line" d="M228.0,220 L228.0,250" marker-end="url(#panah-n4)"/><path class="fc-line" d="M228.0,298 L228.0,328" marker-end="url(#panah-n4)"/><path class="fc-line" d="M228.0,376 L228.0,406" marker-end="url(#panah-n4)"/><path class="fc-line" d="M228.0,470 L228.0,500" marker-end="url(#panah-n4)"/><path class="fc-line" d="M228.0,548 L228.0,578" marker-end="url(#panah-n4)"/><path class="fc-line" d="M228.0,626 L228.0,656" marker-end="url(#panah-n4)"/><path class="fc-line" d="M228.0,704 L228.0,734" marker-end="url(#panah-n4)"/><path class="fc-line" d="M228.0,782 L228.0,812" marker-end="url(#panah-n4)"/><path class="fc-line" d="M228.0,860 L228.0,890" marker-end="url(#panah-n4)"/><path class="fc-line" d="M228.0,938 L228.0,968" marker-end="url(#panah-n4)"/><rect class="fc-term" x="78.0" y="16" width="300" height="32" rx="16.0"/><text class="fc-t" x="228.0" y="36.5" text-anchor="middle">Mulai nlu_target (Model 2: target)</text><polygon class="fc-node" points="92.0,78 378.0,78 364.0,158 78.0,158"/><text class="fc-t" x="228.0" y="98.5" text-anchor="middle">Dataset target: pesan + konteks</text><text class="fc-ann" x="228.0" y="114.5" text-anchor="middle">≤ 12 pesan + daftar pemain + target</text><text class="fc-ann" x="228.0" y="130.5" text-anchor="middle">{pemain, relasi};</text><text class="fc-ann" x="228.0" y="146.5" text-anchor="middle">pilot 775 sesi + tambahan 500 sesi</text><rect class="fc-node" x="78.0" y="188" width="300" height="32" rx="3"/><text class="fc-t" x="228.0" y="208.5" text-anchor="middle">Validasi konsistensi dan EDA</text><rect class="fc-node" x="78.0" y="250" width="300" height="48" rx="3"/><text class="fc-t" x="228.0" y="270.5" text-anchor="middle">Kenali panggilan, samarkan nama</text><text class="fc-ann" x="228.0" y="286.5" text-anchor="middle">KANDIDAT_X, PENGIRIM_X, PEMAIN_X</text><rect class="fc-node" x="78.0" y="328" width="300" height="48" rx="3"/><text class="fc-t" x="228.0" y="348.5" text-anchor="middle">Teks pasangan: intent || pesan sekarang ||</text><text class="fc-t" x="228.0" y="364.5" text-anchor="middle">konteks beranotasi (terbaru dulu)</text><rect class="fc-node" x="78.0" y="406" width="300" height="64" rx="3"/><text class="fc-t" x="228.0" y="426.5" text-anchor="middle">Bagi pesan per grup kalimat sumber</text><text class="fc-ann" x="228.0" y="442.5" text-anchor="middle">StratifiedGroupKFold → train / validation / test</text><text class="fc-ann" x="228.0" y="458.5" text-anchor="middle">sesi tambahan: 80% train, 20% uji tambahan</text><rect class="fc-node" x="78.0" y="500" width="300" height="48" rx="3"/><text class="fc-t" x="228.0" y="520.5" text-anchor="middle">Satu pasangan (pesan, kandidat) per pemain</text><text class="fc-ann" x="228.0" y="536.5" text-anchor="middle">+ pemain semu sampai 6; label relasi</text><rect class="fc-sub" x="78.0" y="578" width="300" height="48"/><line class="fc-sub" x1="87.0" y1="578" x2="87.0" y2="626"/><line class="fc-sub" x1="369.0" y1="578" x2="369.0" y2="626"/><text class="fc-ts" x="228.0" y="598.5" text-anchor="middle">Model klasik (Gambar 2)</text><text class="fc-ann" x="228.0" y="614.5" text-anchor="middle">dilewati pada run 27 Okt</text><rect class="fc-sub" x="78.0" y="656" width="300" height="48"/><line class="fc-sub" x1="87.0" y1="656" x2="87.0" y2="704"/><line class="fc-sub" x1="369.0" y1="656" x2="369.0" y2="704"/><text class="fc-ts" x="228.0" y="676.5" text-anchor="middle">Fine-tuning IndoBERT (Gambar 3)</text><text class="fc-ann" x="228.0" y="692.5" text-anchor="middle">max 512 token</text><rect class="fc-node" x="78.0" y="734" width="300" height="48" rx="3"/><text class="fc-t" x="228.0" y="754.5" text-anchor="middle">Gabung per pesan: relasi ≠ tidak_ada;</text><text class="fc-ann" x="228.0" y="770.5" text-anchor="middle">offend/defend tanpa target → ambang 0,5</text><rect class="fc-node" x="78.0" y="812" width="300" height="48" rx="3"/><text class="fc-t" x="228.0" y="832.5" text-anchor="middle">Evaluasi test dan uji tambahan: macro-F1</text><text class="fc-t" x="228.0" y="848.5" text-anchor="middle">relasi, F1 neutral, exact match pesan</text><polygon class="fc-node" points="92.0,890 378.0,890 364.0,938 78.0,938"/><text class="fc-t" x="228.0" y="910.5" text-anchor="middle">target_classifier_transformer</text><text class="fc-ann" x="228.0" y="926.5" text-anchor="middle">+ ambang_target.json, pair_builder.json</text><rect class="fc-term" x="78.0" y="968" width="300" height="32" rx="16.0"/><text class="fc-t" x="228.0" y="988.5" text-anchor="middle">Selesai</text><path class="fc-brk" d="M668,190 H674 V218 H668"/><text class="fc-annb" x="682" y="201.0">Sel 3–15</text><text class="fc-ann" x="682" y="215.0">EDA</text><path class="fc-brk" d="M668,252 H674 V546 H668"/><text class="fc-annb" x="682" y="396.0">Sel 16–35</text><text class="fc-ann" x="682" y="410.0">Preprocessing</text><path class="fc-brk" d="M668,580 H674 V624 H668"/><text class="fc-annb" x="682" y="599.0">Sel 54–149</text><text class="fc-ann" x="682" y="613.0">SVM, Naive Bayes</text><path class="fc-brk" d="M668,658 H674 V858 H668"/><text class="fc-annb" x="682" y="755.0">Sel 150–187</text><text class="fc-ann" x="682" y="769.0">IndoBERT, perbandingan</text></svg></div><figcaption><b>Gambar 4.</b> Notebook <code>nlu_target.ipynb</code>. Model 2 tidak menebak nama langsung: setiap pemain dinilai lewat satu pasangan (pesan, kandidat), lalu hasilnya digabung per pesan.</figcaption></figure>
-<p>Di game, kedua model hanya dipakai untuk inferensi (tanpa training) lewat <code>NLUIndoBERT</code>; alurnya ada di
-dokumen Diagram Alir dan Kode tiap metode bot (Gambar 1; sel 17–18).</p>
-<h2 id="asumsi">Asumsi</h2>
-<div class="assume"><section><h3>A. Data dan label</h3><ul><li>Label intent dan target mengikuti aturan tertulis data/ATURAN_LABEL.md (relabel 26 Okt 2026) dan dianggap benar; teks identik berlabel ganda dibuang, duplikat persis disimpan sekali.</li><li>Satu chat hanya punya satu intent; kalimat campuran (membela + menuduh) berintent offend, dan relasi per pemain (siapa dibela, siapa dituduh) dicatat Model 2.</li><li>Test (20%) disisihkan sebelum pemilihan parameter dan hanya dipakai untuk pelaporan.</li><li>Data tambahan (100 chat intent dan 500 sesi target, dibuat 27 Okt 2026 mengikuti plan03) dan pesan sesi dari dataset target hanya masuk train; validation dan test tetap dari dataset asli, kecuali 20% sesi target tambahan yang dipakai sebagai uji tambahan terpisah.</li><li>Dataset target asli adalah data pilot (775 pesan, 25 per kasus), jadi skor per kasus masih sangat bervariasi.</li><li>Anotasi konteks di dataset target adalah label benar; di game anotasi berasal dari prediksi sebelumnya, sehingga skor test adalah batas atas.</li><li>Pesan dari satu grup kalimat sumber tidak dipisah ke train dan test (dataset target), agar parafrase tidak bocor.</li></ul></section><section><h3>B. Model klasik</h3><ul><li>Chat direpresentasikan sebagai kantong kata/potongan karakter berbobot TF-IDF; urutan kata hilang di luar n-gram.</li><li>Naive Bayes menganggap fitur saling bebas bila kelas diketahui; SVM memisahkan kelas dengan batas linear.</li><li>Parameter dipilih dari rata-rata macro-F1 5-fold CV dengan fold yang sama untuk semua kandidat.</li></ul></section><section><h3>C. IndoBERT</h3><ul><li>Model pralatih indobenchmark/indobert-base-p1 di-fine-tune penuh; setiap learning rate mulai dari bobot pralatih dan seed yang sama.</li><li>Checkpoint dipilih dari macro-F1 validation; early stopping patience 3 dengan ambang kenaikan 0,001.</li><li>Confidence softmax belum dikalibrasi dan ketimpangan kelas tidak memakai loss berbobot.</li><li>Nama pemain disamarkan (target) atau divariasikan (intent di game) agar model belajar pola kalimat, bukan nama.</li></ul></section></div>
-<h2 id="hitung">Cara hitung</h2>
-<p>Angka diambil dari artefak run yang sudah ada saat dokumen dibangun. Langkah yang ditandai "ilustrasi" memakai angka
-contoh untuk menjelaskan rumus.</p>
-<section class="step"><div class="num">1</div><div><h3>Relabel dataset (26 Oktober 2026)</h3><p class="rumus">label baru = aturan tertulis ATURAN_LABEL.md diterapkan ke setiap chat; urutan keputusan offend → defend → neutral; kalimat campuran (membela + menuduh) = offend</p><p>Dataset intent: <b>331</b> dari 5.615 chat berubah (neutral→defend 183, defend→offend 84, offend→neutral 30, neutral→offend 23, offend→defend 9, defend→neutral 2). Dataset target: <b>262</b> pesan berubah intent atau targetnya, 2 di antaranya pesan utama; sisanya pesan konteks. Setiap perubahan tercatat di <code>data/relabel_2026-10-26.csv</code>.</p></div></section><section class="step"><div class="num">2</div><div><h3>Pembersihan dan distribusi data (intent)</h3><p class="rumus">baris bersih = baris mentah − kosong − duplikat persis − teks berlabel ganda</p><p>5.615 − 0 − 4 − 0 = <b>5.611</b> chat. Distribusi: defend 1.048 (18,7%), neutral 1.934 (34,5%), offend 2.629 (46,9%). Kelas defend paling sedikit, jadi macro-F1 dipakai sebagai metrik pemilihan.</p></div></section><section class="step"><div class="num">3</div><div><h3>Pembagian data</h3><p class="rumus">test = 20% (stratified); validation IndoBERT = 15% dari seluruh data; train IndoBERT = sisanya + chat tambahan + pesan sesi (teks yang ada di validation/test dibuang)</p><p>Test 1.123 chat; validation 15% × 5.611 = 842; sisa 8.623 + 100 chat tambahan + 4.877 pesan sesi dari sesi train dataset target = train <b>8.623</b>. Validation dan test tetap dari <code>dataset_final3.csv</code> saja. Model klasik memakai seluruh 9.465 chat untuk 5-fold CV.</p></div></section><section class="step"><div class="num">4</div><div><h3>TF-IDF (fitur model klasik)</h3><p class="rumus">tf' = 1 + ln(tf) bila sublinear; idf(t) = ln((1 + n) ÷ (1 + df(t))) + 1; bobot = tf' × idf, lalu vektor tiap chat dinormalisasi L2 (panjang 1)</p><p>Ilustrasi: kata yang muncul 2 kali dalam satu chat dan ada di 50 dari 9.465 chat train: tf' = 1 + ln 2 = 1,693; idf = ln(9.466 ÷ 51) + 1 = 6,224; bobot = 10,538 sebelum normalisasi. Kata langka berbobot lebih besar daripada kata yang ada di hampir semua chat.</p></div></section><section class="step"><div class="num">5</div><div><h3>Pemilihan parameter: macro-F1 cross-validation (SVM/NB, run 25 Sep, label lama)</h3><p class="rumus">skor kandidat = rata-rata macro-F1 dari 5 fold; test tidak pernah dipakai memilih</p><p>SVM Grid Search mencoba 720 kombinasi → terbaik C = 2,0, n-gram (1, 2), analyzer word; macro-F1 CV = <b>0,830</b> ± 0,008. NB Grid Search (1.920 kombinasi): 0,809.</p></div></section><section class="step"><div class="num">6</div><div><h3>Penghentian Optuna (run 25 Sep, label lama)</h3><p class="rumus">berhenti bila sudah ≥ 100 trial selesai dan 30 trial berturut-turut tanpa kenaikan ≥ 0,001, atau 500 trial</p><p>SVM Optuna berhenti di trial 130 (stagnation): 100 trial awal + 30 tanpa kenaikan berarti. Macro-F1 CV 0,830, hampir sama dengan Grid (0,830) dalam 160 detik vs 745 detik.</p></div></section><section class="step"><div class="num">7</div><div><h3>Softmax dan loss IndoBERT</h3><p class="rumus">p<sub>i</sub> = e<sup>z<sub>i</sub></sup> ÷ Σ<sub>j</sub> e<sup>z<sub>j</sub></sup>; loss = −ln p<sub>label benar</sub></p><p>Ilustrasi logit z = (2,1, 0,4, -1,2) untuk (offend, neutral, defend): p = (0,820, 0,150, 0,030). Bila label benar offend, loss = −ln 0,820 = 0,198. Confidence yang dipakai game adalah p terbesar; chat dihitung sebagai bukti bila ≥ 0,60.</p></div></section><section class="step"><div class="num">8</div><div><h3>Jadwal learning rate</h3><p class="rumus">langkah per epoch = ⌈train ÷ batch efektif⌉; total = epoch maks × langkah; warmup = ⌈10% × total⌉; lr naik linear 0 → lr<sub>maks</sub> selama warmup, lalu turun linear ke 0 di langkah terakhir</p><p>⌈8.623 ÷ 16⌉ = <b>539</b> langkah per epoch; total 12 × 539 = 6.468; warmup 647 langkah. Untuk lr<sub>maks</sub> = 3×10⁻⁵: di langkah 539 lr = 3×10⁻⁵ × 539 ÷ 647 = 2,499×10⁻⁵; di langkah 1078 lr = 3×10⁻⁵ × (6.468 − 1078) ÷ (6.468 − 647) = 2,778×10⁻⁵.</p></div></section><section class="step"><div class="num">9</div><div><h3>Early stopping dan pemilihan learning rate</h3><p class="rumus">berhenti bila macro-F1 validation tidak naik ≥ 0,001 selama 3 evaluasi; pilih learning rate dan checkpoint dengan macro-F1 validation tertinggi</p><p>Macro-F1 validation terbaik: lr 1×10⁻⁵ → 0,9156 (epoch 3, dilatih 6); lr 2×10⁻⁵ → 0,9112 (epoch 9, dilatih 12); lr 3×10⁻⁵ → 0,9247 (epoch 8, dilatih 11). Terpilih lr 3×10⁻⁵: puncak di epoch 8 (langkah 4312 = checkpoint-4312), lalu 3 epoch tanpa kenaikan sehingga berhenti di epoch 11.</p></div></section><section class="step"><div class="num">10</div><div><h3>Metrik test Model 1 (intent)</h3><p class="rumus">accuracy = Σ diagonal ÷ n; precision = TP ÷ prediksi kelas itu; recall = TP ÷ data kelas itu; F1 = 2PR ÷ (P + R); macro-F1 = rata-rata F1 semua kelas</p><p>Accuracy = 1.032 ÷ 1.123 = <b>0,9190</b>. defend: P = 175/198 = 0,884, R = 175/210 = 0,833, F1 = 0,858; neutral: P = 359/401 = 0,895, R = 359/387 = 0,928, F1 = 0,911; offend: P = 498/524 = 0,950, R = 498/526 = 0,947, F1 = 0,949. Macro-F1 = <b>0,906</b>. Karena label berubah, isi test ikut berubah, jadi angka ini tidak bisa dibandingkan langsung dengan run 25 Sep. Perbandingan adil dengan model lama yang dipakai game sampai 27 Oktober (run 25 Sep; sejak 27 Oktober game memakai model ini), pada data yang tidak pernah dilatih kedua model dan dinilai dengan label baru: Chat intent biasa (n=285): lama 0,888 / 0,857, baru <b>0,923 / 0,909</b> (recall defend 0,761 → 0,891); Pesan sesi, kondisi game (n=152): lama 0,638 / 0,640, baru <b>0,947 / 0,944</b> (recall defend 0,418 → 0,940) (accuracy / macro-F1). Pesan sesi dibuat dengan cara yang sama seperti pesan sesi di train, jadi kenaikannya pada chat pemain sungguhan kemungkinan lebih kecil. Hasil SVM/NB terakhir masih dari label lama: SVM baseline 0,8405, Naive Bayes baseline 0,6783, SVM Grid 0,8406 (macro-F1 test lama).</p></div></section><section class="step"><div class="num">11</div><div><h3>Data pasangan Model 2 (target)</h3><p class="rumus">pasangan = Σ<sub>pesan</sub> jumlah kandidat (roster ditambah pemain semu sampai minimal 6)</p><p>775 pesan pilot (offend 322, defend 323, neutral 130; 31 kasus) dibagi train/validation/test 496/124/155 pesan; 400 sesi tambahan ikut train dan 100 sesi menjadi uji tambahan → train/validation/test/uji tambahan 5.377/745/931/600 pasangan (± 6,0 kandidat per pesan). Learning rate terbaik: 1×10⁻⁵ → 0,9457; 2×10⁻⁵ → 0,9513; 3×10⁻⁵ → 0,9527.</p></div></section><section class="step"><div class="num">12</div><div><h3>Metrik test Model 2 (target)</h3><p class="rumus">macro-F1 relasi = rata-rata F1 offend dan defend; exact match pesan = proporsi pesan yang daftar targetnya persis benar</p><p>Pasangan: accuracy 0,9817 (didominasi tidak_ada), F1 defend 0,957; F1 neutral 0,950; F1 offend 0,923; F1 tidak_ada 0,989. Macro-F1 relasi = (0,923 + 0,957) ÷ 2 = <b>0,940</b>; F1 neutral 0,950. Per pesan: exact match <b>0,903</b>, target precision 0,959, recall 0,927. Uji tambahan (100 sesi kasus sulit yang tidak dilatih): exact match 0,890. Perbandingan dengan model target lama yang dipakai game sampai 27 Oktober (run 16 Okt), dihitung lewat kode NLU game pada test yang sama dengan label baru: intent benar (label): exact match lama 0,852 → baru <b>0,903</b>, precision 0,891 → 0,952, recall 0,921 → 0,927; kondisi game (intent ditebak): exact match lama 0,542 → baru <b>0,858</b>, precision 0,594 → 0,890, recall 0,563 → 0,854. Pada kondisi game, model lama memakai intent 25 Sep dan model baru memakai intent 27 Okt, jadi sebagian besar kenaikan berasal dari Model 1. Recall offend turun (0,950 → 0,900; 3 dari 60 target) karena model baru lebih hati-hati menunjuk nama: salah tuduh turun dari 9 menjadi 4.</p></div></section><section class="step"><div class="num">13</div><div><h3>Aturan minimal satu target (ambang)</h3><p class="rumus">pesan offend/defend tanpa pasangan berelasi → kandidat dengan p(relasi intent) tertinggi dipakai bila ≥ ambang; selain itu target = tidak_diketahui. Pesan neutral boleh tanpa target.</p><p>Ambang IndoBERT = <b>0,5</b> (dipilih dari validation). Pada test exact match dengan dan tanpa ambang sama (0,903), jadi aturan ini jarang terpakai pada data pilot; di game aturan yang sama ada di <code>NLUIndoBERT.target</code>.</p></div></section>
-
+<h1>Diagram Alir NLU</h1>
+<p class="subjudul">Bagan alir dua model NLU IndoBERT yang dipakai bot: Model 1 membaca intent chat, Model 2 membaca siapa yang dituju beserta relasinya. Pelatihan di <code>nlu_baru.ipynb</code> dan <code>nlu_target.ipynb</code> (angka dari artefak run 27 Okt 2026 sesudah relabel; SVM/NB dari run 25 Sep, label lama), pemakaian di game di <code>backend/app/bot/nlu.py</code>; dibangun 2026-11-13 09:30.</p>
+<div class="kotak"><p><strong>Cara membaca.</strong> Gambar 1–4 adalah pelatihan di notebook, Gambar 5
+pemakaian kedua model di game. Panah ke bawah adalah jalur utama, cabang ke kanan hasil keputusan, dan panah balik di kiri
+perulangan. <b>Arahkan kursor, fokus dengan Tab, atau ketuk kotak</b> untuk melihat dari mana bahannya, artinya, dan dipakai
+untuk apa. Kurung di kanan menyebut sel notebook (Gambar 1–4) atau letak kode game (Gambar 5). Tombol <b>Kode</b> ada di gambar
+yang punya kode game. Di HP, bagan digulir ke samping di dalam kotaknya.</p>
+<div class="legenda" aria-label="Legenda simbol">
+  <span><svg viewBox="0 0 34 18" aria-hidden="true"><rect class="fc-term" x="1" y="2" width="32" height="14" rx="7"/></svg>Mulai / selesai</span>
+  <span><svg viewBox="0 0 34 18" aria-hidden="true"><polygon class="fc-node" points="6,2 33,2 28,16 1,16"/></svg>Masukan / keluaran</span>
+  <span><svg viewBox="0 0 34 18" aria-hidden="true"><rect class="fc-node" x="1" y="2" width="32" height="14" rx="2"/></svg>Proses</span>
+  <span><svg viewBox="0 0 34 18" aria-hidden="true"><polygon class="fc-dec" points="17,1 33,9 17,17 1,9"/></svg>Keputusan</span>
+  <span><svg viewBox="0 0 34 18" aria-hidden="true"><rect class="fc-sub" x="1" y="2" width="32" height="14"/><line class="fc-sub" x1="5" y1="2" x2="5" y2="16"/><line class="fc-sub" x1="29" y1="2" x2="29" y2="16"/></svg>Subproses (dirinci di gambar lain)</span>
+</div></div><h2 id="n1"><span class="nomor">1</span> Gambar 1 · Alur training Model 1 (intent)</h2>
+<figure class="bagan"><div class="fig-scroll"><svg viewBox="0 0 879 954" role="group" aria-label="Gambar 1. Alur training Model 1 (intent)" xmlns="http://www.w3.org/2000/svg"><defs><marker id="panah-n1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="fc-dot"/></marker></defs><path class="fc-line" d="M228.0,48 L228.0,78" marker-end="url(#panah-n1)"/><path class="fc-line" d="M228.0,142 L228.0,172" marker-end="url(#panah-n1)"/><path class="fc-line" d="M228.0,236 L228.0,266" marker-end="url(#panah-n1)"/><path class="fc-line" d="M228.0,298 L228.0,328" marker-end="url(#panah-n1)"/><path class="fc-line" d="M228.0,376 L228.0,406" marker-end="url(#panah-n1)"/><path class="fc-line" d="M228.0,454 L228.0,484" marker-end="url(#panah-n1)"/><path class="fc-line" d="M228.0,548 L228.0,578" marker-end="url(#panah-n1)"/><path class="fc-line" d="M228.0,626 L228.0,656" marker-end="url(#panah-n1)"/><path class="fc-line" d="M228.0,720 L228.0,750" marker-end="url(#panah-n1)"/><path class="fc-line" d="M228.0,798 L228.0,828" marker-end="url(#panah-n1)"/><path class="fc-line" d="M228.0,876 L228.0,906" marker-end="url(#panah-n1)"/><g class="fc-simpul" tabindex="0" role="button" aria-label="Mulai notebook nlu_baru (Model 1: intent)" data-p-judul="Mulai notebook nlu_baru (Model 1: intent)" data-p-dari="Notebook nlu_baru.ipynb di folder pelatihan." data-p-arti="Melatih model yang membaca niat chat: offend, defend, neutral." data-p-pakai="Model 1 yang dimuat game."><rect class="fc-term" x="78.0" y="16" width="300" height="32" rx="16.0"/><text class="fc-t" x="228.0" y="36.5" text-anchor="middle">Mulai notebook nlu_baru (Model 1: intent)</text></g><g class="fc-simpul" tabindex="0" role="button" aria-label="dataset_final3.csv" data-p-judul="dataset_final3.csv" data-p-dari="Dataset chat game buatan; label direvisi 26 Oktober 2026 dengan aturan tertulis." data-p-arti="5.615 chat berlabel satu intent." data-p-pakai="Bahan pembersihan dan pembagian data."><polygon class="fc-node" points="92.0,78 378.0,78 364.0,142 78.0,142"/><text class="fc-t" x="228.0" y="98.5" text-anchor="middle">dataset_final3.csv</text><text class="fc-ann" x="228.0" y="114.5" text-anchor="middle">teks_chat + label_intent</text><text class="fc-ann" x="228.0" y="130.5" text-anchor="middle">label sesuai ATURAN_LABEL.md</text></g><g class="fc-simpul" tabindex="0" role="button" aria-label="Pembersihan data" data-p-judul="Pembersihan data" data-p-dari="Dataset mentah." data-p-arti="Baris kosong, duplikat persis, dan teks berlabel ganda dibuang." data-p-pakai="5.611 chat bersih."><rect class="fc-node" x="78.0" y="172" width="300" height="64" rx="3"/><text class="fc-t" x="228.0" y="192.5" text-anchor="middle">Pembersihan data</text><text class="fc-ann" x="228.0" y="208.5" text-anchor="middle">buang kosong, duplikat persis, dan teks</text><text class="fc-ann" x="228.0" y="224.5" text-anchor="middle">yang berlabel lebih dari satu</text></g><g class="fc-simpul" tabindex="0" role="button" aria-label="EDA: distribusi kelas dan panjang chat" data-p-judul="EDA: distribusi kelas dan panjang chat" data-p-dari="Data bersih." data-p-arti="Melihat sebaran kelas (defend paling sedikit) dan panjang chat." data-p-pakai="Alasan memakai macro-F1 dan panjang token 128."><rect class="fc-node" x="78.0" y="266" width="300" height="32" rx="3"/><text class="fc-t" x="228.0" y="286.5" text-anchor="middle">EDA: distribusi kelas dan panjang chat</text></g><g class="fc-simpul" tabindex="0" role="button" aria-label="Bagi data: test 20% (stratified, seed 42)" data-p-judul="Bagi data: test 20% (stratified, seed 42)" data-p-dari="Data bersih." data-p-arti="Test disisihkan sebelum pemilihan apa pun; validation untuk memilih checkpoint IndoBERT." data-p-pakai="Semua model dinilai pada test yang sama."><rect class="fc-node" x="78.0" y="328" width="300" height="48" rx="3"/><text class="fc-t" x="228.0" y="348.5" text-anchor="middle">Bagi data: test 20% (stratified, seed 42)</text><text class="fc-ann" x="228.0" y="364.5" text-anchor="middle">IndoBERT: validation 15% dari seluruh data</text></g><g class="fc-simpul" tabindex="0" role="button" aria-label="SVM dan Naive Bayes (Gambar 2)" data-p-judul="SVM dan Naive Bayes (Gambar 2)" data-p-dari="Data train (5-fold CV) dan test." data-p-arti="Model pembanding berbasis kata; tidak dipakai game." data-p-pakai="Tabel perbandingan model."><rect class="fc-sub" x="78.0" y="406" width="300" height="48"/><line class="fc-sub" x1="87.0" y1="406" x2="87.0" y2="454"/><line class="fc-sub" x1="369.0" y1="406" x2="369.0" y2="454"/><text class="fc-ts" x="228.0" y="426.5" text-anchor="middle">SVM dan Naive Bayes (Gambar 2)</text><text class="fc-ann" x="228.0" y="442.5" text-anchor="middle">TF-IDF; baseline, Grid Search, Optuna</text></g><g class="fc-simpul" tabindex="0" role="button" aria-label="Tambah ke train IndoBERT saja:" data-p-judul="Tambah ke train IndoBERT saja:" data-p-dari="Chat tambahan 27 Oktober (kasus sulit) dan pesan sesi dataset target bagian train." data-p-arti="Train IndoBERT bertambah 100 + 4.877 chat; validation dan test tetap dari dataset asli." data-p-pakai="Train IndoBERT."><rect class="fc-node" x="78.0" y="484" width="300" height="64" rx="3"/><text class="fc-t" x="228.0" y="504.5" text-anchor="middle">Tambah ke train IndoBERT saja:</text><text class="fc-ann" x="228.0" y="520.5" text-anchor="middle">100 chat tambahan + pesan sesi dari</text><text class="fc-ann" x="228.0" y="536.5" text-anchor="middle">sesi train dataset target</text></g><g class="fc-simpul" tabindex="0" role="button" aria-label="Fine-tuning IndoBERT (Gambar 3)" data-p-judul="Fine-tuning IndoBERT (Gambar 3)" data-p-dari="Train dan validation IndoBERT." data-p-arti="Model pralatih bahasa Indonesia dilatih ulang untuk tiga kelas intent." data-p-pakai="Checkpoint terbaik."><rect class="fc-sub" x="78.0" y="578" width="300" height="48"/><line class="fc-sub" x1="87.0" y1="578" x2="87.0" y2="626"/><line class="fc-sub" x1="369.0" y1="578" x2="369.0" y2="626"/><text class="fc-ts" x="228.0" y="598.5" text-anchor="middle">Fine-tuning IndoBERT (Gambar 3)</text><text class="fc-ann" x="228.0" y="614.5" text-anchor="middle">3 learning rate, pilih lewat validation</text></g><g class="fc-simpul" tabindex="0" role="button" aria-label="Evaluasi test sekali per model" data-p-judul="Evaluasi test sekali per model" data-p-dari="Model terlatih dan data test." data-p-arti="Test hanya untuk pelaporan, tidak untuk memilih." data-p-pakai="Laporan dan perbandingan."><rect class="fc-node" x="78.0" y="656" width="300" height="64" rx="3"/><text class="fc-t" x="228.0" y="676.5" text-anchor="middle">Evaluasi test sekali per model</text><text class="fc-ann" x="228.0" y="692.5" text-anchor="middle">accuracy, macro-F1, weighted-F1,</text><text class="fc-ann" x="228.0" y="708.5" text-anchor="middle">confusion matrix, 10 contoh chat</text></g><g class="fc-simpul" tabindex="0" role="button" aria-label="Simpan model dan laporan; bandingkan semua model" data-p-judul="Simpan model dan laporan; bandingkan semua model" data-p-dari="Hasil evaluasi semua model yang dilatih run ini." data-p-arti="Model dan metrik disimpan di folder models/." data-p-pakai="Model IndoBERT disalin ke game."><rect class="fc-node" x="78.0" y="750" width="300" height="48" rx="3"/><text class="fc-t" x="228.0" y="770.5" text-anchor="middle">Simpan model dan laporan;</text><text class="fc-t" x="228.0" y="786.5" text-anchor="middle">bandingkan semua model</text></g><g class="fc-simpul" tabindex="0" role="button" aria-label="intent_classifier_transformer" data-p-judul="intent_classifier_transformer" data-p-dari="Folder model hasil fine-tuning." data-p-arti="Bobot, tokenizer, dan config IndoBERT intent." data-p-pakai="Dimuat NLUIndoBERT di game (Gambar 5)." data-p-kode="kode-n1"><polygon class="fc-node" points="92.0,828 378.0,828 364.0,876 78.0,876"/><text class="fc-t" x="228.0" y="848.5" text-anchor="middle">intent_classifier_transformer</text><text class="fc-ann" x="228.0" y="864.5" text-anchor="middle">dimuat game sebagai Model 1</text></g><g class="fc-simpul" tabindex="0" role="button" aria-label="Selesai" data-p-judul="Selesai" data-p-dari="Notebook selesai." data-p-arti="Model 1 siap." data-p-pakai="Gambar 5."><rect class="fc-term" x="78.0" y="906" width="300" height="32" rx="16.0"/><text class="fc-t" x="228.0" y="926.5" text-anchor="middle">Selesai</text></g><path class="fc-brk" d="M668,174 H674 V296 H668"/><text class="fc-annb" x="682" y="232.0">Sel 3–17</text><text class="fc-ann" x="682" y="246.0">EDA</text><path class="fc-brk" d="M668,330 H674 V374 H668"/><text class="fc-annb" x="682" y="349.0">Sel 19–32</text><text class="fc-ann" x="682" y="363.0">pengaturan eksperimen</text><path class="fc-brk" d="M668,408 H674 V452 H668"/><text class="fc-annb" x="682" y="427.0">Sel 33–128</text><text class="fc-ann" x="682" y="441.0">SVM, Naive Bayes</text><path class="fc-brk" d="M668,486 H674 V624 H668"/><text class="fc-annb" x="682" y="552.0">Sel 129–159</text><text class="fc-ann" x="682" y="566.0">IndoBERT</text><path class="fc-brk" d="M668,658 H674 V796 H668"/><text class="fc-annb" x="682" y="724.0">Sel 160–173</text><text class="fc-ann" x="682" y="738.0">perbandingan</text></svg></div><figcaption><b>Gambar 1.</b> Notebook <code>nlu_baru.ipynb</code>; isi dan cara pembuatan dataset ada di <a href="dataset-nlu">Dataset NLU</a>, penjelasan sel demi sel di <a href="kode-nlu-intent">Kode NLU Intent</a>. SVM, Naive Bayes, dan IndoBERT memakai test yang sama, tetapi SVM dan Naive Bayes terakhir dilatih 25 Sep dengan label lama, jadi angkanya tidak dibandingkan langsung. Saklar <code>LATIH_SVM</code>/<code>LATIH_NB</code>/<code>LATIH_INDOBERT</code> memilih model yang dilatih; run 27 Okt hanya melatih IndoBERT. Model IndoBERT yang tersimpan dipakai game. Kurung di kanan menunjukkan sel notebook.</figcaption></figure>
+<aside class="ringkasan" aria-label="Ringkasan bagian 1"><p class="ringkasan-judul">Ringkasan bagian 1</p><ul><li>Model 1 membaca niat chat: offend, defend, atau neutral.</li><li>Data dibersihkan dan test disisihkan dulu. Run 27 Okt hanya melatih IndoBERT; angka SVM dan Naive Bayes dari run 25 Sep (label lama), jadi tidak dibandingkan langsung.</li><li>Hanya train IndoBERT yang ditambah chat tambahan dan pesan sesi; validation dan test tetap dari data asli.</li><li>Model IndoBERT terpilih dimuat game sebagai Model 1.</li></ul></aside>
+<h2 id="n2"><span class="nomor">2</span> Gambar 2 · Subproses model klasik (SVM / Naive Bayes)</h2>
+<figure class="bagan"><div class="fig-scroll"><svg viewBox="0 0 879 732" role="group" aria-label="Gambar 2. Subproses model klasik (SVM / Naive Bayes)" xmlns="http://www.w3.org/2000/svg"><defs><marker id="panah-n2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="fc-dot"/></marker></defs><path class="fc-line" d="M228.0,48 L228.0,78" marker-end="url(#panah-n2)"/><path class="fc-line" d="M228.0,126 L228.0,156" marker-end="url(#panah-n2)"/><path class="fc-line" d="M228.0,204 L228.0,234" marker-end="url(#panah-n2)"/><path class="fc-line" d="M228.0,282 L228.0,312" marker-end="url(#panah-n2)"/><path class="fc-line" d="M228.0,344 L228.0,374" marker-end="url(#panah-n2)"/><path class="fc-line" d="M228.0,406 L228.0,436" marker-end="url(#panah-n2)"/><path class="fc-line" d="M228.0,530 L228.0,560" marker-end="url(#panah-n2)"/><text class="fc-lbl" x="234.0" y="545">Ya</text><path class="fc-line" d="M228.0,592 L228.0,622" marker-end="url(#panah-n2)"/><path class="fc-line" d="M228.0,654 L228.0,684" marker-end="url(#panah-n2)"/><path class="fc-line" d="M78.0,483.0 L52,483.0 L52,328.0 L78.0,328.0" marker-end="url(#panah-n2)"/><text class="fc-lbl" x="48.0" y="477.0">Tidak</text><g class="fc-simpul" tabindex="0" role="button" aria-label="Mulai satu model klasik (SVM atau NB)" data-p-judul="Mulai satu model klasik (SVM atau NB)" data-p-dari="Gambar 1 (intent) atau Gambar 4 (target)." data-p-arti="Dijalankan untuk SVM lalu Naive Bayes." data-p-pakai="Satu model pembanding."><rect class="fc-term" x="78.0" y="16" width="300" height="32" rx="16.0"/><text class="fc-t" x="228.0" y="36.5" text-anchor="middle">Mulai satu model klasik (SVM atau NB)</text></g><g class="fc-simpul" tabindex="0" role="button" aria-label="Pipeline: TF-IDF → SVM linear terkalibrasi" data-p-judul="Pipeline: TF-IDF → SVM linear terkalibrasi" data-p-dari="Teks chat train." data-p-arti="TF-IDF mengubah chat menjadi bobot kata dan potongan huruf; pengklasifikasi memilih kelas." data-p-pakai="Dipakai baseline, Grid Search, dan Optuna."><rect class="fc-node" x="78.0" y="78" width="300" height="48" rx="3"/><text class="fc-t" x="228.0" y="98.5" text-anchor="middle">Pipeline: TF-IDF → SVM linear terkalibrasi</text><text class="fc-ann" x="228.0" y="114.5" text-anchor="middle">atau Multinomial Naive Bayes</text></g><g class="fc-simpul" tabindex="0" role="button" aria-label="Baseline: parameter tetap, latih di train, evaluasi test" data-p-judul="Baseline: parameter tetap, latih di train, evaluasi test" data-p-dari="Pipeline dengan parameter bawaan." data-p-arti="Titik awal pembanding." data-p-pakai="Skor baseline."><rect class="fc-node" x="78.0" y="156" width="300" height="48" rx="3"/><text class="fc-t" x="228.0" y="176.5" text-anchor="middle">Baseline: parameter tetap,</text><text class="fc-t" x="228.0" y="192.5" text-anchor="middle">latih di train, evaluasi test</text></g><g class="fc-simpul" tabindex="0" role="button" aria-label="Grid Search: setiap kombinasi parameter" data-p-judul="Grid Search: setiap kombinasi parameter" data-p-dari="Daftar kombinasi parameter." data-p-arti="Semua kombinasi dicoba; skor = rata-rata macro-F1 5 fold." data-p-pakai="Kombinasi terbaik."><rect class="fc-node" x="78.0" y="234" width="300" height="48" rx="3"/><text class="fc-t" x="228.0" y="254.5" text-anchor="middle">Grid Search: setiap kombinasi parameter</text><text class="fc-ann" x="228.0" y="270.5" text-anchor="middle">dinilai 5-fold CV (macro-F1 rata-rata)</text></g><g class="fc-simpul" tabindex="0" role="button" aria-label="Optuna (TPE) mengusulkan kombinasi" data-p-judul="Optuna (TPE) mengusulkan kombinasi" data-p-dari="Riwayat trial sebelumnya." data-p-arti="Pencarian terarah: kombinasi berikutnya diusulkan dari hasil sebelumnya." data-p-pakai="Satu trial."><rect class="fc-node" x="78.0" y="312" width="300" height="32" rx="3"/><text class="fc-t" x="228.0" y="332.5" text-anchor="middle">Optuna (TPE) mengusulkan kombinasi</text></g><g class="fc-simpul" tabindex="0" role="button" aria-label="5-fold CV di data train → macro-F1" data-p-judul="5-fold CV di data train → macro-F1" data-p-dari="Kombinasi usulan." data-p-arti="Skor kombinasi itu." data-p-pakai="Diberikan kembali ke Optuna."><rect class="fc-node" x="78.0" y="374" width="300" height="32" rx="3"/><text class="fc-t" x="228.0" y="394.5" text-anchor="middle">5-fold CV di data train → macro-F1</text></g><g class="fc-simpul" tabindex="0" role="button" aria-label="≥ 100 trial, lalu 30 trial tanpa naik ≥ 0,001; atau 500?" data-p-judul="≥ 100 trial, lalu 30 trial tanpa naik ≥ 0,001; atau 500?" data-p-dari="Jumlah trial dan riwayat skor terbaik." data-p-arti="Berhenti bila sudah cukup trial dan skor tidak lagi naik berarti." data-p-pakai="Refit atau trial berikutnya."><polygon class="fc-dec" points="228.0,436 378.0,483.0 228.0,530 78.0,483.0"/><text class="fc-t" x="228.0" y="471.5" text-anchor="middle">≥ 100 trial, lalu 30</text><text class="fc-t" x="228.0" y="487.5" text-anchor="middle">trial tanpa naik</text><text class="fc-t" x="228.0" y="503.5" text-anchor="middle">≥ 0,001; atau 500?</text></g><g class="fc-simpul" tabindex="0" role="button" aria-label="Refit kombinasi terbaik di seluruh train" data-p-judul="Refit kombinasi terbaik di seluruh train" data-p-dari="Kombinasi terbaik Optuna." data-p-arti="Dilatih ulang di seluruh data train." data-p-pakai="Model akhir."><rect class="fc-node" x="78.0" y="560" width="300" height="32" rx="3"/><text class="fc-t" x="228.0" y="580.5" text-anchor="middle">Refit kombinasi terbaik di seluruh train</text></g><g class="fc-simpul" tabindex="0" role="button" aria-label="Evaluasi test + contoh pemeriksaan" data-p-judul="Evaluasi test + contoh pemeriksaan" data-p-dari="Model akhir dan data test." data-p-arti="Skor pelaporan; contoh pemeriksaan (10 chat intent, 12 skenario target) hanya untuk melihat perilaku model." data-p-pakai="Tabel perbandingan."><rect class="fc-node" x="78.0" y="622" width="300" height="32" rx="3"/><text class="fc-t" x="228.0" y="642.5" text-anchor="middle">Evaluasi test + contoh pemeriksaan</text></g><g class="fc-simpul" tabindex="0" role="button" aria-label="Kembali ke alur utama" data-p-judul="Kembali ke alur utama" data-p-dari="Hasil semua varian." data-p-arti="Pembanding selesai." data-p-pakai="Gambar 1 atau 4."><rect class="fc-term" x="78.0" y="684" width="300" height="32" rx="16.0"/><text class="fc-t" x="228.0" y="704.5" text-anchor="middle">Kembali ke alur utama</text></g><path class="fc-brk" d="M668,80 H674 V202 H668"/><text class="fc-annb" x="682" y="138.0">Baseline</text><text class="fc-ann" x="682" y="152.0">sel 40–52 (SVM)</text><path class="fc-brk" d="M668,236 H674 V280 H668"/><text class="fc-annb" x="682" y="255.0">Grid Search</text><text class="fc-ann" x="682" y="269.0">sel 53–67</text><path class="fc-brk" d="M668,314 H674 V652 H668"/><text class="fc-annb" x="682" y="480.0">Optuna</text><text class="fc-ann" x="682" y="494.0">sel 68–80</text></svg></div><figcaption><b>Gambar 2.</b> Dijalankan untuk SVM dan Naive Bayes. Grid Search mencoba seluruh kombinasi; Optuna mencoba kombinasi pilihan TPE sampai aturan berhenti terpenuhi. Nomor sel di kurung untuk SVM; Naive Bayes ada di sel 81–128. Gambar ini tanpa tombol Kode: model klasik hanya pembanding di notebook dan tidak ada di kode game.</figcaption></figure>
+<aside class="ringkasan" aria-label="Ringkasan bagian 2"><p class="ringkasan-judul">Ringkasan bagian 2</p><ul><li>SVM dan Naive Bayes hanya pembanding di notebook; game tidak memakainya.</li><li>Chat diubah menjadi bobot TF-IDF, lalu diklasifikasi.</li><li>Parameter dipilih dengan Grid Search atau Optuna berdasarkan macro-F1 5-fold CV.</li></ul></aside>
+<h2 id="n3"><span class="nomor">3</span> Gambar 3 · Subproses fine-tuning IndoBERT</h2>
+<figure class="bagan"><div class="fig-scroll"><svg viewBox="0 0 879 866" role="group" aria-label="Gambar 3. Subproses fine-tuning IndoBERT" xmlns="http://www.w3.org/2000/svg"><defs><marker id="panah-n3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="fc-dot"/></marker></defs><path class="fc-line" d="M228.0,48 L228.0,78" marker-end="url(#panah-n3)"/><path class="fc-line" d="M228.0,126 L228.0,156" marker-end="url(#panah-n3)"/><path class="fc-line" d="M228.0,204 L228.0,234" marker-end="url(#panah-n3)"/><path class="fc-line" d="M228.0,282 L228.0,312" marker-end="url(#panah-n3)"/><path class="fc-line" d="M228.0,360 L228.0,390" marker-end="url(#panah-n3)"/><path class="fc-line" d="M228.0,438 L228.0,468" marker-end="url(#panah-n3)"/><path class="fc-line" d="M228.0,544 L228.0,574" marker-end="url(#panah-n3)"/><text class="fc-lbl" x="234.0" y="559">Ya</text><path class="fc-line" d="M228.0,632 L228.0,662" marker-end="url(#panah-n3)"/><text class="fc-lbl" x="234.0" y="647">Tidak</text><path class="fc-line" d="M228.0,710 L228.0,740" marker-end="url(#panah-n3)"/><path class="fc-line" d="M228.0,788 L228.0,818" marker-end="url(#panah-n3)"/><path class="fc-line" d="M78.0,506.0 L52,506.0 L52,336.0 L78.0,336.0" marker-end="url(#panah-n3)"/><text class="fc-lbl" x="48.0" y="500.0">Tidak</text><path class="fc-line" d="M78.0,603.0 L36,603.0 L36,180.0 L78.0,180.0" marker-end="url(#panah-n3)"/><text class="fc-lbl" x="48.0" y="597.0">Ya</text><g class="fc-simpul" tabindex="0" role="button" aria-label="Mulai fine-tuning IndoBERT" data-p-judul="Mulai fine-tuning IndoBERT" data-p-dari="Gambar 1 (intent) atau Gambar 4 (target)." data-p-arti="Langkah yang sama untuk kedua model." data-p-pakai="Checkpoint terbaik."><rect class="fc-term" x="78.0" y="16" width="300" height="32" rx="16.0"/><text class="fc-t" x="228.0" y="36.5" text-anchor="middle">Mulai fine-tuning IndoBERT</text></g><g class="fc-simpul" tabindex="0" role="button" aria-label="Tokenisasi teks" data-p-judul="Tokenisasi teks" data-p-dari="Teks chat (intent) atau teks pasangan (target)." data-p-arti="Teks dipotong menjadi token kosakata IndoBERT." data-p-pakai="Masukan model."><rect class="fc-node" x="78.0" y="78" width="300" height="48" rx="3"/><text class="fc-t" x="228.0" y="98.5" text-anchor="middle">Tokenisasi teks</text><text class="fc-ann" x="228.0" y="114.5" text-anchor="middle">intent: max 128 token; target: max 512</text></g><g class="fc-simpul" tabindex="0" role="button" aria-label="Ambil learning rate berikutnya" data-p-judul="Ambil learning rate berikutnya" data-p-dari="Daftar kandidat learning rate." data-p-arti="Setiap kandidat dilatih terpisah dari bobot pralatih yang sama." data-p-pakai="Satu run pelatihan."><rect class="fc-node" x="78.0" y="156" width="300" height="48" rx="3"/><text class="fc-t" x="228.0" y="176.5" text-anchor="middle">Ambil learning rate berikutnya</text><text class="fc-ann" x="228.0" y="192.5" text-anchor="middle">1×10⁻⁵, 2×10⁻⁵, 3×10⁻⁵</text></g><g class="fc-simpul" tabindex="0" role="button" aria-label="Muat ulang indobert-base-p1 pralatih" data-p-judul="Muat ulang indobert-base-p1 pralatih" data-p-dari="indobenchmark/indobert-base-p1 (Wilie dkk., 2020)." data-p-arti="Model bahasa Indonesia ditambah satu lapisan pengklasifikasi." data-p-pakai="Dilatih per epoch."><rect class="fc-node" x="78.0" y="234" width="300" height="48" rx="3"/><text class="fc-t" x="228.0" y="254.5" text-anchor="middle">Muat ulang indobert-base-p1 pralatih</text><text class="fc-ann" x="228.0" y="270.5" text-anchor="middle">+ kepala klasifikasi baru, seed 42</text></g><g class="fc-simpul" tabindex="0" role="button" aria-label="Latih satu epoch: AdamW, batch efektif 16," data-p-judul="Latih satu epoch: AdamW, batch efektif 16," data-p-dari="Data train." data-p-arti="Bobot diperbarui; learning rate naik selama warmup lalu turun linear." data-p-pakai="Evaluasi validation."><rect class="fc-node" x="78.0" y="312" width="300" height="48" rx="3"/><text class="fc-t" x="228.0" y="332.5" text-anchor="middle">Latih satu epoch: AdamW, batch efektif 16,</text><text class="fc-ann" x="228.0" y="348.5" text-anchor="middle">warmup 10% lalu learning rate turun linear</text></g><g class="fc-simpul" tabindex="0" role="button" aria-label="Evaluasi validation → macro-F1; simpan checkpoint" data-p-judul="Evaluasi validation → macro-F1; simpan checkpoint" data-p-dari="Model sesudah satu epoch." data-p-arti="Skor validation dicatat dan checkpoint disimpan." data-p-pakai="Early stopping dan pemilihan."><rect class="fc-node" x="78.0" y="390" width="300" height="48" rx="3"/><text class="fc-t" x="228.0" y="410.5" text-anchor="middle">Evaluasi validation → macro-F1;</text><text class="fc-t" x="228.0" y="426.5" text-anchor="middle">simpan checkpoint</text></g><g class="fc-simpul" tabindex="0" role="button" aria-label="Tidak naik ≥ 0,001 selama 3 epoch, atau epoch = 12?" data-p-judul="Tidak naik ≥ 0,001 selama 3 epoch, atau epoch = 12?" data-p-dari="Riwayat macro-F1 validation." data-p-arti="Berhenti bila skor tidak lagi naik berarti atau epoch maksimum." data-p-pakai="Kandidat learning rate berikutnya."><polygon class="fc-dec" points="228.0,468 378.0,506.0 228.0,544 78.0,506.0"/><text class="fc-t" x="228.0" y="502.5" text-anchor="middle">Tidak naik ≥ 0,001 selama</text><text class="fc-t" x="228.0" y="518.5" text-anchor="middle">3 epoch, atau epoch = 12?</text></g><g class="fc-simpul" tabindex="0" role="button" aria-label="Masih ada learning rate?" data-p-judul="Masih ada learning rate?" data-p-dari="Daftar kandidat." data-p-arti="Ulang untuk setiap learning rate." data-p-pakai="Pemilihan checkpoint."><polygon class="fc-dec" points="228.0,574 378.0,603.0 228.0,632 78.0,603.0"/><text class="fc-t" x="228.0" y="607.5" text-anchor="middle">Masih ada learning rate?</text></g><g class="fc-simpul" tabindex="0" role="button" aria-label="Pilih checkpoint dengan macro-F1 validation tertinggi" data-p-judul="Pilih checkpoint dengan macro-F1 validation tertinggi" data-p-dari="Semua checkpoint semua kandidat." data-p-arti="Satu model terbaik menurut validation." data-p-pakai="Evaluasi test."><rect class="fc-node" x="78.0" y="662" width="300" height="48" rx="3"/><text class="fc-t" x="228.0" y="682.5" text-anchor="middle">Pilih checkpoint dengan macro-F1</text><text class="fc-t" x="228.0" y="698.5" text-anchor="middle">validation tertinggi</text></g><g class="fc-simpul" tabindex="0" role="button" aria-label="Evaluasi sekali pada test" data-p-judul="Evaluasi sekali pada test" data-p-dari="Checkpoint terpilih dan data test." data-p-arti="Skor yang dilaporkan." data-p-pakai="Laporan dan model yang disimpan."><rect class="fc-node" x="78.0" y="740" width="300" height="48" rx="3"/><text class="fc-t" x="228.0" y="760.5" text-anchor="middle">Evaluasi sekali pada test</text><text class="fc-ann" x="228.0" y="776.5" text-anchor="middle">test tidak dipakai memilih</text></g><g class="fc-simpul" tabindex="0" role="button" aria-label="Kembali ke alur utama" data-p-judul="Kembali ke alur utama" data-p-dari="Model terpilih." data-p-arti="Fine-tuning selesai." data-p-pakai="Gambar 1 atau 4."><rect class="fc-term" x="78.0" y="818" width="300" height="32" rx="16.0"/><text class="fc-t" x="228.0" y="838.5" text-anchor="middle">Kembali ke alur utama</text></g><path class="fc-brk" d="M668,80 H674 V124 H668"/><text class="fc-annb" x="682" y="99.0">Sel 139–142</text><text class="fc-ann" x="682" y="113.0">split, tokenizer (intent)</text><path class="fc-brk" d="M668,158 H674 V630 H668"/><text class="fc-annb" x="682" y="391.0">Sel 145–146</text><text class="fc-ann" x="682" y="405.0">melatih kandidat LR (intent)</text><path class="fc-brk" d="M668,664 H674 V786 H668"/><text class="fc-annb" x="682" y="722.0">Sel 147–150</text><text class="fc-ann" x="682" y="736.0">checkpoint, evaluasi (intent)</text></svg></div><figcaption><b>Gambar 3.</b> Sama untuk intent dan target, berbeda di panjang token dan pembagian batch (intent 8 × 2, target 4 × 4; keduanya batch efektif 16). Panah balik dalam mengulang epoch, panah balik luar mengambil learning rate berikutnya. Gambar ini tanpa tombol Kode: pelatihan hanya ada di notebook, game hanya memuat model jadinya.</figcaption></figure>
+<aside class="ringkasan" aria-label="Ringkasan bagian 3"><p class="ringkasan-judul">Ringkasan bagian 3</p><ul><li>Fine-tuning yang sama dipakai Model 1 dan Model 2.</li><li>Beberapa learning rate dicoba dari bobot pralatih yang sama.</li><li>Early stopping memakai macro-F1 validation; test hanya untuk pelaporan.</li></ul></aside>
+<h2 id="n4"><span class="nomor">4</span> Gambar 4 · Alur training Model 2 (target)</h2>
+<figure class="bagan"><div class="fig-scroll"><svg viewBox="0 0 879 1016" role="group" aria-label="Gambar 4. Alur training Model 2 (target)" xmlns="http://www.w3.org/2000/svg"><defs><marker id="panah-n4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="fc-dot"/></marker></defs><path class="fc-line" d="M228.0,48 L228.0,78" marker-end="url(#panah-n4)"/><path class="fc-line" d="M228.0,158 L228.0,188" marker-end="url(#panah-n4)"/><path class="fc-line" d="M228.0,220 L228.0,250" marker-end="url(#panah-n4)"/><path class="fc-line" d="M228.0,298 L228.0,328" marker-end="url(#panah-n4)"/><path class="fc-line" d="M228.0,376 L228.0,406" marker-end="url(#panah-n4)"/><path class="fc-line" d="M228.0,470 L228.0,500" marker-end="url(#panah-n4)"/><path class="fc-line" d="M228.0,548 L228.0,578" marker-end="url(#panah-n4)"/><path class="fc-line" d="M228.0,626 L228.0,656" marker-end="url(#panah-n4)"/><path class="fc-line" d="M228.0,704 L228.0,734" marker-end="url(#panah-n4)"/><path class="fc-line" d="M228.0,782 L228.0,812" marker-end="url(#panah-n4)"/><path class="fc-line" d="M228.0,860 L228.0,890" marker-end="url(#panah-n4)"/><path class="fc-line" d="M228.0,938 L228.0,968" marker-end="url(#panah-n4)"/><g class="fc-simpul" tabindex="0" role="button" aria-label="Mulai nlu_target (Model 2: target)" data-p-judul="Mulai nlu_target (Model 2: target)" data-p-dari="Notebook nlu_target.ipynb di folder pelatihan." data-p-arti="Melatih model yang membaca siapa yang dituju chat dan relasinya." data-p-pakai="Model 2 yang dimuat game."><rect class="fc-term" x="78.0" y="16" width="300" height="32" rx="16.0"/><text class="fc-t" x="228.0" y="36.5" text-anchor="middle">Mulai nlu_target (Model 2: target)</text></g><g class="fc-simpul" tabindex="0" role="button" aria-label="Dataset target: pesan + konteks" data-p-judul="Dataset target: pesan + konteks" data-p-dari="Dataset sesi buatan: satu pesan utama per sesi, dengan konteks chat sebelumnya." data-p-arti="Jawaban tiap sesi = daftar {pemain, relasi}; relasi offend, defend, atau neutral." data-p-pakai="Bahan validasi, preprocessing, dan pasangan."><polygon class="fc-node" points="92.0,78 378.0,78 364.0,158 78.0,158"/><text class="fc-t" x="228.0" y="98.5" text-anchor="middle">Dataset target: pesan + konteks</text><text class="fc-ann" x="228.0" y="114.5" text-anchor="middle">≤ 12 pesan + daftar pemain + target</text><text class="fc-ann" x="228.0" y="130.5" text-anchor="middle">{pemain, relasi};</text><text class="fc-ann" x="228.0" y="146.5" text-anchor="middle">pilot 775 sesi + tambahan 500 sesi</text></g><g class="fc-simpul" tabindex="0" role="button" aria-label="Validasi konsistensi dan EDA" data-p-judul="Validasi konsistensi dan EDA" data-p-dari="Dataset target." data-p-arti="Memeriksa format target dan sebaran kasus." data-p-pakai="Data siap diproses."><rect class="fc-node" x="78.0" y="188" width="300" height="32" rx="3"/><text class="fc-t" x="228.0" y="208.5" text-anchor="middle">Validasi konsistensi dan EDA</text></g><g class="fc-simpul" tabindex="0" role="button" aria-label="Kenali panggilan, samarkan nama" data-p-judul="Kenali panggilan, samarkan nama" data-p-dari="Teks chat dan daftar pemain." data-p-arti="Nama dan panggilan diganti token peran supaya model belajar pola kalimat, bukan nama (samarkan_nama)." data-p-pakai="Teks pasangan." data-p-kode="kode-n4"><rect class="fc-node" x="78.0" y="250" width="300" height="48" rx="3"/><text class="fc-t" x="228.0" y="270.5" text-anchor="middle">Kenali panggilan, samarkan nama</text><text class="fc-ann" x="228.0" y="286.5" text-anchor="middle">KANDIDAT_X, PENGIRIM_X, PEMAIN_X</text></g><g class="fc-simpul" tabindex="0" role="button" aria-label="Teks pasangan: intent || pesan sekarang || konteks beranotasi (terbaru dulu)" data-p-judul="Teks pasangan: intent || pesan sekarang || konteks beranotasi (terbaru dulu)" data-p-dari="Pesan, intent, dan konteks yang sudah disamarkan." data-p-arti="Satu teks per kandidat (buat_teks_pasangan); konteks terbaru ditulis dulu supaya yang terpotong yang paling lama." data-p-pakai="Masukan Model 2." data-p-kode="kode-n4"><rect class="fc-node" x="78.0" y="328" width="300" height="48" rx="3"/><text class="fc-t" x="228.0" y="348.5" text-anchor="middle">Teks pasangan: intent || pesan sekarang ||</text><text class="fc-t" x="228.0" y="364.5" text-anchor="middle">konteks beranotasi (terbaru dulu)</text></g><g class="fc-simpul" tabindex="0" role="button" aria-label="Bagi pesan per grup kalimat sumber" data-p-judul="Bagi pesan per grup kalimat sumber" data-p-dari="Sesi pilot dan tambahan." data-p-arti="Parafrase dari kalimat sumber yang sama tidak dipisah ke train dan test." data-p-pakai="Train/validation/test 496/124/155 pesan pilot."><rect class="fc-node" x="78.0" y="406" width="300" height="64" rx="3"/><text class="fc-t" x="228.0" y="426.5" text-anchor="middle">Bagi pesan per grup kalimat sumber</text><text class="fc-ann" x="228.0" y="442.5" text-anchor="middle">StratifiedGroupKFold → train / validation / test</text><text class="fc-ann" x="228.0" y="458.5" text-anchor="middle">sesi tambahan: 80% train, 20% uji tambahan</text></g><g class="fc-simpul" tabindex="0" role="button" aria-label="Satu pasangan (pesan, kandidat) per pemain" data-p-judul="Satu pasangan (pesan, kandidat) per pemain" data-p-dari="Pesan dan daftar pemain." data-p-arti="Setiap pemain menjadi satu contoh: relasinya, atau tidak_ada." data-p-pakai="5.377 pasangan train."><rect class="fc-node" x="78.0" y="500" width="300" height="48" rx="3"/><text class="fc-t" x="228.0" y="520.5" text-anchor="middle">Satu pasangan (pesan, kandidat) per pemain</text><text class="fc-ann" x="228.0" y="536.5" text-anchor="middle">+ pemain semu sampai 6; label relasi</text></g><g class="fc-simpul" tabindex="0" role="button" aria-label="Model klasik (Gambar 2)" data-p-judul="Model klasik (Gambar 2)" data-p-dari="Pasangan train." data-p-arti="Pembanding; pada run ini tidak dilatih." data-p-pakai="Tidak ada."><rect class="fc-sub" x="78.0" y="578" width="300" height="48"/><line class="fc-sub" x1="87.0" y1="578" x2="87.0" y2="626"/><line class="fc-sub" x1="369.0" y1="578" x2="369.0" y2="626"/><text class="fc-ts" x="228.0" y="598.5" text-anchor="middle">Model klasik (Gambar 2)</text><text class="fc-ann" x="228.0" y="614.5" text-anchor="middle">dilewati pada run 27 Okt</text></g><g class="fc-simpul" tabindex="0" role="button" aria-label="Fine-tuning IndoBERT (Gambar 3)" data-p-judul="Fine-tuning IndoBERT (Gambar 3)" data-p-dari="Pasangan train dan validation." data-p-arti="IndoBERT dilatih menebak relasi tiap pasangan." data-p-pakai="Checkpoint terbaik."><rect class="fc-sub" x="78.0" y="656" width="300" height="48"/><line class="fc-sub" x1="87.0" y1="656" x2="87.0" y2="704"/><line class="fc-sub" x1="369.0" y1="656" x2="369.0" y2="704"/><text class="fc-ts" x="228.0" y="676.5" text-anchor="middle">Fine-tuning IndoBERT (Gambar 3)</text><text class="fc-ann" x="228.0" y="692.5" text-anchor="middle">max 512 token</text></g><g class="fc-simpul" tabindex="0" role="button" aria-label="Gabung per pesan: relasi ≠ tidak_ada;" data-p-judul="Gabung per pesan: relasi ≠ tidak_ada;" data-p-dari="Prediksi relasi semua pasangan satu pesan." data-p-arti="Pemain berelasi menjadi target; pesan offend/defend tanpa target memakai kandidat terkuat bila peluangnya ≥ ambang, selain itu tidak_diketahui." data-p-pakai="Daftar target per pesan." data-p-kode="kode-n4"><rect class="fc-node" x="78.0" y="734" width="300" height="48" rx="3"/><text class="fc-t" x="228.0" y="754.5" text-anchor="middle">Gabung per pesan: relasi ≠ tidak_ada;</text><text class="fc-ann" x="228.0" y="770.5" text-anchor="middle">offend/defend tanpa target → ambang 0,5</text></g><g class="fc-simpul" tabindex="0" role="button" aria-label="Evaluasi test dan uji tambahan: macro-F1 relasi, F1 neutral, exact match pesan" data-p-judul="Evaluasi test dan uji tambahan: macro-F1 relasi, F1 neutral, exact match pesan" data-p-dari="Daftar target per pesan dan jawaban benarnya." data-p-arti="Skor per pasangan dan per pesan." data-p-pakai="Laporan."><rect class="fc-node" x="78.0" y="812" width="300" height="48" rx="3"/><text class="fc-t" x="228.0" y="832.5" text-anchor="middle">Evaluasi test dan uji tambahan: macro-F1</text><text class="fc-t" x="228.0" y="848.5" text-anchor="middle">relasi, F1 neutral, exact match pesan</text></g><g class="fc-simpul" tabindex="0" role="button" aria-label="target_classifier_transformer" data-p-judul="target_classifier_transformer" data-p-dari="Folder model hasil fine-tuning." data-p-arti="Model, ambang aturan minimal satu target, dan kata umum untuk aturan nama." data-p-pakai="Dimuat NLUIndoBERT di game (Gambar 5)." data-p-kode="kode-n4"><polygon class="fc-node" points="92.0,890 378.0,890 364.0,938 78.0,938"/><text class="fc-t" x="228.0" y="910.5" text-anchor="middle">target_classifier_transformer</text><text class="fc-ann" x="228.0" y="926.5" text-anchor="middle">+ ambang_target.json, pair_builder.json</text></g><g class="fc-simpul" tabindex="0" role="button" aria-label="Selesai" data-p-judul="Selesai" data-p-dari="Notebook selesai." data-p-arti="Model 2 siap." data-p-pakai="Gambar 5."><rect class="fc-term" x="78.0" y="968" width="300" height="32" rx="16.0"/><text class="fc-t" x="228.0" y="988.5" text-anchor="middle">Selesai</text></g><path class="fc-brk" d="M668,190 H674 V218 H668"/><text class="fc-annb" x="682" y="201.0">Sel 3–15</text><text class="fc-ann" x="682" y="215.0">EDA</text><path class="fc-brk" d="M668,252 H674 V546 H668"/><text class="fc-annb" x="682" y="396.0">Sel 16–35</text><text class="fc-ann" x="682" y="410.0">Preprocessing</text><path class="fc-brk" d="M668,580 H674 V624 H668"/><text class="fc-annb" x="682" y="599.0">Sel 54–149</text><text class="fc-ann" x="682" y="613.0">SVM, Naive Bayes</text><path class="fc-brk" d="M668,658 H674 V858 H668"/><text class="fc-annb" x="682" y="755.0">Sel 150–187</text><text class="fc-ann" x="682" y="769.0">IndoBERT, perbandingan</text></svg></div><figcaption><b>Gambar 4.</b> Notebook <code>nlu_target.ipynb</code>; isi dan kasus dataset ada di <a href="dataset-nlu">Dataset NLU</a>, penjelasan sel demi sel di <a href="kode-nlu-target">Kode NLU Target</a>. Model 2 tidak menebak nama langsung: setiap pemain dinilai lewat satu pasangan (pesan, kandidat), lalu hasilnya digabung per pesan. Penyamaran nama dan teks pasangan di notebook sama dengan kode game di tombol Kode.</figcaption></figure>
+<aside class="ringkasan" aria-label="Ringkasan bagian 4"><p class="ringkasan-judul">Ringkasan bagian 4</p><ul><li>Model 2 menilai setiap pemain lewat satu pasangan (pesan, kandidat), lalu hasilnya digabung per pesan.</li><li>Nama disamarkan menjadi token peran supaya model tidak menghafal nama.</li><li>Pesan offend/defend tanpa target memakai aturan minimal satu target dengan ambang.</li><li>Model IndoBERT terpilih dimuat game sebagai Model 2.</li></ul></aside>
+<h2 id="n5"><span class="nomor">5</span> Gambar 5 · Model dipakai di game</h2>
+<figure class="bagan"><div class="fig-scroll"><svg viewBox="0 0 879 698" role="group" aria-label="Gambar 5. Model dipakai di game" xmlns="http://www.w3.org/2000/svg"><defs><marker id="panah-n5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="fc-dot"/></marker></defs><path class="fc-line" d="M228.0,48 L228.0,78" marker-end="url(#panah-n5)"/><path class="fc-line" d="M228.0,126 L228.0,156" marker-end="url(#panah-n5)"/><path class="fc-line" d="M228.0,220 L228.0,250" marker-end="url(#panah-n5)"/><path class="fc-line" d="M228.0,298 L228.0,328" marker-end="url(#panah-n5)"/><path class="fc-line" d="M228.0,376 L228.0,406" marker-end="url(#panah-n5)"/><path class="fc-line" d="M228.0,454 L228.0,484" marker-end="url(#panah-n5)"/><path class="fc-line" d="M228.0,542 L228.0,572" marker-end="url(#panah-n5)"/><text class="fc-lbl" x="234.0" y="557">Tidak</text><path class="fc-line" d="M228.0,620 L228.0,650" marker-end="url(#panah-n5)"/><path class="fc-line" d="M378.0,513.0 L424,513.0" marker-end="url(#panah-n5)"/><text class="fc-lbl" x="384.0" y="507.0">Ya</text><path class="fc-line" d="M634,513.0 L656,513.0 L656,596.0 L378.0,596.0" marker-end="url(#panah-n5)"/><g class="fc-simpul" tabindex="0" role="button" aria-label="Mulai: chat baru di ingatan bot" data-p-judul="Mulai: chat baru di ingatan bot" data-p-dari="Chat yang masuk ingatan bot lewat Ingatan.sinkron_snapshot, belum punya bacaan." data-p-arti="Setiap chat dibaca sekali per bot, berurutan, dengan chat sebelumnya sebagai konteks." data-p-pakai="baca_chat_baru (dipanggil BrainRuntime.langkah sebelum putuskan)." data-p-kode="kode-n5"><rect class="fc-term" x="78.0" y="16" width="300" height="32" rx="16.0"/><text class="fc-t" x="228.0" y="36.5" text-anchor="middle">Mulai: chat baru di ingatan bot</text></g><g class="fc-simpul" tabindex="0" role="button" aria-label="varian_nama_intent: nama pemain" data-p-judul="varian_nama_intent: nama pemain" data-p-dari="Teks chat dan roster." data-p-arti="Nama bebas (mis. username) diganti nama yang dikenal Model 1 saat pelatihan." data-p-pakai="Tiga teks untuk Model 1." data-p-kode="kode-n5"><rect class="fc-node" x="78.0" y="78" width="300" height="48" rx="3"/><text class="fc-t" x="228.0" y="98.5" text-anchor="middle">varian_nama_intent: nama pemain</text><text class="fc-ann" x="228.0" y="114.5" text-anchor="middle">diganti nama yang dikenal model, 3 varian</text></g><g class="fc-simpul" tabindex="0" role="button" aria-label="Model 1 (NLUIndoBERT.intent):" data-p-judul="Model 1 (NLUIndoBERT.intent):" data-p-dari="Tiga varian teks; NLUBersama menyimpan bacaan per teks dan roster, jadi chat yang sama tidak dibaca dua kali." data-p-arti="Intent dengan keyakinan terbesar: offend, defend, atau neutral." data-p-pakai="Intent dan conf_intent; label intent ikut ke teks pasangan Model 2." data-p-kode="kode-n5"><rect class="fc-node" x="78.0" y="156" width="300" height="64" rx="3"/><text class="fc-t" x="228.0" y="176.5" text-anchor="middle">Model 1 (NLUIndoBERT.intent):</text><text class="fc-ann" x="228.0" y="192.5" text-anchor="middle">probabilitas 3 varian dirata-ratakan;</text><text class="fc-ann" x="228.0" y="208.5" text-anchor="middle">hasil disimpan memo NLUBersama</text></g><g class="fc-simpul" tabindex="0" role="button" aria-label="Konteks: 12 chat terakhir yang sudah" data-p-judul="Konteks: 12 chat terakhir yang sudah" data-p-dari="Chat sebelumnya di ingatan bot." data-p-arti="Riwayat yang sudah dibaca menjadi konteks." data-p-pakai="Teks pasangan." data-p-kode="kode-n5"><rect class="fc-node" x="78.0" y="250" width="300" height="48" rx="3"/><text class="fc-t" x="228.0" y="270.5" text-anchor="middle">Konteks: 12 chat terakhir yang sudah</text><text class="fc-ann" x="228.0" y="286.5" text-anchor="middle">beranotasi (pengirim, teks, intent, target)</text></g><g class="fc-simpul" tabindex="0" role="button" aria-label="buat_teks_pasangan untuk setiap" data-p-judul="buat_teks_pasangan untuk setiap" data-p-dari="Pesan, konteks, roster, dan intent." data-p-arti="Satu teks pasangan per kandidat, sama dengan bentuk saat pelatihan." data-p-pakai="Model 2." data-p-kode="kode-n5"><rect class="fc-node" x="78.0" y="328" width="300" height="48" rx="3"/><text class="fc-t" x="228.0" y="348.5" text-anchor="middle">buat_teks_pasangan untuk setiap</text><text class="fc-ann" x="228.0" y="364.5" text-anchor="middle">pemain roster (nama disamarkan)</text></g><g class="fc-simpul" tabindex="0" role="button" aria-label="Model 2 (NLUIndoBERT.target):" data-p-judul="Model 2 (NLUIndoBERT.target):" data-p-dari="Teks pasangan semua kandidat (memo per teks, konteks, dan roster)." data-p-arti="Relasi offend, defend, neutral, atau tidak_ada per pemain." data-p-pakai="Target pesan, dengan aturan minimal satu target untuk offend/defend." data-p-kode="kode-n5"><rect class="fc-node" x="78.0" y="406" width="300" height="48" rx="3"/><text class="fc-t" x="228.0" y="426.5" text-anchor="middle">Model 2 (NLUIndoBERT.target):</text><text class="fc-ann" x="228.0" y="442.5" text-anchor="middle">relasi tiap kandidat; lewat memo yang sama</text></g><g class="fc-simpul" tabindex="0" role="button" aria-label="Intent = neutral?" data-p-judul="Intent = neutral?" data-p-dari="Intent dari Model 1." data-p-arti="Pesan neutral boleh tanpa target; nama yang disebut menjadi target neutral." data-p-pakai="Aturan nama atau langsung selesai." data-p-kode="kode-n5"><polygon class="fc-dec" points="228.0,484 378.0,513.0 228.0,542 78.0,513.0"/><text class="fc-t" x="228.0" y="517.5" text-anchor="middle">Intent = neutral?</text></g><g class="fc-simpul" tabindex="0" role="button" aria-label="pemain_disebut: nama → target neutral" data-p-judul="pemain_disebut: nama → target neutral" data-p-dari="Teks chat dan roster." data-p-arti="Pemain yang disebut nama atau panggilannya menjadi target neutral." data-p-pakai="Penanda pemain yang diajak bicara (konteks penanya)." data-p-kode="kode-n5"><rect class="fc-node" x="424" y="489.0" width="210" height="48" rx="3"/><text class="fc-t" x="529.0" y="509.5" text-anchor="middle">pemain_disebut: nama</text><text class="fc-t" x="529.0" y="525.5" text-anchor="middle">→ target neutral</text></g><g class="fc-simpul" tabindex="0" role="button" aria-label="Chat + intent, conf_intent, target" data-p-judul="Chat + intent, conf_intent, target" data-p-dari="anotasi_chat." data-p-arti="Bacaan lengkap satu chat." data-p-pakai="Offend/defend dengan keyakinan ≥ 0,60 menjadi bukti (relasi_chat); target neutral menandai penanya." data-p-kode="kode-n5"><polygon class="fc-node" points="92.0,572 378.0,572 364.0,620 78.0,620"/><text class="fc-t" x="228.0" y="592.5" text-anchor="middle">Chat + intent, conf_intent, target</text><text class="fc-ann" x="228.0" y="608.5" text-anchor="middle">[{pemain, relasi, prob, sumber}]</text></g><g class="fc-simpul" tabindex="0" role="button" aria-label="Selesai: bacaan masuk ingatan bot" data-p-judul="Selesai: bacaan masuk ingatan bot" data-p-dari="baca_chat_baru." data-p-arti="Ingatan bot siap dinilai fuzzy." data-p-pakai="hitung_bukti di Diagram Alir Fuzzy." data-p-kode="kode-n5"><rect class="fc-term" x="78.0" y="650" width="300" height="32" rx="16.0"/><text class="fc-t" x="228.0" y="670.5" text-anchor="middle">Selesai: bacaan masuk ingatan bot</text></g><path class="fc-brk" d="M668,80 H674 V218 H668"/><text class="fc-annb" x="682" y="146.0">game</text><text class="fc-ann" x="682" y="160.0">nlu.py:191</text><path class="fc-brk" d="M668,330 H674 V452 H668"/><text class="fc-annb" x="682" y="388.0">game</text><text class="fc-ann" x="682" y="402.0">nlu.py:205</text><path class="fc-brk" d="M668,486 H674 V618 H668"/><text class="fc-annb" x="682" y="549.0">game</text><text class="fc-ann" x="682" y="563.0">nlu.py:322</text></svg></div><figcaption><b>Gambar 5.</b> Di game kedua model hanya membaca chat lewat <code>backend/app/bot/nlu.py</code>. <code>BrainRuntime.langkah</code> memanggil <code>baca_chat_baru</code> untuk setiap chat baru sebelum otak fuzzy berjalan. Langkah sesudahnya (bukti dan [FUZZY 1]) ada di <a href="diagram-alir-fuzzy#g1">Diagram Alir Fuzzy Gambar 1</a> dan <a href="cara-kerja-bot#t-input">Cara Kerja Bot [INPUT]</a>.</figcaption></figure>
+<aside class="ringkasan" aria-label="Ringkasan bagian 5"><p class="ringkasan-judul">Ringkasan bagian 5</p><ul><li>Di game kedua model hanya membaca chat, lewat bot/nlu.py.</li><li>Model 1 membaca tiga varian nama lalu merata-ratakan peluangnya.</li><li>Model 2 membaca teks pasangan tiap pemain dengan 12 chat konteks; pesan neutral juga mendapat target dari nama.</li><li>Bacaan disimpan di memo bersama dan menjadi bukti untuk otak fuzzy.</li></ul></aside>
+<h2 id="asumsi"><span class="nomor">6</span> Asumsi</h2>
+<section class="kartu "><div class="kepala-kartu"><h3 id="asumsi-1">A. Data dan label</h3></div><ul><li>Label intent dan target mengikuti aturan tertulis data/ATURAN_LABEL.md (relabel 26 Okt 2026) dan dianggap benar; teks identik berlabel ganda dibuang, duplikat persis disimpan sekali.</li><li>Satu chat hanya punya satu intent; kalimat campuran (membela + menuduh) berintent offend, dan relasi per pemain (siapa dibela, siapa dituduh) dicatat Model 2.</li><li>Test (20%) disisihkan sebelum pemilihan parameter dan hanya dipakai untuk pelaporan.</li><li>Data tambahan (100 chat intent dan 500 sesi target, dibuat 27 Okt 2026 mengikuti plan03) dan pesan sesi dari dataset target hanya masuk train; validation dan test tetap dari dataset asli, kecuali 20% sesi target tambahan yang dipakai sebagai uji tambahan terpisah.</li><li>Dataset target asli adalah data pilot (775 sesi, 25 per kasus), jadi skor per kasus masih sangat bervariasi.</li><li>Anotasi konteks di dataset target adalah label benar; di game anotasi berasal dari prediksi sebelumnya, sehingga skor test adalah batas atas.</li><li>Pesan dari satu grup kalimat sumber tidak dipisah ke train dan test (dataset target), agar parafrase tidak bocor.</li></ul></section>
+<section class="kartu "><div class="kepala-kartu"><h3 id="asumsi-2">B. Model klasik</h3></div><ul><li>Chat direpresentasikan sebagai kantong kata/potongan karakter berbobot TF-IDF; urutan kata hilang di luar n-gram.</li><li>Naive Bayes menganggap fitur saling bebas bila kelas diketahui; SVM memisahkan kelas dengan batas linear.</li><li>Parameter dipilih dari rata-rata macro-F1 5-fold CV dengan fold yang sama untuk semua kandidat.</li></ul></section>
+<section class="kartu "><div class="kepala-kartu"><h3 id="asumsi-3">C. IndoBERT</h3></div><ul><li>Model pralatih indobenchmark/indobert-base-p1 di-fine-tune penuh; setiap learning rate mulai dari bobot pralatih dan seed yang sama.</li><li>Checkpoint dipilih dari macro-F1 validation; early stopping patience 3 dengan ambang kenaikan 0,001.</li><li>Confidence softmax belum dikalibrasi dan ketimpangan kelas tidak memakai loss berbobot.</li><li>Nama pemain disamarkan saat pelatihan target agar model belajar pola kalimat, bukan nama. Model intent dilatih dengan teks apa adanya.</li></ul></section>
+<section class="kartu "><div class="kepala-kartu"><h3 id="asumsi-4">D. Pemakaian di game</h3></div><ul><li>Game hanya memakai kedua model untuk membaca (inferensi), tanpa pelatihan, lewat backend/app/bot/nlu.py.</li><li>Model target membaca bentuk teks yang sama dengan saat pelatihan (teks pasangan dengan 12 chat konteks). Model intent membaca tiga varian nama dari satu chat lalu hasilnya dirata-ratakan; varian ini hanya dipakai saat membaca di game, tidak saat pelatihan.</li><li>Satu NLU dipakai bersama semua bot; bacaan setiap chat disimpan di memo, jadi semua bot membaca hasil yang sama.</li><li>Kalimat bot sendiri juga dibaca IndoBERT setelah terkirim, untuk konteks dan langkah bot lain.</li></ul></section>
+<aside class="ringkasan" aria-label="Ringkasan bagian 6"><p class="ringkasan-judul">Ringkasan bagian 6</p><ul><li>Label mengikuti aturan tertulis dan dianggap benar.</li><li>Test disisihkan sebelum pemilihan apa pun.</li><li>Skor target adalah batas atas karena konteks di data memakai label benar.</li><li>Di game, model target membaca bentuk teks yang sama dengan saat pelatihan; model intent merata-ratakan tiga varian nama.</li></ul></aside>
+<h2 id="hitung"><span class="nomor">7</span> Cara hitung</h2>
+<p>Angka diambil dari artefak run yang sudah ada saat dokumen dibangun. Langkah yang ditandai "ilustrasi" memakai angka contoh untuk menjelaskan rumus.</p>
+<section class="kartu langkah"><div class="kepala-kartu"><h3 id="hitung-1"><span class="nomor-langkah">1</span>Relabel dataset (26 Oktober 2026)</h3></div><p class="rumus">label baru = aturan tertulis ATURAN_LABEL.md diterapkan ke setiap chat; urutan keputusan offend → defend → neutral; kalimat campuran (membela + menuduh) = offend</p><p>Dataset intent: <b>331</b> dari 5.615 chat berubah (neutral→defend 183, defend→offend 84, offend→neutral 30, neutral→offend 23, offend→defend 9, defend→neutral 2). Dataset target: <b>262</b> pesan berubah intent atau targetnya, 2 di antaranya pesan utama; sisanya pesan konteks. Setiap perubahan tercatat di <code>data/relabel_2026-10-26.csv</code>.</p></section>
+<section class="kartu langkah"><div class="kepala-kartu"><h3 id="hitung-2"><span class="nomor-langkah">2</span>Pembersihan dan distribusi data (intent)</h3></div><p class="rumus">baris bersih = baris mentah − kosong − duplikat persis − teks berlabel ganda</p><p>5.615 − 0 − 4 − 0 = <b>5.611</b> chat. Distribusi: defend 1.048 (18,7%), neutral 1.934 (34,5%), offend 2.629 (46,9%). Kelas defend paling sedikit, jadi macro-F1 dipakai sebagai metrik pemilihan.</p></section>
+<section class="kartu langkah"><div class="kepala-kartu"><h3 id="hitung-3"><span class="nomor-langkah">3</span>Pembagian data</h3></div><p class="rumus">test = 20% (stratified); validation IndoBERT = 15% dari seluruh data; train IndoBERT = sisanya + chat tambahan + pesan sesi (teks yang ada di validation/test dibuang)</p><p>Test 1.123 chat; validation 15% × 5.611 = 842; sisa 5.611 − 1.123 − 842 = 3.646, ditambah 100 chat tambahan + 4.877 pesan sesi dari sesi train dataset target = train <b>8.623</b>. Validation dan test tetap dari <code>dataset_final3.csv</code> saja. Model klasik (run 25 Sep) memakai 4.488 chat train (semua kecuali test) untuk 5-fold CV.</p></section>
+<section class="kartu langkah"><div class="kepala-kartu"><h3 id="hitung-4"><span class="nomor-langkah">4</span>TF-IDF (fitur model klasik)</h3></div><p class="rumus">tf' = 1 + ln(tf) bila sublinear; idf(t) = ln((1 + n) ÷ (1 + df(t))) + 1; bobot = tf' × idf, lalu vektor tiap chat dinormalisasi L2 (panjang 1)</p><p>Ilustrasi: kata yang muncul 2 kali dalam satu chat dan ada di 50 dari 4.488 chat train: tf' = 1 + ln 2 = 1,693; idf = ln(4.489 ÷ 51) + 1 = 5,478; bobot = 9,274 sebelum normalisasi. Kata langka berbobot lebih besar daripada kata yang ada di hampir semua chat.</p></section>
+<section class="kartu langkah"><div class="kepala-kartu"><h3 id="hitung-5"><span class="nomor-langkah">5</span>Pemilihan parameter: macro-F1 cross-validation (SVM/NB, run 25 Sep, label lama)</h3></div><p class="rumus">skor kandidat = rata-rata macro-F1 dari 5 fold; test tidak pernah dipakai memilih</p><p>SVM Grid Search mencoba 720 kombinasi → terbaik C = 2,0, n-gram (1, 2), analyzer word; macro-F1 CV = <b>0,830</b> ± 0,008. NB Grid Search (1.920 kombinasi): 0,809.</p></section>
+<section class="kartu langkah"><div class="kepala-kartu"><h3 id="hitung-6"><span class="nomor-langkah">6</span>Penghentian Optuna (run 25 Sep, label lama)</h3></div><p class="rumus">berhenti bila sudah ≥ 100 trial selesai dan 30 trial berturut-turut tanpa kenaikan ≥ 0,001, atau 500 trial</p><p>SVM Optuna berhenti di trial 130 (stagnation): 100 trial awal + 30 tanpa kenaikan berarti. Macro-F1 CV 0,830, hampir sama dengan Grid (0,830) dalam 160 detik vs 745 detik.</p></section>
+<section class="kartu langkah"><div class="kepala-kartu"><h3 id="hitung-7"><span class="nomor-langkah">7</span>Softmax dan loss IndoBERT</h3></div><p class="rumus">p<sub>i</sub> = e<sup>z<sub>i</sub></sup> ÷ Σ<sub>j</sub> e<sup>z<sub>j</sub></sup>; loss = −ln p<sub>label benar</sub></p><p>Ilustrasi logit z = (2,1, 0,4, -1,2) untuk (offend, neutral, defend): p = (0,820, 0,150, 0,030). Bila label benar offend, loss = −ln 0,820 = 0,198. Confidence yang dipakai game adalah p terbesar; chat offend/defend menjadi bukti bila ≥ 0,60 (<code>MIN_CONF_INTENT</code>).</p></section>
+<section class="kartu langkah"><div class="kepala-kartu"><h3 id="hitung-8"><span class="nomor-langkah">8</span>Jadwal learning rate</h3></div><p class="rumus">langkah per epoch = ⌈train ÷ batch efektif⌉; total = epoch maks × langkah; warmup = ⌈10% × total⌉; lr naik linear 0 → lr<sub>maks</sub> selama warmup, lalu turun linear ke 0 di langkah terakhir</p><p>⌈8.623 ÷ 16⌉ = <b>539</b> langkah per epoch; total 12 × 539 = 6.468; warmup 647 langkah. Untuk lr<sub>maks</sub> = 3×10⁻⁵: di langkah 539 lr = 3×10⁻⁵ × 539 ÷ 647 = 2,499×10⁻⁵; di langkah 1078 lr = 3×10⁻⁵ × (6.468 − 1078) ÷ (6.468 − 647) = 2,778×10⁻⁵.</p></section>
+<section class="kartu langkah"><div class="kepala-kartu"><h3 id="hitung-9"><span class="nomor-langkah">9</span>Early stopping dan pemilihan learning rate</h3></div><p class="rumus">berhenti bila macro-F1 validation tidak naik ≥ 0,001 selama 3 evaluasi; pilih learning rate dan checkpoint dengan macro-F1 validation tertinggi</p><p>Macro-F1 validation terbaik: lr 1×10⁻⁵ → 0,9156 (epoch 3, dilatih 6); lr 2×10⁻⁵ → 0,9112 (epoch 9, dilatih 12); lr 3×10⁻⁵ → 0,9247 (epoch 8, dilatih 11). Terpilih lr 3×10⁻⁵: puncak di epoch 8 (langkah 4312 = checkpoint-4312), lalu 3 epoch tanpa kenaikan sehingga berhenti di epoch 11.</p></section>
+<section class="kartu langkah"><div class="kepala-kartu"><h3 id="hitung-10"><span class="nomor-langkah">10</span>Metrik test Model 1 (intent)</h3></div><p class="rumus">accuracy = Σ diagonal ÷ n; precision = TP ÷ prediksi kelas itu; recall = TP ÷ data kelas itu; F1 = 2PR ÷ (P + R); macro-F1 = rata-rata F1 semua kelas</p><p>Accuracy = 1.032 ÷ 1.123 = <b>0,9190</b>. defend: P = 175/198 = 0,884, R = 175/210 = 0,833, F1 = 0,858; neutral: P = 359/401 = 0,895, R = 359/387 = 0,928, F1 = 0,911; offend: P = 498/524 = 0,950, R = 498/526 = 0,947, F1 = 0,949. Macro-F1 = <b>0,906</b>. Karena label berubah, isi test ikut berubah, jadi angka ini tidak bisa dibandingkan langsung dengan run 25 Sep. Perbandingan adil dengan model lama yang dipakai game sampai 27 Oktober (run 25 Sep; sejak 27 Oktober game memakai model ini), pada data yang tidak pernah dilatih kedua model dan dinilai dengan label baru: Chat intent biasa (n=285): lama 0,888 / 0,857, baru <b>0,923 / 0,909</b> (recall defend 0,761 → 0,891); Pesan sesi, kondisi game (n=152): lama 0,638 / 0,640, baru <b>0,947 / 0,944</b> (recall defend 0,418 → 0,940) (accuracy / macro-F1). Pesan sesi dibuat dengan cara yang sama seperti pesan sesi di train, jadi kenaikannya pada chat pemain sungguhan kemungkinan lebih kecil. Hasil SVM/NB terakhir masih dari label lama: SVM baseline 0,8405, Naive Bayes baseline 0,6783, SVM Grid 0,8406 (macro-F1 test lama).</p></section>
+<section class="kartu langkah"><div class="kepala-kartu"><h3 id="hitung-11"><span class="nomor-langkah">11</span>Data pasangan Model 2 (target)</h3></div><p class="rumus">pasangan = Σ<sub>pesan</sub> jumlah kandidat (roster ditambah pemain semu sampai minimal 6)</p><p>775 pesan pilot (offend 322, defend 323, neutral 130; 31 kasus) dibagi train/validation/test 496/124/155 pesan; 400 sesi tambahan ikut train dan 100 sesi menjadi uji tambahan → train/validation/test/uji tambahan 5.377/745/931/600 pasangan (± 6,0 kandidat per pesan). Learning rate terbaik: 1×10⁻⁵ → 0,9457; 2×10⁻⁵ → 0,9513; 3×10⁻⁵ → 0,9527.</p></section>
+<section class="kartu langkah"><div class="kepala-kartu"><h3 id="hitung-12"><span class="nomor-langkah">12</span>Metrik test Model 2 (target)</h3></div><p class="rumus">macro-F1 relasi = rata-rata F1 offend dan defend; exact match pesan = proporsi pesan yang daftar targetnya persis benar</p><p>Pasangan: accuracy 0,9817 (didominasi tidak_ada), F1 defend 0,957; F1 neutral 0,950; F1 offend 0,923; F1 tidak_ada 0,989. Macro-F1 relasi = (0,923 + 0,957) ÷ 2 = <b>0,940</b>; F1 neutral 0,950. Per pesan: exact match <b>0,903</b>, target precision 0,959, recall 0,927. Uji tambahan (100 sesi kasus sulit yang tidak dilatih): exact match 0,890. Perbandingan dengan model target lama yang dipakai game sampai 27 Oktober (run 16 Okt), dihitung lewat kode NLU game pada test yang sama dengan label baru: intent benar (label): exact match lama 0,852 → baru <b>0,903</b>, precision 0,891 → 0,952, recall 0,921 → 0,927; kondisi game (intent ditebak): exact match lama 0,542 → baru <b>0,858</b>, precision 0,594 → 0,890, recall 0,563 → 0,854. Pada kondisi game, model lama memakai intent 25 Sep dan model baru memakai intent 27 Okt, jadi sebagian besar kenaikan berasal dari Model 1. Recall offend turun (0,950 → 0,900; 3 dari 60 target) karena model baru lebih hati-hati menunjuk nama: salah tuduh turun dari 9 menjadi 4.</p></section>
+<section class="kartu langkah"><div class="kepala-kartu"><h3 id="hitung-13"><span class="nomor-langkah">13</span>Aturan minimal satu target (ambang)</h3></div><p class="rumus">pesan offend/defend tanpa pasangan berelasi → kandidat dengan p(relasi intent) tertinggi dipakai bila ≥ ambang; selain itu target = tidak_diketahui. Pesan neutral boleh tanpa target.</p><p>Ambang IndoBERT = <b>0,5</b> (dipilih dari validation). Pada test exact match dengan dan tanpa ambang sama (0,903), jadi aturan ini jarang terpakai pada data pilot; di game aturan yang sama ada di <code>NLUIndoBERT.target</code>.</p></section>
+<aside class="ringkasan" aria-label="Ringkasan bagian 7"><p class="ringkasan-judul">Ringkasan bagian 7</p><ul><li>Angka diambil dari artefak run yang sudah ada; tidak ada pelatihan ulang saat dokumen dibangun.</li><li>Hasil SVM dan Naive Bayes masih dari label lama (run 25 September).</li><li>Perbandingan model lama dan baru memakai data yang sama dan label baru.</li></ul></aside>
+<h2 id="kesimpulan">Kesimpulan akhir</h2>
+<p>Bot membaca chat dengan dua model IndoBERT: Model 1 menebak niat chat, Model 2 menebak siapa yang dituju dan relasinya. Keduanya dilatih di notebook dengan data yang dibersihkan dan dibagi sebelum pemilihan apa pun, lalu dimuat game hanya untuk membaca. Model target membaca bentuk teks yang sama dengan saat pelatihan, model intent merata-ratakan tiga varian nama, dan bacaan setiap chat disimpan di memo bersama sebelum menjadi bukti otak fuzzy.</p><p><strong>Dokumen lain:</strong> <a href="dataset-nlu">Dataset NLU</a> (cara dataset dibuat, kasus, dan contoh), <a href="kode-nlu-intent">Kode NLU Intent</a> dan <a href="kode-nlu-target">Kode NLU Target</a> (notebook sel demi sel), <a href="cara-kerja-bot">Cara Kerja Bot</a> (jalur kode satu langkah bot), <a href="diagram-alir-fuzzy">Diagram Alir Fuzzy</a> (apa yang terjadi sesudah chat dibaca), <a href="proses-ai">Proses AI</a> (penjelasan awam dan asal setiap parameter), dan <a href="bedah-otak-fuzzy">Bedah Otak Fuzzy</a> (bukti dan aturan fuzzy).</p>
 </main>
+</div>
+<template id="kode-n1" data-untuk="n1">
+<h2 class="pk-judul">Kode: Model 1 di game</h2>
+<p class="pk-tujuan">Kode game yang membaca chat dengan Model 1 hasil notebook ini.</p>
+<p class="pk-letak"><strong>Letak:</strong> <code>backend/app/bot/nlu.py:100–130</code>, <code>backend/app/bot/nlu.py:188–198</code></p>
+<p><strong>Alur di kode:</strong></p><ul class="pk-alur"><li><code>varian_nama_intent</code> dipanggil oleh <code>NLUIndoBERT.intent</code> (nlu.py:193)</li><li><code>NLUIndoBERT.intent</code> dipanggil oleh <code>anotasi_chat</code> (nlu.py:323)</li></ul>
+<p class="pk-file"><code>backend/app/bot/nlu.py</code>, baris 100–130</p><pre class="kode-asli" tabindex="0"><code><span class="no">100</span><span class="wc"># Varian teks untuk Model 1: nama pemain dan panggilannya diganti nama yang dikenal model, dengan aturan</span>
+<span class="no">101</span><span class="wc"># pencocokan yang sama seperti samarkan_nama. Tanpa nama pemain, teks dipakai apa adanya.</span>
+<span class="no">102</span><span class="wc"># Alur: 1 urutan pemain yang disebut -&gt; 2 tanpa nama: teks apa adanya -&gt; 3 satu varian untuk tiap</span>
+<span class="no">103</span><span class="wc">#       set NAMA_KANONIK</span>
+<span class="no">104</span><span class="wk">def</span> <span class="wf">varian_nama_intent</span>(text, daftar_pemain, common_words):
+<span class="no">105</span>    lowered = {name.casefold(): name <span class="wk">for</span> name <span class="wk">in</span> daftar_pemain}
+<span class="no">106</span>
+<span class="no">107</span>    <span class="wk">def</span> <span class="wf">pemain</span>(word):
+<span class="no">108</span>        key = word.casefold()
+<span class="no">109</span>        <span class="wk">if</span> key <span class="wk">in</span> lowered:
+<span class="no">110</span>            <span class="wk">return</span> lowered[key]
+<span class="no">111</span>        <span class="wk">if</span> key <span class="wk">in</span> KATA_GANTI <span class="wk">or</span> key <span class="wk">in</span> ISTILAH_GAME <span class="wk">or</span> key <span class="wk">in</span> common_words:
+<span class="no">112</span>            <span class="wk">return</span> <span class="wk">None</span>
+<span class="no">113</span>        matches = [name <span class="wk">for</span> name <span class="wk">in</span> daftar_pemain <span class="wk">if</span> _nama_cocok(word, name)]
+<span class="no">114</span>        <span class="wk">return</span> matches[<span class="wn">0</span>] <span class="wk">if</span> len(matches) == <span class="wn">1</span> <span class="wk">else</span> <span class="wk">None</span>
+<span class="no">115</span>
+<span class="no">116</span>    urutan = {}
+<span class="no">117</span>    <span class="wk">for</span> word <span class="wk">in</span> re.findall(<span class="ws">r"\w+"</span>, text):
+<span class="no">118</span>        nama = pemain(word)
+<span class="no">119</span>        <span class="wk">if</span> nama <span class="wk">is</span> <span class="wk">not</span> <span class="wk">None</span>:
+<span class="no">120</span>            urutan.setdefault(nama, len(urutan))
+<span class="no">121</span>    <span class="wk">if</span> <span class="wk">not</span> urutan:
+<span class="no">122</span>        <span class="wk">return</span> [text]
+<span class="no">123</span>
+<span class="no">124</span>    <span class="wk">def</span> <span class="wf">ganti</span>(set_nama):
+<span class="no">125</span>        <span class="wk">def</span> <span class="wf">replace</span>(match):
+<span class="no">126</span>            nama = pemain(match.group(<span class="wn">0</span>))
+<span class="no">127</span>            <span class="wk">return</span> match.group(<span class="wn">0</span>) <span class="wk">if</span> nama <span class="wk">is</span> <span class="wk">None</span> <span class="wk">else</span> set_nama[urutan[nama] % len(set_nama)]
+<span class="no">128</span>        <span class="wk">return</span> re.sub(<span class="ws">r"\w+"</span>, replace, text)
+<span class="no">129</span>
+<span class="no">130</span>    <span class="wk">return</span> [ganti(set_nama) <span class="wk">for</span> set_nama <span class="wk">in</span> NAMA_KANONIK]</code></pre><p class="pk-file"><code>backend/app/bot/nlu.py</code>, baris 188–198</p><pre class="kode-asli" tabindex="0"><code><span class="no">188</span>    <span class="wc"># Model 1: label intent dan confidence 0–1. Dengan roster, nama pemain diganti nama yang dikenal model</span>
+<span class="no">189</span>    <span class="wc"># (varian_nama_intent) dan probabilitas ketiga varian dirata-ratakan.</span>
+<span class="no">190</span>    <span class="wc"># Alur: 1 varian nama -&gt; 2 probabilitas tiap varian dirata-ratakan -&gt; 3 kelas terbesar</span>
+<span class="no">191</span>    <span class="wk">def</span> <span class="wf">intent</span>(self, teks, daftar_pemain=()):
+<span class="no">192</span>        config = self.intent_model.config
+<span class="no">193</span>        varian = varian_nama_intent(teks, list(daftar_pemain), self.common_words) <span class="wk">if</span> daftar_pemain <span class="wk">else</span> [teks]
+<span class="no">194</span>        probs = self._probabilitas(self.intent_tokenizer, self.intent_model, varian,
+<span class="no">195</span>                                   getattr(config, <span class="ws">"nlu_max_length"</span>, <span class="wn">128</span>)).mean(axis=<span class="wn">0</span>)
+<span class="no">196</span>        index = int(probs.argmax())
+<span class="no">197</span>        label = {<span class="ws">"offense"</span>: <span class="ws">"offend"</span>, <span class="ws">"defense"</span>: <span class="ws">"defend"</span>}.get(config.id2label[index], config.id2label[index])
+<span class="no">198</span>        <span class="wk">return</span> label, float(probs[index])</code></pre>
+<p class="sub-kartu">Penjelasan per blok</p><ol class="pk-blok"><li><span class="pk-baris">baris 104–130</span> Varian teks untuk Model 1: nama pemain dan panggilannya diganti nama yang dikenal model, dengan aturan pencocokan yang sama seperti samarkan_nama. Tanpa nama pemain, teks dipakai apa adanya.</li><li><span class="pk-baris">baris 191–198</span> Model 1: label intent dan confidence 0–1. Dengan roster, nama pemain diganti nama yang dikenal model (varian_nama_intent) dan probabilitas ketiga varian dirata-ratakan.</li></ol>
+<div class="pk-ringkas"><p class="sub-kartu">Ringkasan alur</p>
+<p><span class="tahap-badge input">INPUT</span> <span class="kecil">data yang dibaca bot: snapshot, chat, ingatan</span></p>
+<p><strong>Proses apa:</strong></p><ul><li>nama pemain diganti nama yang dikenal model, tiga varian</li><li>probabilitas tiga varian dirata-ratakan</li><li>kelas terbesar menjadi intent</li></ul>
+<p><strong>Untuk apa:</strong> Membaca niat chat di game dengan bentuk teks yang sama seperti saat pelatihan.</p>
+<p><strong>Jadi apa:</strong> <code>(intent, keyakinan 0–1)</code> untuk setiap chat.</p>
+<p><strong>Terhubung ke:</strong></p><div class="mini-alur"><div class="mk-kolom"><span class="mk-kosong">awal</span></div><span class="mk-panah" aria-hidden="true">→</span><div class="mk-kolom"><span class="mini-kotak bahan ini"><span class="mk-nama">Model 1: intent</span><code class="mk-kode">varian_nama_intent</code><span class="mk-letak">nlu.py:104</span></span></div><span class="mk-panah" aria-hidden="true">→</span><div class="mk-kolom"><a class="mini-kotak bahan" data-kode="kode-n4" href="#n4"><span class="mk-nama">Model 2: target</span><code class="mk-kode">samarkan_nama</code><span class="mk-letak">nlu.py:72</span></a></div></div></div>
+</template>
+<template id="kode-n4" data-untuk="n4">
+<h2 class="pk-judul">Kode: Model 2 di game</h2>
+<p class="pk-tujuan">Kode game yang membaca target chat dengan Model 2 hasil notebook ini.</p>
+<p class="pk-letak"><strong>Letak:</strong> <code>backend/app/bot/nlu.py:69–90</code>, <code>backend/app/bot/nlu.py:133–156</code>, <code>backend/app/bot/nlu.py:200–228</code></p>
+<p><strong>Alur di kode:</strong></p><ul class="pk-alur"><li><code>samarkan_nama</code> dipanggil oleh <code>buat_teks_pasangan</code> (nlu.py:153)</li><li><code>buat_teks_pasangan</code> dipanggil oleh <code>NLUIndoBERT.target</code> (nlu.py:210)</li><li><code>NLUIndoBERT.target</code> dipanggil oleh <code>anotasi_chat</code> (nlu.py:330)</li></ul>
+<p class="pk-file"><code>backend/app/bot/nlu.py</code>, baris 69–90</p><pre class="kode-asli" tabindex="0"><code><span class="no">69</span><span class="wc"># Mengganti nama pemain dan panggilannya dengan token peran agar model tidak menghafal nama.</span>
+<span class="no">70</span><span class="wc"># Alur: 1 tiap kata: nama persis -&gt; 2 kata ganti/istilah game/kata umum: biarkan -&gt; 3 panggilan yang</span>
+<span class="no">71</span><span class="wc">#       cocok dengan tepat satu pemain -&gt; 4 ganti dengan token peran</span>
+<span class="no">72</span><span class="wk">def</span> <span class="wf">samarkan_nama</span>(text, daftar_pemain, kandidat, pengirim, common_words):
+<span class="no">73</span>    lowered = {name.casefold(): name <span class="wk">for</span> name <span class="wk">in</span> daftar_pemain}
+<span class="no">74</span>
+<span class="no">75</span>    <span class="wk">def</span> <span class="wf">token_for</span>(name):
+<span class="no">76</span>        <span class="wk">if</span> name == kandidat:
+<span class="no">77</span>            <span class="wk">return</span> TOKEN_KANDIDAT
+<span class="no">78</span>        <span class="wk">return</span> TOKEN_PENGIRIM <span class="wk">if</span> name == pengirim <span class="wk">else</span> TOKEN_PEMAIN
+<span class="no">79</span>
+<span class="no">80</span>    <span class="wk">def</span> <span class="wf">replace</span>(match):
+<span class="no">81</span>        word = match.group(<span class="wn">0</span>)
+<span class="no">82</span>        key = word.casefold()
+<span class="no">83</span>        <span class="wk">if</span> key <span class="wk">in</span> lowered:
+<span class="no">84</span>            <span class="wk">return</span> token_for(lowered[key])
+<span class="no">85</span>        <span class="wk">if</span> key <span class="wk">in</span> KATA_GANTI <span class="wk">or</span> key <span class="wk">in</span> ISTILAH_GAME <span class="wk">or</span> key <span class="wk">in</span> common_words:
+<span class="no">86</span>            <span class="wk">return</span> word
+<span class="no">87</span>        matches = [name <span class="wk">for</span> name <span class="wk">in</span> daftar_pemain <span class="wk">if</span> _nama_cocok(word, name)]
+<span class="no">88</span>        <span class="wk">return</span> token_for(matches[<span class="wn">0</span>]) <span class="wk">if</span> len(matches) == <span class="wn">1</span> <span class="wk">else</span> word
+<span class="no">89</span>
+<span class="no">90</span>    <span class="wk">return</span> re.sub(<span class="ws">r"\w+"</span>, replace, text)</code></pre><p class="pk-file"><code>backend/app/bot/nlu.py</code>, baris 133–156</p><pre class="kode-asli" tabindex="0"><code><span class="no">133</span><span class="wc"># Menyusun satu teks pasangan (pesan, kandidat) dari pesan utama, konteks, dan roster.</span>
+<span class="no">134</span><span class="wc"># Alur: 1 konteks terbaru lebih dulu, nama disamarkan -&gt; 2 pesan sekarang disamarkan -&gt; 3 gabung</span>
+<span class="no">135</span><span class="wc">#       dengan label intent</span>
+<span class="no">136</span><span class="wk">def</span> <span class="wf">buat_teks_pasangan</span>(pengirim, teks_chat, chat_sebelumnya, daftar_pemain, kandidat, common_words, label_intent=<span class="wk">None</span>):
+<span class="no">137</span>
+<span class="no">138</span>    <span class="wk">def</span> <span class="wf">peran</span>(name):
+<span class="no">139</span>        <span class="wk">if</span> name == <span class="ws">"tidak_diketahui"</span>:
+<span class="no">140</span>            <span class="wk">return</span> TOKEN_TIDAK_DIKETAHUI
+<span class="no">141</span>        <span class="wk">if</span> name == kandidat:
+<span class="no">142</span>            <span class="wk">return</span> TOKEN_KANDIDAT
+<span class="no">143</span>        <span class="wk">return</span> TOKEN_PENGIRIM <span class="wk">if</span> name == pengirim <span class="wk">else</span> TOKEN_PEMAIN
+<span class="no">144</span>
+<span class="no">145</span>    <span class="wc"># Konteks terbaru ditulis lebih dulu agar yang terpotong adalah pesan paling lama.</span>
+<span class="no">146</span>    bagian = []
+<span class="no">147</span>    <span class="wk">for</span> pesan <span class="wk">in</span> reversed(chat_sebelumnya):
+<span class="no">148</span>        relasi = <span class="ws">", "</span>.join(<span class="ws">f"{t['relasi']} {peran(t['pemain'])}"</span> <span class="wk">for</span> t <span class="wk">in</span> pesan[<span class="ws">"target"</span>])
+<span class="no">149</span>        anotasi = <span class="ws">f"{pesan['label_intent']}: {relasi}"</span> <span class="wk">if</span> relasi <span class="wk">else</span> pesan[<span class="ws">"label_intent"</span>]
+<span class="no">150</span>        teks = samarkan_nama(pesan[<span class="ws">"teks_chat"</span>], daftar_pemain, kandidat, pengirim, common_words)
+<span class="no">151</span>        bagian.append(<span class="ws">f"{peran(pesan['pengirim'])}: {teks} [{anotasi}]"</span>)
+<span class="no">152</span>
+<span class="no">153</span>    sekarang = samarkan_nama(teks_chat, daftar_pemain, kandidat, pengirim, common_words)
+<span class="no">154</span>    konteks = <span class="ws">" | "</span>.join(bagian) <span class="wk">if</span> bagian <span class="wk">else</span> <span class="ws">"tidak ada"</span>
+<span class="no">155</span>    awal = <span class="ws">f"intent {label_intent} || "</span> <span class="wk">if</span> label_intent <span class="wk">else</span> <span class="ws">""</span>
+<span class="no">156</span>    <span class="wk">return</span> <span class="ws">f"{awal}pesan sekarang {peran(pengirim)}: {sekarang} || konteks: {konteks}"</span></code></pre><p class="pk-file"><code>backend/app/bot/nlu.py</code>, baris 200–228</p><pre class="kode-asli" tabindex="0"><code><span class="no">200</span>    <span class="wc"># Model 2: relasi setiap pemain roster terhadap pesan ini: offend/defend (dituduh/dibela) atau neutral (diajak</span>
+<span class="no">201</span>    <span class="wc"># bicara atau dibicarakan). Sama dengan gabung_target di nlu_target: pesan neutral boleh tanpa target, dan aturan</span>
+<span class="no">202</span>    <span class="wc"># minimal satu target serta "tidak_diketahui" hanya untuk offend/defend.</span>
+<span class="no">203</span>    <span class="wc"># Alur: 1 satu teks pasangan per kandidat -&gt; 2 relasi tiap kandidat -&gt; 3.1 neutral: hanya relasi</span>
+<span class="no">204</span>    <span class="wc">#       neutral -&gt; 3.2 offend/defend: aturan minimal satu target, lalu tidak_diketahui</span>
+<span class="no">205</span>    <span class="wk">def</span> <span class="wf">target</span>(self, pengirim, teks, konteks, daftar_pemain, label_intent):
+<span class="no">206</span>        config = self.target_model.config
+<span class="no">207</span>        labels = [config.id2label[i] <span class="wk">for</span> i <span class="wk">in</span> range(len(config.id2label))]
+<span class="no">208</span>        <span class="wk">if</span> label_intent == <span class="ws">"neutral"</span> <span class="wk">and</span> <span class="ws">"neutral"</span> <span class="wk">not</span> <span class="wk">in</span> labels:
+<span class="no">209</span>            <span class="wk">return</span> []  <span class="wc"># model target lama belum mengenal relasi neutral</span>
+<span class="no">210</span>        texts = [buat_teks_pasangan(pengirim, teks, konteks, daftar_pemain, kandidat, self.common_words, label_intent)
+<span class="no">211</span>                 <span class="wk">for</span> kandidat <span class="wk">in</span> daftar_pemain]
+<span class="no">212</span>        probs = self._probabilitas(self.target_tokenizer, self.target_model, texts,
+<span class="no">213</span>                                   getattr(config, <span class="ws">"nlu_max_length"</span>, <span class="wn">512</span>))
+<span class="no">214</span>        hasil = []
+<span class="no">215</span>        <span class="wk">for</span> kandidat, baris <span class="wk">in</span> zip(daftar_pemain, probs):
+<span class="no">216</span>            relasi = labels[int(baris.argmax())]
+<span class="no">217</span>            <span class="wk">if</span> relasi != <span class="ws">"tidak_ada"</span>:
+<span class="no">218</span>                hasil.append({<span class="ws">"pemain"</span>: kandidat, <span class="ws">"relasi"</span>: relasi, <span class="ws">"prob"</span>: float(baris.max())})
+<span class="no">219</span>        <span class="wk">if</span> label_intent == <span class="ws">"neutral"</span>:
+<span class="no">220</span>            <span class="wc"># Target pesan neutral selalu berelasi neutral (aturan dataset nlu_target); tanpa target = untuk semua.</span>
+<span class="no">221</span>            <span class="wk">return</span> [t <span class="wk">for</span> t <span class="wk">in</span> hasil <span class="wk">if</span> t[<span class="ws">"relasi"</span>] == <span class="ws">"neutral"</span>]
+<span class="no">222</span>        <span class="wc"># Aturan minimal satu target (hanya offend/defend): sama dengan evaluasi di nlu_target.</span>
+<span class="no">223</span>        <span class="wk">if</span> <span class="wk">not</span> hasil <span class="wk">and</span> self.ambang &gt; <span class="wn">0</span> <span class="wk">and</span> label_intent <span class="wk">in</span> labels:
+<span class="no">224</span>            kolom = labels.index(label_intent)
+<span class="no">225</span>            terbaik = int(probs[:, kolom].argmax())
+<span class="no">226</span>            <span class="wk">if</span> probs[terbaik, kolom] &gt;= self.ambang:
+<span class="no">227</span>                hasil.append({<span class="ws">"pemain"</span>: daftar_pemain[terbaik], <span class="ws">"relasi"</span>: label_intent, <span class="ws">"prob"</span>: float(probs[terbaik, kolom])})
+<span class="no">228</span>        <span class="wk">return</span> hasil <span class="wk">or</span> [{<span class="ws">"pemain"</span>: <span class="ws">"tidak_diketahui"</span>, <span class="ws">"relasi"</span>: label_intent, <span class="ws">"prob"</span>: <span class="wk">None</span>}]</code></pre>
+<p class="sub-kartu">Penjelasan per blok</p><ol class="pk-blok"><li><span class="pk-baris">baris 72–90</span> Mengganti nama pemain dan panggilannya dengan token peran agar model tidak menghafal nama.</li><li><span class="pk-baris">baris 136–143</span> Menyusun satu teks pasangan (pesan, kandidat) dari pesan utama, konteks, dan roster.</li><li><span class="pk-baris">baris 146–156</span> Konteks terbaru ditulis lebih dulu agar yang terpotong adalah pesan paling lama.</li><li><span class="pk-baris">baris 205–219</span> Model 2: relasi setiap pemain roster terhadap pesan ini: offend/defend (dituduh/dibela) atau neutral (diajak bicara atau dibicarakan). Sama dengan gabung_target di nlu_target: pesan neutral boleh tanpa target, dan aturan minimal satu target serta &quot;tidak_diketahui&quot; hanya untuk offend/defend.</li><li><span class="pk-baris">baris 221</span> Target pesan neutral selalu berelasi neutral (aturan dataset nlu_target); tanpa target = untuk semua.</li><li><span class="pk-baris">baris 223–228</span> Aturan minimal satu target (hanya offend/defend): sama dengan evaluasi di nlu_target.</li></ol>
+<div class="pk-ringkas"><p class="sub-kartu">Ringkasan alur</p>
+<p><span class="tahap-badge input">INPUT</span> <span class="kecil">data yang dibaca bot: snapshot, chat, ingatan</span></p>
+<p><strong>Proses apa:</strong></p><ul><li>nama disamarkan menjadi token peran</li><li>satu teks pasangan per pemain roster</li><li>relasi tiap pemain</li><li>aturan minimal satu target untuk offend/defend</li></ul>
+<p><strong>Untuk apa:</strong> Membaca siapa yang dituju chat dan relasinya.</p>
+<p><strong>Jadi apa:</strong> Daftar <code>{pemain, relasi, prob}</code>, atau <code>tidak_diketahui</code>.</p>
+<p><strong>Terhubung ke:</strong></p><div class="mini-alur"><div class="mk-kolom"><a class="mini-kotak bahan" data-kode="kode-n1" href="#n1"><span class="mk-nama">Model 1: intent</span><code class="mk-kode">varian_nama_intent</code><span class="mk-letak">nlu.py:104</span></a></div><span class="mk-panah" aria-hidden="true">→</span><div class="mk-kolom"><span class="mini-kotak bahan ini"><span class="mk-nama">Model 2: target</span><code class="mk-kode">samarkan_nama</code><span class="mk-letak">nlu.py:72</span></span></div><span class="mk-panah" aria-hidden="true">→</span><div class="mk-kolom"><a class="mini-kotak bahan" data-kode="kode-n5" href="#n5"><span class="mk-nama">NLU di game</span><code class="mk-kode">anotasi_chat</code><span class="mk-letak">nlu.py:322</span></a></div></div></div>
+</template>
+<template id="kode-n5" data-untuk="n5">
+<h2 class="pk-judul">Kode: NLU dipakai di game</h2>
+<p class="pk-tujuan">Satu chat baru dibaca kedua model, lalu disimpan di ingatan bot.</p>
+<p class="pk-letak"><strong>Letak:</strong> <code>backend/app/bot/nlu.py:311–338</code>, <code>backend/app/bot/nlu.py:284–308</code>, <code>backend/app/bot/nlu.py:341–357</code></p>
+<p><strong>Alur di kode:</strong></p><ul class="pk-alur"><li><code>anotasi_chat</code> dipanggil oleh <code>baca_chat_baru</code> (nlu.py:352), <code>baca_chat</code> (nlu.py:373)</li><li><code>pemain_disebut</code> dipanggil oleh <code>anotasi_chat</code> (nlu.py:332)</li><li><code>baca_chat_baru</code> dipanggil oleh <code>BrainRuntime.langkah</code> (bot_controller.py:259)</li></ul>
+<p class="pk-file"><code>backend/app/bot/nlu.py</code>, baris 311–338</p><pre class="kode-asli" tabindex="0"><code><span class="no">311</span><span class="wc"># Persepsi: membaca satu chat dengan IndoBERT, Model 1 (intent) lalu Model 2 (target per pemain roster). Pesan neutral</span>
+<span class="no">312</span><span class="wc"># juga mendapat target neutral dari aturan nama (pemain_disebut); target dari kedua sumber digabung per pemain.</span>
+<span class="no">313</span><span class="wc"># Menerima nlu = NLUIndoBERT (atau pembungkus dengan intent/target yang sama); chat = {id, ronde, fase, waktu,</span>
+<span class="no">314</span><span class="wc">#   pengirim, teks}; riwayat = chat sebelumnya yang sudah beranotasi (12 terakhir menjadi konteks Model 2);</span>
+<span class="no">315</span><span class="wc">#   daftar_pemain = roster.</span>
+<span class="no">316</span><span class="wc"># Hasilnya chat yang sama + intent, conf_intent (0–1), dan target [{pemain, relasi, prob, sumber}].</span>
+<span class="no">317</span><span class="wc">#   sumber = ["indobert"], ["nama"], atau keduanya. Hanya relasi offend/defend yang menjadi bukti (relasi_chat);</span>
+<span class="no">318</span><span class="wc">#   target neutral menandai pemain yang diajak bicara (konteks "penanya").</span>
+<span class="no">319</span><span class="wc"># Dipanggil oleh baca_chat_baru (setiap chat baru di ingatan bot) dan baca_chat (pencatat NLU pertandingan).</span>
+<span class="no">320</span><span class="wc"># Alur: 1 Model 1: intent -&gt; 2 konteks 12 chat terakhir -&gt; 3 Model 2: target -&gt; 4 pesan neutral:</span>
+<span class="no">321</span><span class="wc">#       tambah target dari aturan nama</span>
+<span class="no">322</span><span class="wk">def</span> <span class="wf">anotasi_chat</span>(nlu, chat, riwayat, daftar_pemain):
+<span class="no">323</span>    intent, confidence = nlu.intent(chat[<span class="ws">"teks"</span>], daftar_pemain)
+<span class="no">324</span>    konteks = [{
+<span class="no">325</span>        <span class="ws">"pengirim"</span>: c[<span class="ws">"pengirim"</span>], <span class="ws">"teks_chat"</span>: c[<span class="ws">"teks"</span>], <span class="ws">"label_intent"</span>: c.get(<span class="ws">"intent"</span>) <span class="wk">or</span> <span class="ws">"neutral"</span>,
+<span class="no">326</span>        <span class="ws">"target"</span>: [{<span class="ws">"pemain"</span>: t[<span class="ws">"pemain"</span>], <span class="ws">"relasi"</span>: t[<span class="ws">"relasi"</span>]} <span class="wk">for</span> t <span class="wk">in</span> c.get(<span class="ws">"target"</span>, [])],
+<span class="no">327</span>    } <span class="wk">for</span> c <span class="wk">in</span> riwayat[-KONTEKS_MAKS:]]
+<span class="no">328</span>    sumber_model = getattr(nlu, <span class="ws">"sumber"</span>, <span class="ws">"indobert"</span>)  <span class="wc"># pembungkus NLU cadangan di backend menamai sumbernya sendiri</span>
+<span class="no">329</span>    target = [{**t, <span class="ws">"sumber"</span>: [sumber_model]}
+<span class="no">330</span>              <span class="wk">for</span> t <span class="wk">in</span> nlu.target(chat[<span class="ws">"pengirim"</span>], chat[<span class="ws">"teks"</span>], konteks, daftar_pemain, intent)]
+<span class="no">331</span>    <span class="wk">if</span> intent == <span class="ws">"neutral"</span>:
+<span class="no">332</span>        <span class="wk">for</span> nama <span class="wk">in</span> pemain_disebut(chat[<span class="ws">"teks"</span>], daftar_pemain, chat[<span class="ws">"pengirim"</span>], getattr(nlu, <span class="ws">"common_words"</span>, ())):
+<span class="no">333</span>            sama = next((t <span class="wk">for</span> t <span class="wk">in</span> target <span class="wk">if</span> t[<span class="ws">"pemain"</span>] == nama), <span class="wk">None</span>)
+<span class="no">334</span>            <span class="wk">if</span> sama <span class="wk">is</span> <span class="wk">None</span>:
+<span class="no">335</span>                target.append({<span class="ws">"pemain"</span>: nama, <span class="ws">"relasi"</span>: <span class="ws">"neutral"</span>, <span class="ws">"prob"</span>: <span class="wk">None</span>, <span class="ws">"sumber"</span>: [<span class="ws">"nama"</span>]})
+<span class="no">336</span>            <span class="wk">else</span>:
+<span class="no">337</span>                sama[<span class="ws">"sumber"</span>].append(<span class="ws">"nama"</span>)
+<span class="no">338</span>    <span class="wk">return</span> {**chat, <span class="ws">"intent"</span>: intent, <span class="ws">"conf_intent"</span>: confidence, <span class="ws">"target"</span>: target}</code></pre><p class="pk-file"><code>backend/app/bot/nlu.py</code>, baris 284–308</p><pre class="kode-asli" tabindex="0"><code><span class="no">284</span><span class="wc"># Aturan nama, sumber kedua target neutral: pemain roster yang disebut nama atau panggilannya di teks. Pencocokan sama</span>
+<span class="no">285</span><span class="wc"># dengan samarkan_nama: nama persis, atau panggilan/akhiran (_nama_cocok) yang cocok dengan tepat satu pemain; kata</span>
+<span class="no">286</span><span class="wc"># ganti, istilah game, dan kata umum (common_words) tidak pernah dianggap nama. Pengirim tidak dihitung.</span>
+<span class="no">287</span><span class="wc"># Menerima teks, daftar_pemain (roster), pengirim, common_words (pair_builder.json Model 2; kosong bila tidak ada).</span>
+<span class="no">288</span><span class="wc"># Hasilnya daftar nama pemain yang disebut, urut kemunculan pertama.</span>
+<span class="no">289</span><span class="wc"># Dipanggil oleh anotasi_chat (hanya untuk pesan neutral, jadi aturan ini tidak pernah membuat target offend/defend).</span>
+<span class="no">290</span><span class="wc"># Alur: 1 tiap kata: nama persis atau panggilan unik -&gt; 2 lewati kata ganti, istilah, kata umum,</span>
+<span class="no">291</span><span class="wc">#       dan pengirim -&gt; 3 nama unik sesuai urutan muncul</span>
+<span class="no">292</span><span class="wk">def</span> <span class="wf">pemain_disebut</span>(teks, daftar_pemain, pengirim, common_words):
+<span class="no">293</span>    lowered = {name.casefold(): name <span class="wk">for</span> name <span class="wk">in</span> daftar_pemain}
+<span class="no">294</span>    disebut = []
+<span class="no">295</span>    <span class="wk">for</span> word <span class="wk">in</span> re.findall(<span class="ws">r"\w+"</span>, teks):
+<span class="no">296</span>        key = word.casefold()
+<span class="no">297</span>        <span class="wk">if</span> key <span class="wk">in</span> lowered:
+<span class="no">298</span>            nama = lowered[key]
+<span class="no">299</span>        <span class="wk">elif</span> key <span class="wk">in</span> KATA_GANTI <span class="wk">or</span> key <span class="wk">in</span> ISTILAH_GAME <span class="wk">or</span> key <span class="wk">in</span> common_words:
+<span class="no">300</span>            <span class="wk">continue</span>
+<span class="no">301</span>        <span class="wk">else</span>:
+<span class="no">302</span>            matches = [name <span class="wk">for</span> name <span class="wk">in</span> daftar_pemain <span class="wk">if</span> _nama_cocok(word, name)]
+<span class="no">303</span>            <span class="wk">if</span> len(matches) != <span class="wn">1</span>:
+<span class="no">304</span>                <span class="wk">continue</span>
+<span class="no">305</span>            nama = matches[<span class="wn">0</span>]
+<span class="no">306</span>        <span class="wk">if</span> nama != pengirim <span class="wk">and</span> nama <span class="wk">not</span> <span class="wk">in</span> disebut:
+<span class="no">307</span>            disebut.append(nama)
+<span class="no">308</span>    <span class="wk">return</span> disebut</code></pre><p class="pk-file"><code>backend/app/bot/nlu.py</code>, baris 341–357</p><pre class="kode-asli" tabindex="0"><code><span class="no">341</span><span class="wc"># Bacakan chat baru di ingatan satu bot, mulai indeks `dari`, berurutan: tiap chat memakai chat sebelumnya yang sudah</span>
+<span class="no">342</span><span class="wc"># terbaca sebagai konteks, sama seperti saat bacaan dulu dilakukan di dalam Ingatan.sinkron_snapshot. Tanpa NLU, chat</span>
+<span class="no">343</span><span class="wc"># dibiarkan tanpa bacaan. Bila NLU gagal di tengah, chat yang belum terbaca dikeluarkan lagi dari ingatan supaya</span>
+<span class="no">344</span><span class="wc"># dibaca ulang di langkah berikutnya.</span>
+<span class="no">345</span><span class="wc"># Alur: 1 tiap chat baru: anotasi_chat dengan chat sebelumnya -&gt; 2 ganti catatan chat dengan hasil bacaannya</span>
+<span class="no">346</span><span class="wc">#                         \&gt; 1.2 NLU gagal: keluarkan chat yang belum terbaca, lalu teruskan galatnya</span>
+<span class="no">347</span><span class="wk">def</span> <span class="wf">baca_chat_baru</span>(nlu, ingatan, roster, dari):
+<span class="no">348</span>    <span class="wk">if</span> nlu <span class="wk">is</span> <span class="wk">None</span>:
+<span class="no">349</span>        <span class="wk">return</span>
+<span class="no">350</span>    <span class="wk">for</span> i <span class="wk">in</span> range(dari, len(ingatan.chat)):
+<span class="no">351</span>        <span class="wk">try</span>:
+<span class="no">352</span>            ingatan.chat[i] = anotasi_chat(nlu, ingatan.chat[i], ingatan.chat[:i], roster)
+<span class="no">353</span>        <span class="wk">except</span> Exception:
+<span class="no">354</span>            <span class="wk">for</span> chat <span class="wk">in</span> ingatan.chat[i:]:
+<span class="no">355</span>                ingatan._id_chat.discard(chat[<span class="ws">"id"</span>])
+<span class="no">356</span>            <span class="wk">del</span> ingatan.chat[i:]
+<span class="no">357</span>            <span class="wk">raise</span></code></pre>
+<p class="sub-kartu">Penjelasan per blok</p><ol class="pk-blok"><li><span class="pk-baris">baris 322–338</span> Persepsi: membaca satu chat dengan IndoBERT, Model 1 (intent) lalu Model 2 (target per pemain roster). Pesan neutral juga mendapat target neutral dari aturan nama (pemain_disebut); target dari kedua sumber digabung per pemain.</li><li><span class="pk-baris">baris 292–308</span> Aturan nama, sumber kedua target neutral: pemain roster yang disebut nama atau panggilannya di teks. Pencocokan sama dengan samarkan_nama: nama persis, atau panggilan/akhiran (_nama_cocok) yang cocok dengan tepat satu pemain; kata ganti, istilah game, dan kata umum (common_words) tidak pernah dianggap nama. Pengirim tidak dihitung.</li><li><span class="pk-baris">baris 347–357</span> Bacakan chat baru di ingatan satu bot, mulai indeks `dari`, berurutan: tiap chat memakai chat sebelumnya yang sudah terbaca sebagai konteks, sama seperti saat bacaan dulu dilakukan di dalam Ingatan.sinkron_snapshot. Tanpa NLU, chat dibiarkan tanpa bacaan. Bila NLU gagal di tengah, chat yang belum terbaca dikeluarkan lagi dari ingatan supaya dibaca ulang di langkah berikutnya.</li></ol>
+<div class="pk-ringkas"><p class="sub-kartu">Ringkasan alur</p>
+<p><span class="tahap-badge input">INPUT</span> <span class="kecil">data yang dibaca bot: snapshot, chat, ingatan</span></p>
+<p><strong>Proses apa:</strong></p><ul><li>Model 1: intent</li><li>konteks 12 chat terakhir</li><li>Model 2: target</li><li>pesan neutral: tambah target dari nama</li><li>bacaan disimpan di ingatan bot</li></ul>
+<p><strong>Untuk apa:</strong> Memberi setiap chat intent dan target sebelum otak fuzzy menghitung bukti.</p>
+<p><strong>Jadi apa:</strong> Chat beranotasi di ingatan bot; offend/defend yang cukup yakin menjadi bukti.</p>
+<p><strong>Terhubung ke:</strong></p><div class="mini-alur"><div class="mk-kolom"><a class="mini-kotak bahan" data-kode="kode-n4" href="#n4"><span class="mk-nama">Model 2: target</span><code class="mk-kode">samarkan_nama</code><span class="mk-letak">nlu.py:72</span></a></div><span class="mk-panah" aria-hidden="true">→</span><div class="mk-kolom"><span class="mini-kotak bahan ini"><span class="mk-nama">NLU di game</span><code class="mk-kode">anotasi_chat</code><span class="mk-letak">nlu.py:322</span></span></div><span class="mk-panah" aria-hidden="true">→</span><div class="mk-kolom"><span class="mk-kosong">awal</span></div></div></div>
+</template>
+<div id="pohon-pop" role="tooltip" hidden></div>
+<div id="panel-kode" class="panel-kode" role="dialog" aria-modal="true" aria-labelledby="panel-kode-judul" hidden><div class="panel-isi"><button type="button" class="panel-tutup" aria-label="Tutup kode">×</button><button type="button" class="panel-kembali" hidden>← kembali</button><div class="panel-badan"></div></div></div>
+
+<script>
+(() => {
+  // Pop-up kotak diagram (dari mana, artinya, dipakai untuk) dan angka bergaris titik (kenapa segini). Hover atau fokus
+  // menampilkan; di layar sentuh ketukan pertama menampilkan, ketukan kedua pada kotak bertautan membuka tautannya.
+  const pop = document.getElementById('pohon-pop');
+  const DATA = JSON.parse((document.getElementById('data-angka') || {}).textContent || '{}');
+  let aktif = null, sentuh = false, timer = 0;
+  const paragraf = (label, teks) => {
+    const p = document.createElement('p'), b = document.createElement('b'); b.textContent = label + ': '; p.append(b, teks); return p;
+  };
+  const isiPohon = a => {
+    const d = a.dataset;
+    const j = document.createElement('p'); j.className = 'pop-judul'; j.textContent = d.pJudul;
+    if (d.pKodeNama) { const c = document.createElement('code'); c.textContent = d.pKodeNama; j.append(' ', c); }
+    pop.append(j);
+    if (d.pDari) pop.append(paragraf('Dari mana', d.pDari));
+    if (d.pArti) pop.append(paragraf('Artinya', d.pArti));
+    if (d.pPakai) pop.append(paragraf('Dipakai untuk', d.pPakai));
+    const href = a.getAttribute('href') || a.getAttribute('data-href');
+    if (href) { const l = document.createElement('a'); l.href = href; l.textContent = 'Baca lengkap →'; pop.append(l); }
+    if (d.pKode && document.getElementById(d.pKode)) {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'pop-kode'; b.textContent = 'Lihat kode';
+      b.addEventListener('click', () => bukaKode(d.pKode, a)); pop.append(b);
+    }
+  };
+  const cari = k => { while (k) { if (DATA[k]) return [k, DATA[k]]; const i = k.lastIndexOf('.'); if (i < 0) break; k = k.slice(0, i); } return [null, null]; };
+  const isiAngka = el => {
+    const kunci = el.dataset.a, [induk, d] = cari(kunci);
+    const j = document.createElement('p'); j.className = 'pop-judul';
+    const teks = el.textContent.trim();
+    if (kunci.startsWith('kartu:') || !/^[A-Z]/.test(kunci)) j.textContent = `Angka ${/\d/.test(teks) ? teks : d.n} ${d.j}`;
+    else j.textContent = `${kunci} = ${kunci !== induk && /\d/.test(teks) ? teks : d.n}`;
+    pop.append(j, paragraf(kunci.startsWith('kartu:') ? 'Rumusnya' : 'Artinya', d.a), paragraf('Kenapa segini', d.l));
+    if (d.f) pop.append(paragraf('Fase 9', d.f));
+    const s = document.createElement('p'), b = document.createElement('span');
+    b.className = 'asal-angka chip sb-' + d.s[0]; b.textContent = d.s[1]; s.append(b); pop.append(s);
+  };
+  const tampil = el => {
+    clearTimeout(timer);
+    if (aktif !== el) { aktif = el; pop.replaceChildren(); (el.dataset.a ? isiAngka : isiPohon)(el); }
+    pop.hidden = false;
+    const r = el.getBoundingClientRect(), w = pop.offsetWidth, h = pop.offsetHeight, lebar = document.documentElement.clientWidth;
+    const x = Math.min(Math.max(8, r.left + r.width / 2 - w / 2), lebar - w - 8);
+    let y = r.bottom + 8; if (y + h > innerHeight - 8) y = Math.max(8, r.top - h - 8);
+    pop.style.left = (x + scrollX) + 'px'; pop.style.top = (y + scrollY) + 'px';
+  };
+  const tutup = () => { pop.hidden = true; aktif = null; };
+  const nanti = () => { clearTimeout(timer); timer = setTimeout(tutup, 250); };
+  document.querySelectorAll('main code').forEach(c => {
+    if (DATA[c.textContent] && !c.closest('.angka, pre, a, button')) { c.classList.add('angka'); c.dataset.a = c.textContent; }
+  });
+  const pasang = (el, bukaTautan) => {
+    if (!el.hasAttribute('tabindex') && el.tagName !== 'A' && el.tagName !== 'a') el.setAttribute('tabindex', '0');
+    el.addEventListener('mouseenter', () => tampil(el));
+    el.addEventListener('mouseleave', nanti);
+    el.addEventListener('focus', () => tampil(el));
+    el.addEventListener('blur', nanti);
+    el.addEventListener('pointerdown', e => { sentuh = e.pointerType !== 'mouse'; });
+    el.addEventListener('click', e => {
+      if (!bukaTautan || (sentuh && (aktif !== el || pop.hidden))) { e.preventDefault(); e.stopPropagation(); tampil(el); }
+      sentuh = false;
+    });
+    el.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && !el.getAttribute('href')) { e.preventDefault(); tampil(el); } });
+  };
+  document.querySelectorAll('main [data-p-judul]').forEach(el => pasang(el, !!el.getAttribute('href')));
+  document.querySelectorAll('.angka[data-a]').forEach(el => { if (cari(el.dataset.a)[1]) pasang(el, false); });
+  pop.addEventListener('mouseenter', () => clearTimeout(timer));
+  pop.addEventListener('mouseleave', nanti);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') tutup(); });
+  document.addEventListener('pointerdown', e => { if (!pop.hidden && !pop.contains(e.target) && !e.target.closest('[data-p-judul], .angka')) tutup(); });
+  document.querySelectorAll('.pohon-gulir, .fig-scroll, .tabel').forEach(g => g.addEventListener('scroll', tutup, { passive: true }));
+
+  // Daftar isi dari heading halaman: bagian (h2) dan subbagian (h3), subbagian dilipat di bawah bagiannya.
+  const nav = document.getElementById('daftar-isi'), wadah = nav.querySelector('.di-isi'), tombol = nav.querySelector('.di-tombol');
+  const daftar = document.createElement('ul'), tautan = new Map();
+  let lipat = null;
+  for (const h of document.querySelectorAll('main h2[id], main h3[id]')) {
+    if (h.closest('template')) continue;
+    const a = document.createElement('a'); a.href = '#' + h.id;
+    const nomor = h.querySelector('.nomor');
+    const teks = [...h.childNodes].filter(n => !(n.classList && (n.classList.contains('nomor') || n.classList.contains('tombol-kode') || n.classList.contains('lencana-kartu') || n.classList.contains('letak') || n.classList.contains('panah-lipat'))))
+                                  .map(n => n.textContent).join('').replace(/\s+/g, ' ').trim();
+    if (h.tagName === 'H2') {
+      const li = document.createElement('li'); li.className = 'di-h1';
+      if (nomor) { const s = document.createElement('span'); s.className = 'nomor'; s.textContent = nomor.textContent; a.append(s); }
+      a.append(teks);
+      li.append(a); daftar.append(li);
+      lipat = document.createElement('details'); const sm = document.createElement('summary'); sm.textContent = 'subbagian';
+      lipat.append(sm, document.createElement('ul')); li.append(lipat); li.lipat = lipat;
+    } else if (lipat) {
+      a.textContent = teks;
+      const li = document.createElement('li'); li.append(a); lipat.lastChild.append(li);
+    }
+    tautan.set(h.id, a);
+  }
+  daftar.querySelectorAll('details').forEach(d => { if (!d.lastChild.children.length) d.remove(); });
+  wadah.append(daftar);
+  tombol.addEventListener('click', () => { const b = nav.classList.toggle('buka'); tombol.setAttribute('aria-expanded', b); });
+  wadah.addEventListener('click', e => { if (e.target.closest('a')) { nav.classList.remove('buka'); tombol.setAttribute('aria-expanded', false); } });
+  const terlihat = new Set();
+  const sorot = () => {
+    const urut = [...tautan.keys()].filter(id => terlihat.has(id));
+    const id = urut[0]; if (!id) return;
+    tautan.forEach(a => a.classList.remove('aktif'));
+    const a = tautan.get(id); a.classList.add('aktif');
+    const d = a.closest('details') || a.parentElement.lipat; if (d) d.open = true;
+    if (getComputedStyle(nav).position === 'sticky' && innerWidth >= 1100) a.scrollIntoView({ block: 'nearest' });
+  };
+  const amati = new IntersectionObserver(es => { es.forEach(e => e.isIntersecting ? terlihat.add(e.target.id) : terlihat.delete(e.target.id)); sorot(); },
+                                         { rootMargin: '0px 0px -70% 0px' });
+  tautan.forEach((_, id) => amati.observe(document.getElementById(id)));
+
+  // Panel Kode: <template id="kode-..." data-untuk="id"> memasang tombol "Kode" di heading atau kartu sasarannya. Panel berisi
+  // kode asli bernomor baris, file:baris, penjelasan per blok, ringkasan alur, dan "Terhubung ke" yang bisa diklik.
+  const panel = document.getElementById('panel-kode'), badan = panel.querySelector('.panel-badan');
+  const tutupKode = panel.querySelector('.panel-tutup'), kembali = panel.querySelector('.panel-kembali');
+  let pemicu = null, riwayat = [];
+  function bukaKode(id, dari, tanpaRiwayat) {
+    const tpl = document.getElementById(id);
+    if (!tpl) return;
+    if (dari) { pemicu = dari; riwayat = []; }
+    else if (!tanpaRiwayat && panel.dataset.kini) riwayat.push(panel.dataset.kini);
+    tutup();
+    badan.replaceChildren(tpl.content.cloneNode(true));
+    panel.dataset.kini = id;
+    const j = badan.querySelector('.pk-judul'); if (j) j.id = 'panel-kode-judul';
+    badan.querySelectorAll('.angka[data-a]').forEach(el => { if (cari(el.dataset.a)[1]) pasang(el, false); });
+    kembali.hidden = !riwayat.length;
+    panel.hidden = false; document.body.classList.add('panel-buka'); badan.scrollTop = 0; tutupKode.focus();
+  }
+  const tutupPanel = () => {
+    panel.hidden = true; document.body.classList.remove('panel-buka'); tutup(); delete panel.dataset.kini; riwayat = [];
+    if (pemicu) pemicu.focus();
+  };
+  document.querySelectorAll('template[id^="kode-"][data-untuk]').forEach(tpl => {
+    const sasaran = document.getElementById(tpl.dataset.untuk);
+    if (!sasaran) return;
+    const kepala = sasaran.matches('h2, h3, h4') ? sasaran : sasaran.querySelector('.kepala-kartu, h3, h4, h2') || sasaran;
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'tombol-kode'; b.textContent = 'Kode'; b.setAttribute('aria-haspopup', 'dialog');
+    const nama = (tpl.content.querySelector('.pk-judul') || {}).textContent || kepala.textContent;
+    b.setAttribute('aria-label', 'Lihat kode: ' + nama.replace(/^Kode:\s*/, '').trim().slice(0, 80));
+    b.addEventListener('click', () => bukaKode(tpl.id, b));
+    kepala.append(' ', b);
+  });
+  document.querySelectorAll('main [data-buka-kode]').forEach(el => el.addEventListener('click', e => { e.preventDefault(); bukaKode(el.dataset.bukaKode, el); }));
+  tutupKode.addEventListener('click', tutupPanel);
+  kembali.addEventListener('click', () => { const id = riwayat.pop(); if (id) bukaKode(id, null, true); });
+  panel.addEventListener('click', e => {
+    if (e.target === panel) { tutupPanel(); return; }
+    const a = e.target.closest('a[data-kode]');
+    if (a) { e.preventDefault(); bukaKode(a.dataset.kode); return; }
+    if (e.target.closest('a[href^="#"]')) { panel.hidden = true; document.body.classList.remove('panel-buka'); tutup(); }
+  });
+  panel.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { e.stopPropagation(); tutupPanel(); return; }
+    if (e.key !== 'Tab') return;
+    const bisa = [...panel.querySelectorAll('button:not([hidden]), a[href], [tabindex]:not([tabindex="-1"]), summary')];
+    const awal = bisa[0], akhir = bisa[bisa.length - 1];
+    if (e.shiftKey && document.activeElement === awal) { e.preventDefault(); akhir.focus(); }
+    else if (!e.shiftKey && document.activeElement === akhir) { e.preventDefault(); awal.focus(); }
+  });
+
+  // Lipat: struktur dibangkitkan dari heading. Isi sesudah h2 (Heading 1) sampai h2 berikutnya dibungkus satu bagian, di
+  // dalamnya h3 (Heading 2), lalu h4 (Heading 3); isi kartu sesudah kepalanya juga bisa dilipat. Bawaan terbuka (kartu
+  // .tutup-awal bawaan tertutup), keadaan yang diubah pembaca diingat di localStorage bila boleh, Ctrl+F membuka isi
+  // tertutup lewat hidden="until-found", dan tautan #jangkar membuka induknya lebih dulu.
+  const main = document.querySelector('main');
+  const bisaCari = 'onbeforematch' in document.body;
+  const gerak = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const kunciSimpan = 'lipat:' + location.pathname;
+  let keadaan = {}, nomorLipat = 0;
+  try { keadaan = JSON.parse(localStorage.getItem(kunciSimpan) || '{}') || {}; } catch (e) { keadaan = {}; }
+  const simpan = () => { try { localStorage.setItem(kunciSimpan, JSON.stringify(keadaan)); } catch (e) { /* penyimpanan tidak tersedia */ } };
+  const semuaLipat = [];
+  const sembunyikan = isi => { if (bisaCari) isi.setAttribute('hidden', 'until-found'); else isi.hidden = true; };
+  const atur = (l, buka, animasi, ingat) => {
+    const { isi, tombol, wadah } = l;
+    if (isi._anim) { isi._anim.cancel(); isi._anim = null; isi.style.overflow = ''; }
+    tombol.setAttribute('aria-expanded', buka);
+    tombol.setAttribute('aria-label', (buka ? 'Tutup: ' : 'Buka: ') + l.nama);
+    wadah.classList.toggle('tertutup', !buka);
+    if (ingat) { keadaan[l.kunci] = buka; simpan(); }
+    if (buka) {
+      isi.removeAttribute('hidden');
+      if (animasi && gerak && isi.animate) {
+        const h = isi.scrollHeight; isi.style.overflow = 'hidden';
+        isi._anim = isi.animate([{ height: '0px', opacity: 0 }, { height: h + 'px', opacity: 1 }], { duration: 200, easing: 'ease-out' });
+        isi._anim.onfinish = () => { isi.style.overflow = ''; isi._anim = null; };
+      }
+    } else if (animasi && gerak && isi.animate && !isi.hasAttribute('hidden')) {
+      const h = isi.scrollHeight; isi.style.overflow = 'hidden';
+      isi._anim = isi.animate([{ height: h + 'px', opacity: 1 }, { height: '0px', opacity: 0 }], { duration: 180, easing: 'ease-in' });
+      isi._anim.onfinish = () => { isi.style.overflow = ''; isi._anim = null; sembunyikan(isi); };
+    } else sembunyikan(isi);
+  };
+  const pasangLipat = (wadah, judul, isi) => {
+    const kunci = judul.id || ('lipat-' + (++nomorLipat));
+    isi.id = isi.id || 'isi-' + kunci;
+    const tombol = document.createElement('button');
+    tombol.type = 'button'; tombol.className = 'panah-lipat'; tombol.setAttribute('aria-controls', isi.id);
+    judul.prepend(tombol);
+    const nama = [...judul.childNodes].filter(n => !(n.classList && ['panah-lipat', 'tombol-kode', 'nomor', 'lencana-kartu'].some(c => n.classList.contains(c))))
+                                     .map(n => n.textContent).join('').replace(/\s+/g, ' ').trim().slice(0, 60);
+    const l = { wadah, judul, isi, tombol, kunci, nama };
+    semuaLipat.push(l);
+    tombol.addEventListener('click', e => { e.stopPropagation(); atur(l, tombol.getAttribute('aria-expanded') !== 'true', true, true); });
+    isi.addEventListener('beforematch', () => atur(l, true, false, true));
+    atur(l, kunci in keadaan ? !!keadaan[kunci] : !wadah.classList.contains('tutup-awal'), false, false);
+  };
+  const bungkus = (wadah, tag, tingkat) => {
+    let isi = null;
+    for (const el of [...wadah.children]) {
+      if (el.tagName === tag) {
+        const bagian = document.createElement('section'); bagian.className = 'lipat l' + tingkat;
+        isi = document.createElement('div'); isi.className = 'isi-lipat';
+        el.before(bagian); bagian.append(el, isi);
+        continue;
+      }
+      if (isi) isi.append(el);
+    }
+    return [...wadah.querySelectorAll(':scope > section.lipat.l' + tingkat)];
+  };
+  const tingkat1 = bungkus(main, 'H2', 1);
+  const tingkat2 = tingkat1.flatMap(b => bungkus(b.querySelector(':scope > .isi-lipat'), 'H3', 2));
+  tingkat2.forEach(b => bungkus(b.querySelector(':scope > .isi-lipat'), 'H4', 3));
+  for (const b of main.querySelectorAll('section.lipat')) {
+    const isi = b.querySelector(':scope > .isi-lipat');
+    if (isi && isi.childNodes.length) pasangLipat(b, b.firstElementChild, isi);
+  }
+  for (const k of main.querySelectorAll('.kartu')) {
+    const kepala = k.querySelector(':scope > .kepala-kartu') || k.querySelector(':scope > h3, :scope > h4');
+    if (!kepala) continue;
+    const isi = document.createElement('div'); isi.className = 'isi-lipat';
+    let n = kepala.nextSibling;
+    while (n) { const lanjut = n.nextSibling; isi.append(n); n = lanjut; }
+    if (!isi.textContent.trim() && !isi.querySelector('img, svg, table')) { kepala.after(...isi.childNodes); continue; }
+    k.append(isi);
+    pasangLipat(k, kepala.matches('h3, h4') ? kepala : (kepala.querySelector('h3, h4') || kepala), isi);
+  }
+  const bukaInduk = el => {
+    for (let x = el; x && x !== main; x = x.parentElement) {
+      if (x.classList && x.classList.contains('isi-lipat') && x.hasAttribute('hidden')) {
+        const l = semuaLipat.find(y => y.isi === x); if (l) atur(l, true, false, true);
+      }
+    }
+  };
+  const bukaJangkar = id => {
+    let el = null;
+    try { el = id && document.getElementById(decodeURIComponent(id)); } catch (e) { el = null; }
+    if (el && !el.closest('template')) bukaInduk(el);
+    return el;
+  };
+  document.addEventListener('click', e => {
+    const a = e.target.closest('a[href^="#"]');
+    if (a && !(a.dataset.kode && a.closest('.panel-kode'))) bukaJangkar(a.getAttribute('href').slice(1));
+  }, true);
+  addEventListener('hashchange', () => { const el = bukaJangkar(location.hash.slice(1)); if (el) el.scrollIntoView(); });
+  if (location.hash) { const el = bukaJangkar(location.hash.slice(1)); if (el) setTimeout(() => el.scrollIntoView(), 0); }
+  document.querySelectorAll('[data-lipat-semua]').forEach(b => b.addEventListener('click', () => {
+    const buka = b.dataset.lipatSemua === 'buka';
+    semuaLipat.forEach(l => atur(l, buka, false, true));
+  }));
+  addEventListener('beforeprint', () => semuaLipat.forEach(l => { if (l.isi.hasAttribute('hidden')) { l.dicetak = true; atur(l, true, false, false); } }));
+  addEventListener('afterprint', () => semuaLipat.forEach(l => { if (l.dicetak) { l.dicetak = false; atur(l, false, false, false); } }));
+})();
+</script>
+
 </body>
 </html>

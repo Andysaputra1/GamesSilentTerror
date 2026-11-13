@@ -1023,6 +1023,7 @@ test('menu dokumen membuka semua dokumen sistem, AI, dan NLU di tab baru', async
       '/panel/dokumen/erd',
       '/panel/dokumen/proses-ai',
       '/panel/dokumen/bedah-alur',
+      '/panel/dokumen/dataset-nlu',
       '/panel/dokumen/diagram-alir-nlu',
       '/panel/dokumen/kode-nlu-intent',
       '/panel/dokumen/kode-nlu-target',
@@ -1030,13 +1031,34 @@ test('menu dokumen membuka semua dokumen sistem, AI, dan NLU di tab baru', async
       '/panel/dokumen/bedah-otak-fuzzy',
       '/panel/dokumen/cara-kerja-bot',
       '/panel/dokumen/kode-fuzzy',
+      '/panel/dokumen/kode-nlg',
     ],
   );
   assert.ok(links.every((a) => a.target === '_blank' && a.rel === 'noopener'));
+  // Setiap kartu bertanda sumber: Training (notebook skripsi), Backend (kode game), atau Panduan (peta).
+  assert.deepEqual(
+    links.map((a) => [a.dataset.sumber, a.querySelector('.doc-src').textContent]),
+    [
+      ['panduan', 'Panduan'],
+      ['backend', 'Backend'],
+      ['backend', 'Backend'],
+      ['backend', 'Backend'],
+      ['backend', 'Backend'],
+      ['training', 'Training'],
+      ['training', 'Training'],
+      ['training', 'Training'],
+      ['training', 'Training'],
+      ['training', 'Training'],
+      ['backend', 'Backend'],
+      ['backend', 'Backend'],
+      ['training', 'Training'],
+      ['training', 'Training'],
+    ],
+  );
   // Dokumen dikelompokkan per bagian: gambaran sistem, NLU, lalu otak bot Fuzzy.
   assert.deepEqual(
     [...doc.querySelectorAll('#menu-dokumen .doc-section h3')].map((h) => h.textContent),
-    ['1. Gambaran sistem', '2. NLU: bot membaca chat (IndoBERT)', '3. Otak bot: Fuzzy Logic'],
+    ['1. Gambaran sistem', '2. NLU: bot membaca chat (IndoBERT)', '3. Otak bot: Fuzzy Logic dan NLG'],
   );
 });
 

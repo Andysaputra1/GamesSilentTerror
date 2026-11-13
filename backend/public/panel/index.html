@@ -59,8 +59,16 @@
               <span class="eyebrow">DOCUMENTATION</span>
               <h2>Dokumen sistem</h2>
               <p>
-                Halaman penjelasan yang dibangun langsung dari kode bot, kode aplikasi, dan migrasi
-                database, jadi isinya sama dengan yang berjalan di server. Dibuka di tab baru.
+                Halaman penjelasan yang dibangun dari kode aplikasi, kode bot, migrasi database, dan notebook
+                skripsi, jadi nama, angka, dan potongan kodenya sama dengan yang berjalan di server; dokumen
+                notebook menampilkan keluaran run tersimpan. Dibuka di tab baru.
+              </p>
+              <p class="doc-src-legend">
+                <em class="doc-src" data-sumber="training">Training</em> dibangun dari notebook dan dataset
+                skripsi (repo prethesis) ·
+                <em class="doc-src" data-sumber="backend">Backend</em> dibangun dari kode game yang berjalan di
+                server ·
+                <em class="doc-src" data-sumber="panduan">Panduan</em> peta yang merangkum dokumen lain
               </p>
             </div>
           </div>
@@ -68,31 +76,38 @@
             <h3>1. Gambaran sistem</h3>
             <p class="hint">Mulai dari sini: susunan aplikasi, database, dan alur AI secara utuh.</p>
             <div class="metric-grid">
-              <a class="metric" href="/panel/dokumen/arsitektur" target="_blank" rel="noopener"
-                ><small>Sistem</small><strong>Arsitektur Sistem</strong
+              <a class="metric" href="/panel/dokumen/peta-dokumen" target="_blank" rel="noopener" data-sumber="panduan"
+                ><small>Mulai di sini</small><em class="doc-src">Panduan</em><strong>Peta Dokumen</strong
                 ><span class="hint"
-                  >Frontend, backend, API, database, dan deployment dari umum ke khusus, plus diagram
-                  UML (use case, class, sequence, state, activity, flowchart).</span
+                  >Semua dokumen dalam satu peta: untuk apa, untuk siapa, isinya, dan kapan dibaca, urutan
+                  baca untuk orang baru, dan diagram sistem utuh yang menaut ke dokumennya.</span
                 ></a
               >
-              <a class="metric" href="/panel/dokumen/erd" target="_blank" rel="noopener"
-                ><small>Database</small><strong>ERD Silent Terror</strong
+              <a class="metric" href="/panel/dokumen/arsitektur" target="_blank" rel="noopener" data-sumber="backend"
+                ><small>Sistem</small><em class="doc-src">Backend</em><strong>Arsitektur Sistem</strong
                 ><span class="hint"
-                  >14 tabel MySQL beserta kunci dan relasinya (migrasi V1–V9).</span
+                  >Frontend, backend, bot AI, survei, panel, database, dan deployment dari umum ke khusus,
+                  dengan pop-up kode asli, peta alur, dan diagram UML.</span
                 ></a
               >
-              <a class="metric" href="/panel/dokumen/proses-ai" target="_blank" rel="noopener"
-                ><small>Bot</small><strong>Proses AI</strong
+              <a class="metric" href="/panel/dokumen/erd" target="_blank" rel="noopener" data-sumber="backend"
+                ><small>Database</small><em class="doc-src">Backend</em><strong>ERD Silent Terror</strong
+                ><span class="hint"
+                  >15 tabel MySQL beserta kolom, kunci, relasi, dan alur datanya (migrasi V01–V12).</span
+                ></a
+              >
+              <a class="metric" href="/panel/dokumen/proses-ai" target="_blank" rel="noopener" data-sumber="backend"
+                ><small>Bot</small><em class="doc-src">Backend</em><strong>Proses AI</strong
                 ><span class="hint"
                   >IndoBERT, Fuzzy, dan NLG: perjalanan data satu langkah nyata, semua parameter
                   beserta asalnya, dan semua output bot.</span
                 ></a
               >
-              <a class="metric" href="/panel/dokumen/bedah-alur" target="_blank" rel="noopener"
-                ><small>Kode</small><strong>Bedah Alur Backend</strong
+              <a class="metric" href="/panel/dokumen/bedah-alur" target="_blank" rel="noopener" data-sumber="backend"
+                ><small>Kode</small><em class="doc-src">Backend</em><strong>Bedah Alur Backend</strong
                 ><span class="hint"
-                  >Alur backend dari main.py sampai ujung tiap fungsi: alur, kode, dan gunanya per
-                  bagian.</span
+                  >Alur backend dari main.py sampai ujung tiap fungsi, per fitur (login, lobby, chat, fase,
+                  bot, survei, panel): alur, kode, dan gunanya per bagian.</span
                 ></a
               >
             </div>
@@ -104,22 +119,29 @@
               dituduh, dibela, atau diajak bicara. Label dataset mengikuti aturan relabel 26 Oktober.
             </p>
             <div class="metric-grid">
-              <a class="metric" href="/panel/dokumen/diagram-alir-nlu" target="_blank" rel="noopener"
-                ><small>Diagram alir</small><strong>Diagram Alir NLU</strong
+              <a class="metric" href="/panel/dokumen/dataset-nlu" target="_blank" rel="noopener" data-sumber="training"
+                ><small>Dataset</small><em class="doc-src">Training</em><strong>Dataset NLU</strong
+                ><span class="hint"
+                  >Cara dataset intent dan target dibuat, setiap kasus beserta contohnya, aturan label, dan
+                  jumlah data yang masuk training.</span
+                ></a
+              >
+              <a class="metric" href="/panel/dokumen/diagram-alir-nlu" target="_blank" rel="noopener" data-sumber="training"
+                ><small>Diagram alir</small><em class="doc-src">Training</em><strong>Diagram Alir NLU</strong
                 ><span class="hint"
                   >Alur training kedua model, relabel dataset, asumsi, dan cara hitung metrik dari
                   artefak model.</span
                 ></a
               >
-              <a class="metric" href="/panel/dokumen/kode-nlu-intent" target="_blank" rel="noopener"
-                ><small>Kode</small><strong>Kode NLU Intent</strong
+              <a class="metric" href="/panel/dokumen/kode-nlu-intent" target="_blank" rel="noopener" data-sumber="training"
+                ><small>Kode</small><em class="doc-src">Training</em><strong>Kode NLU Intent</strong
                 ><span class="hint"
                   >Training Model 1 (intent) sel demi sel: aturan label, EDA, IndoBERT, dengan
                   keluaran run 27 Oktober.</span
                 ></a
               >
-              <a class="metric" href="/panel/dokumen/kode-nlu-target" target="_blank" rel="noopener"
-                ><small>Kode</small><strong>Kode NLU Target</strong
+              <a class="metric" href="/panel/dokumen/kode-nlu-target" target="_blank" rel="noopener" data-sumber="training"
+                ><small>Kode</small><em class="doc-src">Training</em><strong>Kode NLU Target</strong
                 ><span class="hint"
                   >Training Model 2 (target dan relasi per pemain), dari preprocessing pasangan sampai
                   IndoBERT, dengan keluaran run 27 Oktober.</span
@@ -128,32 +150,41 @@
             </div>
           </div>
           <div class="doc-section">
-            <h3>3. Otak bot: Fuzzy Logic</h3>
+            <h3>3. Otak bot: Fuzzy Logic dan NLG</h3>
             <div class="metric-grid">
-              <a class="metric" href="/panel/dokumen/diagram-alir-fuzzy" target="_blank" rel="noopener"
-                ><small>Diagram alir</small><strong>Diagram Alir Fuzzy Logic</strong
+              <a class="metric" href="/panel/dokumen/diagram-alir-fuzzy" target="_blank" rel="noopener" data-sumber="training"
+                ><small>Diagram alir</small><em class="doc-src">Training</em><strong>Diagram Alir Fuzzy Logic</strong
                 ><span class="hint"
-                  >Inferensi Mamdani, hierarki tujuh sistem, keputusan chat/vote/aksi, tabel aturan, asumsi, dan cara hitung dengan angka contoh.</span
+                  >Gambar alur bernomor: satu langkah bot, satu sistem Mamdani, pohon kecurigaan, ancaman, vote,
+                  chat, aksi malam, NLG, dan chat tim, dengan tabel 21 sistem, asumsi, dan cara hitung berangka.</span
                 ></a
               >
-              <a class="metric" href="/panel/dokumen/bedah-otak-fuzzy" target="_blank" rel="noopener"
-                ><small>Bahasan</small><strong>Bedah Otak Fuzzy</strong
+              <a class="metric" href="/panel/dokumen/bedah-otak-fuzzy" target="_blank" rel="noopener" data-sumber="backend"
+                ><small>Bahasan</small><em class="doc-src">Backend</em><strong>Bedah Otak Fuzzy</strong
                 ><span class="hint"
                   >Isi bahasan otak bot yang sudah terpasang: bahan mentah, cara memilih tindakan,
-                  [FUZZY 1] dan [FUZZY 2] dengan 21 sistemnya, serta keputusannya.</span
+                  [FUZZY 1] dan [FUZZY 2] dengan 21 sistemnya, keputusannya, dan NLG (keputusan jadi
+                  kalimat).</span
                 ></a
               >
-              <a class="metric" href="/panel/dokumen/cara-kerja-bot" target="_blank" rel="noopener"
-                ><small>Kode</small><strong>Cara Kerja Bot</strong
+              <a class="metric" href="/panel/dokumen/cara-kerja-bot" target="_blank" rel="noopener" data-sumber="backend"
+                ><small>Kode</small><em class="doc-src">Backend</em><strong>Cara Kerja Bot</strong
                 ><span class="hint"
                   >Jalur kode satu langkah bot dari input sampai chat terkirim: alur tiap tahap, kode asli
                   dan letaknya, serta satu giliran bot nyata dengan angkanya.</span
                 ></a
               >
-              <a class="metric" href="/panel/dokumen/kode-fuzzy" target="_blank" rel="noopener"
-                ><small>Kode</small><strong>Kode Fuzzy Logic</strong
+              <a class="metric" href="/panel/dokumen/kode-fuzzy" target="_blank" rel="noopener" data-sumber="training"
+                ><small>Kode</small><em class="doc-src">Training</em><strong>Kode Fuzzy Logic</strong
                 ><span class="hint"
                   >Notebook Fuzzy sel demi sel: kurva, sistem Mamdani, hierarki kecurigaan, keputusan, dengan keluaran run dan lokasinya di backend.</span
+                ></a
+              >
+              <a class="metric" href="/panel/dokumen/kode-nlg" target="_blank" rel="noopener" data-sumber="training"
+                ><small>Kode</small><em class="doc-src">Training</em><strong>Kode NLG</strong
+                ><span class="hint"
+                  >Notebook NLG sel demi sel: rencana chat jadi kalimat lewat templat atau LLM, pemeriksa
+                  aturan, dan evaluasinya, dengan keluaran run dan lokasinya di backend.</span
                 ></a
               >
             </div>

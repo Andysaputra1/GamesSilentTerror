@@ -88,14 +88,15 @@ def assets(asset: Literal["panel.js", "panel.css"]):
     return FileResponse(ASSETS / asset, headers={"Cache-Control": "no-store"})
 
 
-# Sajikan dokumen Peta Dokumen/ERD/Proses AI/Arsitektur/Bedah Alur/Bedah Otak Fuzzy/Cara Kerja Bot/Kode dan Diagram Alir Fuzzy + NLU (HTML mandiri berskrip inline). Sandbox memberi origin terpisah sehingga
-# skrip dokumen tidak bisa membaca data panel di origin yang sama.
+# Sajikan dokumen menu 08 (HTML mandiri berskrip inline): Peta Dokumen, ERD, Proses AI, Arsitektur, Bedah Alur,
+# Bedah Otak Fuzzy, Cara Kerja Bot, Kode dan Diagram Alir Fuzzy, Kode NLG, serta Dataset, Kode, dan Diagram Alir NLU.
+# Sandbox memberi origin terpisah sehingga skrip dokumen tidak bisa membaca data panel di origin yang sama.
 @router.get("/panel/dokumen/{nama}", include_in_schema=False)
 def dokumen(
     nama: Literal[
         "peta-dokumen", "erd", "proses-ai", "arsitektur", "bedah-alur",
-        "kode-fuzzy", "diagram-alir-fuzzy", "bedah-otak-fuzzy", "cara-kerja-bot",
-        "kode-nlu-intent", "kode-nlu-target", "diagram-alir-nlu",
+        "kode-fuzzy", "diagram-alir-fuzzy", "bedah-otak-fuzzy", "cara-kerja-bot", "kode-nlg",
+        "dataset-nlu", "kode-nlu-intent", "kode-nlu-target", "diagram-alir-nlu",
     ],
 ):  # fmt: skip
     return FileResponse(

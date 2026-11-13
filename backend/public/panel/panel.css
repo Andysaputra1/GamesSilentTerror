@@ -462,6 +462,16 @@ a.metric .hint { display: block; margin-top: 6px; }
 .doc-section:first-of-type { margin-top: 10px; padding-top: 0; border-top: 0; }
 .doc-section h3 { margin: 0 0 4px; color: #e7eef7; }
 .doc-section > p { margin: 0; max-width: 760px; }
+/* Tanda sumber dokumen: Training (notebook skripsi), Backend (kode game), Panduan (peta dokumen). */
+a.metric[data-sumber] { position: relative; }
+a.metric[data-sumber] small { padding-right: 86px; }
+.doc-src { display: inline-block; padding: 1px 8px; border: 1px solid #3a4a5f; border-radius: 999px; font-size: 10px; font-style: normal; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; }
+a.metric .doc-src { position: absolute; top: 11px; right: 12px; }
+[data-sumber="training"] .doc-src, .doc-src[data-sumber="training"] { color: #dcc2ff; border-color: #7c4dbd; background: #21163a; }
+[data-sumber="backend"] .doc-src, .doc-src[data-sumber="backend"] { color: #a9cdff; border-color: #3b6db3; background: #0f1d33; }
+[data-sumber="panduan"] .doc-src, .doc-src[data-sumber="panduan"] { color: #c8f59a; border-color: #5f8a35; background: #16230d; }
+.doc-src-legend { margin: 10px 0 0; font-size: 13px; line-height: 2; color: #a9b6c6; }
+.doc-src-legend .doc-src { margin-right: 4px; }
 .status-good { color: #baf578!important; }.status-bad { color: #ffb5b5!important; }.status-pending { color: #f6d79c!important; }
 .report-title { margin: 20px 0 8px; font-size: 12px; color: #c9d8e9; }
 .steps { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; }

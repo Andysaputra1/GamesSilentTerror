@@ -423,32 +423,45 @@ class MovedSqlIntegration(unittest.TestCase):
             self.assertIsNone(akun_login(nama))
 
 
-# Survei di MySQL asli: pertanyaan hasil migrasi (termasuk V11) lolos validasi panel, susunan ulang
-# ditulis lewat executemany, dan ekspor CSV mengikuti urutan pertanyaan. Data uji di-rollback.
+# Survei di MySQL asli: pertanyaan hasil migrasi (V12 menggantikan V07 dan V11) lolos validasi panel, susunan
+# ulang ditulis lewat executemany, dan ekspor CSV mengikuti urutan pertanyaan. Data uji di-rollback.
 @unittest.skipUnless(os.getenv("STRUCTURE_TEST_DB") == "1", "requires disposable MySQL")
 class SurveySqlIntegration(unittest.TestCase):
-    V11 = [
-        "pengalaman_bermain",
-        "saran_kesan_pesan",
-        "kesenangan_bersama_bot",
-        "harapan_bot_npc",
-        "kesenangan_individu",
+    V12 = [
+        "kesenangan_bermain",
+        "kemiripan_manusia",
+        "pemahaman_pesan",
+        "kewajaran_bahasa",
+        "ketepatan_keputusan",
+        "kesesuaian_peran",
+        "tingkat_tantangan",
+        "kecepatan_respons",
+        "aspek_perbaikan",
+        "saran_masukan",
     ]
 
-    def test_migrated_questions_pass_panel_validation_and_v11_is_last(self):
+    # Database baru: pertanyaan lama belum punya jawaban, jadi V12 menghapus semuanya dan hanya sepuluh
+    # pertanyaan formal yang tersisa, urut sesuai posisi. Delapan pernyataan memakai skala setuju 1–5 yang sama.
+    def test_migrated_questions_pass_panel_validation_and_only_v12_remains(self):
         semua = jalankan_transaksi(lambda db: survey_queries.list_questions(db, active_only=False))
         for pertanyaan in semua:
             hasil = validate_question(pertanyaan)
             for kolom in hasil:
                 self.assertEqual(hasil[kolom], pertanyaan[kolom], (pertanyaan["code"], kolom))
-        posisi = {pertanyaan["code"]: pertanyaan["position"] for pertanyaan in semua}
-        self.assertEqual(sorted(self.V11, key=posisi.get), self.V11)
-        lama = [nilai for kode, nilai in posisi.items() if kode not in self.V11]
-        self.assertLess(max(lama), min(posisi[kode] for kode in self.V11))
-        harapan = next(item for item in semua if item["code"] == "harapan_bot_npc")
+        self.assertEqual([pertanyaan["code"] for pertanyaan in semua], self.V12)
+        self.assertTrue(all(pertanyaan["active"] for pertanyaan in semua))
+        skala = [pertanyaan for pertanyaan in semua if pertanyaan["kind"] == "scale"]
+        self.assertEqual(len(skala), 8)
+        for pertanyaan in skala:
+            self.assertEqual(
+                (pertanyaan["scale_min"], pertanyaan["scale_max"], pertanyaan["label_min"],
+                 pertanyaan["label_max"], pertanyaan["required"]),
+                (1, 5, "Sangat tidak setuju", "Sangat setuju", True),
+                pertanyaan["code"],
+            )  # fmt: skip
+        aspek = next(item for item in semua if item["code"] == "aspek_perbaikan")
         self.assertEqual(
-            (harapan["kind"], harapan["required"], harapan["options"]),
-            ("choice", False, ["Lebih cepat", "Lebih berempati", "Lainnya"]),
+            (aspek["kind"], aspek["required"], aspek["options"][-1]), ("choice", False, "Lainnya")
         )
 
     def test_reorder_and_export_follow_question_positions(self):

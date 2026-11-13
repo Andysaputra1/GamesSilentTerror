@@ -308,7 +308,7 @@ docker compose restart gateway
   pengganti backup.
 - Restart atau recreate backend menghapus pertandingan yang sedang jalan, karena state pertandingan hanya ada di
   memori ([Batas implementasi](CODE_GUIDE.md#batas-implementasi)). Arsip chat di MySQL tetap ada.
-- SQL di `backend/migrations/` (V01–V11) hanya jalan otomatis saat volume database pertama kali dibuat. Database yang
+- SQL di `backend/migrations/` (V01–V12) hanya jalan otomatis saat volume database pertama kali dibuat. Database yang
   sudah berisi perlu menjalankan migrasi baru secara manual; lihat
   [backend/migrations/README.md](backend/migrations/README.md).
 

@@ -35,6 +35,7 @@ mis. `V5__chat_history`, supaya cocok dengan database yang sudah ada.
 | `V09__chat_nlu.sql` | `V9__chat_nlu` | Kolom `chat_messages.nlu`: bacaan IndoBERT tiap pesan untuk menu Riwayat chat |
 | `V10__match_participants.sql` | `V10__match_participants` | `match_participants`: peserta manusia tiap pertandingan selesai, untuk survei kapan pun sesudahnya |
 | `V11__survey_player_feedback.sql` | `V11__survey_player_feedback` | Lima pertanyaan survei pengalaman bermain; tidak mengubah struktur tabel |
+| `V12__survey_formal.sql` | `V12__survey_formal` | Survei penelitian versi formal: sebelas pertanyaan lama diganti sepuluh pertanyaan baru, dan pengingat survei hanya untuk pertandingan mulai 13 November 2026; tidak mengubah struktur tabel |
 
 Nomor V03 sudah tidak ada: dulu berisi akun demo yang dihapus pada 26 Oktober 2026. Hasil akhirnya 15 tabel,
 termasuk `schema_migrations`. Pemakaian tiap tabel oleh backend ada di
@@ -44,7 +45,7 @@ termasuk `schema_migrations`. Pemakaian tiap tabel oleh backend ada di
 memakainya gagal: tanpa V07 kolom `skin_id` dan tabel survei belum ada (login bisa gagal dengan 503), tanpa V08
 peserta Stalker gagal diarsipkan, tanpa V09 menu Riwayat chat gagal dimuat, dan tanpa V10 arsip peserta gagal
 disimpan sehingga survei sesudah keluar room hanya bisa dikirim selama 30 menit dari ingatan backend. Tanpa V11
-aplikasi tetap jalan, hanya lima pertanyaan baru yang belum ada.
+dan V12 aplikasi tetap jalan, hanya pertanyaan survei yang tampil masih versi lama.
 
 ### Catatan V11
 
@@ -58,6 +59,33 @@ baru 70–110), sama seperti pertanyaan baru dari panel. Urutan selanjutnya diat
 atau tombol ▲▼), yang menulis ulang posisi menjadi 10, 20, 30, …. Kode unik pertanyaan mencegah duplikasi bila file
 dijalankan ulang. Pasang versi aplikasi yang mendukung isian `Lainnya` bersama migrasi ini; menyalakan ulang backend
 saja tidak menambahkan pertanyaan.
+
+### Catatan V12
+
+V12 mengganti pertanyaan V07 dan V11 dengan sepuluh pertanyaan formal untuk penelitian. Delapan di antaranya adalah
+pernyataan berskala 1–5 (`Sangat tidak setuju` sampai `Sangat setuju`), dan setiap pernyataan mengukur satu bagian bot:
+
+| Kode | Pernyataan | Yang diukur |
+| --- | --- | --- |
+| `kesenangan_bermain` | Bermain Silent Terror bersama Bot NPC merupakan pengalaman yang menyenangkan. | Pengalaman bermain |
+| `kemiripan_manusia` | Bot NPC berperilaku layaknya pemain manusia. | Kemiripan dengan manusia |
+| `pemahaman_pesan` | Bot NPC memahami maksud pesan yang saya kirimkan dalam diskusi. | NLU (IndoBERT) |
+| `kewajaran_bahasa` | Pesan yang ditulis Bot NPC menggunakan bahasa yang wajar dan sesuai dengan alur diskusi. | NLG |
+| `ketepatan_keputusan` | Tuduhan, pembelaan, dan pilihan vote Bot NPC masuk akal berdasarkan kejadian dalam permainan. | Fuzzy |
+| `kesesuaian_peran` | Tindakan Bot NPC sesuai dengan peran yang dimainkannya. | Fuzzy per role |
+| `tingkat_tantangan` | Bot NPC memberikan tantangan yang sepadan, baik sebagai lawan maupun sebagai rekan satu tim. | Keseimbangan |
+| `kecepatan_respons` | Bot NPC menanggapi pesan dan kejadian dalam permainan dengan cukup cepat. | Waktu tanggap |
+
+Dua pertanyaan lainnya opsional. `aspek_perbaikan` adalah pilihan ganda tentang aspek bot yang paling perlu
+ditingkatkan, dengan opsi `Lainnya` untuk isian bebas. `saran_masukan` adalah isian bebas untuk kesan, saran, atau
+masukan.
+
+Pertanyaan lama yang belum punya jawaban dihapus. Yang sudah punya jawaban hanya dinonaktifkan, karena foreign key
+`survey_responses` menjaga jawaban itu tetap utuh. Jawaban lama bisa dibersihkan lewat menu Survei di panel.
+
+V12 juga menghapus arsip `match_participants` untuk pertandingan yang selesai sebelum 13 November 2026 pukul 00.00 WIB.
+Tabel itu hanya dipakai survei, jadi pengingat di Main dan pengiriman survei hanya berlaku untuk pertandingan mulai
+hari itu. Ambil cadangan database sebelum menjalankan V12 di server.
 
 ## Menambah migrasi
 

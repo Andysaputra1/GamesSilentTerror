@@ -105,9 +105,10 @@ secara manual atau kehilangan disk VM tetap menghapus data. Volume bukan backup.
    | `V9__chat_nlu` | `SOURCE /docker-entrypoint-initdb.d/V09__chat_nlu.sql;` |
    | `V10__match_participants` | `SOURCE /docker-entrypoint-initdb.d/V10__match_participants.sql;` |
    | `V11__survey_player_feedback` | `SOURCE /docker-entrypoint-initdb.d/V11__survey_player_feedback.sql;` |
+   | `V12__survey_formal` | `SOURCE /docker-entrypoint-initdb.d/V12__survey_formal.sql;` (ambil cadangan dulu: V12 menghapus pertanyaan survei lama yang belum dijawab dan arsip peserta sebelum 13 November 2026) |
 
    Cara lain tanpa masuk client: kirim file lewat stdin,
-   `sudo docker compose ... exec -T mysql sh -c 'exec mysql -uroot -p"$MYSQL_ROOT_PASSWORD" shadow_heist' < backend/migrations/V11__survey_player_feedback.sql`.
+   `sudo docker compose ... exec -T mysql sh -c 'exec mysql -uroot -p"$MYSQL_ROOT_PASSWORD" shadow_heist' < backend/migrations/V12__survey_formal.sql`.
 
 Database Azure yang dibuat sebelum 26 Oktober 2026 berasal dari baseline lama: penanda `AZURE_BASELINE_1`
 menggantikan V1–V4, jadi **jangan jalankan V01–V04 di sana**. Jangan menghapus volume untuk memaksa migrasi. Bila SQL
