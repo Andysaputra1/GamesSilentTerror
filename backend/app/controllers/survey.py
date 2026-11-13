@@ -125,6 +125,12 @@ def panel_summary(token=Depends(require_panel)):
     return survey_call(survey_service.summary)
 
 
+@router.get("/api/panel/survey/respondents")
+# PANEL: jumlah pengisi dan isian setiap kiriman (satu akun di satu pertandingan), terbaru dulu.
+def panel_respondents(token=Depends(require_panel)):
+    return survey_call(survey_service.respondents)
+
+
 @router.get("/api/panel/survey/responses.csv")
 # PANEL: ekspor seluruh jawaban untuk analisis penelitian. UTF-8 dengan BOM (dibaca benar oleh Excel).
 # File ini dibuka di spreadsheet, jadi teks yang diawali = + - @ tab atau CR diberi awalan ' supaya tidak

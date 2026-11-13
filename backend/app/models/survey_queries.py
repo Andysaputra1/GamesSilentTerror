@@ -189,7 +189,7 @@ def summary(database: Session) -> dict:
 def export_rows(database: Session) -> list[dict]:
     daftar_baris = database.execute(text("""
         SELECT r.created_at, r.match_id, r.room_code, r.username, r.role, r.team, r.outcome,
-               q.code, r.question_snapshot, r.value_number, r.value_text,
+               r.question_id, q.code, r.question_snapshot, r.value_number, r.value_text,
                (SELECT GROUP_CONCAT(DISTINCT CONCAT(b.bot_name, ':', b.method, ':', b.persona)
                                     ORDER BY b.bot_name SEPARATOR ' | ')
                   FROM match_bots b WHERE b.match_id = r.match_id) AS bots

@@ -271,6 +271,111 @@ test('survey menu renders questions as text and edits scale meaning from the pan
   assert.equal(w.document.querySelector('#survey-editor-box').open, false);
 });
 
+test('survei: jumlah pengisi, diagram per pertanyaan, dan isian tiap nama dibuka lewat klik', async (t) => {
+  const evil = '<img src=x onerror=alert(1)>';
+  const dasar = { label_min: null, label_max: null, options: [], required: false, active: true };
+  const questions = [
+    { ...dasar, id: 1, code: 'kemiripan_manusia', prompt: 'Bot NPC berperilaku layaknya pemain manusia.',
+      kind: 'scale', scale_min: 1, scale_max: 5, label_min: 'Sangat tidak setuju',
+      label_max: 'Sangat setuju', required: true, position: 10 },
+    { ...dasar, id: 2, code: 'aspek_perbaikan', prompt: 'Aspek yang perlu ditingkatkan?', kind: 'choice',
+      scale_min: 1, scale_max: 6, options: ['Kewajaran bahasa', 'Lainnya'], position: 20 },
+    { ...dasar, id: 3, code: 'saran_masukan', prompt: 'Saran Anda?', kind: 'text', scale_min: 1,
+      scale_max: 6, position: 30 },
+    { ...dasar, id: 4, code: 'lama', prompt: 'Pertanyaan lama', kind: 'text', scale_min: 1,
+      scale_max: 6, active: false, position: 40 }, // nonaktif tanpa jawaban: tanpa diagram
+  ]; // prettier-ignore
+  const jawab = (q, value_number, value_text) => ({
+    question_id: q.id, code: q.code, prompt: q.prompt, kind: q.kind, scale_min: q.scale_min,
+    scale_max: q.scale_max, label_min: q.label_min, label_max: q.label_max, value_number, value_text,
+  }); // prettier-ignore
+  const [kemiripan, aspek, saran] = questions;
+  const pengisi = {
+    total_submissions: 2,
+    total_people: 2,
+    total_matches: 1,
+    respondents: [
+      { match_id: 'm1', room_code: 'ABC123', username: evil, role: 'spy', team: 'civilians',
+        outcome: 'won', created_at: '2026-11-13T05:00:00', bots: 'NOX:fuzzy:santai | RAVEN:fuzzy:tegas',
+        answers: [jawab(kemiripan, 5, null), jawab(aspek, null, `Lainnya: lebih ${evil}`),
+          jawab(saran, null, evil)] },
+      { match_id: 'm1', room_code: 'ABC123', username: 'budi', role: 'hitman', team: 'hitman',
+        outcome: 'lost', created_at: '2026-11-13T04:59:00', bots: '',
+        answers: [jawab(kemiripan, 4, null), jawab(aspek, null, 'Kewajaran bahasa'),
+          jawab(saran, null, null)] },
+    ],
+  }; // prettier-ignore
+  const w = setup(t, (path) => {
+    if (path === '/api/panel/survey/summary')
+      return response({ questions, distribution: [], per_method: [], text_answers: [] });
+    if (path === '/api/panel/survey/respondents') return response(pengisi);
+    return undefined;
+  });
+  await login(w);
+  await w.document.querySelector('[data-menu=survey]').onclick({ preventDefault() {} });
+  const doc = w.document;
+  const teks = (daftar) => [...daftar].map((el) => el.textContent);
+
+  // Kotak jumlah: kiriman, orang, pertandingan.
+  assert.deepEqual(teks(doc.querySelectorAll('#survey-stats .metric strong')), ['2', '2', '1']);
+
+  // Diagram: skala 1–5 dengan arti ujung, persentase dari jawaban pertanyaan itu.
+  const diagram = [...doc.querySelectorAll('#survey-charts .survey-chart')];
+  assert.equal(diagram.length, 3);
+  assert.match(diagram[0].querySelector('figcaption').textContent, /2 jawaban · rata-rata 4\.50/);
+  assert.deepEqual(teks(diagram[0].querySelectorAll('.survey-bar-label')), [
+    '1 · Sangat tidak setuju', '2', '3', '4', '5 · Sangat setuju',
+  ]); // prettier-ignore
+  assert.deepEqual(teks(diagram[0].querySelectorAll('.survey-bar-value')), [
+    '0 · 0%', '0 · 0%', '0 · 0%', '1 · 50%', '1 · 50%',
+  ]); // prettier-ignore
+  assert.equal(diagram[0].querySelectorAll('.survey-bar-fill')[4].style.width, '50%');
+  assert.match(diagram[0].querySelectorAll('.survey-bar')[4].title, /1 dari 2 jawaban \(50%\)/);
+  // Pilihan ganda: "Lainnya: …" masuk batang Lainnya, isiannya bisa dibuka.
+  assert.deepEqual(teks(diagram[1].querySelectorAll('.survey-bar-value')), ['1 · 50%', '1 · 50%']);
+  assert.match(diagram[1].querySelector('.survey-isian').textContent, /Isian Lainnya \(1\)/);
+  // Teks bebas: isian kosong tidak dihitung.
+  assert.match(diagram[2].querySelector('figcaption').textContent, /1 jawaban/);
+  assert.match(diagram[2].querySelector('.survey-isian li').textContent, /onerror/);
+
+  // Daftar pengisi: klik nama membuka dan menutup semua isiannya.
+  const tombol = [...doc.querySelectorAll('#survey-respondent-rows .tombol-nama')];
+  assert.deepEqual(teks(tombol), [evil, 'budi']);
+  const rincian = tombol[0].closest('tr').nextElementSibling;
+  assert.equal(rincian.hidden, true);
+  tombol[0].onclick();
+  assert.equal(rincian.hidden, false);
+  assert.equal(tombol[0].getAttribute('aria-expanded'), 'true');
+  assert.deepEqual(teks(rincian.querySelectorAll('dd')), [
+    '5 dari 5 (Sangat setuju)', `Lainnya: lebih ${evil}`, evil,
+  ]); // prettier-ignore
+  assert.match(rincian.textContent, /NOX \(fuzzy, santai\), RAVEN \(fuzzy, tegas\)/);
+  tombol[0].onclick();
+  assert.equal(rincian.hidden, true);
+  assert.match(tombol[1].closest('tr').textContent, /Hitman · kalah2 dari 3/);
+  assert.equal(
+    teks(tombol[1].closest('tr').nextElementSibling.querySelectorAll('dd'))[2],
+    '— (tidak diisi)',
+  );
+  assert.equal(doc.querySelector('#menu-survey img'), null); // data pemain selalu teks
+});
+
+test('survei kosong: jumlah 0 dan daftar pengisi memberi tahu belum ada yang mengisi', async (t) => {
+  const w = setup(t, (path) =>
+    path === '/api/panel/survey/summary'
+      ? response({ questions: [], distribution: [], per_method: [], text_answers: [] })
+      : undefined,
+  );
+  await login(w);
+  await w.document.querySelector('[data-menu=survey]').onclick({ preventDefault() {} });
+  const doc = w.document;
+  assert.deepEqual(
+    [...doc.querySelectorAll('#survey-stats .metric strong')].map((s) => s.textContent),
+    ['0', '0', '0'],
+  );
+  assert.match(doc.querySelector('#survey-respondent-rows').textContent, /Belum ada yang mengisi/);
+});
+
 test('urutan survei: seret, ▲▼, Alt+panah tersimpan; gagal simpan memulihkan urutan', async (t) => {
   const questions = [1, 2, 3].map((id) => ({
     id,

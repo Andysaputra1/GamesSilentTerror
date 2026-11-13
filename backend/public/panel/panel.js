@@ -84,6 +84,9 @@ function clearSession() {
   $('npc-status').replaceChildren();
   $('survey-rows').replaceChildren();
   $('survey-method-rows').replaceChildren();
+  $('survey-stats').replaceChildren();
+  $('survey-charts').replaceChildren();
+  $('survey-respondent-rows').replaceChildren();
   $('survey-order-status').textContent = '';
   urutanSurvei = [];
   urutanSurveiTersimpan = [];
@@ -2311,12 +2314,229 @@ async function pindahkanPertanyaanSurvei(id, indeksBaru) {
     simpanUrutanLagi = false;
   }
 }
-// Muat ringkasan survei lalu tampilkan tabel pertanyaan (urutan server) dan rata-rata per metode.
-// Alur: 1 ambil ringkasan -> 2 kelompokkan nilai -> 3 bangun baris -> 4 tampilkan -> 5 tabel metode
+// Jawaban yang benar-benar diisi: angka, atau teks yang tidak kosong (pertanyaan opsional boleh dilewati).
+function jawabanTerisi(jawaban) {
+  return jawaban.value_number != null || (jawaban.value_text ?? '') !== '';
+}
+// Teks satu jawaban untuk admin: angka beserta skala dan arti ujungnya, atau isian teksnya.
+function teksJawabanSurvei(jawaban) {
+  if (jawaban.value_number == null) return jawaban.value_text || '— (tidak diisi)';
+  const arti =
+    jawaban.value_number === jawaban.scale_min
+      ? jawaban.label_min
+      : jawaban.value_number === jawaban.scale_max
+        ? jawaban.label_max
+        : null;
+  return `${jawaban.value_number} dari ${jawaban.scale_max ?? '?'}${arti ? ` (${arti})` : ''}`;
+}
+// Kelompok batang diagram satu pertanyaan: setiap nilai skala, atau setiap pilihan ganda. Isian
+// "Lainnya: …" masuk ke Lainnya; jawaban di luar daftar (pilihan lama) mendapat batang sendiri.
+// Alur: 1 kelompok kosong sesuai skala atau pilihan -> 2 hitung tiap jawaban -> 3 daftar kelompok
+function kelompokDiagramSurvei(pertanyaan, daftarJawaban) {
+  const kelompok = new Map();
+  if (pertanyaan.kind === 'choice') {
+    for (const pilihan of pertanyaan.options) kelompok.set(pilihan, { label: pilihan, n: 0 });
+  } else {
+    for (let nilai = pertanyaan.scale_min; nilai <= pertanyaan.scale_max; nilai++) {
+      const arti =
+        nilai === pertanyaan.scale_min
+          ? pertanyaan.label_min
+          : nilai === pertanyaan.scale_max
+            ? pertanyaan.label_max
+            : null;
+      kelompok.set(String(nilai), { label: arti ? `${nilai} · ${arti}` : String(nilai), n: 0 });
+    }
+  }
+  for (const jawaban of daftarJawaban) {
+    let kunci = pertanyaan.kind === 'choice' ? jawaban.value_text : String(jawaban.value_number);
+    if (pertanyaan.kind === 'choice' && kunci.startsWith(`${PILIHAN_LAINNYA}:`))
+      kunci = PILIHAN_LAINNYA;
+    if (!kelompok.has(kunci)) kelompok.set(kunci, { label: kunci, n: 0 });
+    kelompok.get(kunci).n++;
+  }
+  return [...kelompok.values()];
+}
+// Daftar isian teks yang dilipat (teks bebas, atau isian Lainnya): "nama: isian" per baris.
+function lipatanIsianSurvei(judul, daftarJawaban) {
+  const lipatan = node('details', undefined, 'survey-isian');
+  const daftar = node('ul');
+  for (const jawaban of daftarJawaban)
+    daftar.append(node('li', `${jawaban.username}: ${jawaban.value_text}`));
+  lipatan.append(node('summary', `${judul} (${daftarJawaban.length})`), daftar);
+  return lipatan;
+}
+// Diagram batang mendatar satu pertanyaan: satu batang per nilai atau pilihan, panjangnya persentase
+// dari jawaban pertanyaan itu. Pertanyaan teks bebas menampilkan jumlah dan daftar isiannya.
+// Alur: 1 jawaban terisi untuk pertanyaan ini -> 2 judul, jumlah, rata-rata -> 3 batang per kelompok
+//       atau daftar isian teks -> 4 daftar isian Lainnya
+function diagramSurvei(nomor, pertanyaan, daftarKiriman) {
+  // 1 jawaban terisi (angka untuk skala, teks untuk pilihan dan teks bebas), beserta nama pengisinya
+  const berskala = pertanyaan.kind === 'stars' || pertanyaan.kind === 'scale';
+  const terisi = daftarKiriman.flatMap((kiriman) =>
+    kiriman.answers
+      .filter(
+        (jawaban) =>
+          jawaban.question_id === pertanyaan.id &&
+          (berskala ? jawaban.value_number != null : (jawaban.value_text ?? '') !== ''),
+      )
+      .map((jawaban) => ({ ...jawaban, username: kiriman.username })),
+  );
+
+  // 2 judul dengan jumlah jawaban, rata-rata untuk skala, dan tanda nonaktif
+  let ringkas = `${terisi.length} jawaban`;
+  if (berskala && terisi.length) {
+    const rataRata = terisi.reduce((jumlah, j) => jumlah + j.value_number, 0) / terisi.length;
+    ringkas += ` · rata-rata ${rataRata.toFixed(2)}`;
+  }
+  if (!pertanyaan.active) ringkas += ' · nonaktif';
+  const kotak = node('figure', undefined, 'survey-chart');
+  const judul = node('figcaption');
+  judul.append(node('strong', `${nomor}. ${pertanyaan.prompt}`), node('span', ringkas, 'hint'));
+  kotak.append(judul);
+  if (!terisi.length) {
+    kotak.append(node('p', 'Belum ada jawaban.', 'hint'));
+    return kotak;
+  }
+
+  // 3 teks bebas: daftar isian; skala dan pilihan: satu batang per kelompok
+  if (pertanyaan.kind === 'text') {
+    kotak.append(lipatanIsianSurvei('Lihat isian', terisi));
+    return kotak;
+  }
+  for (const { label, n } of kelompokDiagramSurvei(pertanyaan, terisi)) {
+    const persen = (n / terisi.length) * 100;
+    const baris = node('div', undefined, 'survey-bar');
+    baris.title = `${label}: ${n} dari ${terisi.length} jawaban (${persen.toFixed(0)}%)`;
+    const jalur = node('span', undefined, 'survey-bar-track');
+    const isi = node('span', undefined, 'survey-bar-fill');
+    isi.style.width = `${persen}%`;
+    jalur.append(isi);
+    baris.append(
+      node('span', label, 'survey-bar-label'),
+      jalur,
+      node('span', `${n} · ${persen.toFixed(0)}%`, 'survey-bar-value'),
+    );
+    kotak.append(baris);
+  }
+
+  // 4 isian bebas dari pilihan Lainnya
+  const isianLainnya = terisi.filter(
+    (jawaban) => pertanyaan.kind === 'choice' && jawaban.value_text.startsWith(`${PILIHAN_LAINNYA}:`),
+  ); // pilihan dan teks bebas selalu punya value_text (disaring di langkah 1)
+  if (isianLainnya.length) kotak.append(lipatanIsianSurvei('Isian Lainnya', isianLainnya));
+  return kotak;
+}
+// Daftar bot satu pertandingan dari kolom bots ("NAMA:metode:persona | …") untuk dibaca admin.
+function teksBotSurvei(bots) {
+  return bots
+    .split(' | ')
+    .map((bot) => {
+      const [nama, metode, persona] = bot.split(':');
+      return persona ? `${nama} (${metode}, ${persona})` : bot;
+    })
+    .join(', ');
+}
+// Satu kiriman di daftar pengisi: baris ringkas dan baris rincian tersembunyi berisi semua isiannya.
+// Klik nama membuka atau menutup rinciannya.
+// Alur: 1 baris ringkas (waktu, nama, room, role, hasil, jumlah jawaban) -> 2 baris rincian: pertanyaan
+//       dan jawaban, bot, nomor pertandingan -> 3 tombol nama membuka/menutup rincian
+function barisPengisiSurvei(kiriman) {
+  // 1 baris ringkas
+  const tombolNama = node('button', kiriman.username, 'tombol-nama');
+  tombolNama.type = 'button';
+  tombolNama.setAttribute('aria-expanded', 'false');
+  const selNama = node('td');
+  selNama.append(tombolNama);
+  const kubu = { hitman: 'Hitman', civilians: 'Warga' }[kiriman.team] ?? '—';
+  const hasil = { won: 'menang', lost: 'kalah' }[kiriman.outcome] ?? '—';
+  const baris = document.createElement('tr');
+  baris.append(
+    node('td', tanggal(kiriman.created_at)),
+    selNama,
+    node('td', kiriman.room_code),
+    node('td', kiriman.role ?? '—'),
+    node('td', `${kubu} · ${hasil}`),
+    node('td', `${kiriman.answers.filter(jawabanTerisi).length} dari ${kiriman.answers.length}`),
+  );
+
+  // 2 baris rincian
+  const rincian = document.createElement('tr');
+  rincian.className = 'survey-detail';
+  rincian.hidden = true;
+  const selRincian = node('td');
+  selRincian.colSpan = 6;
+  const daftarJawaban = node('dl', undefined, 'survey-answers');
+  for (const jawaban of kiriman.answers)
+    daftarJawaban.append(
+      node('dt', jawaban.prompt ?? jawaban.code),
+      node('dd', teksJawabanSurvei(jawaban)),
+    );
+  selRincian.append(daftarJawaban);
+  if (kiriman.bots)
+    selRincian.append(node('p', `Bot di pertandingan ini: ${teksBotSurvei(kiriman.bots)}`, 'hint'));
+  selRincian.append(node('p', `Pertandingan ${kiriman.match_id}`, 'hint'));
+  rincian.append(selRincian);
+
+  // 3 buka/tutup rincian
+  tombolNama.onclick = () => {
+    rincian.hidden = !rincian.hidden;
+    tombolNama.setAttribute('aria-expanded', String(!rincian.hidden));
+  };
+  return [baris, rincian];
+}
+// Bagian pengisi di menu Survei: kotak jumlah, diagram per pertanyaan, dan daftar pengisi.
+// Alur: 1 kotak jumlah kiriman, orang, pertandingan -> 2 diagram untuk pertanyaan aktif dan pertanyaan
+//       nonaktif yang punya jawaban -> 3 daftar pengisi (atau baris kosong)
+function tampilkanPengisiSurvei(daftarPertanyaan, dataPengisi) {
+  // 1 kotak jumlah
+  const daftarKiriman = dataPengisi.respondents ?? [];
+  $('survey-stats').replaceChildren(
+    ...[
+      ['Kiriman survei', dataPengisi.total_submissions],
+      ['Orang yang mengisi', dataPengisi.total_people],
+      ['Pertandingan', dataPengisi.total_matches],
+    ].map(([judul, angka]) => {
+      const kotak = node('div', undefined, 'metric');
+      kotak.append(node('small', judul), node('strong', String(angka ?? 0)));
+      return kotak;
+    }),
+  );
+
+  // 2 diagram
+  const punyaJawaban = new Set(
+    daftarKiriman.flatMap((kiriman) => kiriman.answers.map((jawaban) => jawaban.question_id)),
+  );
+  const pertanyaanDiagram = daftarPertanyaan.filter(
+    (pertanyaan) => pertanyaan.active || punyaJawaban.has(pertanyaan.id),
+  );
+  $('survey-charts').replaceChildren(
+    ...pertanyaanDiagram.map((pertanyaan, indeks) =>
+      diagramSurvei(indeks + 1, pertanyaan, daftarKiriman),
+    ),
+  );
+
+  // 3 daftar pengisi
+  if (!daftarKiriman.length) {
+    const kosong = document.createElement('tr');
+    const sel = node('td', 'Belum ada yang mengisi survei.', 'hint');
+    sel.colSpan = 6;
+    kosong.append(sel);
+    $('survey-respondent-rows').replaceChildren(kosong);
+    return;
+  }
+  $('survey-respondent-rows').replaceChildren(...daftarKiriman.flatMap(barisPengisiSurvei));
+}
+// Muat ringkasan dan pengisi survei, lalu tampilkan tabel pertanyaan (urutan server), rata-rata per
+// metode, dan bagian pengisi (jumlah, diagram, daftar nama).
+// Alur: 1 ambil ringkasan dan pengisi -> 2 kelompokkan nilai -> 3 bangun baris -> 4 tampilkan
+//       -> 5 tabel metode -> 6 bagian pengisi
 async function muatSurvei() {
-  // 1 ambil ringkasan; jawaban untuk sesi lama diabaikan
+  // 1 ambil ringkasan dan pengisi; jawaban untuk sesi lama diabaikan
   const generasiAwal = generation;
-  const ringkasan = await request('/api/panel/survey/summary');
+  const [ringkasan, pengisi] = await Promise.all([
+    request('/api/panel/survey/summary'),
+    request('/api/panel/survey/respondents'),
+  ]);
   if (!token || generasiAwal !== generation) return;
 
   // 2 kelompokkan sebaran nilai dan jumlah jawaban teks per pertanyaan
@@ -2447,6 +2667,9 @@ async function muatSurvei() {
       return barisTabel;
     }),
   );
+
+  // 6 bagian pengisi: jumlah, diagram, daftar nama
+  tampilkanPengisiSurvei(ringkasan.questions, pengisi);
 }
 function kosongkanFormSurvei() {
   $('survey-form').reset();

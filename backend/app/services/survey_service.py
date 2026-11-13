@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 import threading
@@ -467,6 +468,38 @@ class SurveyService:
     # PANEL: baris CSV untuk analisis penelitian.
     def export_rows(self):
         return jalankan_transaksi(queries.export_rows)
+
+    # PANEL: pengisi survei. Jawaban dikelompokkan per kiriman (satu akun di satu pertandingan), kiriman terbaru
+    # di atas, ditambah jumlah kiriman, orang, dan pertandingan. Teks pertanyaan diambil dari salinan saat dijawab.
+    # Alur: 1 baris jawaban (berkelompok per kiriman, urut posisi pertanyaan) -> 2 satu kiriman per (pertandingan,
+    #       akun) -> 3 jawaban dengan salinan pertanyaannya -> 4 terbaru dulu -> 5 jumlah kiriman, orang, pertandingan
+    def respondents(self):
+        kolom_kiriman = ("match_id", "room_code", "username", "role", "team", "outcome")
+        kolom_salinan = ("prompt", "kind", "scale_min", "scale_max", "label_min", "label_max")
+        kiriman = {}
+        for baris in jalankan_transaksi(queries.export_rows):
+            waktu = baris["created_at"]
+            waktu = waktu.isoformat() if hasattr(waktu, "isoformat") else str(waktu)
+            satu_kiriman = kiriman.setdefault(
+                (baris["match_id"], baris["username"]),
+                {**{kolom: baris[kolom] for kolom in kolom_kiriman}, "created_at": waktu,
+                 "bots": baris.get("bots") or "", "answers": []},
+            )  # fmt: skip
+            satu_kiriman["created_at"] = min(satu_kiriman["created_at"], waktu)
+            salinan = baris.get("question_snapshot")
+            salinan = json.loads(salinan) if isinstance(salinan, str) else (salinan or {})
+            satu_kiriman["answers"].append(
+                {"question_id": baris["question_id"], "code": baris["code"],
+                 **{kolom: salinan.get(kolom) for kolom in kolom_salinan},
+                 "value_number": baris["value_number"], "value_text": baris["value_text"]}
+            )  # fmt: skip
+        daftar_kiriman = sorted(kiriman.values(), key=lambda item: item["created_at"], reverse=True)
+        return {
+            "total_submissions": len(daftar_kiriman),
+            "total_people": len({item["username"] for item in daftar_kiriman}),
+            "total_matches": len({item["match_id"] for item in daftar_kiriman}),
+            "respondents": daftar_kiriman,
+        }
 
     # NPC: catat metode dan persona bot pertandingan (gagal simpan tidak menghentikan game).
     def record_match_bots(self, daftar_bot):

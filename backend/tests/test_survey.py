@@ -487,6 +487,63 @@ class SurveyExportTests(unittest.TestCase):
         angka = [r["value_number"] for r in csv.DictReader(io.StringIO(body))]
         self.assertEqual(angka[-1], "3")
 
+    # Pengisi: jawaban dikelompokkan per kiriman (pertandingan + akun), terbaru dulu, teks pertanyaan dari
+    # salinan saat dijawab; jumlah kiriman, orang, dan pertandingan dihitung terpisah.
+    def test_respondents_group_answers_per_submission_newest_first(self):
+        salinan = '{"prompt": "Mirip manusia?", "kind": "scale", "scale_min": 1, "scale_max": 5, ' \
+                  '"label_min": "Sangat tidak setuju", "label_max": "Sangat setuju"}'  # fmt: skip
+        dasar = {"room_code": "ABC123", "role": "spy", "team": "civilians", "outcome": "won",
+                 "question_id": 7, "code": "kemiripan_manusia", "question_snapshot": salinan,
+                 "value_text": None, "bots": "NOX:fuzzy:santai"}  # fmt: skip
+        rows = [
+            {**dasar, "created_at": datetime(2026, 11, 13, 4, 0), "match_id": "m1", "username": "budi",
+             "value_number": 4},
+            {**dasar, "created_at": datetime(2026, 11, 13, 4, 1), "match_id": "m1", "username": "budi",
+             "question_id": 8, "code": "saran_masukan", "question_snapshot": {"prompt": "Saran?"},
+             "value_number": None, "value_text": "seru"},
+            {**dasar, "created_at": datetime(2026, 11, 13, 5, 0), "match_id": "m2", "username": "budi",
+             "value_number": 5, "bots": None},
+            {**dasar, "created_at": datetime(2026, 11, 13, 4, 30), "match_id": "m1", "username": "cici",
+             "value_number": 2},
+        ]  # fmt: skip
+        with patch("app.services.survey_service.jalankan_transaksi", return_value=rows):
+            hasil = SurveyService().respondents()
+        self.assertEqual(
+            (hasil["total_submissions"], hasil["total_people"], hasil["total_matches"]), (3, 2, 2)
+        )
+        kiriman = hasil["respondents"]
+        self.assertEqual(
+            [(k["match_id"], k["username"]) for k in kiriman], [("m2", "budi"), ("m1", "cici"),
+                                                                ("m1", "budi")]
+        )  # fmt: skip
+        budi_m1 = kiriman[2]
+        self.assertEqual(budi_m1["created_at"], "2026-11-13T04:00:00")
+        self.assertEqual(budi_m1["bots"], "NOX:fuzzy:santai")
+        self.assertEqual(kiriman[0]["bots"], "")
+        self.assertEqual(
+            [(j["question_id"], j["prompt"], j["value_number"], j["value_text"])
+             for j in budi_m1["answers"]],
+            [(7, "Mirip manusia?", 4, None), (8, "Saran?", None, "seru")],
+        )  # fmt: skip
+        self.assertEqual(
+            (budi_m1["answers"][0]["scale_max"], budi_m1["answers"][0]["label_max"]),
+            (5, "Sangat setuju"),
+        )
+
+    def test_respondents_endpoint_needs_panel_login(self):
+        tanpa_login = FastAPI()
+        tanpa_login.include_router(router)
+        with patch("app.controllers.survey.survey_service") as service:
+            self.assertEqual(
+                TestClient(tanpa_login).get("/api/panel/survey/respondents").status_code, 401
+            )
+            service.respondents.assert_not_called()
+            service.respondents.return_value = {"total_submissions": 0, "respondents": []}
+            jawaban = self.client.get("/api/panel/survey/respondents")
+            self.assertEqual(jawaban.json(), {"total_submissions": 0, "respondents": []})
+            service.respondents.side_effect = PersistenceError("mati")
+            self.assertEqual(self.client.get("/api/panel/survey/respondents").status_code, 503)
+
     def test_delete_endpoints_need_panel_login_and_map_errors(self):
         tanpa_login = FastAPI()
         tanpa_login.include_router(router)

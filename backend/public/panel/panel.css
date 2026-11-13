@@ -512,6 +512,30 @@ a.metric .doc-src { position: absolute; top: 11px; right: 12px; }
 .survey-order-bar .hint { margin: 0; max-width: 760px; }
 #survey-order-status { font-size: 12px; font-weight: 650; overflow-wrap: anywhere; }
 #menu-survey .survey-order-bar + .table-scroll { margin-top: 12px; }
+/* SURVEI: pengisi, diagram batang per pertanyaan, dan rincian isian per kiriman. */
+#menu-survey > h3 { margin: 28px 0 4px; color: #e7eef7; }
+#menu-survey > h3 + .hint { margin: 0 0 10px; max-width: 760px; }
+.survey-charts { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; margin: 12px 0; }
+.survey-chart { margin: 0; padding: 14px; background: #0c1624; border: 1px solid #2a394d; border-radius: 9px; min-width: 0; }
+.survey-chart figcaption { display: grid; gap: 4px; margin-bottom: 10px; }
+.survey-chart figcaption strong { color: #e7eef7; font-size: 14px; overflow-wrap: anywhere; }
+.survey-chart figcaption .hint, .survey-chart > .hint { margin: 0; }
+.survey-bar { display: grid; grid-template-columns: minmax(0,9.5em) minmax(0,1fr) 5.6em; align-items: center; gap: 10px; padding: 3px 0; }
+.survey-bar-label { font-size: 12px; color: #c9d4e2; overflow-wrap: anywhere; }
+.survey-bar-track { display: block; height: 12px; background: #16212f; border-radius: 0 4px 4px 0; overflow: hidden; }
+.survey-bar-fill { display: block; height: 100%; min-width: 0; background: #4a8ad8; border-radius: 0 4px 4px 0; }
+.survey-bar-value { font-size: 12px; color: #a9b6c6; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.survey-bar:hover .survey-bar-fill { background: #6aa2e6; }
+.survey-isian { margin-top: 10px; font-size: 13px; }
+.survey-isian summary { cursor: pointer; color: #baf578; }
+.survey-isian ul { margin: 8px 0 0; padding-left: 18px; display: grid; gap: 4px; overflow-wrap: anywhere; }
+.tombol-nama { padding: 0; border: 0; background: none; color: #baf578; font: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.tombol-nama[aria-expanded="true"] { color: #e7eef7; }
+.survey-detail > td { background: #0e1724; }
+.survey-answers { display: grid; grid-template-columns: minmax(0,1.4fr) minmax(0,1fr); gap: 6px 16px; margin: 4px 0 10px; }
+.survey-answers dt { color: #a9b6c6; overflow-wrap: anywhere; }
+.survey-answers dd { margin: 0; color: #e7eef7; font-weight: 600; overflow-wrap: anywhere; white-space: pre-wrap; }
+@media (max-width: 760px) { .survey-charts { grid-template-columns: 1fr; }.survey-answers { grid-template-columns: 1fr; gap: 2px; }.survey-answers dd { margin-bottom: 8px; }.survey-bar { grid-template-columns: minmax(0,6.2em) minmax(0,1fr) 4.4em; gap: 8px; } }
 #menu-survey td.urutan-survei { white-space: nowrap; vertical-align: middle; }
 .pegangan-seret { display: inline-block; padding: 4px 6px; color: #7f91a9; font-weight: 700; letter-spacing: -2px; cursor: grab; user-select: none; }
 .pegangan-seret:hover { color: #baf578; }
