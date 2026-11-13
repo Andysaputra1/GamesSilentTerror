@@ -66,8 +66,8 @@ sudo docker compose --env-file .env.azure -f docker-compose.azure.yml up -d mysq
 sudo docker compose --env-file .env.azure -f docker-compose.azure.yml ps
 ```
 
-- Volume baru: MySQL menjalankan semua file di `backend/migrations/` (V01–V11) berurutan, tanpa akun bawaan. Hasil
-  awalnya 15 tabel (termasuk `schema_migrations`) dan nol akun.
+- Volume baru: MySQL menjalankan semua file di `backend/migrations/` (V01–V12, tanpa V03) berurutan, tanpa akun
+  bawaan. Hasil awalnya 15 tabel (termasuk `schema_migrations`), sepuluh pertanyaan survei formal, dan nol akun.
 - Volume yang sudah berisi data: migrasi tidak dijalankan ulang. Hentikan, periksa isinya, lalu ikuti
   [README.md](README.md#menjalankan-migrasi-di-database-lama). Jangan menghapus volume untuk memaksa inisialisasi.
 

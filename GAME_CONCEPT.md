@@ -238,7 +238,9 @@ Layar hasil menampilkan ucapan selamat (untuk pemenang pribadi atau kubu pemenan
 statistik akhir. Di bawahnya ada **survei**.
 
 - Pertanyaan, jenis jawaban (bintang, skala angka, pilihan ganda, teks), rentang skala, dan arti nilai terkecil dan
-  terbesar diatur administrator di panel menu **Survei**, bukan di frontend.
+  terbesar diatur administrator di panel menu **Survei**, bukan di frontend. Sejak 13 November 2026 isinya sepuluh
+  pertanyaan formal penelitian dari migrasi V12; daftarnya dan bagian bot yang diukur tiap pertanyaan ada di
+  [Catatan V12](backend/migrations/README.md#catatan-v12).
 - Pilihan bernama `Lainnya` pada pilihan ganda membuka isian bebas, disimpan sebagai `Lainnya: <isian>`.
 - Pertanyaan baru selalu masuk paling bawah. Urutannya diatur dengan menyeret pegangan ⋮⋮ atau tombol ▲▼ (Alt+↑/↓),
   langsung tersimpan lewat `PUT /api/panel/survey/questions/order`, dan dipakai form pemain serta ekspor CSV.
@@ -246,11 +248,20 @@ statistik akhir. Di bawahnya ada **survei**.
   Jawaban menyimpan salinan pertanyaan saat dijawab beserta role, kubu, dan hasil pemain.
 - Peserta manusia tiap pertandingan yang selesai diarsipkan di tabel `match_participants`, jadi survei tetap bisa
   dikirim sesudah keluar room, sesudah room dibersihkan, atau sesudah server dinyalakan ulang. Bila arsip itu gagal
-  disimpan, backend masih mengingat peserta di memori selama 30 menit.
-- Selama survei belum diisi, halaman Main menampilkan pengingat "Ayo isi survei untuk game ruangan …" di atas binder
-  (satu baris per pertandingan, bisa digulir). Tombol X hanya menyembunyikannya sampai Main dibuka lagi.
-- Panel menampilkan rata-rata per pertanyaan dan per metode bot. Setiap jawaban dihitung sekali: ke metode tunggal
-  pertandingan itu, atau ke kelompok "campuran" untuk pertandingan lama yang botnya memakai beberapa metode.
+  disimpan, backend masih mengingat peserta di memori selama 30 menit. V12 menghapus arsip pertandingan yang selesai
+  sebelum 13 November 2026, jadi pertandingan lama tidak lagi bisa disurvei.
+- Selama survei belum diisi, halaman Main menampilkan pengingat "Mohon isi survei untuk pertandingan di ruangan …" di
+  atas binder (satu baris per pertandingan, bisa digulir). Tombol X hanya menyembunyikannya sampai Main dibuka lagi.
+  Kalimat isian, ucapan terima kasih, dan pengingat memakai bahasa formal ("Anda").
+- Menu Survei di panel menampilkan:
+  - jumlah kiriman, orang, dan pertandingan (satu kiriman = satu akun mengisi survei untuk satu pertandingan);
+  - diagram sebaran jawaban setiap pertanyaan dari semua kiriman;
+  - daftar pengisi, terbaru di atas, dengan nama tampilan akun (username bila akunnya sudah dihapus), room, role,
+    kubu dan hasil, serta jumlah jawaban yang terisi. Mengeklik nama membuka semua isian kiriman itu, bot di
+    pertandingan itu, username, dan nomor pertandingan. Datanya dari `GET /api/panel/survey/respondents`;
+  - rata-rata per pertanyaan dan per metode bot. Setiap jawaban dihitung sekali: ke metode tunggal pertandingan itu,
+    atau ke kelompok "campuran" untuk pertandingan lama yang botnya memakai beberapa metode. Pertandingan baru selalu
+    masuk metode `fuzzy`.
 - Menu Survei juga bisa menghapus permanen semua jawaban beserta arsip peserta (administrator mengetik BERSIHKAN),
   lalu menghapus pertanyaan yang sudah tidak punya jawaban. Ekspor CSV dijelaskan di
   [README.md](README.md#panel-administrator).
@@ -313,9 +324,11 @@ untuk analisis survei. Letak kodenya di [CODE_GUIDE.md](CODE_GUIDE.md#otak-bot-d
   langkah bot itu dijadwalkan segera, minimal 1 detik dari langkah sebelumnya. Bot menjawab pertanyaan langsung
   sekali per panggilan, tetap lewat jatah, jeda, dan lantai bicara.
 - Vote dan aksi rahasia diterapkan begitu diputuskan. Kalimat melewati **lantai bicara**: dalam satu pertandingan
-  paling banyak 3 bot (`LANTAI_MAKS`) menyusun dan "mengetik" bersamaan, jadi permintaan ke LLM dikirim paralel. Bot
-  tidak ikut menulis bila bot lain sedang menulis rencana kembar (intent dan target sama). Rencana chat yang dibuat
-  sebelum chat bot lain masuk dibatalkan, lalu bot memutuskan ulang dengan chat terbaru. Rencana yang ditunda tetap
+  paling banyak 3 bot (`LANTAI_MAKS`) menyusun dan "mengetik" bersamaan, jadi permintaan ke LLM dikirim paralel.
+  Lantai ini dihitung per pertandingan, sedangkan tiga thread penulis dipakai bersama semua room, jadi kalimat bisa
+  antre di belakang room lain. Bot tidak ikut menulis bila bot lain sedang menulis rencana kembar (intent dan target
+  sama). Rencana chat yang dibuat sebelum chat bot lain masuk dibatalkan, lalu bot memutuskan ulang dengan chat
+  terbaru. Rencana yang ditunda tetap
   tercatat di panel beserta masukan NLG-nya. Chat manusia tidak pernah ditahan.
 - Selama menulis, kartu bot menampilkan awan berpikir 🤔 (`players[].thinking`); awan hilang begitu kalimatnya muncul.
 - Kiri bawah kartu bot yang masih hidup menampilkan huruf tahap langkah terakhirnya (`players[].tahap`): **I**

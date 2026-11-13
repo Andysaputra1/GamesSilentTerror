@@ -117,7 +117,11 @@ Contoh SQL di model dan pemakaiannya dari service ada di [backend/README.md](bac
 9. **Panel.** Sesi administrator terpisah dari pemain. Checker menampilkan penjelasan tiap langkah bot yang dibuat
    `bot/penjelasan.py` di `BrainRuntime.langkah`, dilengkapi hasil engine dan NLG di `isi_jejak`
    (`bot/bot_controller.py`). Daftar jejak hanya membawa `ringkas`; penjelasan lengkap diambil per jejak lewat
-   `GET /api/panel/checker/{code}/jejak/{id}`. Nilai API key tidak pernah dikirim balik ke browser.
+   `GET /api/panel/checker/{code}/jejak/{id}`. Bagian yang masih berjalan diambil tiap detik lewat
+   `GET /api/panel/checker/{code}/proses` (`panel_service.proses_checker`): tahap jejak yang belum selesai dan lamanya
+   (`checker_service.proses_berjalan`), kondisi live tiap bot (`NPCService.kondisi_bot`), dan isi antrean thread otak
+   dan penulis, yang dicatat `EksekutorTercatat` di `services/checker_service.py`. Nilai API key tidak pernah dikirim
+   balik ke browser.
 10. **Logout.** `ProfileMenu` → `SessionService` → `POST /api/auth/logout`. Sesudah token dicabut atau kedaluwarsa,
     data sesi browser dibersihkan dan pengguna diarahkan ke login. Logout tidak menghentikan pertandingan.
 
@@ -402,4 +406,10 @@ akurasi vote warga). Seed tetap, jadi hasil bisa diulang. Kedua skrip memakai pa
   menghapus pertandingan aktif; arsip chat dan jejak di MySQL tetap ada, tetapi tidak memulihkan pertandingan.
 - Jangan menjalankan lebih dari satu worker backend sebelum ada state bersama. Ruangan, nonce Google, dan batas
   percobaan login hanya ada di satu proses.
+- Semua room berbagi dua kelompok thread di `BrainRuntime`: **satu thread otak** (`eksekutor_keputusan`) untuk
+  langkah berpikir semua bot dan bacaan IndoBERT setiap chat, karena ingatan bot dan memo NLU tidak dirancang paralel,
+  serta **tiga thread penulis** (`eksekutor_nlg`) untuk kalimat bot. Di VM produksi (2 vCPU), room 10 pemain membuat
+  IndoBERT butuh rata-rata sekitar 8,85 detik per chat, jadi langkah bot yang antre bisa melewati batas
+  `BATAS_LANGKAH_DETIK` (25 detik) dan batal. Pengukurannya ada di dokumen Proses AI (bagian 2, *Lama tiap tahap*), dan
+  antreannya bisa dilihat langsung di panel Checker.
 - Belum ada penggantian otomatis pemain yang offline.

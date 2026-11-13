@@ -35,7 +35,9 @@ Game ini bagian dari skripsi. Naskah penelitiannya:
 **Dokumen web** ada di panel administrator, menu **08 Dokumen** (berkas `backend/public/dokumen/`). Mulailah dari
 **Peta Dokumen**, yang menjelaskan isi dan urutan baca dokumen lain: Arsitektur Sistem, ERD, Proses AI, Bedah Alur
 Backend, Dataset NLU, Diagram Alir NLU, Kode NLU Intent, Kode NLU Target, Diagram Alir Fuzzy Logic, Bedah Otak
-Fuzzy, Cara Kerja Bot, Kode Fuzzy Logic, dan Kode NLG. Berkas HTML di repo adalah salinan hasil pembangun dokumen di
+Fuzzy, Cara Kerja Bot, Kode Fuzzy Logic, dan Kode NLG. Setiap kartu dokumen bertanda sumbernya: **Training**
+(dibangun dari notebook dan dataset repo prethesis), **Backend** (dibangun dari kode game), atau **Panduan** (peta yang
+merangkum dokumen lain). Berkas HTML di repo adalah salinan hasil pembangun dokumen di
 `communicationfolder/<topik>-<tanggal>/`, folder lokal yang tidak ikut Git. Ubah sumbernya, bangun ulang, lalu
 salin hasilnya ke `backend/public/dokumen/`.
 
@@ -51,7 +53,8 @@ salin hasilnya ke `backend/public/dokumen/`.
   ruangan yang mengatur bot dan memulai game.
 - Role acak dari server, layar persiapan, ronde siang → Tribunal → malam (ronde 1 tanpa Tribunal) sampai salah satu
   kubu menang, skill dan cooldown, voting, eksekusi, chat tim malam, serta kondisi kemenangan.
-- Survei setelah pertandingan, dengan pertanyaan yang diatur dari panel.
+- Survei setelah pertandingan, dengan pertanyaan yang diatur dari panel. Isi bawaannya sepuluh pertanyaan formal
+  penelitian dari migrasi V12 ([Catatan V12](backend/migrations/README.md#catatan-v12)).
 - Panel administrator di `/panel` dengan delapan menu (lihat [Panel administrator](#panel-administrator)).
 
 Role: **Hitman** (Hostage, Gag Order), **Spy** (Guard), **Stalker** (Peek), dan **Civilian**. Rincian aturan,
@@ -250,18 +253,22 @@ game. Sesi panel berlaku 8 jam dan otomatis tidak berlaku lagi bila password pan
 | Menu | Isi |
 | --- | --- |
 | 01 Konfigurasi AI | Provider (`api` atau `docker`), sumber key OpenRouter, URL dan token link LLM sendiri, model lokal |
-| 02 Checker | Jejak tiap chat manusia (cek → simpan → kirim) dan tiap langkah bot (NLU, penalaran, penulis kalimat) per ruangan |
+| 02 Checker | Per ruangan: fase, komposisi, dan kondisi live tiap bot; jejak tiap chat manusia (cek → simpan → kirim) dan tiap langkah bot (NLU, penalaran, penulis kalimat) dengan alur proses yang menandai tahap yang sedang berjalan, lama tiap tahap, dan error yang jelas (jenis, pesan, tahap gagal); kotak **Antrean** untuk thread otak (1 thread) dan thread penulis (3 thread) yang dipakai bersama semua room |
 | 03 Riwayat chat | Arsip chat dari MySQL dengan filter dan ekspor CSV, termasuk intent, target, dan konteks bacaan IndoBERT |
 | 04 Manajemen user | Tambah user, ubah nama atau username, reset password akun lokal, hapus akun tanpa menghapus riwayat chat |
 | 05 Otak NPC | Penulis kalimat, urutan rantai penulis, model OpenRouter, model LLM link, tombol **Tes koneksi semua prioritas**, status NLU IndoBERT |
-| 06 Survei | Pertanyaan survei, urutannya (seret ⋮⋮ atau tombol ▲▼), ringkasan jawaban, ekspor CSV, dan pembersihan jawaban |
+| 06 Survei | Pertanyaan survei dan urutannya, jumlah pengisi, diagram jawaban per pertanyaan, daftar pengisi, rata-rata per metode bot, ekspor CSV, dan pembersihan jawaban (rinciannya di [GAME_CONCEPT.md](GAME_CONCEPT.md#akhir-pertandingan-dan-survei)) |
 | 07 Simulasi | Pertandingan tiruan admin + 3–9 bot dengan otak asli: chat, flowchart proses AI yang menyala per tahap, dan kode asli tiap tahap |
 | 08 Dokumen | Dokumen web sistem, dimulai dari Peta Dokumen (lihat [Peta file penjelasan](#peta-file-penjelasan)) |
 
 **Ekspor CSV.** Keduanya UTF-8 dengan BOM.
 
-- Survei (`survei_silent_terror.csv`): teks yang diawali `=`, `+`, `-`, `@`, tab, atau CR diberi awalan `'` supaya
-  spreadsheet tidak menjalankannya sebagai formula. Angka tetap angka.
+- Survei (`survei_silent_terror.csv`): satu baris per kiriman (satu akun di satu pertandingan). Kolomnya
+  `created_at`, `match_id`, `room_code`, `username`, `display_name`, `role`, `team`, `outcome`, lalu satu kolom per
+  pertanyaan yang punya jawaban, berjudul `kode: teks pertanyaan` dan urut sesuai posisi di panel, dan terakhir
+  `bots` (bot di pertandingan itu, `nama:metode:persona` dipisah ` | `). Isi kolom pertanyaan berupa angka untuk
+  skala, atau teks untuk pilihan dan isian. Teks yang diawali `=`, `+`, `-`, `@`, tab, atau CR diberi awalan `'`
+  supaya spreadsheet tidak menjalankannya sebagai formula. Angka tetap angka.
 - Riwayat chat (`riwayat-chat.csv`): isi pesan disimpan persis karena dipakai sebagai dataset NLU. Kolomnya
   `pengirim`, `teks_chat`, `label_intent`, `chat_sebelumnya`, `daftar_pemain`, `target`, `session_id`, `chat_id`,
   `room_code`, `confidence`, `sender_kind`, `waktu_utc`. Filter tanggal memakai hari WIB, dan filter pengirim
@@ -353,6 +360,7 @@ source. Belum ada target `ng e2e`. Perintah tes dan build ada di
 | Port sudah dipakai | Hentikan service lain di port itu. Mengubah port juga perlu menyesuaikan URL frontend, CORS, dan proxy |
 | Login gagal atau backend belum siap | Periksa `docker compose ps -a`, log `ai-engine` dan `mysql`, lalu `/ready`. Database lama mungkin belum menjalankan migrasi terbaru |
 | Bot diam atau kalimatnya kaku | Buka panel **Otak NPC**: NLU harus tertulis IndoBERT, dan minimal satu jalur penulis hidup (atau `NPC_WRITER=templat`). Periksa `database_ready` di `/app-status` |
+| Bot lambat menjawab di room besar | Buka **Checker**: alur proses menunjukkan tahap yang lama, dan kotak Antrean menunjukkan pekerjaan yang menunggu thread otak atau penulis. Semua room berbagi thread itu (lihat [Batas implementasi](CODE_GUIDE.md#batas-implementasi)) |
 | Panel tidak bisa login | Pastikan `PANEL_PASSWORD_HASH` dibuat dengan `setup_panel.py` dan backend sudah di-recreate |
 | Ruangan tidak ditemukan | Backend mungkin baru restart; buat ruangan baru atau periksa kode undangan |
 

@@ -10,6 +10,8 @@ Vercel) ada di [AZURE_SETUP.md](AZURE_SETUP.md). Isi tiap migrasi ada di
 | Bagian | Isi |
 | --- | --- |
 | Alamat | Backend `https://backendthesis.andylabs.site`, panel `https://backendthesis.andylabs.site/panel`, frontend `https://silent-terror.andylabs.site` (Vercel) |
+| VM | Azure, 2 vCPU tanpa GPU. IndoBERT dan Fuzzy berjalan di CPU VM; penulis kalimat memakai OpenRouter atau LLM laptop lewat `ai-docker/` |
+| Frontend | Dibangun ulang otomatis oleh Vercel setiap push ke `main`; tidak ada langkah frontend di VM ([frontend/DEPLOYMENT.md](../../frontend/DEPLOYMENT.md)) |
 | Repo di VM | `~/GamesSilentTerror`, dengan secret di `.env.azure` (diabaikan Git, jangan dibagikan) |
 | Compose | `docker-compose.azure.yml`, selalu dipakai dengan `--env-file .env.azure` |
 | `mysql` | MySQL 8.4.11. Volume eksternal `shadow_heist_mysql_data`; `backend/migrations/` dipasang ke `/docker-entrypoint-initdb.d`. Tanpa port host dan tanpa phpMyAdmin |

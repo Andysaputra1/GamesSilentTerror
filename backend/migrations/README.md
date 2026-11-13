@@ -89,14 +89,18 @@ hari itu. Ambil cadangan database sebelum menjalankan V12 di server.
 
 ## Menambah migrasi
 
-1. Buat file dengan nomor dua digit berikutnya, mis. `V12__nama_singkat.sql`.
-2. Tulis perubahan yang hanya menambah (`CREATE TABLE IF NOT EXISTS`, `ADD COLUMN`, `INSERT IGNORE`). Jangan
-   menghapus data.
-3. Akhiri dengan `INSERT IGNORE INTO schema_migrations (version) VALUES ('V12__nama_singkat');`.
+1. Buat file dengan nomor dua digit berikutnya. Nomor terakhir sekarang V12, jadi file berikutnya mis.
+   `V13__nama_singkat.sql`.
+2. Utamakan perubahan yang hanya menambah (`CREATE TABLE IF NOT EXISTS`, `ADD COLUMN`, `INSERT IGNORE`). Bila
+   migrasi memang harus menghapus atau menonaktifkan data, seperti V12, tulis alasannya di komentar awal file dan di
+   catatan migrasi di bawah tabel, lalu ingatkan bahwa database harus di-backup dulu.
+3. Akhiri dengan `INSERT IGNORE INTO schema_migrations (version) VALUES ('V13__nama_singkat');`.
 4. Uji pada database kosong (volume baru) dan pada salinan database lama.
 5. Catat file baru di tabel di atas, dan tambahkan perintahnya ke tabel migrasi di
    [backend/deployment/README.md](../deployment/README.md#menjalankan-migrasi-di-database-lama).
-6. Ingatkan bahwa database lokal dan produksi yang sudah berisi harus menjalankan file ini secara manual.
+6. Ingatkan bahwa database lokal dan produksi yang sudah berisi harus menjalankan file ini secara manual. Di Azure,
+   jalankan sesudah [backup `mysqldump`](../deployment/README.md#backup-database) dan sebelum backend versi baru
+   menyala.
 
 `ALTER TABLE` di MySQL tidak bisa dibatalkan bersama `INSERT` penanda migrasi. Bila SQL gagal di tengah, periksa
 struktur kolom sebelum mengulang.
