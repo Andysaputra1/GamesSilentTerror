@@ -350,3 +350,22 @@ class UserManagementTests(unittest.TestCase):
                 db.execute(text("SELECT username FROM user_accounts WHERE id=2")).scalar(),
                 "google_random",
             )
+
+    # Ganti username memindahkan arsip survei dan peserta ke username baru, supaya panel survei tetap menemukan akun
+    # dan nama tampilan terbarunya.
+    def test_rename_moves_survey_and_participant_history(self):
+        self.admin()
+        with self.engine.begin() as db:
+            db.execute(text("INSERT INTO match_participants VALUES ('m1', 'google_random')"))
+            db.execute(text("INSERT INTO survey_responses VALUES ('m1', 'google_random')"))
+        response = self.client.post(
+            "/api/panel/users/2/profile",
+            json={"username": "google_baru", "display_name": "Nama Baru"},
+        )
+        self.assertEqual(response.status_code, 200)
+        with self.engine.connect() as db:
+            for tabel in ("match_participants", "survey_responses"):
+                self.assertEqual(
+                    db.execute(text(f"SELECT username FROM {tabel}")).scalars().all(),
+                    ["google_baru"],
+                )

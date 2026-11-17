@@ -13,12 +13,25 @@ def update_display_name(database: Session, user_id: int, display_name: str):
     )
 
 
-# Username berubah berdasarkan ID akun tetap, sehingga email Google dan token tetap menunjuk akun sama.
+# Username berubah berdasarkan ID akun tetap, sehingga email Google dan token tetap menunjuk akun sama. Arsip survei
+# dan peserta pertandingan ikut pindah ke username baru: keduanya disimpan per username, dan tanpa ini panel survei
+# tidak lagi menemukan akunnya (nama tampilan jatuh ke username lama). Arsip chat tetap mencatat nama saat itu.
+# Alur: 1 baca username lama -> 2 ganti username akun -> 3 pindahkan survey_responses dan match_participants
 def update_username(database: Session, user_id: int, username: str):
+    username_lama = database.execute(
+        text("SELECT username FROM user_accounts WHERE id = :user_id"), {"user_id": user_id}
+    ).scalar()
     database.execute(
         text("UPDATE user_accounts SET username = :username WHERE id = :user_id"),
         {"username": username, "user_id": user_id},
     )
+    if username_lama is None or username_lama == username:
+        return
+    for tabel in ("survey_responses", "match_participants"):
+        database.execute(
+            text(f"UPDATE {tabel} SET username = :baru WHERE username = :lama"),
+            {"baru": username, "lama": username_lama},
+        )
 
 
 # Ubah skin pilihan pengguna berdasarkan ID akun.
