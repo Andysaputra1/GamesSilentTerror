@@ -150,17 +150,34 @@ def delete_question(database: Session, id_pertanyaan: int) -> None:
     database.execute(text("DELETE FROM survey_questions WHERE id = :id"), {"id": id_pertanyaan})
 
 
-# QUERY RINGKASAN: jumlah, rata-rata, dan sebaran nilai per pertanyaan, serta rata-rata per metode bot.
-# Setiap jawaban dihitung sekali: pertandingan yang semua botnya satu metode masuk ke metode itu,
-# pertandingan dengan beberapa metode masuk kelompok "campuran" (tidak dibagi ke tiap metode).
+# CTE kiriman terbaru tiap akun, dipakai ringkasan dan ekspor. Kiriman = (match_id, username); yang terbaru
+# punya MAX(created_at) terbesar, seri dipecah dengan match_id terbesar. Kiriman lama tetap tersimpan.
+KIRIMAN_TERBARU = """
+    WITH kiriman_terbaru AS (
+        SELECT match_id, username FROM (
+            SELECT match_id, username,
+                   ROW_NUMBER() OVER (PARTITION BY username
+                                      ORDER BY MAX(created_at) DESC, match_id DESC) AS urutan
+            FROM survey_responses GROUP BY username, match_id
+        ) kiriman WHERE urutan = 1
+    )
+"""
+HANYA_TERBARU = "JOIN kiriman_terbaru t ON t.match_id = r.match_id AND t.username = r.username"
+
+
+# QUERY RINGKASAN: jumlah, rata-rata, dan sebaran nilai per pertanyaan, serta rata-rata per metode bot, hanya
+# dari kiriman terbaru tiap akun. Pertandingan yang semua botnya satu metode masuk ke metode itu, pertandingan
+# dengan beberapa metode masuk kelompok "campuran" (tidak dibagi ke tiap metode).
 def summary(database: Session) -> dict:
-    distribusi = database.execute(text("""
-        SELECT question_id, value_number, COUNT(*) AS n FROM survey_responses
-        WHERE value_number IS NOT NULL GROUP BY question_id, value_number
+    distribusi = database.execute(text(f"""
+        {KIRIMAN_TERBARU}
+        SELECT r.question_id, r.value_number, COUNT(*) AS n FROM survey_responses r {HANYA_TERBARU}
+        WHERE r.value_number IS NOT NULL GROUP BY r.question_id, r.value_number
     """)).all()
-    per_metode = database.execute(text("""
+    per_metode = database.execute(text(f"""
+        {KIRIMAN_TERBARU}
         SELECT r.question_id, b.method, COUNT(*) AS n, AVG(r.value_number) AS rata
-        FROM survey_responses r
+        FROM survey_responses r {HANYA_TERBARU}
         JOIN (
             SELECT match_id,
                    CASE WHEN COUNT(DISTINCT method) = 1 THEN MIN(method) ELSE 'campuran' END AS method
@@ -169,9 +186,10 @@ def summary(database: Session) -> dict:
         WHERE r.value_number IS NOT NULL
         GROUP BY r.question_id, b.method
     """)).all()
-    teks = database.execute(text("""
-        SELECT question_id, COUNT(*) AS n FROM survey_responses
-        WHERE value_text IS NOT NULL AND value_text <> '' GROUP BY question_id
+    teks = database.execute(text(f"""
+        {KIRIMAN_TERBARU}
+        SELECT r.question_id, COUNT(*) AS n FROM survey_responses r {HANYA_TERBARU}
+        WHERE r.value_text IS NOT NULL AND r.value_text <> '' GROUP BY r.question_id
     """)).all()
     return {
         "distribution": [dict(baris._mapping) for baris in distribusi],
@@ -183,11 +201,12 @@ def summary(database: Session) -> dict:
     }
 
 
-# QUERY EKSPOR: seluruh jawaban beserta nama tampilan pengisi (username bila akunnya sudah dihapus) dan
-# metode bot di pertandingan yang sama. Satu kiriman (pertandingan + akun) tetap berkelompok menurut
-# waktu kirimnya; di dalamnya jawaban mengikuti urutan pertanyaan sekarang.
-def export_rows(database: Session) -> list[dict]:
-    daftar_baris = database.execute(text("""
+# QUERY EKSPOR: jawaban beserta nama tampilan pengisi (username bila akunnya sudah dihapus) dan metode bot di
+# pertandingan yang sama; bawaannya hanya kiriman terbaru tiap akun, hanya_terbaru=False memuat semua kiriman.
+# Satu kiriman tetap berkelompok menurut waktu kirimnya; di dalamnya jawaban mengikuti urutan pertanyaan sekarang.
+def export_rows(database: Session, *, hanya_terbaru: bool = True) -> list[dict]:
+    daftar_baris = database.execute(text(f"""
+        {KIRIMAN_TERBARU if hanya_terbaru else ""}
         SELECT r.created_at, r.match_id, r.room_code, r.username,
                COALESCE(a.display_name, r.username) AS display_name, r.role, r.team, r.outcome,
                r.question_id, q.code, q.prompt AS question_prompt, q.position AS question_position,
@@ -195,12 +214,24 @@ def export_rows(database: Session) -> list[dict]:
                (SELECT GROUP_CONCAT(DISTINCT CONCAT(b.bot_name, ':', b.method, ':', b.persona)
                                     ORDER BY b.bot_name SEPARATOR ' | ')
                   FROM match_bots b WHERE b.match_id = r.match_id) AS bots
-        FROM survey_responses r JOIN survey_questions q ON q.id = r.question_id
+        FROM survey_responses r {HANYA_TERBARU if hanya_terbaru else ""}
+        JOIN survey_questions q ON q.id = r.question_id
         LEFT JOIN user_accounts a ON a.username = r.username
         ORDER BY MIN(r.created_at) OVER (PARTITION BY r.match_id, r.username), r.match_id,
                  r.username, q.position, q.id
     """))
     return [dict(baris._mapping) for baris in daftar_baris]
+
+
+# QUERY COUNT: semua kiriman di database, termasuk kiriman lama yang tidak ditampilkan panel.
+def count_submissions(database: Session) -> int:
+    return int(
+        database.execute(
+            text(
+                "SELECT COUNT(*) FROM (SELECT DISTINCT match_id, username FROM survey_responses) k"
+            )
+        ).scalar_one()
+    )
 
 
 # QUERY INSERT: peserta manusia pertandingan yang selesai; dicatat sekali (INSERT IGNORE per match + username).

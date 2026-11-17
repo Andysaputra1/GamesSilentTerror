@@ -85,7 +85,10 @@ kertas yang sama, tetapi berdampingan.
 pada paint pertama) dan gayanya di `styles.css`; `core/boot-loader.ts` menghapusnya setelah halaman
 pertama, font, dan gambar penting Main (`MAIN_CRITICAL_IMAGES` di `core/asset-preloader.ts`) siap dan
 satu sapuan kaca pembesar selesai (`BOOT_LOADER_SCAN_MS`, 2,4 detik). Batas tunggunya
-`BOOT_LOADER_MAX_WAIT_MS` (4 detik), jadi jaringan lambat tetap masuk ke aplikasi. Gambar besar di
+`BOOT_LOADER_MAX_WAIT_MS` (4 detik), jadi jaringan lambat tetap masuk ke aplikasi. Sesudah login,
+`BootLoader.bukaSesudahLogin` memasang layar yang sama lagi, membuka Main di belakangnya, dan baru
+memudarkannya setelah Main selesai dirender: gambar penting Main, semua `<img>` di halaman (kartu role,
+skin, props), dan font siap, lalu tergambar. Batas tunggunya `LOGIN_LOADER_MAX_WAIT_MS` (8 detik). Gambar besar di
 `public/assets` sudah diperkecil sesuai ukuran tampil; jaga agar aset baru tidak jauh lebih besar dari
 ukuran tampilnya.
 

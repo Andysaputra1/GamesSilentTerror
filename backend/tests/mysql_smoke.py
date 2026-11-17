@@ -496,6 +496,59 @@ class SurveySqlIntegration(unittest.TestCase):
             finally:
                 db.rollback()
 
+    # Satu akun mengisi di dua pertandingan: ringkasan dan ekspor bawaan hanya memakai kiriman terbarunya, ekspor
+    # semua kiriman dan jumlah semua kiriman tetap memuat keduanya. Waktu kiriman diatur lewat UPDATE supaya urutannya pasti.
+    def test_only_latest_submission_per_account_is_shown(self):
+        with SessionLocal() as db:
+            try:
+                id_pertanyaan = survey_queries.list_questions(db)[0]["id"]
+
+                def sebaran(ringkasan):
+                    return {(b["question_id"], b["value_number"]): b["n"]
+                            for b in ringkasan["distribution"]}  # fmt: skip
+
+                def metode(ringkasan):
+                    return {(b["question_id"], b["method"]): b["n"]
+                            for b in ringkasan["per_method"]}  # fmt: skip
+
+                awal = survey_queries.summary(db)
+                kiriman_awal = survey_queries.count_submissions(db)
+                akun, kode_room = "smoke_" + uuid4().hex[:8], _kode_room()
+                lama, baru = uuid4().hex, uuid4().hex
+                for id_match, nilai, waktu in ((lama, 1, _utc(hours=-2)), (baru, 5, _utc())):
+                    survey_queries.record_match_bot(
+                        db,
+                        {"match_id": id_match, "room_code": kode_room, "bot_name": "NOX",
+                         "method": "smoke_metode", "persona": "santai", "role": "spy"},
+                    )  # fmt: skip
+                    survey_queries.insert_answer(
+                        db,
+                        {"match_id": id_match, "room_code": kode_room, "username": akun,
+                         "question_id": id_pertanyaan, "question_snapshot": {"prompt": "uji"},
+                         "value_number": nilai, "value_text": None,
+                         "role": "spy", "team": "civilians", "outcome": "won"},
+                    )  # fmt: skip
+                    db.execute(
+                        text("UPDATE survey_responses SET created_at = :w WHERE match_id = :m"),
+                        {"w": waktu, "m": id_match},
+                    )
+                akhir = survey_queries.summary(db)
+                ekspor = [b for b in survey_queries.export_rows(db) if b["username"] == akun]
+                self.assertEqual([(b["match_id"], b["value_number"]) for b in ekspor], [(baru, 5)])
+                ekspor_semua = [
+                    b["match_id"]
+                    for b in survey_queries.export_rows(db, hanya_terbaru=False)
+                    if b["username"] == akun
+                ]
+                self.assertEqual(ekspor_semua, [lama, baru])
+                self.assertEqual(survey_queries.count_submissions(db) - kiriman_awal, 2)
+                for kunci in ((id_pertanyaan, 1), (id_pertanyaan, 5)):
+                    tambah = sebaran(akhir).get(kunci, 0) - sebaran(awal).get(kunci, 0)
+                    self.assertEqual(tambah, 1 if kunci[1] == 5 else 0, kunci)
+                self.assertEqual(metode(akhir).get((id_pertanyaan, "smoke_metode")), 1)
+            finally:
+                db.rollback()
+
 
 if __name__ == "__main__":
     unittest.main()

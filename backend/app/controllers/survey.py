@@ -134,33 +134,34 @@ def panel_clear_responses(token=Depends(require_panel)):
 
 
 @router.get("/api/panel/survey/summary")
-# PANEL: sebaran nilai per pertanyaan dan rata-rata per metode bot.
+# PANEL: sebaran nilai per pertanyaan dan rata-rata per metode bot, dari kiriman terbaru tiap akun.
 def panel_summary(token=Depends(require_panel)):
     return survey_call(survey_service.summary)
 
 
 @router.get("/api/panel/survey/respondents")
-# PANEL: jumlah pengisi dan isian setiap kiriman (satu akun di satu pertandingan), terbaru dulu.
+# PANEL: jumlah pengisi dan isian kiriman terbaru tiap akun, terbaru dulu, plus jumlah semua kiriman.
 def panel_respondents(token=Depends(require_panel)):
     return survey_call(survey_service.respondents)
 
 
 @router.get("/api/panel/survey/responses.csv")
-# PANEL: ekspor jawaban untuk analisis penelitian. Satu baris = satu kiriman (satu akun di satu pertandingan);
-# setiap pertanyaan menjadi satu kolom berjudul "kode: teks pertanyaan" (urut posisi di panel) berisi jawabannya,
-# angka untuk skala atau teks untuk pilihan dan isian. UTF-8 dengan BOM (dibaca benar oleh Excel). File ini dibuka
+# PANEL: ekspor jawaban untuk analisis penelitian. Bawaannya satu baris = kiriman terbaru satu akun (sama dengan
+# diagram); semua=true memuat semua kiriman, termasuk kiriman lama akun yang mengisi berkali-kali. Setiap
+# pertanyaan menjadi satu kolom berjudul "kode: teks pertanyaan" (urut posisi di panel) berisi jawabannya, angka
+# untuk skala atau teks untuk pilihan dan isian. UTF-8 dengan BOM (dibaca benar oleh Excel). File ini dibuka
 # di spreadsheet, jadi teks yang diawali = + - @ tab atau CR diberi awalan ' supaya tidak dijalankan sebagai formula
 # (injeksi CSV). Angka tetap angka. CSV riwayat chat sengaja tidak diubah, karena dipakai sebagai dataset NLU.
 # Alur: 1 ambil baris jawaban -> 2 kolom pertanyaan urut posisi -> 3 satu baris per kiriman, jawaban di kolom
 #       pertanyaannya -> 4 amankan teks dari formula -> 5 tulis CSV ber-BOM
-def panel_export(token=Depends(require_panel)):
+def panel_export(semua: bool = False, token=Depends(require_panel)):
     def aman_spreadsheet(nilai):
         if isinstance(nilai, str) and nilai[:1] in ("=", "+", "-", "@", "\t", "\r"):
             return "'" + nilai
         return nilai
 
     # 1 baris jawaban (berkelompok per kiriman)
-    daftar_baris = survey_call(survey_service.export_rows)
+    daftar_baris = survey_call(lambda: survey_service.export_rows(hanya_terbaru=not semua))
 
     # 2 kolom pertanyaan: satu per pertanyaan yang punya jawaban, urut posisi sekarang
     judul_pertanyaan = {}
@@ -187,6 +188,7 @@ def panel_export(token=Depends(require_panel)):
         satu[judul_pertanyaan[baris["question_id"]]] = jawaban
 
     # 4-5 amankan dari formula lalu tulis
+    akhiran = "_semua_kiriman" if semua else ""
     penampung_csv = io.StringIO()
     penulis_csv = csv.writer(penampung_csv)
     penulis_csv.writerow([aman_spreadsheet(kolom) for kolom in kolom_csv])
@@ -196,7 +198,7 @@ def panel_export(token=Depends(require_panel)):
         "﻿" + penampung_csv.getvalue(),
         media_type="text/csv; charset=utf-8",
         headers={
-            "Content-Disposition": 'attachment; filename="survei_silent_terror.csv"',
+            "Content-Disposition": f'attachment; filename="survei_silent_terror{akhiran}.csv"',
             "Cache-Control": "no-store",
         },
     )

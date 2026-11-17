@@ -3631,23 +3631,31 @@ function barisPengisiSurvei(kiriman) {
   };
   return [baris, rincian];
 }
-// Bagian pengisi di menu Survei: kotak jumlah, diagram per pertanyaan, dan daftar pengisi.
-// Alur: 1 kotak jumlah kiriman, orang, pertandingan -> 2 diagram untuk pertanyaan aktif dan pertanyaan
-//       nonaktif yang punya jawaban -> 3 daftar pengisi (atau baris kosong)
+// Bagian pengisi di menu Survei: kotak jumlah, diagram per pertanyaan, dan daftar pengisi. Server hanya
+// mengirim kiriman terbaru tiap orang; kiriman lama cukup disebut jumlahnya.
+// Alur: 1 kotak jumlah orang dan pertandingan, plus catatan kiriman lama -> 2 diagram untuk pertanyaan aktif
+//       dan pertanyaan nonaktif yang punya jawaban -> 3 daftar pengisi (atau baris kosong)
 function tampilkanPengisiSurvei(daftarPertanyaan, dataPengisi) {
   // 1 kotak jumlah
   const daftarKiriman = dataPengisi.respondents ?? [];
-  $('survey-stats').replaceChildren(
-    ...[
-      ['Kiriman survei', dataPengisi.total_submissions],
-      ['Orang yang mengisi', dataPengisi.total_people],
-      ['Pertandingan', dataPengisi.total_matches],
-    ].map(([judul, angka]) => {
-      const kotak = node('div', undefined, 'metric');
-      kotak.append(node('small', judul), node('strong', String(angka ?? 0)));
-      return kotak;
-    }),
-  );
+  const [kotakOrang, kotakPertandingan] = [
+    ['Orang yang mengisi', dataPengisi.total_people],
+    ['Pertandingan', dataPengisi.total_matches],
+  ].map(([judul, angka]) => {
+    const kotak = node('div', undefined, 'metric');
+    kotak.append(node('small', judul), node('strong', String(angka ?? 0)));
+    return kotak;
+  });
+  const kirimanLama = (dataPengisi.total_submissions_all ?? 0) - daftarKiriman.length;
+  if (kirimanLama > 0)
+    kotakOrang.append(
+      node(
+        'span',
+        `${kirimanLama} kiriman lama tidak ditampilkan (hanya kiriman terbaru tiap orang)`,
+        'hint',
+      ),
+    );
+  $('survey-stats').replaceChildren(kotakOrang, kotakPertandingan);
 
   // 2 diagram
   const punyaJawaban = new Set(
@@ -4286,19 +4294,24 @@ $('survey-clean').onclick = handle(async () => {
   notice(`${hasil.deleted} jawaban survei dihapus.`);
   await muatSurvei();
 });
-$('download-survey').onclick = handle(async () => {
-  $('download-survey').disabled = true;
-  try {
-    await unduhCsv(
-      '/api/panel/survey/responses.csv',
-      'survei-silent-terror.csv',
-      'Download gagal. Periksa login dan migrasi V7.',
-    );
-    notice('Jawaban survei berhasil diunduh.');
-  } finally {
-    $('download-survey').disabled = false;
-  }
-});
+// Dua tombol CSV survei: per orang (kiriman terbaru, sama dengan diagram) dan semua kiriman.
+for (const [idTombol, semua, namaBerkas] of [
+  ['download-survey', false, 'survei-silent-terror-per-orang.csv'],
+  ['download-survey-all', true, 'survei-silent-terror-semua-kiriman.csv'],
+])
+  $(idTombol).onclick = handle(async () => {
+    $(idTombol).disabled = true;
+    try {
+      await unduhCsv(
+        `/api/panel/survey/responses.csv${semua ? '?semua=true' : ''}`,
+        namaBerkas,
+        'Download gagal. Periksa login dan migrasi V7.',
+      );
+      notice('Jawaban survei berhasil diunduh.');
+    } finally {
+      $(idTombol).disabled = false;
+    }
+  });
 $('logout').onclick = handle(async () => {
   $('logout').disabled = true;
   try {

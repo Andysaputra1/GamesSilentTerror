@@ -456,7 +456,7 @@ dialog form button { width: 100%; }
 .metric strong { display: block; font-size: 17px; margin-top: 8px; overflow-wrap: anywhere; }
 a.metric { color: inherit; text-decoration: none; }
 a.metric:hover, a.metric:focus-visible { border-color: #baf578; }
-a.metric .hint { display: block; margin-top: 6px; }
+.metric .hint { display: block; margin-top: 6px; }
 /* DOKUMEN: kartu dikelompokkan per bagian (gambaran, NLU, otak bot). */
 .doc-section { margin-top: 26px; padding-top: 18px; border-top: 1px solid #22303f; }
 .doc-section:first-of-type { margin-top: 10px; padding-top: 0; border-top: 0; }
@@ -510,6 +510,7 @@ a.metric .doc-src { position: absolute; top: 11px; right: 12px; }
 /* SURVEI: urutan pertanyaan (pegangan seret, nomor, tombol ▲▼), status simpan, dan penanda tempat jatuh. */
 .survey-order-bar { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; }
 .survey-order-bar .hint { margin: 0; max-width: 760px; }
+.survey-downloads { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 #survey-order-status { font-size: 12px; font-weight: 650; overflow-wrap: anywhere; }
 #menu-survey .survey-order-bar + .table-scroll { margin-top: 12px; }
 /* SURVEI: pengisi, diagram batang per pertanyaan, dan rincian isian per kiriman. */

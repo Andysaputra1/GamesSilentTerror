@@ -260,13 +260,16 @@ game. Sesi panel berlaku 8 jam dan otomatis tidak berlaku lagi bila password pan
 | 03 Riwayat chat | Arsip chat dari MySQL dengan filter dan ekspor CSV, termasuk intent, target, dan konteks bacaan IndoBERT |
 | 04 Manajemen user | Tambah user, ubah nama atau username, reset password akun lokal, hapus akun tanpa menghapus riwayat chat |
 | 05 Otak NPC | Penulis kalimat, urutan rantai penulis, model OpenRouter, model LLM link, tombol **Tes koneksi semua prioritas**, status NLU IndoBERT |
-| 06 Survei | Pertanyaan survei dan urutannya, jumlah pengisi, diagram jawaban per pertanyaan, daftar pengisi, rata-rata per metode bot, ekspor CSV, dan pembersihan jawaban (rinciannya di [GAME_CONCEPT.md](GAME_CONCEPT.md#akhir-pertandingan-dan-survei)) |
+| 06 Survei | Pertanyaan survei dan urutannya, jumlah pengisi, diagram jawaban per pertanyaan, daftar pengisi (satu kiriman terbaru per orang), rata-rata per metode bot, ekspor CSV per orang dan semua kiriman, dan pembersihan jawaban (rinciannya di [GAME_CONCEPT.md](GAME_CONCEPT.md#akhir-pertandingan-dan-survei)) |
 | 07 Simulasi | Pertandingan tiruan admin + 3–9 bot dengan otak asli: chat, flowchart proses AI yang menyala per tahap, dan kode asli tiap tahap |
 | 08 Dokumen | Dokumen web sistem, dimulai dari Peta Dokumen (lihat [Peta file penjelasan](#peta-file-penjelasan)) |
 
 **Ekspor CSV.** Keduanya UTF-8 dengan BOM.
 
-- Survei (`survei_silent_terror.csv`): satu baris per kiriman (satu akun di satu pertandingan). Kolomnya
+- Survei, dua tombol dengan kolom yang sama. **CSV per orang** (`survei_silent_terror.csv`): satu baris per akun,
+  memakai kiriman terbarunya (sama dengan diagram panel). **CSV semua kiriman**
+  (`survei_silent_terror_semua_kiriman.csv`, `GET /api/panel/survey/responses.csv?semua=true`): satu baris per
+  kiriman (satu akun di satu pertandingan), termasuk kiriman lama akun yang mengisi berkali-kali. Kolomnya
   `created_at`, `match_id`, `room_code`, `username`, `display_name`, `role`, `team`, `outcome`, lalu satu kolom per
   pertanyaan yang punya jawaban, berjudul `kode: teks pertanyaan` dan urut sesuai posisi di panel, dan terakhir
   `bots` (bot di pertandingan itu, `nama:metode:persona` dipisah ` | `). Isi kolom pertanyaan berupa angka untuk

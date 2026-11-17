@@ -257,10 +257,13 @@
               <p>
                 Atur pertanyaan, jenis jawaban, skala, dan arti nilai terkecil/terbesar. Pertanyaan
                 yang masih punya jawaban tidak bisa dihapus; nonaktifkan, atau bersihkan jawabannya
-                dulu.
+                dulu. CSV per orang sama dengan diagram; CSV semua kiriman juga memuat kiriman lama.
               </p>
             </div>
-            <button id="download-survey">&darr; Download jawaban (CSV)</button>
+            <div class="survey-downloads">
+              <button id="download-survey">&darr; CSV per orang (kiriman terbaru)</button>
+              <button id="download-survey-all" class="secondary">&darr; CSV semua kiriman</button>
+            </div>
           </div>
           <div class="survey-order-bar">
             <p class="hint">
@@ -288,18 +291,22 @@
           </div>
           <h3>Pengisi survei</h3>
           <p class="hint">
-            Satu kiriman = satu akun mengisi survei untuk satu pertandingan. Satu orang bisa mengirim
-            beberapa kali bila bermain di beberapa pertandingan.
+            Satu kiriman = satu akun mengisi survei untuk satu pertandingan. Bila satu orang mengisi
+            di beberapa pertandingan, hanya kiriman terbarunya yang ditampilkan, dihitung di diagram,
+            dan ikut CSV. Kiriman lama tetap tersimpan.
           </p>
           <div id="survey-stats" class="metric-grid"></div>
           <h3>Diagram jawaban</h3>
           <p class="hint">
-            Sebaran jawaban setiap pertanyaan dari semua kiriman. Panjang batang = persentase dari
-            jawaban pertanyaan itu; arahkan kursor ke batang untuk rinciannya.
+            Sebaran jawaban setiap pertanyaan dari kiriman terbaru tiap orang. Panjang batang =
+            persentase dari jawaban pertanyaan itu; arahkan kursor ke batang untuk rinciannya.
           </p>
           <div id="survey-charts" class="survey-charts"></div>
           <h3>Daftar pengisi</h3>
-          <p class="hint">Terbaru di atas. Klik nama untuk membuka semua isian kiriman itu.</p>
+          <p class="hint">
+            Satu baris per orang (kiriman terbarunya), terbaru di atas. Klik nama untuk membuka semua
+            isian kiriman itu.
+          </p>
           <div class="table-scroll">
             <table>
               <thead>

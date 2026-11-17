@@ -256,14 +256,19 @@ statistik akhir. Di bawahnya ada **survei**.
   atas binder (satu baris per pertandingan, bisa digulir). Tombol X hanya menyembunyikannya sampai Main dibuka lagi.
   Kalimat isian, ucapan terima kasih, dan pengingat memakai bahasa formal ("Anda").
 - Menu Survei di panel menampilkan:
-  - jumlah kiriman, orang, dan pertandingan (satu kiriman = satu akun mengisi survei untuk satu pertandingan);
-  - diagram sebaran jawaban setiap pertanyaan dari semua kiriman;
-  - daftar pengisi, terbaru di atas, dengan nama tampilan akun (username bila akunnya sudah dihapus), room, role,
-    kubu dan hasil, serta jumlah jawaban yang terisi. Mengeklik nama membuka semua isian kiriman itu, bot di
-    pertandingan itu, username, dan nomor pertandingan. Datanya dari `GET /api/panel/survey/respondents`;
-  - rata-rata per pertanyaan dan per metode bot. Setiap jawaban dihitung sekali: ke metode tunggal pertandingan itu,
-    atau ke kelompok "campuran" untuk pertandingan lama yang botnya memakai beberapa metode. Pertandingan baru selalu
-    masuk metode `fuzzy`.
+  - satu kiriman per orang: satu kiriman = satu akun mengisi survei untuk satu pertandingan. Bila satu akun mengisi
+    di beberapa pertandingan, hanya kiriman terbarunya yang ditampilkan dan dihitung (waktu kirim terbaru; bila
+    seri, `match_id` terbesar). Kiriman lama tetap tersimpan di database;
+  - jumlah orang yang mengisi dan pertandingan, ditambah catatan "N kiriman lama tidak ditampilkan" bila ada;
+  - diagram sebaran jawaban setiap pertanyaan dari kiriman terbaru tiap orang;
+  - daftar pengisi, satu baris per orang, terbaru di atas, dengan nama tampilan akun (username bila akunnya sudah
+    dihapus), room, role, kubu dan hasil, serta jumlah jawaban yang terisi. Mengeklik nama membuka semua isian
+    kiriman itu, bot di pertandingan itu, username, dan nomor pertandingan. Datanya dari
+    `GET /api/panel/survey/respondents` (`total_people`, `total_matches`, dan `total_submissions_all` untuk semua
+    kiriman termasuk yang lama);
+  - rata-rata per pertanyaan dan per metode bot, juga dari kiriman terbaru tiap orang. Setiap jawaban dihitung sekali:
+    ke metode tunggal pertandingan itu, atau ke kelompok "campuran" untuk pertandingan lama yang botnya memakai
+    beberapa metode. Pertandingan baru selalu masuk metode `fuzzy`.
 - Menu Survei juga bisa menghapus permanen semua jawaban beserta arsip peserta (administrator mengetik BERSIHKAN),
   lalu menghapus pertanyaan yang sudah tidak punya jawaban. Ekspor CSV dijelaskan di
   [README.md](README.md#panel-administrator).

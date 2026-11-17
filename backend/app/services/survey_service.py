@@ -469,7 +469,7 @@ class SurveyService:
 
         jalankan_transaksi(hapus_bila_belum_dijawab)
 
-    # PANEL: ringkasan jawaban per pertanyaan dan per metode bot.
+    # PANEL: ringkasan jawaban per pertanyaan dan per metode bot, dari kiriman terbaru tiap akun.
     def summary(self):
         def ambil_pertanyaan_dan_ringkasan(database):
             return queries.list_questions(database, active_only=False), queries.summary(database)
@@ -477,15 +477,18 @@ class SurveyService:
         semua_pertanyaan, ringkasan = jalankan_transaksi(ambil_pertanyaan_dan_ringkasan)
         return {"questions": semua_pertanyaan, **ringkasan}
 
-    # PANEL: baris CSV untuk analisis penelitian.
-    def export_rows(self):
-        return jalankan_transaksi(queries.export_rows)
+    # PANEL: baris CSV untuk analisis penelitian: kiriman terbaru tiap akun, atau semua kiriman.
+    def export_rows(self, *, hanya_terbaru=True):
+        return jalankan_transaksi(
+            lambda database: queries.export_rows(database, hanya_terbaru=hanya_terbaru)
+        )
 
-    # PANEL: pengisi survei. Jawaban dikelompokkan per kiriman (satu akun di satu pertandingan), kiriman terbaru
-    # di atas, ditambah jumlah kiriman, orang, dan pertandingan. Teks pertanyaan diambil dari salinan saat dijawab;
-    # nama yang tampil adalah nama tampilan akun (username bila akunnya sudah tidak ada).
-    # Alur: 1 baris jawaban dan nama tampilan pengisinya dalam satu transaksi -> 2 satu kiriman per (pertandingan,
-    #       akun) -> 3 jawaban dengan salinan pertanyaannya -> 4 terbaru dulu -> 5 jumlah kiriman, orang, pertandingan
+    # PANEL: pengisi survei, satu entri per orang memakai kiriman terbarunya (kiriman lama tetap tersimpan,
+    # hanya dihitung di total_submissions_all). Teks pertanyaan diambil dari salinan saat dijawab; nama yang
+    # tampil adalah nama tampilan akun (username bila akunnya sudah tidak ada).
+    # Alur: 1 jawaban kiriman terbaru, nama tampilan, dan jumlah semua kiriman dalam satu transaksi -> 2 satu
+    #       entri per kiriman -> 3 jawaban dengan salinan pertanyaannya -> 4 terbaru dulu -> 5 jumlah orang,
+    #       pertandingan, dan semua kiriman
     def respondents(self):
         def ambil_jawaban_dan_nama(database):
             daftar_baris = queries.export_rows(database)
@@ -493,9 +496,10 @@ class SurveyService:
             profil = (
                 auth_queries.account_profiles(database, daftar_username) if daftar_username else []
             )
-            return daftar_baris, {baris.username: baris.display_name for baris in profil}
+            nama_tampilan = {baris.username: baris.display_name for baris in profil}
+            return daftar_baris, nama_tampilan, queries.count_submissions(database)
 
-        daftar_baris, nama_tampilan = jalankan_transaksi(ambil_jawaban_dan_nama)
+        daftar_baris, nama_tampilan, semua_kiriman = jalankan_transaksi(ambil_jawaban_dan_nama)
         kolom_kiriman = ("match_id", "room_code", "username", "role", "team", "outcome")
         kolom_salinan = ("prompt", "kind", "scale_min", "scale_max", "label_min", "label_max")
         kiriman = {}
@@ -518,7 +522,7 @@ class SurveyService:
             )  # fmt: skip
         daftar_kiriman = sorted(kiriman.values(), key=lambda item: item["created_at"], reverse=True)
         return {
-            "total_submissions": len(daftar_kiriman),
+            "total_submissions_all": semua_kiriman,
             "total_people": len({item["username"] for item in daftar_kiriman}),
             "total_matches": len({item["match_id"] for item in daftar_kiriman}),
             "respondents": daftar_kiriman,

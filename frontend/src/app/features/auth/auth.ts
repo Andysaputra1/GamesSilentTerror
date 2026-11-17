@@ -16,7 +16,6 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
 import {
   catchError,
   exhaustMap,
@@ -30,6 +29,7 @@ import {
   TimeoutError,
   timeout,
 } from 'rxjs';
+import { BootLoader } from '../../core/boot-loader';
 import { loadGoogleIdentity } from '../../core/google-identity';
 import { profileCountdown, PROFILE_COUNTDOWN_TARGET } from '../../core/profile-countdown';
 
@@ -254,12 +254,12 @@ export class Auth implements OnInit, AfterViewInit {
   // CONSTANT MILIK INSTANCE: batas tunggu login; private berarti dipakai di dalam class.
   private readonly loginTimeoutMs = 15_000;
 
-  // CONSTRUCTOR: Angular menyediakan HTTP, router, lifecycle, pembaruan view, dan platform.
+  // CONSTRUCTOR: Angular menyediakan HTTP, lifecycle, pembaruan view, layar loading, dan platform.
   constructor(
     private readonly http: HttpClient,
-    private readonly router: Router,
     private readonly destroyRef: DestroyRef,
     private readonly changeDetector: ChangeDetectorRef,
+    private readonly bootLoader: BootLoader,
     @Inject(PLATFORM_ID) private readonly platformId: object,
   ) {}
 
@@ -368,7 +368,8 @@ export class Auth implements OnInit, AfterViewInit {
     return '';
   }
 
-  // PRIVATE METHOD: periksa respons, simpan sesi lokal, lalu buka main page.
+  // PRIVATE METHOD: periksa respons, simpan sesi lokal, lalu buka main page di balik layar loading yang baru
+  // ditutup setelah tampilan Main selesai dirender.
   private completeLogin(response: LoginResponse): void {
     if (!response.access_token || !response.expires_at || !response.user?.username) {
       this.errorMessage = 'RESPONS LOGIN TIDAK LENGKAP. COBA LAGI.';
@@ -394,7 +395,7 @@ export class Auth implements OnInit, AfterViewInit {
     }
 
     this.password = '';
-    void this.router.navigateByUrl('/main').catch(() => {
+    void this.bootLoader.bukaSesudahLogin('/main').catch(() => {
       this.errorMessage = 'LOGIN BERHASIL, NAMUN MAIN PAGE GAGAL DIBUKA.';
     });
   }

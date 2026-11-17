@@ -100,7 +100,8 @@ Contoh SQL di model dan pemakaiannya dari service ada di [backend/README.md](bac
 ## Alur utama
 
 1. **Login dan daftar.** Komponen `Auth` memanggil `controllers/auth.py`; `auth_service` memvalidasi identitas dan
-   menyimpan hash token sesi. Rinciannya di [Akun, sesi, dan login](#akun-sesi-dan-login).
+   menyimpan hash token sesi. Sesudah berhasil, `BootLoader.bukaSesudahLogin` membuka Main di balik layar loading
+   sampai tampilannya selesai dirender. Rinciannya di [Akun, sesi, dan login](#akun-sesi-dan-login).
 2. **Pemulihan sesi.** Guard dan `ActiveMatchService` menanyakan pertandingan aktif ke server
    (`GET /api/rooms/active`). Akun yang masih bertanding dikembalikan ke `/game`, dari tab mana pun. Role dan izin
    tetap berasal dari snapshot backend, bukan storage browser.

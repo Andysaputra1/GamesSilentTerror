@@ -291,7 +291,7 @@ test('survei: jumlah pengisi, diagram per pertanyaan, dan isian tiap nama dibuka
   }); // prettier-ignore
   const [kemiripan, aspek, saran] = questions;
   const pengisi = {
-    total_submissions: 2,
+    total_submissions_all: 3, // satu kiriman lama budi tidak dikirim server
     total_people: 2,
     total_matches: 1,
     respondents: [
@@ -317,8 +317,15 @@ test('survei: jumlah pengisi, diagram per pertanyaan, dan isian tiap nama dibuka
   const doc = w.document;
   const teks = (daftar) => [...daftar].map((el) => el.textContent);
 
-  // Kotak jumlah: kiriman, orang, pertandingan.
-  assert.deepEqual(teks(doc.querySelectorAll('#survey-stats .metric strong')), ['2', '2', '1']);
+  // Kotak jumlah: orang dan pertandingan, plus catatan kiriman lama yang tidak ditampilkan.
+  assert.deepEqual(teks(doc.querySelectorAll('#survey-stats .metric small')), [
+    'Orang yang mengisi',
+    'Pertandingan',
+  ]);
+  assert.deepEqual(teks(doc.querySelectorAll('#survey-stats .metric strong')), ['2', '1']);
+  assert.deepEqual(teks(doc.querySelectorAll('#survey-stats .metric .hint')), [
+    '1 kiriman lama tidak ditampilkan (hanya kiriman terbaru tiap orang)',
+  ]);
 
   // Diagram: skala 1–5 dengan arti ujung, persentase dari jawaban pertanyaan itu.
   const diagram = [...doc.querySelectorAll('#survey-charts .survey-chart')];
@@ -373,9 +380,36 @@ test('survei kosong: jumlah 0 dan daftar pengisi memberi tahu belum ada yang men
   const doc = w.document;
   assert.deepEqual(
     [...doc.querySelectorAll('#survey-stats .metric strong')].map((s) => s.textContent),
-    ['0', '0', '0'],
+    ['0', '0'],
   );
+  assert.equal(doc.querySelector('#survey-stats .hint'), null);
   assert.match(doc.querySelector('#survey-respondent-rows').textContent, /Belum ada yang mengisi/);
+});
+
+test('survei: dua CSV, per orang (kiriman terbaru) dan semua kiriman', async (t) => {
+  const diminta = [];
+  const w = setup(t, (path) => {
+    if (!path.startsWith('/api/panel/survey/responses.csv')) return undefined;
+    diminta.push(path);
+    return { ok: true, status: 200, blob: async () => new w.Blob(['csv']) };
+  });
+  w.URL.createObjectURL = () => 'blob:csv';
+  w.URL.revokeObjectURL = () => {};
+  const diunduh = [];
+  w.HTMLAnchorElement.prototype.click = function () {
+    diunduh.push(this.download);
+  };
+  await login(w);
+  await w.document.querySelector('#download-survey').onclick({ preventDefault() {} });
+  await w.document.querySelector('#download-survey-all').onclick({ preventDefault() {} });
+  assert.deepEqual(diminta, [
+    '/api/panel/survey/responses.csv',
+    '/api/panel/survey/responses.csv?semua=true',
+  ]);
+  assert.deepEqual(diunduh, [
+    'survei-silent-terror-per-orang.csv',
+    'survei-silent-terror-semua-kiriman.csv',
+  ]);
 });
 
 test('urutan survei: seret, ▲▼, Alt+panah tersimpan; gagal simpan memulihkan urutan', async (t) => {

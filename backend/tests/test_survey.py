@@ -496,6 +496,21 @@ class SurveyExportTests(unittest.TestCase):
              "2", "Lainnya: lebih cepat", "", ""],
         ])  # fmt: skip
 
+    # Dua CSV: bawaannya kiriman terbaru tiap orang, semua=true memuat semua kiriman dengan nama berkas lain.
+    def test_csv_latest_per_person_by_default_and_all_submissions_on_request(self):
+        with patch("app.controllers.survey.survey_service.export_rows", return_value=[]) as ekspor:
+            terbaru = self.client.get("/api/panel/survey/responses.csv")
+            semua = self.client.get("/api/panel/survey/responses.csv?semua=true")
+        self.assertEqual(
+            [panggilan.kwargs for panggilan in ekspor.call_args_list],
+            [{"hanya_terbaru": True}, {"hanya_terbaru": False}],
+        )
+        self.assertIn('filename="survei_silent_terror.csv"', terbaru.headers["content-disposition"])
+        self.assertIn(
+            'filename="survei_silent_terror_semua_kiriman.csv"',
+            semua.headers["content-disposition"],
+        )
+
     # Semua awalan formula diamankan; teks biasa, angka, dan kosong tetap persis.
     def test_csv_escapes_every_formula_prefix_only(self):
         dasar = {"created_at": "2026-09-30 10:00:00", "room_code": "ABC123", "username": "alice",
@@ -517,8 +532,9 @@ class SurveyExportTests(unittest.TestCase):
         hasil = [r["saran: Saran?"] for r in csv.DictReader(io.StringIO(body))]
         self.assertEqual(hasil, ["'=SUM(A1)", "'+1", "'-2+3", "'@cmd", "'\tx", "biasa", "", "3"])
 
-    # Pengisi: jawaban dikelompokkan per kiriman (pertandingan + akun), terbaru dulu, teks pertanyaan dari
-    # salinan saat dijawab; jumlah kiriman, orang, dan pertandingan dihitung terpisah.
+    # Pengisi: SQL sudah menyaring kiriman terbaru tiap akun; service mengelompokkan jawaban per kiriman, terbaru
+    # dulu, teks pertanyaan dari salinan saat dijawab. Orang dan pertandingan dihitung dari kiriman yang tampil,
+    # total_submissions_all meneruskan jumlah semua kiriman (termasuk yang lama).
     def test_respondents_group_answers_per_submission_newest_first(self):
         salinan = '{"prompt": "Mirip manusia?", "kind": "scale", "scale_min": 1, "scale_max": 5, ' \
                   '"label_min": "Sangat tidak setuju", "label_max": "Sangat setuju"}'  # fmt: skip
@@ -531,26 +547,22 @@ class SurveyExportTests(unittest.TestCase):
             {**dasar, "created_at": datetime(2026, 11, 13, 4, 1), "match_id": "m1", "username": "budi",
              "question_id": 8, "code": "saran_masukan", "question_snapshot": {"prompt": "Saran?"},
              "value_number": None, "value_text": "seru"},
-            {**dasar, "created_at": datetime(2026, 11, 13, 5, 0), "match_id": "m2", "username": "budi",
+            {**dasar, "created_at": datetime(2026, 11, 13, 5, 0), "match_id": "m2", "username": "cici",
              "value_number": 5, "bots": None},
-            {**dasar, "created_at": datetime(2026, 11, 13, 4, 30), "match_id": "m1", "username": "cici",
-             "value_number": 2},
         ]  # fmt: skip
         nama = {"budi": "Budi Santoso"}  # cici tidak punya akun lagi: tampil sebagai username
-        with patch("app.services.survey_service.jalankan_transaksi", return_value=(rows, nama)):
+        with patch("app.services.survey_service.jalankan_transaksi", return_value=(rows, nama, 3)):
             hasil = SurveyService().respondents()
         self.assertEqual(
-            (hasil["total_submissions"], hasil["total_people"], hasil["total_matches"]), (3, 2, 2)
+            (hasil["total_submissions_all"], hasil["total_people"], hasil["total_matches"]),
+            (3, 2, 2),
         )
         kiriman = hasil["respondents"]
         self.assertEqual(
-            [(k["match_id"], k["username"]) for k in kiriman], [("m2", "budi"), ("m1", "cici"),
-                                                                ("m1", "budi")]
-        )  # fmt: skip
-        budi_m1 = kiriman[2]
-        self.assertEqual(
-            [k["display_name"] for k in kiriman], ["Budi Santoso", "cici", "Budi Santoso"]
+            [(k["match_id"], k["username"]) for k in kiriman], [("m2", "cici"), ("m1", "budi")]
         )
+        budi_m1 = kiriman[1]
+        self.assertEqual([k["display_name"] for k in kiriman], ["cici", "Budi Santoso"])
         self.assertEqual(budi_m1["created_at"], "2026-11-13T04:00:00")
         self.assertEqual(budi_m1["bots"], "NOX:fuzzy:santai")
         self.assertEqual(kiriman[0]["bots"], "")
@@ -572,9 +584,9 @@ class SurveyExportTests(unittest.TestCase):
                 TestClient(tanpa_login).get("/api/panel/survey/respondents").status_code, 401
             )
             service.respondents.assert_not_called()
-            service.respondents.return_value = {"total_submissions": 0, "respondents": []}
+            service.respondents.return_value = {"total_submissions_all": 0, "respondents": []}
             jawaban = self.client.get("/api/panel/survey/respondents")
-            self.assertEqual(jawaban.json(), {"total_submissions": 0, "respondents": []})
+            self.assertEqual(jawaban.json(), {"total_submissions_all": 0, "respondents": []})
             service.respondents.side_effect = PersistenceError("mati")
             self.assertEqual(self.client.get("/api/panel/survey/respondents").status_code, 503)
 
@@ -680,6 +692,13 @@ class SurveyOrderSqlTests(unittest.TestCase):
             self.assertEqual([kode for kode, _ in urutan()], ["aa", "bb", "cc"])
 
 
+# Tabel jawaban minimal untuk SQL ringkasan di SQLite (kolom yang dibaca query saja).
+SKEMA_JAWABAN_SQLITE = (
+    "CREATE TABLE survey_responses (match_id TEXT, username TEXT, question_id INT, "
+    "value_number INT, value_text TEXT, created_at TEXT)"
+)
+
+
 class SurveySummarySqlTests(unittest.TestCase):
     """SQL ringkasan dijalankan sungguhan (SQLite) agar semantik per metode teruji."""
 
@@ -687,10 +706,7 @@ class SurveySummarySqlTests(unittest.TestCase):
         engine = create_engine("sqlite://")
         with Session(engine) as database:
             database.execute(text("CREATE TABLE match_bots (match_id TEXT, method TEXT)"))
-            database.execute(text(
-                "CREATE TABLE survey_responses (match_id TEXT, question_id INT, value_number INT, "
-                "value_text TEXT)"
-            ))  # fmt: skip
+            database.execute(text(SKEMA_JAWABAN_SQLITE))
             bots = [
                 ("tunggal", "fuzzy"),
                 ("tunggal", "fuzzy"),
@@ -701,8 +717,48 @@ class SurveySummarySqlTests(unittest.TestCase):
                 database.execute(text("INSERT INTO match_bots VALUES (:m, :method)"),
                                  {"m": match_id, "method": method})  # fmt: skip
             for match_id, nilai in [("tunggal", 5), ("campur", 3), ("tanpa_bot", 1)]:
-                database.execute(text("INSERT INTO survey_responses VALUES (:m, 1, :v, NULL)"),
-                                 {"m": match_id, "v": nilai})  # fmt: skip
+                database.execute(
+                    text("INSERT INTO survey_responses VALUES (:m, :u, 1, :v, NULL, '2026-11-13')"),
+                    {"m": match_id, "u": "akun_" + match_id, "v": nilai},
+                )
             hasil = survey_queries.summary(database)
         per_metode = {row["method"]: (row["n"], row["rata"]) for row in hasil["per_method"]}
         self.assertEqual(per_metode, {"fuzzy": (1, 5.0), "campuran": (1, 3.0)})
+
+    # Satu akun mengisi di dua pertandingan: hanya kiriman terbarunya yang dihitung, dan bila waktunya seri,
+    # match_id terbesar yang dipakai. Kiriman lama tetap ada di tabel.
+    def test_only_latest_submission_per_account_counts(self):
+        engine = create_engine("sqlite://")
+        with Session(engine) as database:
+            database.execute(text("CREATE TABLE match_bots (match_id TEXT, method TEXT)"))
+            database.execute(text(SKEMA_JAWABAN_SQLITE))
+            for match_id in ("m1", "m2", "m3", "m4"):
+                database.execute(
+                    text("INSERT INTO match_bots VALUES (:m, 'fuzzy')"), {"m": match_id}
+                )
+            jawaban = [
+                # budi: m1 lama (nilai 1 + teks), m2 terbaru (nilai 5, teks kosong)
+                ("m1", "budi", 1, 1, None, "2026-11-13 04:00:00"),
+                ("m1", "budi", 2, None, "lama", "2026-11-13 04:00:05"),
+                ("m2", "budi", 1, 5, None, "2026-11-13 05:00:00"),
+                ("m2", "budi", 2, None, "", "2026-11-13 05:00:01"),
+                # cici: dua kiriman berwaktu sama, m4 (match_id lebih besar) yang dipakai
+                ("m3", "cici", 1, 2, None, "2026-11-13 06:00:00"),
+                ("m4", "cici", 1, 4, None, "2026-11-13 06:00:00"),
+            ]
+            for baris in jawaban:
+                database.execute(
+                    text("INSERT INTO survey_responses VALUES (:m, :u, :q, :v, :t, :w)"),
+                    dict(zip(("m", "u", "q", "v", "t", "w"), baris)),
+                )
+            hasil = survey_queries.summary(database)
+            semua_kiriman = survey_queries.count_submissions(database)
+        self.assertEqual(
+            sorted((b["question_id"], b["value_number"], b["n"]) for b in hasil["distribution"]),
+            [(1, 4, 1), (1, 5, 1)],
+        )
+        self.assertEqual(
+            [(b["method"], b["n"], b["rata"]) for b in hasil["per_method"]], [("fuzzy", 2, 4.5)]
+        )
+        self.assertEqual(hasil["text_answers"], [])
+        self.assertEqual(semua_kiriman, 4)
