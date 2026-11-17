@@ -34,7 +34,7 @@ sys.path.insert(0, str(BACKEND))
 from app.game import match_engine  # noqa: E402
 from app.bot import fuzzy_controller  # noqa: E402
 from app.bot.ingatan import Ingatan  # noqa: E402
-from app.bot.bot_controller import BrainRuntime  # noqa: E402
+from app.bot.bot_controller import BrainRuntime, keputusan_akhir  # noqa: E402
 from app.bot.nlu import NLUBersama, baca_chat  # noqa: E402
 from tests.palsu.nlu_palsu import NLUPalsu  # noqa: E402
 from app.bot.nlg.prompt import JUMLAH_CHAT_KONTEKS, buat_prompt, buat_prompt_tim  # noqa: E402
@@ -127,7 +127,8 @@ def game_putuskan(argumen):
             for k in range(1, langkah + 1):
                 for urutan, n in enumerate(sorted(otak)):
                     waktu = t + durasi * k / (langkah + 1) + urutan * 1e-6
-                    if not match.players[n].alive or match.phase == "finished":
+                    # Seperti penjadwal game: korban Hostage tidak melangkah lagi.
+                    if not match.players[n].alive or match.players[n].hostage or match.phase == "finished":
                         continue
                     ingatan = otak[n]
                     view = ingatan.sinkron_snapshot(match.snapshot(n), waktu)
@@ -162,6 +163,8 @@ def game_putuskan(argumen):
                             if npc.get("pindah"):
                                 match.cancel_action(n)
                             match.act(n, npc["action"], npc["target"])
+                        # Seperti game: keputusan yang sampai ke engine tanpa ditolak memakai saat terkunci.
+                        ingatan.catat_terkunci(view)
                         if hasil.get("nlg_tim"):
                             tim = tulis_chat_tim(hasil["nlg_tim"], nama, None, persona)
                             prompt_tim = buat_prompt_tim(hasil["nlg_tim"], persona)
@@ -216,7 +219,7 @@ def game_langkah(argumen):
                     jejak.append(baris(jumlah, seed, ronde, fase, k, "tamu", teks, tanpa_waktu(bacaan)))
                 for urutan, n in enumerate(sorted(otak)):
                     waktu = waktu_langkah + urutan * 1e-6
-                    if not match.players[n].alive or match.phase == "finished":
+                    if not match.players[n].alive or match.players[n].hostage or match.phase == "finished":
                         continue
                     bot = otak[n]
                     bot.langkah += 1
@@ -225,7 +228,6 @@ def game_langkah(argumen):
                     keputusan = {kunci: isi for kunci, isi in keputusan.items() if kunci != "waktu"}
                     jejak.append(baris(jumlah, seed, ronde, fase, k, n, view, keputusan, konteks))
                     npc = keputusan["npc_decision"]
-                    match.npc_decisions.add((ronde, fase, n))
                     try:
                         if npc["action"] == "vote":
                             if npc.get("pindah"):
@@ -236,6 +238,11 @@ def game_langkah(argumen):
                             if npc.get("pindah"):
                                 match.cancel_action(n)
                             match.act(n, npc["action"], match.username(npc["target"]))
+                        runtime.catat_terkunci(bot, view)
+                        # Seperti RoomService.pilihan_bot: "tunggu" dan pilihan yang ditolak tetap mendapat aksi
+                        # cadangan engine di akhir fase.
+                        if keputusan_akhir(keputusan):
+                            match.npc_decisions.add((ronde, fase, n))
                     except ValueError as error:
                         jejak.append(baris("ditolak", n, str(error)))
                     if keputusan.get("nlg_tim") is not None:

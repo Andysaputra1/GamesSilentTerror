@@ -45,10 +45,11 @@ def ch(ronde, fase, detik, pengirim, teks, intent="neutral", target=(), conf=0.9
                                             for p, r in pasangan]}
 
 
-# Menyusun ingatan bot sampai fase tertentu.
+# Menyusun ingatan bot sampai fase tertentu. peran hanya penanda skenario: Ingatan tidak menyimpan role (role bot dibaca
+# dari view).
 def buat_ingatan(chats=(), votes=(), eksekusi=(), sampai=(1, "day"), gag_bot=(), aksi_bot=(), bot=BOT_DEMO,
                  peran="civilian", intel=(), keluar=(), vote_bot=()):
-    ingatan = Ingatan(bot, jumlah_awal=len(PEMAIN_DEMO), peran=peran)
+    ingatan = Ingatan(bot, jumlah_awal=len(PEMAIN_DEMO))
     R, fase = sampai
     for r in range(1, R + 1):
         for f in ("day", "tribunal", "night"):
@@ -99,8 +100,7 @@ def buat_view(ronde, fase, detik, *, peran="civilian", mati=(), suara=None, bot=
             "rekan_spy": [], "aksi_rekan_spy": [], "korban_gag_tim": [], "rekan_manusia": [], "chat_tim": [],
             "hasil_sandera": []}
     saya.update(status)
-    return {"ronde": ronde, "fase": fase, "waktu": jam(ronde, fase, detik),
-            "deadline": jam(ronde, fase, DURASI_DEMO[fase]), "durasi": DURASI_DEMO,
+    return {"ronde": ronde, "fase": fase, "waktu": jam(ronde, fase, detik), "durasi": DURASI_DEMO,
             "pemain": [{"nama": p, "hidup": p not in mati, "sandera": (sandera or {}).get(p)} for p in PEMAIN_DEMO],
             "komposisi": {"hitman": hitman, "spy": spy, "stalker": 1, "civilian": len(PEMAIN_DEMO) - hitman - spy - 1},
             "hitman_tersisa": hitman_tersisa, "tribunal_tambahan": False, "saya": saya, "suara_tribunal": dict(suara or {})}

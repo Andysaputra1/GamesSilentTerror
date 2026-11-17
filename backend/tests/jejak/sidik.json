@@ -1,14 +1,14 @@
 {
   "a_putuskan": {
-    "total": "754d1f68d05aa5f12b03870b3fb020e20a3e783f7ba794fb7023ed8e7a42e856",
-    "baris": 7066
+    "total": "91959a2028cf6f21a2a2c605e8029cab48f3d5221fc229ec79e1fbab2600d325",
+    "baris": 5707
   },
   "b_templat": {
-    "total": "9c419413130d86e67323d4c4375257791efd8c9f81005b55a2fd3cea86596392",
-    "baris": 726
+    "total": "d4fd7f4dacfe20c19003099f84bbd6b27a658195165f61591da32a05009daa7a",
+    "baris": 732
   },
   "c_langkah": {
-    "total": "80be6e1ec828c9e86121a8cb725b7b22e419e28f4a2a5182a1e651e572c4a09c",
-    "baris": 2923
+    "total": "d467ea8c8972411b49313e1b61dc2761be50f8b7dd5bffaa13ca7bef27af8626",
+    "baris": 2519
   }
 }

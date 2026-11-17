@@ -933,7 +933,9 @@ test('checker: alur proses per item, langkah live, error, kondisi bot, dan antre
           },
         ],
       },
-      penulis: { thread: 3, tugas: [] },
+      penulis: { thread: 6, tugas: [] },
+      simulasi: { thread: 1, tugas: [] },
+      simulasi_penulis: { thread: 2, tugas: [] },
     },
   };
   const room = {
@@ -1139,14 +1141,18 @@ test('checker: alur proses per item, langkah live, error, kondisi bot, dan antre
   // Antrean: yang dikerjakan terang, yang menunggu berurutan, label room lain, dan teks kosong.
   const antrean = doc.querySelector('#checker-antrean');
   const tugas = [...antrean.querySelectorAll('.antrean-tugas')];
-  assert.equal(antrean.querySelectorAll('.antrean-baris').length, 2); // satu baris memanjang per thread
+  assert.equal(antrean.querySelectorAll('.antrean-baris').length, 4); // satu baris per eksekutor
   assert.ok(tugas[0].classList.contains('keadaan-sedang'));
   assert.match(
     tugas[0].textContent,
     /#1● dikerjakanIndoBERT membaca chat “aku curiga <img src=x onerror=alert\(1\)>” dari Kimberly/,
   );
   assert.match(tugas[1].textContent, /#2… menunggu.*room LAIN99.*ONYX berpikir \(NLU \+ Fuzzy\)/);
-  assert.match(antrean.textContent, /Thread penulis · 3 thread.*Tidak ada antrean\./);
+  assert.match(antrean.textContent, /Thread penulis · 6 thread.*Tidak ada antrean\./);
+  assert.match(
+    antrean.textContent,
+    /Thread simulasi · 1 thread.*Thread penulis simulasi · 2 thread/,
+  );
 
   // Semua isi server dipasang sebagai teks.
   assert.equal(doc.querySelector('#menu-checker img'), null);

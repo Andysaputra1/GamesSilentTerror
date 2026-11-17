@@ -150,6 +150,17 @@ class PindahkanVoteTests(unittest.TestCase):
             pindahkan_vote(game, "warga1", "warga3")
         self.assertEqual(game.votes["warga1"], "warga2")
 
+    # Target lama dan target baru sama-sama tidak sah lagi: suara lama tetap kembali beserta urutannya, dan pesan
+    # penolakan yang diteruskan milik suara baru.
+    def test_old_vote_returns_even_when_its_target_is_no_longer_valid(self):
+        game = tribunal()
+        game.vote("warga1", "warga2")
+        game.vote("hitman", "warga2")
+        game.players["warga2"].alive = game.players["warga3"].alive = False
+        with self.assertRaisesRegex(ValueError, "Target tidak valid"):
+            pindahkan_vote(game, "warga1", "warga3")
+        self.assertEqual(list(game.votes.items()), [("warga1", "warga2"), ("hitman", "warga2")])
+
 
 class KirimPindahTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
@@ -179,8 +190,9 @@ class KirimPindahTests(unittest.IsolatedAsyncioTestCase):
         keputusan = {"npc_decision": {"action": "vote", "target": target, "message": "", "pindah": True},
                      "rencana_vote": {"aksi": "vote", "target": target, "alasan": ["baru"], "pindah": True}}  # fmt: skip
         return self.service._kirim_vote_atau_aksi(
-            self.room.code, self.match, (self.match.id, 2, "tribunal"), self.otak, {"ronde": 2}, keputusan
-        )
+            self.room.code, self.match, (self.match.id, 2, "tribunal"), self.otak,
+            {"ronde": 2, "saya": {"saat_terkunci": False}}, keputusan,
+        )  # fmt: skip
 
     async def test_moved_vote_reaches_the_engine_and_the_memory(self):
         self.assertEqual(self.kirim("ECHO"), (True, None))

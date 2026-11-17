@@ -1,7 +1,7 @@
 """Pemahaman chat untuk bot: IndoBERT membaca intent lalu target, aturan nama menambah target neutral.
 
-Satu NLU dipakai bersama semua bot (NLUBersama): bacaan tiap chat disimpan di memo karena hasilnya sama untuk semua
-bot, dan inferensi model diserialkan supaya aman antar-thread. NLU tidak tahu soal fuzzy maupun socket; yang
+Satu NLU dipakai bersama semua bot (NLUBersama): bacaan tiap chat disimpan di memo per pertandingan karena hasilnya sama
+untuk semua bot, dan inferensi model diserialkan supaya aman antar-thread. NLU tidak tahu soal fuzzy maupun socket; yang
 memanggilnya adalah bot_controller.py dan pencatat NLU pertandingan.
 
 Alurnya
@@ -13,8 +13,8 @@ Alurnya
    2.2 Model 2 (NLUIndoBERT.target): satu teks pasangan per kandidat (buat_teks_pasangan) dengan 12 chat terakhir
        sebagai konteks
    2.3 Pesan neutral: pemain yang disebut namanya (pemain_disebut) menjadi target neutral
-3. Pencatat NLU (baca_chat) membaca chat pertandingan sekali, menyimpannya sebagai konteks chat berikutnya, dan
-   memberi ringkasan bacaan untuk checker dan riwayat chat panel
+3. Pencatat NLU (baca_chat) membaca chat pertandingan sekali, menyimpannya menurut urutan pesan sebagai konteks chat
+   berikutnya, dan memberi ringkasan bacaan untuk checker dan riwayat chat panel
 """
 
 from __future__ import annotations
@@ -26,6 +26,8 @@ import re
 import threading
 import time
 from collections import OrderedDict
+from contextlib import contextmanager
+from contextvars import ContextVar
 from functools import lru_cache
 from pathlib import Path
 
@@ -228,28 +230,51 @@ class NLUIndoBERT:
         return hasil or [{"pemain": "tidak_diketahui", "relasi": label_intent, "prob": None}]
 
 
+# Pertandingan yang sedang dibaca di thread ini; memo NLUBersama dipisah per pertandingan. None = di luar pertandingan
+# (tes dan alat ukur).
+MEMO_PERTANDINGAN: ContextVar[str | None] = ContextVar("memo_pertandingan", default=None)
+
+
+# Pakai memo milik satu pertandingan selama blok ini. Dipasang di dalam pekerjaan thread (langkah bot, pencatat NLU),
+# karena run_in_executor tidak membawa ContextVar pemanggilnya.
+@contextmanager
+def memo_pertandingan(match_id):
+    penanda = MEMO_PERTANDINGAN.set(match_id)
+    try:
+        yield
+    finally:
+        MEMO_PERTANDINGAN.reset(penanda)
+
+
 class NLUBersama:
-    """Satu NLU untuk semua bot: hasil disimpan (memo) dan inferensi model diserialkan."""
+    """Satu NLU untuk semua bot: hasil disimpan (memo per pertandingan) dan inferensi model diserialkan."""
 
     def __init__(self, nlu, sumber, maks=4096):
         self.nlu, self.sumber, self.maks = nlu, sumber, maks
         self.ambang = getattr(nlu, "ambang", 0.0)
         # Kata umum (pair_builder.json) untuk aturan nama di anotasi_chat: tidak pernah dianggap nama pemain.
         self.common_words = getattr(nlu, "common_words", frozenset())
-        self._memo = OrderedDict()
+        self._memo: dict[str | None, OrderedDict] = {}  # id pertandingan → memo bacaan
         self._lock = threading.Lock()
 
-    # Ambil dari memo atau hitung sekali; salinan dikembalikan agar ingatan bot tidak saling berbagi objek.
+    # Ambil dari memo pertandingan ini atau hitung sekali; salinan dikembalikan agar ingatan bot tidak saling berbagi
+    # objek. Memo hanya penghemat: bacaan yang dihitung ulang sama dengan bacaan di memo.
     # Alur: 1 kunci belum ada: hitung lalu simpan, buang yang paling lama bila memo penuh -> 2 tandai baru dipakai
     #       -> 3 kembalikan salinan
     def _ingat(self, kunci, hitung):
         with self._lock:
-            if kunci not in self._memo:
-                self._memo[kunci] = hitung()
-                if len(self._memo) > self.maks:
-                    self._memo.popitem(last=False)
-            self._memo.move_to_end(kunci)
-            return copy.deepcopy(self._memo[kunci])
+            memo = self._memo.setdefault(MEMO_PERTANDINGAN.get(), OrderedDict())
+            if kunci not in memo:
+                memo[kunci] = hitung()
+                if len(memo) > self.maks:
+                    memo.popitem(last=False)
+            memo.move_to_end(kunci)
+            return copy.deepcopy(memo[kunci])
+
+    # Buang memo satu pertandingan yang sudah selesai atau dibuang (room asli dan simulasi panel).
+    def lupakan(self, match_id):
+        with self._lock:
+            self._memo.pop(match_id, None)
 
     # Model 1 lewat memo. Roster ikut menjadi kunci, karena IndoBERT mengganti nama pemain sebelum membaca intent.
     def intent(self, teks, daftar_pemain=()):
@@ -358,20 +383,27 @@ def baca_chat_baru(nlu, ingatan, roster, dari):
 
 
 # Pencatat NLU: baca satu chat pertandingan seperti ingatan bot membacanya, dengan `riwayat` (milik pemanggil, urut
-# kronologis) sebagai konteks. Bacaannya sama dengan bacaan bot dan masuk memo NLU, jadi bot tidak menghitung ulang.
-# Target neutral (pemain yang diajak bicara) ikut dengan asalnya: IndoBERT dan/atau aturan nama.
+# id pesan) sebagai konteks. Bacaannya sama dengan bacaan bot dan masuk memo NLU, jadi bot tidak menghitung ulang.
+# id_chat = id pesan di pertandingan: chat yang baru dibaca sesudah chat yang lebih baru (mis. kalimat bot yang
+# disiarkan dulu) tetap masuk di urutan pesannya, dan konteksnya hanya chat sebelum id itu, sama dengan urutan ingatan
+# bot. Tanpa id_chat chat masuk di akhir. Target neutral (pemain yang diajak bicara) ikut dengan asalnya: IndoBERT
+# dan/atau aturan nama.
 # Hasil: bacaan beserta konteks (maks KONTEKS_MAKS chat sebelumnya) dan roster, untuk riwayat panel dan ekspor format
 # dataset (target sebagai {pemain, relasi}).
-# Alur: 1 salin konteks sebelum chat ini -> 2 anotasi_chat -> 3 chat masuk riwayat (maks 50) -> 4 susun ringkasan
-def baca_chat(nlu, riwayat, pengirim, teks, roster):
+# Alur: 1 posisi chat menurut id -> 2 salin konteks sebelum posisi itu -> 3 anotasi_chat -> 4 chat masuk riwayat
+#       (maks 50) -> 5 susun ringkasan
+def baca_chat(nlu, riwayat, pengirim, teks, roster, id_chat=None):
     mulai = time.perf_counter()
+    posisi = len(riwayat) if id_chat is None else sum(c.get("id", "") < id_chat for c in riwayat)
+    sebelum = riwayat[:posisi]
     konteks = [
         {"pengirim": c["pengirim"], "teks": c["teks"], "intent": c.get("intent"),
          "target": [{"pemain": t["pemain"], "relasi": t["relasi"]} for t in c.get("target", [])]}
-        for c in riwayat[-KONTEKS_MAKS:]
+        for c in sebelum[-KONTEKS_MAKS:]
     ]  # fmt: skip
-    chat = anotasi_chat(nlu, {"pengirim": pengirim, "teks": teks}, riwayat, list(roster))
-    riwayat.append(chat)
+    chat = {"pengirim": pengirim, "teks": teks, **({"id": id_chat} if id_chat is not None else {})}
+    chat = anotasi_chat(nlu, chat, sebelum, list(roster))
+    riwayat.insert(posisi, chat)
     del riwayat[:-50]
     return {"intent": chat["intent"], "confidence": round(chat["conf_intent"], 3),
             "target": [{"pemain": t["pemain"], "relasi": t["relasi"],

@@ -899,6 +899,19 @@ class DisplayNameTests(unittest.TestCase):
         self.assertEqual(labels["nox1"], "NOX (nox1)")  # tidak boleh menyamar jadi bot
         self.assertEqual((labels["NOX"], labels["ECHO"]), ("NOX", "ECHO"))
 
+    # Nama tampilan yang sama persis dengan label berpenanda pemain lain tidak membuat label kembar; username yang
+    # hanya beda huruf besar/kecil diberi nomor.
+    def test_display_name_copying_a_marked_label_stays_unique(self):
+        labels = label_unik(
+            {"alice": "NOX", "bob": "NOX (alice)", "carol": "nox (ALICE)"}, ["NOX", "ECHO"]
+        )
+        self.assertEqual(labels["alice"], "NOX (alice)")
+        self.assertEqual(labels["bob"], "NOX (alice) (bob)")
+        self.assertEqual(labels["carol"], "nox (ALICE) (carol)")
+        self.assertEqual(len({label.casefold() for label in labels.values()}), len(labels))
+        kembar = label_unik({"Ab": "X", "ab": "X"})
+        self.assertEqual(kembar, {"Ab": "X (Ab) 2", "ab": "X (ab) 3"})
+
     def test_bot_snapshot_uses_labels_and_targets_map_back(self):
         labels = {"andy88": "Andy Saputra", "budi": "Budi", "citra": "Citra", "NOX": "NOX"}
         match = Match(["andy88", "budi", "citra"], ["NOX"], labels=labels)

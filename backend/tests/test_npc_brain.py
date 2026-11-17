@@ -10,11 +10,12 @@ import time
 import unittest
 from unittest.mock import AsyncMock, Mock, patch
 
-from app.game.match_engine import Match
+from app.game.match_engine import Match, label_unik, snapshot_berlabel
 from app.bot import fuzzy as fuzzy_bot
+from app.bot import fuzzy_controller
 from app.bot import ingatan as ingatan_bot
 from app.bot.bot_controller import LANTAI_MAKS, BrainRuntime, NPCService, catat_nlu
-from app.bot.nlu import NLUBersama, baca_chat, baca_chat_baru
+from app.bot.nlu import NLUBersama, baca_chat, baca_chat_baru, memo_pertandingan
 from app.services.persistence_service import PersistenceError
 from app.services.room_service import RoomService
 from tests.palsu.bot_lobby import isi_kursi_bot
@@ -166,6 +167,62 @@ class BrainRuntimeTests(unittest.TestCase):
         self.assertEqual(hasil["konteks"][-1]["target"], [{"pemain": "NOX", "relasi": "offend"}])
         self.assertEqual(hasil["daftar_pemain"], roster)
         self.assertEqual(baca_chat(self.runtime.nlu, [], "human", "Halo.", roster)["konteks"], [])
+
+    # Pencatat NLU memakai urutan id pesan: chat yang dibaca terlambat masuk di urutannya, dan konteksnya hanya chat
+    # sebelum id itu (sama dengan ingatan bot), jadi kunci memonya sama.
+    def test_baca_chat_reads_a_late_chat_in_message_order(self):
+        roster, riwayat = ["human", "NOX", "ECHO", "VEIL"], []
+        baca_chat(self.runtime.nlu, riwayat, "human", "Aku curiga NOX.", roster, "000002aa")
+        terlambat = baca_chat(self.runtime.nlu, riwayat, "ECHO", "Halo semua.", roster, "000001aa")
+        self.assertEqual(terlambat["konteks"], [])
+        self.assertEqual([c["teks"] for c in riwayat], ["Halo semua.", "Aku curiga NOX."])
+        berikut = baca_chat(self.runtime.nlu, riwayat, "VEIL", "Vote NOX.", roster, "000003aa")
+        self.assertEqual([c["teks"] for c in berikut["konteks"]], ["Halo semua.", "Aku curiga NOX."])
+
+    # Memo NLU dipisah per pertandingan dan dibuang bersama pertandingannya; bacaannya tetap sama.
+    def test_nlu_memo_is_kept_per_match_and_forgotten_with_it(self):
+        model = Mock()
+        model.intent.return_value = ("offend", 0.9)
+        runtime = BrainRuntime()
+        self.addCleanup(runtime.tutup)
+        runtime.nlu = NLUBersama(model, "palsu")
+        for match_id in ("m1", "m1", "m2"):
+            with memo_pertandingan(match_id):
+                self.assertEqual(runtime.nlu.intent("Aku curiga NOX.", ["NOX"]), ("offend", 0.9))
+        self.assertEqual(model.intent.call_count, 2)  # m1 sekali, m2 sekali
+        runtime.lupakan_memo("m1")
+        self.assertEqual(set(runtime.nlu._memo), {"m2"})
+
+    # Ingatan mencatat ronde dan fase dari pesan: chat akhir Tribunal yang baru terlihat di siang berikutnya tetap
+    # tercatat sebagai chat Tribunal ronde itu.
+    def test_late_seen_chat_keeps_its_own_round_and_phase(self):
+        match = Match(["human"], ["NOX", "ECHO", "VEIL"], now=0.0)
+        match.round, match.phase = 2, "tribunal"
+        match.add_message("human", "Vote ECHO sekarang.", now=10.0)
+        match.round, match.phase = 3, "day"
+        ingatan = ingatan_bot.Ingatan("NOX")
+        ingatan.sinkron_snapshot(match.snapshot("NOX"), 20.0)
+        self.assertEqual((ingatan.chat[0]["ronde"], ingatan.chat[0]["fase"]), (2, "tribunal"))
+
+    # Nama tampilan "NOX (alice)" milik pemain lain dulu membuat dua pemain berlabel sama, dan otak Hitman serta Spy
+    # error di setiap langkah. Dengan label unik, keduanya memutuskan seperti biasa, siang maupun malam.
+    def test_hitman_and_spy_brains_work_when_a_name_copies_a_marked_label(self):
+        bots = ["ECHO", "NOX", "VEIL", "ASH"]
+        labels = label_unik({"alice": "NOX", "bob": "NOX (alice)"}, bots)
+        match = Match(["alice", "bob"], bots, rng=random.Random(3), labels=labels, now=0.0)
+        for nama, role in zip(["alice", "bob", *bots], ["civilian", "civilian", "hitman", "spy", "stalker",
+                                                      "civilian"]):  # fmt: skip
+            match.players[nama].role = role
+        ingatan = {b: ingatan_bot.Ingatan(b) for b in ("ECHO", "NOX")}
+        for waktu in (match.deadline - 10, None):
+            if waktu is None:
+                match.tick(match.deadline)  # malam ronde 1
+                waktu = match.deadline - 10
+            for nama, ing in ingatan.items():
+                view = ing.sinkron_snapshot(snapshot_berlabel(match.snapshot(nama), match.labels), waktu)
+                hasil = fuzzy_controller.putuskan(ing, view)
+                self.assertIn(hasil["npc_decision"]["action"], {"wait", "gag", "hostage", "guard"})
+        self.assertEqual(match.phase, "night")
 
     # NLU terpisah dari ingatan: chat baru dibaca berurutan dengan chat sebelumnya sebagai konteks. Bila NLU gagal di
     # tengah, chat yang belum terbaca keluar lagi dari ingatan dan dibaca ulang di langkah berikutnya.
@@ -399,7 +456,7 @@ class NPCServiceBrainTests(unittest.IsolatedAsyncioTestCase):
         self.match.round, self.match.phase = 2, "tribunal"
         self.match.deadline = time.time() + 60
         otak = self.runtime.otak_bot(self.match.id, "NOX")
-        fase, view = (self.match.id, 2, "tribunal"), {"ronde": 2}
+        fase, view = (self.match.id, 2, "tribunal"), {"ronde": 2, "saya": {"saat_terkunci": False}}
         keputusan = {
             "npc_decision": {"action": "vote", "target": "human", "message": ""},
             "rencana_vote": {"aksi": "vote", "target": "human", "alasan": ["Dia aneh."]},
@@ -424,6 +481,7 @@ class NPCServiceBrainTests(unittest.IsolatedAsyncioTestCase):
         self.match.begin()
         nox = self.runtime.otak_bot(self.match.id, "NOX")
         tuduh_ash = {"intent": "offend", "target": "ASH"}
+        self.service.lantai_fase[self.match.id] = (self.match.round, self.match.phase)  # lantai milik fase ini
         # Lantai penuh (LANTAI_MAKS bot sedang menulis) dan rencana kembar ditolak.
         penuh = {f"B{i}": ("neutral", f"P{i}") for i in range(LANTAI_MAKS)}
         self.service.lantai[self.match.id] = penuh
@@ -481,6 +539,63 @@ class NPCServiceBrainTests(unittest.IsolatedAsyncioTestCase):
         # Langkah selesai → tahap O di kartu setiap bot (I dan L sudah dilewati).
         tahap = {p["name"]: p.get("tahap") for p in self.match.snapshot("human")["players"]}
         self.assertEqual({nama: tahap[nama] for nama in langkah}, {nama: "O" for nama in langkah})
+
+    # Korban Hostage tidak bisa chat, vote, atau beraksi sampai pertandingan selesai: penjadwal melewatinya, snapshot
+    # bot tidak diberikan, dan panel tidak menampilkan hitung mundur langkahnya.
+    async def test_hostage_bot_takes_no_steps(self):
+        await self.service.prepare(self.room.code, self.match)
+        self.match.begin(now=time.time() - 30)
+        self.match.players["ECHO"].hostage, self.match.players["ECHO"].hostage_round = True, 1
+        with patch("app.bot.bot_controller.asyncio.sleep", AsyncMock()):
+            self.service.jalankan_bot_yang_sudah_waktunya()
+            await asyncio.gather(*list(self.service.tasks))
+        langkah = {nama: o.langkah for nama, o in self.runtime.pertandingan[self.match.id].items()}
+        self.assertEqual(langkah.pop("ECHO"), 0)
+        self.assertEqual(set(langkah.values()), {1})
+        self.assertIsNone(self.rooms.lihat_untuk_bot(self.room.code, self.match, "ECHO"))
+        kondisi = {k["nama"]: k for k in self.service.kondisi_bot(self.room.code)}
+        self.assertEqual(kondisi["ECHO"]["status"], "disandera")
+        self.assertIsNone(kondisi["ECHO"]["berikutnya_detik"])
+
+    # Snapshot bot hanya membawa kolom yang dibaca otak bot.
+    async def test_bot_snapshot_carries_only_the_columns_the_brain_reads(self):
+        await self.service.prepare(self.room.code, self.match)
+        self.match.begin()
+        _, snapshot, _ = self.rooms.lihat_untuk_bot(self.room.code, self.match, "NOX")
+        self.assertNotIn("events", snapshot)
+        self.assertNotIn("result", snapshot)
+        self.assertNotIn("skin_id", snapshot["players"][0])
+        self.assertNotIn("vote", snapshot["me"])
+        self.assertEqual(snapshot["me"]["name"], "NOX")
+
+    # Otak gagal dimuat saat persiapan: penjadwal mencoba memuat lagi, dan begitu otak siap, bot di pertandingan yang
+    # sudah berjalan mendapat otak lalu melangkah.
+    async def test_match_prepared_while_the_brain_failed_gets_brains_later(self):
+        runtime = BrainRuntime()
+        self.addCleanup(runtime.tutup)
+        # Baru gagal: mulai_memuat menunggu JEDA_MUAT_ULANG_DETIK sebelum mencoba lagi.
+        runtime._set(gagal=True, detail="gagal")
+        runtime._gagal_pada = time.monotonic()
+        service = NPCService(Mock(emit=AsyncMock()), runtime=runtime)
+        self.addAsyncCleanup(service.close)
+        await service.prepare(self.room.code, self.match)
+        self.match.begin(now=time.time() - 30)
+        self.assertIsNone(runtime.otak_bot(self.match.id, "NOX"))
+        with patch.object(runtime, "mulai_memuat") as muat:
+            service.jalankan_bot_yang_sudah_waktunya()
+        muat.assert_called_once()
+        self.assertIsNone(runtime.otak_bot(self.match.id, "NOX"))
+        runtime.penulis_npc.konfigurasi.penulis = "templat"
+        runtime.muat_sekarang(nlu=NLUBersama(NLUPalsu(r"curiga"), "cadangan"))
+        service.jalankan_bot_yang_sudah_waktunya()
+        self.assertIsNotNone(runtime.otak_bot(self.match.id, "NOX"))
+        await asyncio.gather(*list(service.tasks))
+        rows = self.survey.record_match_bots.call_args.args[0]
+        self.assertEqual(len(rows), 5)
+        with patch("app.bot.bot_controller.asyncio.sleep", AsyncMock()):
+            service.jalankan_bot_yang_sudah_waktunya()
+            await asyncio.gather(*list(service.tasks))
+        self.assertEqual(runtime.otak_bot(self.match.id, "NOX").langkah, 1)
 
     async def test_called_or_accused_bot_steps_promptly_and_answers_once(self):
         await self.service.prepare(self.room.code, self.match)

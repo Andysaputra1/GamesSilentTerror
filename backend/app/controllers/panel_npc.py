@@ -143,8 +143,8 @@ KODE_ALUR = {
     ],
     "nlu_pesan": [
         (NLU, "baca_chat", [
-            ("anotasi_chat(nlu, {", "fungsi anotasi yang sama dengan ingatan bot"),
-            ("riwayat.append(chat)", "chat ini menjadi konteks chat berikutnya"),
+            ("anotasi_chat(nlu, chat, sebelum", "fungsi anotasi yang sama dengan ingatan bot"),
+            ("riwayat.insert(posisi, chat)", "chat ini masuk di urutan id pesannya, menjadi konteks chat berikutnya"),
         ]),
         (NLU, "anotasi_chat", [
             ("nlu.intent(", "Model 1: intent + keyakinan"),
@@ -176,7 +176,7 @@ KODE_ALUR = {
     ],
     "nlu_memo": [
         (NLU, "NLUBersama._ingat", [
-            ("if kunci not in self._memo", "dihitung hanya bila belum ada di memo"),
+            ("if kunci not in memo", "dihitung hanya bila belum ada di memo pertandingan ini"),
             ("copy.deepcopy", "tiap bot mendapat salinan sendiri"),
         ]),
         (NLU, "NLUBersama.intent", [('("intent", teks, daftar)', "kunci memo: teks + daftar pemain")]),
@@ -349,7 +349,7 @@ KODE_ALUR = {
     "kirim": [
         (BOT, "BrainRuntime.catat_chat", [("catat_aksi_bot", "ingatan: bot sudah bicara (jeda antar-chat)")]),
         (BOT, "catat_nlu", [
-            ("baca_chat,", "kalimat bot dibaca NLU"),
+            ("baca_chat(runtime.nlu", "kalimat bot dibaca NLU"),
             ("otak.segera = True", "bot yang dipanggil/dituduh melangkah segera"),
             ("record_nlu", "bacaan disimpan untuk riwayat chat"),
         ]),

@@ -178,7 +178,12 @@ async def kirim_chat_pemain(sid: str, data: dict[str, Any]) -> None:
         if pertandingan:
             with measure(jejak, "nlu_ms"):
                 jejak["nlu"] = await catat_nlu(
-                    pertandingan, pengirim, pesan, jejak["message_id"], room_code=kode_room
+                    pertandingan,
+                    pengirim,
+                    pesan,
+                    jejak["message_id"],
+                    room_code=kode_room,
+                    id_chat=pesan_diterima["id"],
                 )
     finally:
         if jejak:

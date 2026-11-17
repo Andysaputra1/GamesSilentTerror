@@ -77,22 +77,29 @@ def phase_durations(count, quick=False):
 
 
 # Nama yang tampil di game = nama tampilan akun; username tetap ID engine. Nama yang bentrok (sesama
-# pemain, beda huruf besar/kecil saja, atau sama dengan nama bot) diberi penanda "(username)".
+# pemain, beda huruf besar/kecil saja, atau sama dengan nama bot) diberi penanda "(username)". Pemeriksaan
+# diulang sampai tidak ada label kembar, karena nama tampilan boleh sama persis dengan label berpenanda pemain
+# lain (mis. "NOX (alice)"); label kembar membuat otak bot membaca dua pemain sebagai satu.
+# Alur: 1 nama bersih -> 2 label kembar: beri penanda pada yang belum berpenanda -> 3 sisa kembar (semua sudah
+#       berpenanda): beri nomor -> 4 ulangi sampai semua label unik
 def label_unik(nama_tampilan, bots=()):
-    nama_bersih = {
+    labels = {
         username: (nama or "").strip() or username for username, nama in nama_tampilan.items()
     }
-    jumlah_nama = Counter(nama.casefold() for nama in nama_bersih.values())
-    nama_bot = {bot.casefold() for bot in bots}
-    labels = {
-        username: (
-            nama
-            if jumlah_nama[nama.casefold()] == 1 and nama.casefold() not in nama_bot
-            else f"{nama} ({username})"
-        )
-        for username, nama in nama_bersih.items()
-    }
-    return labels | {bot: bot for bot in bots}
+    bertanda = set()
+    while True:
+        jumlah = Counter(label.casefold() for label in [*labels.values(), *bots])
+        kembar = [username for username, label in labels.items() if jumlah[label.casefold()] > 1]
+        if not kembar:
+            return labels | {bot: bot for bot in bots}
+        belum_bertanda = [username for username in kembar if username not in bertanda]
+        for nomor, username in enumerate(belum_bertanda or kembar, 2):
+            labels[username] = (
+                f"{labels[username]} ({username})"
+                if belum_bertanda
+                else f"{labels[username]} {nomor}"
+            )
+            bertanda.add(username)
 
 
 # Salinan snapshot untuk otak bot: semua username diganti label, sehingga bot membaca dan menyebut nama yang
@@ -791,13 +798,16 @@ class Match:
     # now hanya diisi simulasi yang memakai jam buatan.
     def add_message(self, sender, message, now=None):
         # ID diawali nomor urut: otak bot mengurutkan chat dengan waktu lalu ID, jadi chat dengan
-        # waktu yang sama tetap kronologis (UUID murni membuat urutannya acak).
+        # waktu yang sama tetap kronologis (UUID murni membuat urutannya acak). Ronde dan fase pesan
+        # dibaca otak bot yang baru melihat chat ini di fase sesudahnya.
         self.jumlah_pesan += 1
         pesan = {
             "id": f"{self.jumlah_pesan:06d}{uuid4().hex[:10]}",
             "sender": sender,
             "message": message,
             "time": time.time() if now is None else now,
+            "round": self.round,
+            "phase": self.phase,
         }
         self.messages.append(pesan)
         self.messages = self.messages[-100:]

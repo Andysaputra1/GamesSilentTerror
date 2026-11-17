@@ -18,9 +18,10 @@ Alurnya
    6.3 Aksi: Kirim vote atau aksi rahasia ke game (pindah pilihan malam bila otak memintanya), lalu vote yang diterima
        masuk ingatan bot
    6.4 Chat tim: Bila ada rekan manusia, tulis kalimat dan simpan di kanal tim, tanpa database, siaran, atau NLU
-   6.5 Tulis chat: Minta giliran bicara, tulis kalimat (NLG), jeda mengetik, simpan chat
+   6.5 Tulis chat: Minta giliran bicara, tulis kalimat (NLG), jeda mengetik, simpan chat, lalu IndoBERT membaca
+       kalimat bot di latar
    6.6 Kirim: Siarkan chat ke room
-   6.7 Catat: Simpan jejak untuk panel checker, IndoBERT membaca kalimat bot
+   6.7 Catat: Simpan jejak untuk panel checker
 
 Chat manusia masuk lewat sockets/chat.py dan services/chat_service.py, lalu bacaannya dicatat catat_nlu di file ini.
 """
@@ -42,9 +43,12 @@ from typing import TYPE_CHECKING
 
 from app.bot import nlg_controller
 from app.bot.nlg.pengaturan import JamPenulis, PenulisNPC, tanpa_lapor
+from app.bot.nlg.penulis import BATAS_WAKTU_DETIK
 from app.bot.nlg.prompt import JUMLAH_CHAT_KONTEKS, buat_prompt
 from app.bot.nlg.templat import persona_bot
-from app.bot.nlu import NLUBersama, NLUIndoBERT, baca_chat, baca_chat_baru, folder_model
+from app.bot.nlu import (
+    NLUBersama, NLUIndoBERT, baca_chat, baca_chat_baru, folder_model, memo_pertandingan,
+)  # fmt: skip
 from app.bot.penjelasan import jelaskan
 from app.bot.penjelasan import lengkapi as lengkapi_penjelasan
 from app.bot.penjelasan import ringkas as ringkas_penjelasan
@@ -77,7 +81,8 @@ BATAS_TEMPLAT_DETIK = 10
 # Pemicu cepat: jarak minimal antar-langkah bot yang dipanggil/dituduh (langkah biasa: NPC_STEP_SECONDS).
 JEDA_SEGERA_DETIK = 1.0
 # Lantai bicara: bot per pertandingan yang boleh menyusun chat bersamaan. Dihitung per pertandingan, sedangkan
-# thread penulis (eksekutor_nlg, 3 thread) dipakai bersama semua room, jadi kalimat bisa antre di belakang room lain.
+# thread penulis (eksekutor_nlg, 6 thread) dipakai bersama semua room: dua room penuh bisa menulis bersamaan, room
+# ketiga antre. Thread penulis hampir selalu hanya menunggu jaringan LLM, jadi jumlahnya murah.
 LANTAI_MAKS = 3
 
 
@@ -117,7 +122,14 @@ class BrainRuntime:
         self._thread = None
         self._gagal_pada = None  # waktu (monotonic) pemuatan terakhir gagal; None = belum pernah gagal
         self.eksekutor_keputusan = EksekutorTercatat("otak", 1, thread_name_prefix="otak-npc")
-        self.eksekutor_nlg = EksekutorTercatat("penulis", 3, thread_name_prefix="nlg-npc")
+        self.eksekutor_nlg = EksekutorTercatat("penulis", 6, thread_name_prefix="nlg-npc")
+        # Simulasi panel memakai thread sendiri (berpikir dan IndoBERT satu thread, menulis kalimat dua thread), supaya
+        # simulasi tidak menahan langkah bot room live. Fuzzy dan memo NLU aman dipakai dua thread keputusan sekaligus
+        # (kunci di fuzzy/mesin.py dan NLUBersama).
+        self.eksekutor_simulasi = EksekutorTercatat("simulasi", 1, thread_name_prefix="sim-npc")
+        self.eksekutor_nlg_simulasi = EksekutorTercatat(
+            "simulasi_penulis", 2, thread_name_prefix="sim-nlg"
+        )
 
     # Ubah status muat otak di bawah kunci.
     def _set(self, **nilai):
@@ -238,11 +250,17 @@ class BrainRuntime:
         with self.lock:
             return self.pertandingan.get(match_id, {}).get(nama)
 
-    # Buang ingatan pertandingan yang sudah tidak aktif.
+    # Buang ingatan dan memo NLU pertandingan yang sudah tidak aktif.
     def lupakan_kecuali(self, match_ids):
         with self.lock:
             for match_id in [m for m in self.pertandingan if m not in match_ids]:
                 del self.pertandingan[match_id]
+                self.lupakan_memo(match_id)
+
+    # Memo NLU satu pertandingan dibuang; NLU titipan tes boleh tanpa memo.
+    def lupakan_memo(self, match_id):
+        if hasattr(self.nlu, "lupakan"):
+            self.nlu.lupakan(match_id)
 
     # Satu keputusan di thread otak: sinkron snapshot, NLU membaca chat baru, putuskan() metode bot, lalu penjelasan
     # untuk panel.
@@ -261,7 +279,8 @@ class BrainRuntime:
         mulai, jumlah_chat_sebelumnya = time.perf_counter(), len(bot.ingatan.chat)
         lapor("nlu")
         view = bot.ingatan.sinkron_snapshot(snapshot, sekarang)
-        baca_chat_baru(self.nlu, bot.ingatan, [p["nama"] for p in view["pemain"]], jumlah_chat_sebelumnya)
+        with memo_pertandingan(snapshot["id"]):
+            baca_chat_baru(self.nlu, bot.ingatan, [p["nama"] for p in view["pemain"]], jumlah_chat_sebelumnya)
         selesai_nlu = time.perf_counter()
         lapor("logika")
         keputusan = modul.putuskan(bot.ingatan, view)
@@ -335,18 +354,32 @@ class BrainRuntime:
     def catat_vote(self, bot: OtakBot, view, rencana):
         bot.ingatan.catat_vote_bot(view, rencana)
 
+    # Dipanggil setelah keputusan langkah sampai ke engine tanpa ditolak: saat terkunci malam ini terpakai.
+    def catat_terkunci(self, bot: OtakBot, view):
+        bot.ingatan.catat_terkunci(view)
+
     # Dipanggil setelah rencana chat tim dikerjakan: yang dicatat pemicunya, bukan kalimatnya.
     def catat_chat_tim(self, bot: OtakBot, view, rencana, terkirim):
         bot.ingatan.catat_chat_tim(view, rencana, terkirim)
 
-    # Server mati: hentikan thread keputusan dan penulis, lalu tutup koneksi rantai LLM.
+    # Server mati: hentikan thread keputusan, penulis, dan simulasi, lalu tutup koneksi rantai LLM.
     def tutup(self):
-        self.eksekutor_keputusan.shutdown(wait=False, cancel_futures=True)
-        self.eksekutor_nlg.shutdown(wait=False, cancel_futures=True)
+        for eksekutor in (self.eksekutor_keputusan, self.eksekutor_nlg, self.eksekutor_simulasi,
+                          self.eksekutor_nlg_simulasi):  # fmt: skip
+            eksekutor.shutdown(wait=False, cancel_futures=True)
         self.penulis_npc.tutup()
 
 
 brain_runtime = BrainRuntime()
+
+
+# Keputusan ini mengakhiri pilihan bot di fase ini: vote atau aksi dikirim, atau otak sengaja tidak bertindak (abstain,
+# tidak ada aksi yang bisa dipakai). "tunggu" belum akhir, karena langkah berikutnya masih bisa vote atau beraksi; aksi
+# cadangan engine di akhir fase tetap berlaku bila langkah itu gagal. Dipakai room asli dan simulasi panel.
+def keputusan_akhir(keputusan):
+    return keputusan["npc_decision"]["action"] != "wait" or "tunggu" not in (
+        keputusan["rencana_vote"]["aksi"], keputusan["rencana_aksi"]["aksi"],
+    )  # fmt: skip
 
 
 # Lama tiap tahap satu langkah bot (ms): NLU + sinkron ingatan, logika metode, penjelasan panel, lalu NLG
@@ -409,26 +442,39 @@ def isi_jejak(trace, match, otak, npc, rencana, tulisan, penolakan, durasi_ms, d
 # NLG dengan batas waktu. Jika penulis LLM terlalu lama, kalimat tetap dikirim dari templat agar
 # rencana bot tidak hilang. Thread LLM yang tertinggal selesai sendiri; rantai penulis mencatat
 # hasilnya (mis. mengistirahatkan jalur yang lambat) untuk kalimat berikutnya.
-# lapor(tahap): simulasi panel dan alur live Checker memantau tahap NLG (nlg, llm, aturan).
-# Alur: 1 tulis di thread NLG dengan batas BATAS_TULIS_DETIK -> 2 lewat batas: templat di thread bawaan -> 3 catat
-#       percobaan LLM yang melewati batas
-async def tulis_kalimat(runtime, otak, payload, konteks, lapor=None):
+# lapor(tahap): simulasi panel dan alur live Checker memantau tahap NLG (nlg, llm, aturan). eksekutor: thread penulis
+# lain (simulasi panel); bawaannya thread penulis room live. sisa_detik: sisa fase room live. Bila lebih pendek dari
+# batas satu panggilan LLM (BATAS_WAKTU_DETIK), jawaban LLM bisa datang sesudah fase berganti lalu dibuang, jadi
+# kalimat langsung ditulis templat; selain itu batas tunggu LLM tidak melewati sisa fase.
+# Alur: 1 sisa fase pendek: templat saja -> 2 tulis di thread NLG dengan batas BATAS_TULIS_DETIK (atau sisa fase)
+#       -> 3 lewat batas: templat di thread bawaan -> 4 catat percobaan LLM yang dilewati atau melewati batas
+async def tulis_kalimat(runtime, otak, payload, konteks, lapor=None, eksekutor=None, sisa_detik=None):
     loop = asyncio.get_running_loop()
     tulis = runtime.tulis if lapor is None else partial(runtime.tulis, lapor=lapor)
+    pakai_llm = sisa_detik is None or sisa_detik >= BATAS_WAKTU_DETIK
+    batas_detik = (
+        BATAS_TULIS_DETIK
+        if sisa_detik is None
+        else min(BATAS_TULIS_DETIK, round(max(1.0, sisa_detik - 2), 1))
+    )
     try:
-        return await asyncio.wait_for(
-            loop.run_in_executor(runtime.eksekutor_nlg, tulis, otak, payload, konteks),
-            timeout=BATAS_TULIS_DETIK,
-        )
+        tulisan = await asyncio.wait_for(
+            loop.run_in_executor(eksekutor or runtime.eksekutor_nlg, tulis, otak, payload, konteks,
+                                 pakai_llm),
+            timeout=batas_detik,
+        )  # fmt: skip
+        if pakai_llm or runtime.penulis_npc.dipakai() is None:
+            return tulisan
+        dilewati = {"sumber": "llm", "status": f"dilewati: sisa fase {sisa_detik:.0f} detik"}
+        return {**tulisan, "percobaan": [dilewati, *tulisan["percobaan"]]}
     except TimeoutError:
-        logger.warning("Kalimat %s melewati %s detik; memakai templat.", otak.nama,
-                       BATAS_TULIS_DETIK)  # fmt: skip
+        logger.warning("Kalimat %s melewati %s detik; memakai templat.", otak.nama, f"{batas_detik:g}")
     # Thread bawaan, bukan eksekutor NLG: jangan antre di belakang panggilan LLM yang tertahan.
     tulisan = await asyncio.wait_for(
         asyncio.to_thread(tulis, otak, payload, konteks, False),
         timeout=BATAS_TEMPLAT_DETIK,
     )
-    batas = {"sumber": "llm", "status": f"melewati batas {BATAS_TULIS_DETIK} detik"}
+    batas = {"sumber": "llm", "status": f"melewati batas {batas_detik:g} detik"}
     return {**tulisan, "percobaan": [batas, *tulisan["percobaan"]]}
 
 
@@ -449,7 +495,7 @@ async def tulis_kalimat_tim(runtime, otak, payload, roster, sisa_detik):
     )
 
 
-# Riwayat pencatat NLU per pertandingan (konteks target, urut kronologis); dibuang saat pertandingan usai.
+# Riwayat pencatat NLU per pertandingan (konteks target, urut id pesan); dibuang saat pertandingan usai.
 riwayat_nlu: dict[str, list] = {}
 
 
@@ -460,25 +506,25 @@ def roster_label(match):
 
 # Pencatat NLU: baca satu chat pertandingan dengan IndoBERT di thread keputusan (urut dengan langkah bot), simpan
 # bacaannya ke riwayat chat, dan kembalikan hasilnya (None bila otak belum siap atau gagal). Dipakai chat manusia
-# (services/chat_service.py) dan chat bot (brain_turn).
+# (services/chat_service.py) dan chat bot (brain_turn). id_chat = id pesan di pertandingan: riwayat diurutkan menurut
+# id ini dan memo NLU pertandingan ini dipakai, jadi kunci memonya sama dengan bacaan ingatan bot.
 # Alur: 1 otak belum siap: None -> 2 nlu.baca_chat di thread keputusan -> 3 bangunkan bot yang dipanggil/dituduh
 #       -> 4 simpan bacaan ke pesan di MySQL
-async def catat_nlu(match, pengirim, teks, message_id=None, runtime=brain_runtime, room_code=None):
+async def catat_nlu(match, pengirim, teks, message_id=None, runtime=brain_runtime, room_code=None,
+                    id_chat=None):  # fmt: skip
     if runtime.nlu is None or not runtime.modul:
         return None
     riwayat = riwayat_nlu.setdefault(match.id, [])
     label = match.labels.get(pengirim, pengirim)
+    roster = roster_label(match)
+
+    def baca():
+        with memo_pertandingan(match.id):
+            return baca_chat(runtime.nlu, riwayat, label, teks, roster, id_chat)
+
     try:
         with label_antrean(room_code, label, "IndoBERT membaca chat", teks):
-            tugas = asyncio.get_running_loop().run_in_executor(
-                runtime.eksekutor_keputusan,
-                baca_chat,
-                runtime.nlu,
-                riwayat,
-                label,
-                teks,
-                roster_label(match),
-            )
+            tugas = asyncio.get_running_loop().run_in_executor(runtime.eksekutor_keputusan, baca)
         nlu = await tugas
     except Exception:
         logger.exception("NLU chat gagal dicatat.")
@@ -512,8 +558,10 @@ class NPCService:
         self.tasks = set()
         self.preparing = set()
         self.runtime = runtime or brain_runtime
-        # Lantai bicara: match_id → {bot yang sedang menyusun/mengetik chat: (intent, target) rencananya}.
+        # Lantai bicara: match_id → {bot yang sedang menyusun/mengetik chat: (intent, target) rencananya}, dan fase
+        # (ronde, fase) tempat isinya diambil.
         self.lantai: dict[str, dict[str, tuple]] = {}
+        self.lantai_fase: dict[str, tuple] = {}
 
     # Jalankan coroutine sebagai task yang dilacak agar bisa dibatalkan saat shutdown.
     def _spawn(self, coroutine):
@@ -535,6 +583,13 @@ class NPCService:
         if lama_fase_berjalan < waktu_mulai or match.deadline - waktu_sekarang < 1.0:
             return False
         return waktu_sekarang - otak.langkah_terakhir >= jeda
+
+    # Metode dan persona bot pertandingan dicatat ke arsip survei di thread latar.
+    async def _arsipkan_bot(self, rows):
+        try:
+            await asyncio.to_thread(survey_service.record_match_bots, rows)
+        except PersistenceError:
+            logger.warning("Metode bot tidak tersimpan ke database (migrasi V7?).")
 
     # Layar persiapan: tunggu otak siap, bagi persona per bot, lalu buka ronde 1.
     # Alur: 1 mulai memuat otak -> 2 salin progres ke layar persiapan sampai siap atau gagal -> 3.1 siap: siapkan otak
@@ -558,22 +613,36 @@ class NPCService:
             rows = self.runtime.siapkan_pertandingan(match, code)
             if rows:
                 detail = f"AI siap: {len(rows)} bot."
-                try:
-                    await asyncio.to_thread(survey_service.record_match_bots, rows)
-                except PersistenceError:
-                    logger.warning("Metode bot tidak tersimpan ke database (migrasi V7?).")
+                await self._arsipkan_bot(rows)
             room_service.ai_siap(match, detail)
         except Exception:
             logger.exception("Persiapan otak NPC gagal.")
             room_service.ai_siap(match, "Persiapan AI gagal; bot memakai aksi cadangan engine.")
 
-    # Vote/aksi rahasia diterapkan segera lewat room_service; vote yang diterima masuk ingatan bot.
-    # Hasil: (masih berlaku, pesan penolakan engine atau None).
+    # Pertandingan yang dimulai saat otak gagal dimuat belum punya otak bot. Pemuatan dicoba lagi (mulai_memuat menjaga
+    # jeda JEDA_MUAT_ULANG_DETIK), dan begitu otak siap, otak tiap bot disiapkan di tengah pertandingan lalu dicatat ke
+    # arsip survei. Sampai itu bot memakai aksi cadangan engine. Dipanggil penjadwal di dalam room_service.lock.
+    # Alur: 1 otak gagal: coba muat lagi -> 2 otak siap: siapkan otak bot dan catat ke arsip
+    def _siapkan_ulang(self, code, match):
+        if self.runtime.status["gagal"]:
+            self.runtime.mulai_memuat()
+        elif self.runtime.status["siap"]:
+            rows = self.runtime.siapkan_pertandingan(match, code)
+            if rows:
+                self._spawn(self._arsipkan_bot(rows))
+
+    # Vote/aksi rahasia diterapkan segera lewat room_service; vote yang diterima masuk ingatan bot, dan keputusan yang
+    # sampai ke engine tanpa ditolak memakai saat terkunci malam ini. Hasil: (masih berlaku, pesan penolakan engine atau
+    # None).
     def _kirim_vote_atau_aksi(self, code, match, fase, otak, view, keputusan):
         keputusan_aksi = keputusan["npc_decision"]
-        masih_berlaku, penolakan = room_service.pilihan_bot(code, match, fase, otak.nama, keputusan_aksi)
-        if masih_berlaku and penolakan is None and keputusan_aksi["action"] == "vote":
-            self.runtime.catat_vote(otak, view, keputusan["rencana_vote"])
+        masih_berlaku, penolakan = room_service.pilihan_bot(
+            code, match, fase, otak.nama, keputusan_aksi, keputusan_akhir(keputusan)
+        )
+        if masih_berlaku and penolakan is None:
+            if keputusan_aksi["action"] == "vote":
+                self.runtime.catat_vote(otak, view, keputusan["rencana_vote"])
+            self.runtime.catat_terkunci(otak, view)
         return masih_berlaku, penolakan
 
     # Chat tim rahasia, jadi tanpa lantai bicara, database, siaran, NLU, atau @traced (lihat room_service.chat_tim_bot).
@@ -590,19 +659,29 @@ class NPCService:
         status = "terkirim" if terkirim else "tidak terkirim" if teks else "kosong"
         return {"status": status, "panjang": len(teks)}
 
+    # Lantai bicara hanya berlaku di fase tempat tempatnya diambil. Saat fase berganti, penyusun fase lama dilepas
+    # (kalimatnya pasti dibuang chat_bot), supaya bot di fase baru tidak ditolak karena lantai penuh atau rencana kembar
+    # milik fase lama. Dipanggil di dalam room_service.lock. Hasil: penyusun fase ini {bot: (intent, target)}.
+    def _lantai_fase_ini(self, match):
+        fase = (match.round, match.phase)
+        if self.lantai_fase.get(match.id) != fase:
+            self.lantai.pop(match.id, None)
+            self.lantai_fase[match.id] = fase
+        return self.lantai.get(match.id, {})
+
     # Lantai bicara: paling banyak LANTAI_MAKS bot menyusun/mengetik chat bersamaan per pertandingan (LLM menulis
     # paralel). Ditolak bila lantai penuh, bila bot lain sedang menulis rencana kembar (intent dan target sama: tidak
     # ada tuduhan atau pertanyaan serentak yang sama), atau bila rencana dibuat sebelum chat bot lain masuk. Bot yang
     # ditolak memutuskan ulang di langkah berikutnya dengan chat terbaru.
-    # Alur: 1 lantai penuh atau rencana kembar: tolak -> 2 ada chat bot lain sesudah yang dilihat: tolak -> 3 ambil
-    #       tempat di lantai dan tampilkan awan berpikir
+    # Alur: 1 lepas lantai fase lama -> 2 lantai penuh atau rencana kembar: tolak -> 3 ada chat bot lain sesudah yang
+    #       dilihat: tolak -> 4 ambil tempat di lantai dan tampilkan awan berpikir
     def _ambil_giliran_bicara(self, match, otak, id_chat_terakhir_dilihat, rencana_chat):
-        penyusun = self.lantai.get(match.id, {})
+        with room_service.lock:
+            penyusun = self._lantai_fase_ini(match)
+            pesan = list(match.messages)
         niat = (rencana_chat.get("intent"), rencana_chat.get("target"))
         if len(penyusun) >= LANTAI_MAKS or niat in penyusun.values():
             return False
-        with room_service.lock:
-            pesan = list(match.messages)
         semua_id = [m["id"] for m in pesan]
         pesan_baru = (
             pesan[semua_id.index(id_chat_terakhir_dilihat) + 1 :]
@@ -620,8 +699,8 @@ class NPCService:
     # Untuk panel Checker, tahap yang sedang berjalan dilaporkan ke checker_service (alur live, lapor), lama antre dan
     # jeda ikut ke timings jejak, dan langkah yang error dicatat dengan jenis, pesan singkat, dan tahap gagalnya.
     # Alur: 1 lihat snapshot milik bot -> 2 berpikir di thread keputusan (NLU, fuzzy, penjelasan) -> 3 vote/aksi ke
-    #       game -> 4 chat tim -> 5 giliran bicara, tulis kalimat, jeda mengetik, simpan chat -> 6 jejak checker,
-    #       siaran chat, NLU membaca kalimat bot -> 7 selesai: lepas lantai bicara, bot tidak sibuk
+    #       game -> 4 chat tim -> 5 giliran bicara, tulis kalimat, jeda mengetik, simpan chat, NLU membaca kalimat
+    #       bot di latar -> 6 jejak checker, siaran chat -> 7 selesai: lepas lantai bicara, bot tidak sibuk
     #       \> 1.2 / 3.2 room berganti, bot tersingkir, atau fase berganti selama berpikir: berhenti [lanjut 7]
     async def brain_turn(self, code, match, otak):
         waktu_mulai = perf_counter()
@@ -686,8 +765,9 @@ class NPCService:
                 penulis = "LLM" if self.runtime.penulis_npc.dipakai() is not None else "templat"
                 with label_antrean(code, otak.nama, f"menulis kalimat ({penulis})"):
                     kalimat = await tulis_kalimat(
-                        self.runtime, otak, keputusan["nlg"], konteks, lapor=lapor
-                    )
+                        self.runtime, otak, keputusan["nlg"], konteks, lapor=lapor,
+                        sisa_detik=match.deadline - time.time(),
+                    )  # fmt: skip
                 # Jeda mengetik: balasan instan terasa seperti mesin.
                 lama_mengetik = min(4.0, max(1.0, len(kalimat["teks"]) / 30))
                 lapor("ketik")
@@ -701,8 +781,15 @@ class NPCService:
                 )
                 if pesan_terkirim:
                     self.runtime.catat_chat(otak, view, rencana_chat, kalimat["teks"])
+                    # NLU membaca kalimat ini di latar, sebelum siaran dan arsip jejak: chat yang masuk sesudahnya
+                    # terbaca sesudah kalimat ini, sama dengan urutan ingatan bot (kunci memo NLU sama). Lantai bicara
+                    # tidak ditahan selama NLU membaca.
+                    self._spawn(
+                        catat_nlu(match, otak.nama, pesan_terkirim["message"], id_pesan, self.runtime,
+                                  code, pesan_terkirim["id"])
+                    )  # fmt: skip
 
-            # 6 jejak untuk panel checker (tanpa role pemain lain), siaran chat, bacaan IndoBERT
+            # 6 jejak untuk panel checker (tanpa role pemain lain), lalu siaran chat
             tahap = "jejak"
             lapor("jejak")  # alur live: simpan_ms berhenti di sini
             jejak = None
@@ -755,13 +842,6 @@ class NPCService:
                     await asyncio.to_thread(PersistenceService(code).record_trace, jejak)
                 except PersistenceError:
                     pass  # gagal simpan tidak menghentikan bot; jejak tetap ada di memori checker
-            # Di latar: lantai bicara tidak ditahan selama NLU membaca kalimat ini.
-            if pesan_terkirim:
-                self._spawn(
-                    catat_nlu(
-                        match, otak.nama, pesan_terkirim["message"], id_pesan, self.runtime, code
-                    )
-                )
         except Exception as error:
             gagal, hasil_langkah, jenis_error = True, "error", type(error).__name__
             logger.exception("Langkah otak %s gagal.", otak.nama)
@@ -790,9 +870,14 @@ class NPCService:
                     "chat_tim": BATAS_TEMPLAT_DETIK,
                 }.get(tahap)  # fmt: skip
         finally:
-            # 7 selesai, juga saat error: alur live ditutup, lepas giliran bicara, dan tandai bot tidak sibuk.
+            # 7 selesai, juga saat error: alur live ditutup, lepas giliran bicara, dan tandai bot tidak sibuk. Alur live
+            # ditutup lebih dulu supaya waktu selesainya lebih awal dari langkah_terakhir (dibaca kondisi_bot), tetapi
+            # dibungkus try: error di catatan panel tidak boleh membuat bot macet sibuk.
             if langkah_live is not None:
-                checker_service.selesai_langkah(langkah_live, hasil_langkah, jenis_error)
+                try:
+                    checker_service.selesai_langkah(langkah_live, hasil_langkah, jenis_error)
+                except Exception:
+                    logger.exception("Alur live langkah %s gagal ditutup.", otak.nama)
             penyusun = self.lantai.get(match.id, {})
             if sedang_bicara and penyusun.pop(otak.nama, None) is not None and not penyusun:
                 del self.lantai[match.id]
@@ -817,7 +902,7 @@ class NPCService:
             berjalan = not match.winner and match.ai_controlled and match.phase not in ("preparing", "finished")
             lama_fase_berjalan = match.phase_length() - (match.deadline - waktu_sekarang)
             nama_bot_hidup = sorted(p.name for p in match.players.values() if p.bot and p.alive)
-            lantai = self.lantai.get(match.id, {})
+            lantai = self._lantai_fase_ini(match)
             daftar = []
             for peserta in sorted((p for p in match.players.values() if p.bot), key=lambda p: p.name):
                 otak = self.runtime.otak_bot(match.id, peserta.name)
@@ -827,7 +912,7 @@ class NPCService:
                     else "dibungkam" if peserta.gagged else "aktif"
                 )  # fmt: skip
                 berikutnya = None
-                if berjalan and otak is not None and peserta.alive and not otak.sibuk:
+                if berjalan and otak is not None and peserta.alive and not peserta.hostage and not otak.sibuk:
                     waktu_mulai, jeda = self._jadwal_langkah(
                         otak, match, nama_bot_hidup.index(peserta.name)
                     )
@@ -861,7 +946,9 @@ class NPCService:
     # Dipanggil jam permainan tiap 0,5 detik: menyuruh bot yang sudah waktunya melangkah, tanpa menunggu manusia
     # mengirim chat.
     # Alur: 1 cari pertandingan yang masih berjalan -> 2 buang data pertandingan yang sudah selesai -> 3.1 persiapan:
-    #       siapkan otak bot sekali -> 3.2 fase berjalan: jalankan brain_turn untuk bot yang sudah waktunya
+    #       siapkan otak bot sekali -> 3.2 fase berjalan: jalankan brain_turn untuk bot yang sudah waktunya (korban
+    #       Hostage dilewati)
+    #       \> 3.2.2 pertandingan tanpa otak bot: _siapkan_ulang
     def jalankan_bot_yang_sudah_waktunya(self):
         waktu_sekarang = time.time()
         with room_service.lock:
@@ -872,8 +959,10 @@ class NPCService:
             # Data pertandingan yang sudah selesai dibuang, supaya memori server tidak penuh.
             self.preparing &= id_pertandingan_aktif
             self.lantai = {m: bot for m, bot in self.lantai.items() if m in id_pertandingan_aktif}
+            self.lantai_fase = {m: f for m, f in self.lantai_fase.items() if m in id_pertandingan_aktif}
             for match_id in [m for m in riwayat_nlu if m not in id_pertandingan_aktif]:
                 del riwayat_nlu[match_id]
+                self.runtime.lupakan_memo(match_id)
             self.runtime.lupakan_kecuali(id_pertandingan_aktif)
 
             for room in list(room_service.rooms.values()):
@@ -889,9 +978,17 @@ class NPCService:
                 lama_fase_berjalan = match.phase_length() - (match.deadline - waktu_sekarang)
                 nama_bot_hidup = sorted(p.name for p in match.players.values() if p.bot and p.alive)
                 for urutan, nama in enumerate(nama_bot_hidup):
+                    if match.players[nama].hostage:
+                        # Korban Hostage tidak bisa chat, vote, atau beraksi sampai pertandingan selesai, jadi
+                        # langkahnya tidak menghasilkan apa pun; thread otak tidak dibebani. Urutannya tetap dihitung
+                        # agar jadwal bot lain tidak bergeser.
+                        continue
                     otak = self.runtime.otak_bot(match.id, nama)
                     if otak is None:
-                        continue  # otak gagal dimuat: engine mengisi aksi cadangan di deadline
+                        # Otak gagal dimuat saat persiapan: engine mengisi aksi cadangan di deadline sampai otak
+                        # pertandingan ini berhasil disiapkan.
+                        self._siapkan_ulang(room.code, match)
+                        break
                     if not otak.sibuk and self._sudah_waktunya_melangkah(
                         otak, match, lama_fase_berjalan, waktu_sekarang, urutan
                     ):

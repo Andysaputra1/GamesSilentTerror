@@ -2213,10 +2213,12 @@ function nlgTab(p) {
   return box;
 }
 // ANTREAN THREAD (kotak paling bawah): pekerjaan yang menunggu atau sedang dikerjakan di thread otak dan thread penulis
-// semua room, dari registri EksekutorTercatat di server.
+// semua room, serta thread simulasi panel, dari registri EksekutorTercatat di server.
 const ANTREAN_JUDUL = {
   otak: ['Thread otak', 'langkah berpikir bot dan IndoBERT membaca chat'],
   penulis: ['Thread penulis', 'menulis kalimat bot (LLM atau templat)'],
+  simulasi: ['Thread simulasi', 'simulasi panel: langkah berpikir bot dan IndoBERT membaca chat'],
+  simulasi_penulis: ['Thread penulis simulasi', 'simulasi panel: menulis kalimat bot'],
 };
 // Satu kotak pekerjaan: urutan, status, room (bila beda room), siapa mengerjakan apa, dan lamanya (berdetak).
 function kotakAntrean(t, room) {

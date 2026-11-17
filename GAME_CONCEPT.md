@@ -344,11 +344,13 @@ untuk analisis survei. Letak kodenya di [CODE_GUIDE.md](CODE_GUIDE.md#otak-bot-d
   sekali per panggilan, tetap lewat jatah, jeda, dan lantai bicara.
 - Vote dan aksi rahasia diterapkan begitu diputuskan. Kalimat melewati **lantai bicara**: dalam satu pertandingan
   paling banyak 3 bot (`LANTAI_MAKS`) menyusun dan "mengetik" bersamaan, jadi permintaan ke LLM dikirim paralel.
-  Lantai ini dihitung per pertandingan, sedangkan tiga thread penulis dipakai bersama semua room, jadi kalimat bisa
-  antre di belakang room lain. Bot tidak ikut menulis bila bot lain sedang menulis rencana kembar (intent dan target
-  sama). Rencana chat yang dibuat sebelum chat bot lain masuk dibatalkan, lalu bot memutuskan ulang dengan chat
-  terbaru. Rencana yang ditunda tetap
-  tercatat di panel beserta masukan NLG-nya. Chat manusia tidak pernah ditahan.
+  Lantai ini dihitung per pertandingan dan per fase: saat fase berganti, penyusun fase lama dilepas. Enam thread
+  penulis dipakai bersama semua room, jadi dua room penuh bisa menulis bersamaan dan room ketiga antre. Bot tidak ikut
+  menulis bila bot lain sedang menulis rencana kembar (intent dan target sama). Rencana chat yang dibuat sebelum chat
+  bot lain masuk dibatalkan, lalu bot memutuskan ulang dengan chat terbaru. Rencana yang ditunda tetap tercatat di
+  panel beserta masukan NLG-nya. Chat manusia tidak pernah ditahan.
+- Bila sisa fase lebih pendek dari batas satu panggilan LLM (20 detik), kalimat langsung ditulis templat, karena
+  jawaban LLM bisa datang sesudah fase berganti lalu dibuang. Selain itu batas tunggu LLM tidak melewati sisa fase.
 - Selama menulis, kartu bot menampilkan awan berpikir 🤔 (`players[].thinking`); awan hilang begitu kalimatnya muncul.
 - Kiri bawah kartu bot yang masih hidup menampilkan huruf tahap langkah terakhirnya (`players[].tahap`): **I**
   snapshot (input) sudah diterima, **L** logika dan penyusunan kalimat sedang berjalan, **O** output atau aksi
@@ -359,9 +361,14 @@ untuk analisis survei. Letak kodenya di [CODE_GUIDE.md](CODE_GUIDE.md#otak-bot-d
 - Bot tidak menunggu manusia bicara: satu bot membuka diskusi, dan bila ruangan hening (tidak ada chat selama ≥
   max(15 detik, 20% durasi fase), sekitar 24 detik di siang standar 6 pemain) bot boleh memancing percakapan lagi atau
   mengajak pemain yang belum bicara. Bot tetap tidak menuduh tanpa bukti.
-- Keputusan diterapkan hanya bila ronde dan fase belum berganti; aksi yang ditolak engine tidak mengubah state. Begitu
-  otak memegang fase tertentu, "tunggu" atau abstain miliknya dihormati; aksi cadangan acak engine hanya untuk bot yang
-  otaknya gagal.
+- Keputusan diterapkan hanya bila ronde dan fase belum berganti; aksi yang ditolak engine tidak mengubah state. Bot
+  memegang fasenya begitu vote atau aksinya masuk, atau begitu otak sengaja tidak bertindak (abstain, tidak ada aksi
+  yang bisa dipakai); engine tidak menggantinya dengan aksi acak. "Tunggu" dan pilihan yang ditolak engine belum
+  memegang fase, jadi bila langkah berikutnya gagal, aksi cadangan engine tetap mengisi di akhir fase.
+- Bot yang menjadi korban Hostage tidak dijadwalkan lagi, karena sampai pertandingan selesai ia tidak bisa chat, vote,
+  atau beraksi.
+- Pertandingan yang dimulai saat otak gagal dimuat mendapat otak bot begitu pemuatan ulang berhasil (paling cepat 60
+  detik sesudah gagal); sampai itu bot memakai aksi cadangan engine.
 - Jadwal bot dan simulasi panel menghitung lama fase lewat `Match.phase_length()`, jadi waktu tambahan tidak membuat
   fase tampak mundur.
 
@@ -405,7 +412,8 @@ Rinciannya ada di notebook `npc_fuzzy`, bagian Strategi per Role.
   kecurigaannya lebih tinggi; Hitman memakai aturan votenya sendiri, termasuk mempertahankan seri.
 - **Malam.** Aksi malam selalu terpakai bila ada target. Bot terkunci 15 detik (mode cepat 10 detik) sebelum malam
   habis, sedangkan manusia boleh mengganti pilihan sampai waktu habis.
-  - **Hostage:** saat terkunci, mengikuti Hitman manusia yang sudah memilih; selain itu mengikuti rekan bot yang sudah
+  - **Hostage:** saat terkunci, mengikuti Hitman manusia yang sudah memilih. Saat terkunci adalah langkah pertama
+    sesudah batas kunci yang keputusannya sampai ke engine, jadi langkah yang timeout tidak menghabiskannya; selain itu mengikuti rekan bot yang sudah
     memilih, atau memilih warga dengan ancaman × (1 − 0,5 × jejak tuduhan) tertinggi. Seri diacak stabil per bot dan
     ronde.
   - **Guard:** diri sendiri bila role sudah terbuka dan bot masih diserang ronde ini. Selain itu, orang yang diyakini

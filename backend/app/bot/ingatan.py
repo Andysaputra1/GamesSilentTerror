@@ -89,7 +89,6 @@ class Ingatan:
     nama_bot: str
     cepat: bool = False
     jumlah_awal: int | None = None
-    peran: str | None = None
     chat: list = field(default_factory=list)
     vote: list = field(default_factory=list)
     eksekusi: list = field(default_factory=list)
@@ -108,7 +107,8 @@ class Ingatan:
     _hitman_tersisa: int | None = None
     # Chat tim: hitungan dan id terakhir saja, supaya isinya tidak pernah tersimpan di ingatan.
     _chat_tim: dict = field(default_factory=lambda: {"jumlah": 0, "id_terakhir": None})
-    # Ronde yang saat terkuncinya sudah lewat, dan pemicu chat tim bot yang sudah dikerjakan, tanpa isi kalimat.
+    # Ronde yang saat terkuncinya sudah terpakai (catat_terkunci), dan pemicu chat tim bot yang sudah dikerjakan, tanpa
+    # isi kalimat.
     _ronde_terkunci: set = field(default_factory=set)
     chat_tim_bot: list = field(default_factory=list)
 
@@ -155,6 +155,13 @@ class Ingatan:
             lama.pop("paksa", None)
             lama.update(catatan, dinilai_ulang=True)
 
+    # Dipanggil game sesudah keputusan langkah saat terkunci sampai ke engine (diterapkan, atau tunggu tanpa ditolak).
+    # Kesempatan mengikuti pilihan rekan manusia baru terpakai di sini, jadi langkah yang timeout, basi, atau ditolak
+    # engine tidak menghabiskannya.
+    def catat_terkunci(self, view):
+        if view["saya"]["saat_terkunci"]:
+            self._ronde_terkunci.add(view["ronde"])
+
     # Dipanggil game sesudah rencana chat tim dikerjakan, juga bila kalimatnya kosong. Isi kalimat tidak pernah disimpan.
     def catat_chat_tim(self, view, rencana, terkirim):
         self.chat_tim_bot.append({"ronde": view["ronde"], "pemicu": rencana["pemicu"], "target_saya": rencana["target_saya"],
@@ -164,7 +171,7 @@ class Ingatan:
     # Menerima snapshot = Match.snapshot(nama_bot) {round, phase, deadline, players, messages, tribunal_votes, me};
     #   waktu_terima = detik saat snapshot diterima. Chat baru dicatat tanpa intent dan target; bacaannya diisi
     #   nlu.baca_chat_baru sesudah fungsi ini, berurutan sesuai catatan.
-    # Hasilnya view = {ronde, fase, waktu, deadline, durasi, pemain, suara_tribunal, komposisi, hitman_tersisa,
+    # Hasilnya view = {ronde, fase, waktu, durasi, pemain, suara_tribunal, komposisi, hitman_tersisa,
     #   tribunal_tambahan, saya};
     #   pemain = [{nama, hidup, sandera}], sandera = ronde malam korban Hostage (diumumkan server) atau None.
     # Dipanggil oleh game sebelum putuskan(ingatan, view); ingatan yang diperbarui dibaca semua tahap berikutnya.
@@ -177,7 +184,6 @@ class Ingatan:
             raise ValueError("Snapshot bukan milik bot ini.")
         if me["role"] not in PERAN:
             raise ValueError(f"Role tidak dikenal: {me['role']}")
-        self.peran = me["role"]
         ronde, fase = snapshot["round"], snapshot["phase"]
         pemain = [{"nama": p["name"], "hidup": bool(p["alive"]),
                    "sandera": p.get("hostage_round", ronde) if p.get("hostage") else None} for p in snapshot["players"]]
@@ -240,24 +246,25 @@ class Ingatan:
         if chat_tim:
             self._chat_tim = {"jumlah": len(chat_tim), "id_terakhir": chat_tim[-1]["id"]}
 
-        # Waktu chat dari server. Fase chat tetap dari snapshot: chat yang baru terlihat saat malam/selesai dikirim di
-        # akhir fase publik sebelumnya, yaitu siang di ronde 1 dan Tribunal di ronde berikutnya.
+        # Waktu, ronde, dan fase chat dari pesan server, jadi chat yang baru terlihat di fase sesudahnya (bot sibuk lebih
+        # dari satu fase) tetap tercatat di fase saat dikirim. Pesan tanpa ronde dan fase: ditebak dari snapshot; chat
+        # yang baru terlihat saat malam/selesai dikirim di akhir fase publik sebelumnya, yaitu siang di ronde 1 dan
+        # Tribunal di ronde berikutnya.
         fase_chat = fase if fase in ("day", "tribunal") else ("day" if ronde == 1 else "tribunal")
         for pesan in snapshot["messages"]:
             if pesan["id"] in self._id_chat:
                 continue
-            chat = {"id": pesan["id"], "ronde": ronde, "fase": fase_chat, "waktu": pesan.get("time", waktu_terima),
-                    "pengirim": pesan["sender"], "teks": pesan["message"]}
+            chat = {"id": pesan["id"], "ronde": pesan.get("round", ronde), "fase": pesan.get("phase", fase_chat),
+                    "waktu": pesan.get("time", waktu_terima), "pengirim": pesan["sender"], "teks": pesan["message"]}
             self.catat_chat(chat)
 
-        # Langkah pertama sesudah batas kunci adalah saat terkunci, satu-satunya kesempatan bot mengikuti rekan manusia.
+        # Langkah sesudah batas kunci adalah saat terkunci sampai keputusannya sampai ke engine (catat_terkunci):
+        # satu-satunya kesempatan bot mengikuti rekan manusia.
         terkunci = fase == "night" and bot_terkunci(self.cepat, snapshot["deadline"], waktu_terima)
         saat_terkunci = terkunci and ronde not in self._ronde_terkunci
-        if terkunci:
-            self._ronde_terkunci.add(ronde)
 
         return {
-            "ronde": ronde, "fase": fase, "waktu": waktu_terima, "deadline": snapshot["deadline"],
+            "ronde": ronde, "fase": fase, "waktu": waktu_terima,
             "durasi": durasi, "pemain": pemain, "suara_tribunal": suara, "komposisi": snapshot.get("composition"),
             "hitman_tersisa": tersisa, "tribunal_tambahan": tribunal_tambahan,
             "saya": {"nama": me["name"], "role": me["role"], "can_chat": me["can_chat"], "can_vote": me["can_vote"],

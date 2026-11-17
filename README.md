@@ -257,7 +257,7 @@ game. Sesi panel berlaku 8 jam dan otomatis tidak berlaku lagi bila password pan
 | Menu | Isi |
 | --- | --- |
 | 01 Konfigurasi AI | Provider (`api` atau `docker`), sumber key OpenRouter, URL dan token link LLM sendiri, model lokal |
-| 02 Checker | Per ruangan: fase, komposisi, dan kondisi live tiap bot; jejak tiap chat manusia (cek → simpan → kirim) dan tiap langkah bot (NLU, penalaran, penulis kalimat) dengan alur proses yang menandai tahap yang sedang berjalan, lama tiap tahap, dan error yang jelas (jenis, pesan, tahap gagal); kotak **Antrean** untuk thread otak (1 thread) dan thread penulis (3 thread) yang dipakai bersama semua room |
+| 02 Checker | Per ruangan: fase, komposisi, dan kondisi live tiap bot; jejak tiap chat manusia (cek → simpan → kirim) dan tiap langkah bot (NLU, penalaran, penulis kalimat) dengan alur proses yang menandai tahap yang sedang berjalan, lama tiap tahap, dan error yang jelas (jenis, pesan, tahap gagal); kotak **Antrean** untuk thread otak (1 thread) dan thread penulis (6 thread) yang dipakai bersama semua room, serta thread simulasi panel (1 thread berpikir, 2 thread penulis) |
 | 03 Riwayat chat | Arsip chat dari MySQL dengan filter dan ekspor CSV, termasuk intent, target, dan konteks bacaan IndoBERT |
 | 04 Manajemen user | Tambah user, ubah nama atau username, reset password akun lokal, hapus akun tanpa menghapus riwayat chat |
 | 05 Otak NPC | Penulis kalimat, urutan rantai penulis, model OpenRouter, model LLM link, tombol **Tes koneksi semua prioritas**, status NLU IndoBERT |

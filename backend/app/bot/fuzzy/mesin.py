@@ -16,6 +16,7 @@ Isi berurutan
 
 import inspect
 import math
+import threading
 import warnings
 from functools import lru_cache
 
@@ -98,6 +99,10 @@ def sistem_fuzzy(aturan, arti):
 
 # ===== 4. HITUNG: validasi input, cache, lalu satu run skfuzzy =====
 
+# Simulasi skfuzzy menyimpan input dan keluarannya di objek yang dipakai bersama, jadi satu run dijaga kunci: thread
+# otak room live dan thread simulasi panel boleh menghitung bersamaan tanpa saling menimpa input.
+_KUNCI_RUN = threading.Lock()
+
 # Satu run skfuzzy, disimpan per (nama, a, b) agar input yang sama tidak dihitung ulang.
 # Menerima nama sistem, a dan b = input yang sudah divalidasi dan dibulatkan oleh hitung().
 # Hasilnya float 0–100 = centroid himpunan keluaran hasil agregasi.
@@ -107,9 +112,10 @@ def sistem_fuzzy(aturan, arti):
 def _fuzzy_tersimpan(nama, a, b):
     simulasi = SIMULASI[nama]
     nama_a, nama_b = SEMUA_SISTEM[nama]["input"]
-    simulasi.input[nama_a], simulasi.input[nama_b] = a, b
-    simulasi.compute()
-    return float(simulasi.output["keluaran"])
+    with _KUNCI_RUN:
+        simulasi.input[nama_a], simulasi.input[nama_b] = a, b
+        simulasi.compute()
+        return float(simulasi.output["keluaran"])
 
 # Inferensi Mamdani satu sistem: fuzzifikasi → aturan DAN (min) → agregasi (max) → centroid 0–100. Badan setiap
 # fungsi fuzzy hanya memanggil ini dengan namanya sendiri.

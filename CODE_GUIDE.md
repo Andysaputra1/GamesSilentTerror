@@ -144,14 +144,14 @@ Semua logika bot ada di `backend/app/bot/`. Kode inilah sumber logika game; note
 | File | Isi |
 | --- | --- |
 | `bot_controller.py` | `NPCService` (jadwal dan urutan satu langkah bot, lantai bicara) dan `BrainRuntime` (otak bersama: memuat NLU, fuzzy, dan penulis; ingatan dan persona tiap bot) |
-| `nlu.py` | IndoBERT membaca chat: intent, lalu target; aturan nama untuk pesan netral; memo bersama semua bot |
+| `nlu.py` | IndoBERT membaca chat: intent, lalu target; aturan nama untuk pesan netral; memo per pertandingan yang dipakai bersama semua bot dan pencatat NLU |
 | `ingatan.py` | Bahan: `Ingatan` satu bot, lalu chat, vote, dan fakta menjadi angka bukti 0–1 per pemain (`hitung_bukti`, `pengetahuan_peran`, `fitur_hitman`, `fitur_lindung`). Tidak ada fuzzy di sini |
 | `fuzzy_controller.py` | Main controller: `putuskan` dan semua logika di sekitar pemanggilan fuzzy, berurutan [FUZZY 1] → Tribunal → Diskusi → Malam → bungkus keputusan |
 | `fuzzy/` | Fungsi fuzzy saja: satu sistem = satu fungsi. `mesin.py` berisi kurva, pembangun sistem Mamdani, cache, dan `SEMUA_SISTEM` |
 | `nlg_controller.py` | Main controller NLG: `tulis_pesan` (chat publik) dan `tulis_chat_tim` (chat tim) menyusun urutan tahap [PROMPT] → [PENULIS LLM] → [PERIKSA ATURAN], paling banyak 2 percobaan LLM, lalu [TEMPLAT] dan cadangan |
 | `nlg/` | Isi penulis kalimat, satu file per tahap: `prompt.py` [PROMPT] perintah untuk LLM, `penulis.py` [PENULIS LLM] rantai OpenRouter lalu link LLM sendiri, `aturan.py` [PERIKSA ATURAN] pemeriksa aturan, `templat.py` [TEMPLAT] persona dan varian templat, `pengaturan.py` [PANEL] rantai penulis yang diatur panel (`PenulisNPC`) |
 | `penjelasan.py` | Penjelasan keputusan bot untuk panel Checker |
-| `simulasi.py` | Simulasi panel menu 07 dengan engine, otak, NLU, dan NLG yang sama |
+| `simulasi.py` | Simulasi panel menu 07 dengan engine, otak, NLU, dan NLG yang sama, di thread simulasi sendiri |
 
 Arah impor: `fuzzy_controller` mengimpor `ingatan` dan `fuzzy/`; `ingatan` tidak mengimpor file bot lain; file di
 `fuzzy/` hanya mengimpor `fuzzy/mesin.py`. Polanya sama di NLG: `nlg_controller` mengimpor tahap di `nlg/` dan
@@ -165,15 +165,18 @@ memuat modul otak saat server menyala. Penjelasan susunan NLG ada di dokumen Bed
 Jam di `main.py` memanggil `NPCService.jalankan_bot_yang_sudah_waktunya` tiap 0,5 detik. Untuk bot yang sudah
 waktunya:
 
-1. `room_service.lihat_untuk_bot`: snapshot privat bot dan token fase yang ia lihat.
+1. `room_service.lihat_untuk_bot`: snapshot privat bot (hanya kolom yang dibaca otak) dan token fase yang ia lihat.
+   Korban Hostage tidak dijadwalkan.
 2. `BrainRuntime.langkah`: `Ingatan.sinkron_snapshot` mencatat snapshot → `nlu.baca_chat_baru` membaca chat baru
    dengan IndoBERT → `fuzzy_controller.putuskan`.
 3. `room_service.pilihan_bot`: vote atau aksi rahasia diterapkan hanya bila fase yang dilihat bot belum berganti.
+   Fase ditandai milik otak (`npc_decisions`) hanya bila vote/aksi masuk atau otak sengaja tidak bertindak; "tunggu"
+   tidak menandai. Keputusan yang sampai ke engine tanpa ditolak juga memakai saat terkunci malam itu.
 4. Chat tim bila ada rekan manusia (`room_service.chat_tim_bot`), tanpa lantai bicara, database, siaran, atau NLU.
-5. Chat publik: `NPCService._ambil_giliran_bicara` (lantai bicara, paling banyak `LANTAI_MAKS` = 3 bot menyusun
-   bersamaan tanpa rencana kembar) → kalimat dari `nlg_controller.tulis_pesan` yang dicek aturan →
-   `room_service.chat_bot` (simpan) → `emit_room("receive_chat")`.
-6. Jejak untuk panel (`isi_jejak`), lalu IndoBERT membaca kalimat bot itu.
+5. Chat publik: `NPCService._ambil_giliran_bicara` (lantai bicara per fase, paling banyak `LANTAI_MAKS` = 3 bot
+   menyusun bersamaan tanpa rencana kembar) → kalimat dari `nlg_controller.tulis_pesan` yang dicek aturan (templat saja
+   bila sisa fase < 20 detik) → `room_service.chat_bot` (simpan) → IndoBERT membaca kalimat itu di latar.
+6. Jejak untuk panel (`isi_jejak`), lalu `emit_room("receive_chat")`.
 
 ### Urutan `putuskan`
 
@@ -437,8 +440,9 @@ akurasi vote warga). Seed tetap, jadi hasil bisa diulang. Kedua skrip memakai pa
 - Jangan menjalankan lebih dari satu worker backend sebelum ada state bersama. Ruangan, kunci nonce Google, dan
   semua batas percobaan (login, gabung room, chat) hanya ada di satu proses.
 - Semua room berbagi dua kelompok thread di `BrainRuntime`: **satu thread otak** (`eksekutor_keputusan`) untuk
-  langkah berpikir semua bot dan bacaan IndoBERT setiap chat, karena ingatan bot dan memo NLU tidak dirancang paralel,
-  serta **tiga thread penulis** (`eksekutor_nlg`) untuk kalimat bot. Di VM produksi (2 vCPU), room 10 pemain membuat
+  langkah berpikir semua bot dan bacaan IndoBERT setiap chat, karena ingatan bot tidak dirancang paralel, serta
+  **enam thread penulis** (`eksekutor_nlg`) untuk kalimat bot. Simulasi panel memakai thread sendiri (satu thread
+  berpikir, dua thread penulis); inferensi IndoBERT tetap bergiliran lewat kunci memo NLU. Di VM produksi (2 vCPU), room 10 pemain membuat
   IndoBERT butuh rata-rata sekitar 8,85 detik per chat, jadi langkah bot yang antre bisa melewati batas
   `BATAS_LANGKAH_DETIK` (25 detik) dan batal. Pengukurannya ada di dokumen Proses AI (bagian 2, *Lama tiap tahap*), dan
   antreannya bisa dilihat langsung di panel Checker.

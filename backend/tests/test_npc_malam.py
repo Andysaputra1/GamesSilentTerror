@@ -45,10 +45,13 @@ def malam(game, ronde=1):
     return game
 
 
-# Satu langkah keputusan bot seperti NPCService.brain_turn, tanpa jaringan.
+# Satu langkah keputusan bot seperti NPCService.brain_turn yang berhasil, tanpa jaringan: keputusannya dianggap sampai
+# ke engine, jadi saat terkunci malam ini terpakai (catat_terkunci).
 def langkah(game, ingatan, nama, sekarang):
     view = ingatan.sinkron_snapshot(snapshot_berlabel(game.snapshot(nama), game.labels), sekarang)
-    return view, fuzzy_controller.putuskan(ingatan, view)
+    hasil = fuzzy_controller.putuskan(ingatan, view)
+    ingatan.catat_terkunci(view)
+    return view, hasil
 
 
 # Pilihan otak diterapkan ke engine seperti _kirim_vote_atau_aksi.
@@ -115,6 +118,26 @@ class BrainOnEngineTests(unittest.TestCase):
             self.assertEqual(h["nlg_tim"]["pemicu"], "ikut_manusia")
             terapkan(game, "hitman2", h["npc_decision"])
             self.assertEqual(game.actions["hitman2"]["target"], target_manusia)
+
+    # Saat terkunci baru terpakai sesudah keputusannya sampai ke engine (catat_terkunci). Langkah yang timeout atau
+    # dibuang tidak menghabiskannya.
+    def test_lock_moment_is_kept_until_the_decision_reaches_the_engine(self):
+        game = malam(pertandingan(["hitman"], lainnya("hitman")))
+        ingatan = ingatan_bot.Ingatan("hitman2")
+
+        def lihat(sekarang):
+            return ingatan.sinkron_snapshot(
+                snapshot_berlabel(game.snapshot("hitman2"), game.labels), sekarang
+            )
+
+        self.assertFalse(lihat(game.deadline - 20)["saya"]["terkunci"])
+        self.assertTrue(lihat(game.deadline - 14)["saya"]["saat_terkunci"])  # keputusan ini dibuang
+        view = lihat(game.deadline - 12)
+        self.assertTrue(view["saya"]["saat_terkunci"])
+        ingatan.catat_terkunci(view)
+        view = lihat(game.deadline - 10)
+        self.assertTrue(view["saya"]["terkunci"])
+        self.assertFalse(view["saya"]["saat_terkunci"])
 
     def test_human_change_after_the_lock_wins_and_the_bot_stays(self):
         game = malam(pertandingan(["hitman"], lainnya("hitman")))
@@ -426,6 +449,32 @@ class NPCTeamChatTests(unittest.IsolatedAsyncioTestCase):
         await self.langkah_bot(spy)
         self.assertIn("spy2", self.game.actions)
         self.assertEqual(self.game.team_messages["spy"], [])
+
+    # Langkah saat terkunci yang timeout tidak menghabiskan kesempatan: langkah berikutnya tetap mengikuti pilihan rekan
+    # manusia dan mengabarinya.
+    async def test_timed_out_lock_step_keeps_the_chance_to_follow_the_human(self):
+        self.game.deadline = time.time() + 40
+        await self.langkah_bot()
+        target_bot = self.game.actions["hitman2"]["target"]
+        lain = next(n for n in ("civilian", "civilian2", "spy") if n != target_bot)
+        self.game.act("hitman", "hostage", lain)
+        self.game.deadline = time.time() + 14
+        langkah_asli = self.runtime.langkah
+
+        def lambat(*argumen, **opsi):
+            hasil = langkah_asli(*argumen, **opsi)
+            time.sleep(0.3)
+            return hasil
+
+        with (
+            patch.object(self.runtime, "langkah", side_effect=lambat),
+            patch("app.bot.bot_controller.BATAS_LANGKAH_DETIK", 0.05),
+        ):
+            await self.langkah_bot()
+        self.assertEqual(self.game.actions["hitman2"]["target"], target_bot)
+        await self.langkah_bot()
+        self.assertEqual(self.game.actions["hitman2"]["target"], lain)
+        self.assertEqual(self.otak.ingatan.chat_tim_bot[-1]["pemicu"], "ikut_manusia")
 
     # Rekan manusia tiruan satu malam penuh: bot memilih, manusia memilih lain, bot menanggapi sekali, lalu ikut saat terkunci.
     async def test_full_night_with_a_simulated_human_teammate(self):

@@ -1,7 +1,10 @@
 """Ketahanan NPCService dan runtime otak (temuan review R5).
 
 - penulis LLM yang lambat tidak menghilangkan kalimat bot: kalimat dikirim dari templat;
-- langkah otak yang gagal sebelum pernah memutuskan tidak memblokir aksi cadangan engine;
+- langkah otak yang gagal sebelum pernah memutuskan, atau sesudah keputusan "tunggu", tidak memblokir aksi cadangan
+  engine; abstain tetap dihormati;
+- lantai bicara lepas saat fase berganti, dan sisa fase yang pendek ditulis templat tanpa LLM;
+- error saat menutup alur live panel tidak membuat bot macet sibuk;
 - jejak otak tetap tersimpan (thread latar) setelah langkah selesai;
 - pemuatan otak yang gagal dicoba ulang setelah jeda; path model yang salah dicatat.
 """
@@ -13,7 +16,7 @@ import unittest
 from unittest.mock import AsyncMock, Mock, patch
 
 from app.bot import bot_controller as runtime_modul
-from app.bot.bot_controller import BrainRuntime
+from app.bot.bot_controller import BrainRuntime, tulis_kalimat
 from app.bot.nlu import NLUBersama, folder_model
 from tests.palsu.arsip_palsu import arsip_bot_palsu
 from tests.palsu.nlu_palsu import NLUPalsu
@@ -57,6 +60,24 @@ class BrainTurnKetahananTests(unittest.IsolatedAsyncioTestCase):
             self.otak.sibuk = True
             await self.service.brain_turn(self.room.code, self.match, self.otak)
 
+    # Hasil BrainRuntime.langkah tiruan tanpa chat: vote = aksi rencana vote (tunggu, abstain, tidak_bisa).
+    def keputusan_diam(self, vote):
+        view = {"ronde": self.match.round, "saya": {"saat_terkunci": False}}
+        keputusan = {
+            "npc_decision": {"action": "wait", "target": None, "message": ""},
+            "rencana_vote": {"aksi": vote},
+            "rencana_aksi": {"aksi": "tidak_bisa"},
+            "rencana_chat": {"kirim": False},
+            "nlg": None,
+        }
+        return view, keputusan, {"roster": []}
+
+    # Tribunal ronde 2 tanpa suara, untuk menguji aksi cadangan engine.
+    def tribunal(self):
+        with self.rooms.lock:
+            self.match.round, self.match.phase, self.match.votes = 2, "tribunal", {}
+            self.match.deadline = time.time() + 60
+
     async def test_slow_llm_writer_still_sends_a_template_sentence(self):
         with self.rooms.lock:
             self.match.add_message("human", "Aku curiga NOX, dia Hitman. Ayo vote NOX!")
@@ -85,9 +106,95 @@ class BrainTurnKetahananTests(unittest.IsolatedAsyncioTestCase):
             await self.langkah()
         self.assertNotIn(penanda, self.match.npc_decisions)
         self.persistence.record_trace.assert_not_called()
-        # Setelah keputusan berhasil, otak memegang fase (tunggu/abstain dihormati engine).
-        await self.langkah()
+        # Setelah keputusan akhir berhasil (di sini: tidak ada aksi yang bisa dipakai), otak memegang fase.
+        with patch.object(self.runtime, "langkah", return_value=self.keputusan_diam("tidak_bisa")):
+            await self.langkah()
         self.assertIn(penanda, self.match.npc_decisions)
+
+    # "tunggu" bukan keputusan akhir: bila langkah berikutnya gagal, engine tetap memberi vote cadangan di deadline.
+    async def test_waiting_then_failing_keeps_the_engine_fallback(self):
+        self.tribunal()
+        with patch.object(self.runtime, "langkah", return_value=self.keputusan_diam("tunggu")):
+            await self.langkah()
+        self.assertNotIn((2, "tribunal", "NOX"), self.match.npc_decisions)
+        with patch.object(self.runtime, "langkah", side_effect=RuntimeError("otak rusak")):
+            await self.langkah()
+        with self.rooms.lock:
+            self.match.run_bots()
+        self.assertIn("NOX", self.match.votes)
+
+    # Abstain yang disengaja tetap dihormati: engine tidak menggantinya dengan vote acak.
+    async def test_deliberate_abstain_is_still_honored(self):
+        self.tribunal()
+        with patch.object(self.runtime, "langkah", return_value=self.keputusan_diam("abstain")):
+            await self.langkah()
+        self.assertIn((2, "tribunal", "NOX"), self.match.npc_decisions)
+        with self.rooms.lock:
+            self.match.run_bots()
+        self.assertNotIn("NOX", self.match.votes)
+
+    # Vote yang ditolak engine tidak menandai fase: vote cadangan tetap berjalan.
+    async def test_rejected_vote_keeps_the_engine_fallback(self):
+        self.tribunal()
+        view, keputusan, konteks = self.keputusan_diam("vote")
+        keputusan["npc_decision"] = {
+            "action": "vote",
+            "target": "NOX",
+            "message": "",
+        }  # diri sendiri: ditolak
+        with patch.object(self.runtime, "langkah", return_value=(view, keputusan, konteks)):
+            await self.langkah()
+        self.assertNotIn((2, "tribunal", "NOX"), self.match.npc_decisions)
+
+    # Lantai bicara milik fase lama lepas saat fase berganti.
+    async def test_floor_is_released_when_the_phase_changes(self):
+        self.service.lantai_fase[self.match.id] = (self.match.round, self.match.phase)
+        self.service.lantai[self.match.id] = {
+            "ECHO": ("offend", "human"), "VEIL": ("defend", "ECHO"), "ASH": ("neutral", None),
+        }  # fmt: skip
+        rencana = {"intent": "offend", "target": "VEIL"}
+        terlihat = self.match.messages[-1]["id"] if self.match.messages else None
+        self.assertFalse(
+            self.service._ambil_giliran_bicara(self.match, self.otak, terlihat, rencana)
+        )
+        with self.rooms.lock:
+            self.match.round, self.match.phase = 2, "tribunal"
+        self.assertTrue(
+            self.service._ambil_giliran_bicara(self.match, self.otak, terlihat, rencana)
+        )
+        self.assertEqual(self.service.lantai[self.match.id], {"NOX": ("offend", "VEIL")})
+
+    # Sisa fase lebih pendek dari batas satu panggilan LLM: kalimat langsung ditulis templat tanpa LLM. Sisa fase
+    # yang panjang tetap memakai LLM, dengan batas tunggu yang tidak melewati sisa fase.
+    async def test_short_remaining_phase_writes_with_template_only(self):
+        dipanggil = []
+
+        def tulis(bot, payload, konteks, pakai_llm=True, lapor=tanpa_lapor):
+            dipanggil.append(pakai_llm)
+            return {"teks": "Halo.", "sumber": "templat", "percobaan": []}
+
+        with (
+            patch.object(self.runtime, "tulis", tulis),
+            patch.object(self.runtime.penulis_npc, "dipakai", return_value=object()),
+        ):
+            pendek = await tulis_kalimat(self.runtime, self.otak, {}, {}, sisa_detik=8.0)
+            panjang = await tulis_kalimat(self.runtime, self.otak, {}, {}, sisa_detik=60.0)
+        self.assertEqual(dipanggil, [False, True])
+        self.assertEqual(pendek["percobaan"][0]["status"], "dilewati: sisa fase 8 detik")
+        self.assertEqual(panjang["percobaan"], [])
+
+    # Menutup alur live panel gagal: bot tetap tidak sibuk dan lantai bicara tetap lepas.
+    async def test_panel_close_error_does_not_leave_the_bot_busy(self):
+        with self.rooms.lock:
+            self.match.add_message("human", "Aku curiga NOX, dia Hitman. Ayo vote NOX!")
+        with patch(
+            "app.bot.bot_controller.checker_service.selesai_langkah",
+            side_effect=RuntimeError("panel rusak"),
+        ):
+            await self.langkah()
+        self.assertFalse(self.otak.sibuk)
+        self.assertEqual(self.service.lantai.get(self.match.id, {}), {})
+        self.assertNotIn("NOX", self.match.bot_berpikir)
 
     async def test_trace_is_stored_after_the_turn_without_blocking_the_loop(self):
         with self.rooms.lock:
@@ -157,7 +264,7 @@ class BrainTurnKetahananTests(unittest.IsolatedAsyncioTestCase):
             await asyncio.gather(self.langkah(), intip())
         self.assertEqual([(b["nama"], b["tahap"]) for b in terlihat["bot"]], [("NOX", "llm")])
         penulis = terlihat["antrean"]["penulis"]
-        self.assertEqual(penulis["thread"], 3)
+        self.assertEqual(penulis["thread"], 6)
         self.assertIn(
             ("NOX", "menulis kalimat (templat)", "dikerjakan"),
             [(t["siapa"], t["kerja"], t["status"]) for t in penulis["tugas"]],
