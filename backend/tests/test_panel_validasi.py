@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from app.controllers.panel import require_panel, router
 from app.controllers.users import router as users_router
 from app.controllers.routes import api_router
-from app.middleware.auth_limits import _riwayat_percobaan
+from app.middleware.auth_limits import limit_auth, limit_auth_pemain
 
 
 class PanelSafetyTests(unittest.TestCase):
@@ -38,7 +38,8 @@ class PanelSafetyTests(unittest.TestCase):
 
 class PasswordValidationResponseTests(unittest.TestCase):
     def setUp(self):
-        _riwayat_percobaan.clear()
+        limit_auth.riwayat.clear()
+        limit_auth_pemain.riwayat.clear()
         app = FastAPI()
         # Router gabungan, supaya route_class tiap router teruji lewat susunan yang dipakai aplikasi.
         app.include_router(api_router)

@@ -107,28 +107,29 @@ def muat_konfigurasi_ai():
             ai_runtime.override = override
 
 
-# Simpan konfigurasi AI dari panel ke DB dan memori, supaya langsung berlaku tanpa restart.
+# Simpan konfigurasi AI dari panel ke DB dan memori, supaya langsung berlaku tanpa restart. Hanya kolom yang diisi
+# admin (atau sudah pernah diisi lewat panel) yang ditulis; kolom lain tidak disimpan, jadi tetap mengikuti .env.
+# Baris ini hanya baris 1 (Konfigurasi AI); pengaturan Otak NPC di baris 2 tidak disentuh.
 def simpan_konfigurasi_ai(
     provider,
-    endpoint,
+    endpoint=None,
     api_key=None,
     key_source=None,
     tunnel_token=None,
     clear_tunnel_token=False,
     model=None,
 ):
-    stored = {
-        "ai_provider": provider,
-        "openrouter_model": "qwen/qwen3-14b",
-        "ollama_base_url": endpoint,
-    }
+    stored = {"ai_provider": provider}
     with ai_runtime.lock:
         # Kunci baris konfigurasi agar pembaruan sumber kunci tidak menimpa perubahan lain.
         def write(db):
             previous = panel_queries.panel_configuration(db, BARIS_AI, for_update=True)
             previous = json.loads(previous) if isinstance(previous, str) else (previous or {})
-            # Model lokal (ai-docker: qwen3:4b-instruct/qwen3:14b); kosong = pilihan sebelumnya.
-            stored["ollama_model"] = model or previous.get("ollama_model") or "qwen3:14b"
+            # Link LLM dan model lokal (ai-docker: qwen3:4b-instruct/qwen3:14b): kosong = isian panel sebelumnya;
+            # belum pernah diisi = tidak disimpan, jadi OLLAMA_BASE_URL/OLLAMA_MODEL di .env yang dipakai.
+            for kolom, nilai in (("ollama_base_url", endpoint), ("ollama_model", model)):
+                if nilai or previous.get(kolom):
+                    stored[kolom] = nilai or previous[kolom]
             source = key_source or (
                 "custom"
                 if api_key

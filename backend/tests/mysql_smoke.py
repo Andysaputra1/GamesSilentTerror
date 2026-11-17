@@ -427,6 +427,39 @@ class MovedSqlIntegration(unittest.TestCase):
             self.assertIsNone(akun_panel(id_akun))
             self.assertIsNone(akun_login(nama))
 
+    # H1 dan M3 di MySQL asli: email belum terverifikasi tidak dipakai login dan dilepas sebelum akun Google dibuat;
+    # riwayat username dicocokkan tanpa membedakan huruf besar (collation _ci). Data uji di-rollback.
+    def test_unverified_email_and_username_history(self):
+        nama = "smoke_" + uuid4().hex[:10]
+        email = nama + "@contoh.test"
+        with SessionLocal() as db:
+            try:
+                id_akun = auth_queries.create_account(
+                    db, username=nama, display_name="Akun Lama", password_hash="hash-lama"
+                )
+                auth_queries.create_identity(db, id_akun, email)
+                self.assertIsNone(auth_queries.account_by_login(db, email))
+                auth_queries.delete_unverified_identity(db, email)
+                self.assertEqual(
+                    db.execute(
+                        text("SELECT COUNT(*) FROM account_identities WHERE email=:e"), {"e": email}
+                    ).scalar_one(),
+                    0,
+                )
+                auth_queries.create_identity(db, id_akun, email, "subjek-" + uuid4().hex)
+                auth_queries.delete_unverified_identity(db, email)  # yang terverifikasi tetap
+                self.assertEqual(auth_queries.account_by_login(db, email.upper())["id"], id_akun)
+
+                self.assertFalse(auth_queries.username_punya_riwayat(db, nama))
+                survey_queries.record_participants(
+                    db,
+                    [{"match_id": uuid4().hex, "room_code": _kode_room(), "username": nama,
+                      "role": "spy", "team": "civilians", "outcome": "won"}],
+                )  # fmt: skip
+                self.assertTrue(auth_queries.username_punya_riwayat(db, nama.upper()))
+            finally:
+                db.rollback()
+
 
 # Survei di MySQL asli: pertanyaan hasil migrasi (V12 menggantikan V07 dan V11) lolos validasi panel, susunan
 # ulang ditulis lewat executemany, dan ekspor CSV mengikuti urutan pertanyaan. Data uji di-rollback.
@@ -507,10 +540,6 @@ class SurveySqlIntegration(unittest.TestCase):
                     return {(b["question_id"], b["value_number"]): b["n"]
                             for b in ringkasan["distribution"]}  # fmt: skip
 
-                def metode(ringkasan):
-                    return {(b["question_id"], b["method"]): b["n"]
-                            for b in ringkasan["per_method"]}  # fmt: skip
-
                 awal = survey_queries.summary(db)
                 kiriman_awal = survey_queries.count_submissions(db)
                 akun, kode_room = "smoke_" + uuid4().hex[:8], _kode_room()
@@ -545,7 +574,7 @@ class SurveySqlIntegration(unittest.TestCase):
                 for kunci in ((id_pertanyaan, 1), (id_pertanyaan, 5)):
                     tambah = sebaran(akhir).get(kunci, 0) - sebaran(awal).get(kunci, 0)
                     self.assertEqual(tambah, 1 if kunci[1] == 5 else 0, kunci)
-                self.assertEqual(metode(akhir).get((id_pertanyaan, "smoke_metode")), 1)
+                self.assertNotIn("per_method", akhir)
             finally:
                 db.rollback()
 

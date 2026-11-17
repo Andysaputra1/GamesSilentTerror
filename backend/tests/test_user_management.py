@@ -29,6 +29,8 @@ class UserManagementTests(unittest.TestCase):
                 "CREATE TABLE chat_messages (id INTEGER PRIMARY KEY, sender_name TEXT, message TEXT)",
                 "CREATE TABLE ai_analyses (id INTEGER PRIMARY KEY, chat_message_id INTEGER, llm_response TEXT)",
                 "CREATE TABLE checker_traces (id INTEGER PRIMARY KEY, trace TEXT)",
+                "CREATE TABLE match_participants (match_id TEXT, username TEXT)",
+                "CREATE TABLE survey_responses (match_id TEXT, username TEXT)",
             ]:
                 db.execute(text(statement))
             self.old_hash = hash_password("old-password-123")
@@ -269,3 +271,82 @@ class UserManagementTests(unittest.TestCase):
         )
         body["display_name"] = "   "
         self.assertEqual(self.client.post("/api/panel/users/1/profile", json=body).status_code, 422)
+        for nama in ["Aku", "vote", "🔥🔥"]:
+            body["display_name"] = nama
+            self.assertEqual(
+                self.client.post("/api/panel/users/1/profile", json=body).status_code, 422
+            )
+
+    # L9: CLI create_user.py memakai aturan yang sama dengan API: pola dan panjang username, password 10-128, nama
+    # tampilan, username terlarang, riwayat, dan username kembar.
+    def test_cli_create_user_uses_api_rules(self):
+        import importlib.util
+        from pathlib import Path
+
+        lokasi = Path(__file__).resolve().parents[1] / "scripts" / "create_user.py"
+        spesifikasi = importlib.util.spec_from_file_location("create_user_cli", lokasi)
+        cli = importlib.util.module_from_spec(spesifikasi)
+        spesifikasi.loader.exec_module(cli)
+
+        def jalankan(*argumen, password="test-password-123"):
+            with (
+                patch("sys.argv", ["create_user.py", *argumen]),
+                patch.object(cli, "getpass", return_value=password),
+                patch("sys.stderr"),
+            ):
+                try:
+                    cli.main()
+                except SystemExit as keluar:
+                    return keluar.code
+            return 0
+
+        for argumen, password in [
+            (("ab",), "test-password-123"),  # username terlalu pendek
+            (("ada-minus",), "test-password-123"),
+            (("cli_user",), "pendek123"),  # password < 10
+            (("cli_user", "--name", "Aku"), "test-password-123"),
+            (("NOX",), "test-password-123"),
+            (("alice",), "test-password-123"),  # sudah ada
+        ]:
+            with self.subTest(argumen=argumen):
+                self.assertEqual(jalankan(*argumen, password=password), 2)
+        self.assertEqual(jalankan("cli_user", "--name", "Pemain CLI"), 0)
+        with self.engine.connect() as db:
+            akun = db.execute(
+                text(
+                    "SELECT display_name, password_hash FROM user_accounts WHERE username='cli_user'"
+                )
+            ).one()
+        self.assertEqual(akun.display_name, "Pemain CLI")
+        self.assertTrue(verify_password("test-password-123", akun.password_hash))
+        with self.engine.connect() as db:
+            self.assertEqual(db.execute(text("SELECT COUNT(*) FROM user_accounts")).scalar(), 3)
+
+    # M3: survei terikat ke username, jadi username yang masih tercatat di arsip peserta atau jawaban survei (mis.
+    # milik akun yang sudah dihapus) tidak boleh dipakai akun baru maupun akun lain yang berganti username.
+    def test_username_with_match_or_survey_history_cannot_be_reused(self):
+        self.admin()
+        with self.engine.begin() as db:
+            db.execute(text("INSERT INTO match_participants VALUES ('m1', 'alice')"))
+            db.execute(text("INSERT INTO survey_responses VALUES ('m2', 'bekas')"))
+        self.client.post("/api/panel/users/1/delete", json={"confirm_username": "alice"})
+        body = {
+            "username": "alice",
+            "display_name": "Alice Baru",
+            "password": "test-password-123",
+            "password_confirmation": "test-password-123",
+        }
+        for username in ["alice", "bekas"]:
+            response = self.client.post("/api/panel/users", json={**body, "username": username})
+            self.assertEqual(response.status_code, 409)
+            self.assertIn("riwayat", response.json()["detail"])
+            response = self.client.post(
+                "/api/panel/users/2/profile", json={"username": username, "display_name": "G"}
+            )
+            self.assertEqual(response.status_code, 409)
+        with self.engine.connect() as db:
+            self.assertEqual(db.execute(text("SELECT COUNT(*) FROM user_accounts")).scalar(), 1)
+            self.assertEqual(
+                db.execute(text("SELECT username FROM user_accounts WHERE id=2")).scalar(),
+                "google_random",
+            )

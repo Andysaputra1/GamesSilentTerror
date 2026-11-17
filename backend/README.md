@@ -74,6 +74,10 @@ panel menimpa `.env` tanpa restart. Selama baris panel kosong, `.env` yang dipak
 - **Token tunnel** (`LLM_TOKEN` dari `ai-docker/.env`) menimpa `OLLAMA_TUNNEL_TOKEN`; centang "Hapus token"
   mengembalikannya ke environment.
 - **Model lokal** dipakai jalur link bila "Model LLM link" di menu Otak NPC dibiarkan Bawaan.
+- **Simpan** hanya menulis kolom yang diisi admin atau yang sudah pernah diisi lewat panel. URL tunnel dan model
+  lokal yang belum pernah diisi tidak disimpan, jadi `OLLAMA_BASE_URL` dan `OLLAMA_MODEL` dari `.env` tetap berlaku.
+  Model OpenRouter tidak diatur menu ini (dulu selalu ditulis `qwen/qwen3-14b`; sisa itu hilang pada simpan
+  berikutnya). Menyimpan menu ini tidak menyentuh baris Otak NPC.
 - Key dan token disimpan sebagai ciphertext Fernet dengan `PANEL_ENCRYPTION_KEY`. Nilainya tidak pernah dikembalikan
   API panel. Bila kunci itu hilang atau diganti, key yang tersimpan tidak bisa didekripsi lagi.
 
@@ -144,9 +148,10 @@ python -m venv .venv
 .venv/bin/python -m uvicorn app.main:asgi_app --host 0.0.0.0 --port 8000
 ```
 
-Jalankan **satu worker** saja: ruangan, pertandingan, nonce Google, dan batas percobaan login hanya ada di memori satu
-proses. Migrasi tidak membuat akun; buat akun lewat halaman daftar atau `python scripts/create_user.py <username>
---name "Nama"` dari folder `backend`. Perintah tes ada di [CODE_GUIDE.md](../CODE_GUIDE.md#tes-dan-simulasi).
+Jalankan **satu worker** saja: ruangan, pertandingan, kunci nonce Google, dan batas percobaan (login, gabung room,
+chat) hanya ada di memori satu proses. Migrasi tidak membuat akun; buat akun lewat halaman daftar atau
+`python scripts/create_user.py <username> --name "Nama"` dari folder `backend` (aturan username, nama, dan password
+sama dengan API). Perintah tes ada di [CODE_GUIDE.md](../CODE_GUIDE.md#tes-dan-simulasi).
 
 ## Pola SQL di model
 

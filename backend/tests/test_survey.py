@@ -258,6 +258,23 @@ class SurveyServiceTests(unittest.TestCase):
             self.client.post(endpoint, json=bad, headers={"x-user": "bob"}).status_code, 422
         )
 
+    # L4: kiriman tanpa satu jawaban pun (semua pertanyaan opsional dan kosong) ditolak 400 dan tidak dianggap
+    # terkirim, jadi survei itu tetap bisa diisi.
+    def test_empty_submission_is_rejected(self):
+        for pertanyaan in self.fake.questions:
+            pertanyaan["required"] = False
+        self.finish()
+        endpoint = f"/api/rooms/{self.room.code}/survey"
+        kosong = self.client.post(endpoint, json={"match_id": self.match.id, "answers": []})
+        self.assertEqual(kosong.status_code, 400)
+        self.assertIn("minimal satu jawaban", kosong.json()["detail"])
+        self.assertEqual(self.fake.answers, [])
+        self.assertFalse(self.client.get(endpoint).json()["submitted"])
+        satu = {"match_id": self.match.id, "answers": [{"question_id": 4, "text": "Seru"}]}
+        self.assertEqual(
+            self.client.post(endpoint, json=satu).json(), {"submitted": True, "answers": 1}
+        )
+
     def test_other_choice_is_saved_with_the_question_snapshot(self):
         self.fake.questions[2]["options"] = ["Lebih cepat", "Lebih berempati", "Lainnya"]
         self.finish()
@@ -700,30 +717,25 @@ SKEMA_JAWABAN_SQLITE = (
 
 
 class SurveySummarySqlTests(unittest.TestCase):
-    """SQL ringkasan dijalankan sungguhan (SQLite) agar semantik per metode teruji."""
+    """SQL ringkasan dijalankan sungguhan (SQLite) agar semantiknya teruji."""
 
-    def test_each_answer_counts_once_by_match_method_or_mixed(self):
+    # L32: ringkasan tidak lagi memuat rata-rata per metode bot (skripsi tanpa banding metode), dan tidak membaca
+    # tabel match_bots sama sekali.
+    def test_summary_has_no_per_method_block(self):
         engine = create_engine("sqlite://")
         with Session(engine) as database:
-            database.execute(text("CREATE TABLE match_bots (match_id TEXT, method TEXT)"))
             database.execute(text(SKEMA_JAWABAN_SQLITE))
-            bots = [
-                ("tunggal", "fuzzy"),
-                ("tunggal", "fuzzy"),
-                ("campur", "fuzzy"),
-                ("campur", "bt"),
-            ]
-            for match_id, method in bots:
-                database.execute(text("INSERT INTO match_bots VALUES (:m, :method)"),
-                                 {"m": match_id, "method": method})  # fmt: skip
-            for match_id, nilai in [("tunggal", 5), ("campur", 3), ("tanpa_bot", 1)]:
+            for match_id, nilai in [("m1", 5), ("m2", 3)]:
                 database.execute(
                     text("INSERT INTO survey_responses VALUES (:m, :u, 1, :v, NULL, '2026-11-13')"),
                     {"m": match_id, "u": "akun_" + match_id, "v": nilai},
                 )
             hasil = survey_queries.summary(database)
-        per_metode = {row["method"]: (row["n"], row["rata"]) for row in hasil["per_method"]}
-        self.assertEqual(per_metode, {"fuzzy": (1, 5.0), "campuran": (1, 3.0)})
+        self.assertEqual(set(hasil), {"distribution", "text_answers"})
+        self.assertEqual(
+            sorted((b["question_id"], b["value_number"], b["n"]) for b in hasil["distribution"]),
+            [(1, 3, 1), (1, 5, 1)],
+        )
 
     # Satu akun mengisi di dua pertandingan: hanya kiriman terbarunya yang dihitung, dan bila waktunya seri,
     # match_id terbesar yang dipakai. Kiriman lama tetap ada di tabel.
@@ -756,9 +768,6 @@ class SurveySummarySqlTests(unittest.TestCase):
         self.assertEqual(
             sorted((b["question_id"], b["value_number"], b["n"]) for b in hasil["distribution"]),
             [(1, 4, 1), (1, 5, 1)],
-        )
-        self.assertEqual(
-            [(b["method"], b["n"], b["rata"]) for b in hasil["per_method"]], [("fuzzy", 2, 4.5)]
         )
         self.assertEqual(hasil["text_answers"], [])
         self.assertEqual(semua_kiriman, 4)

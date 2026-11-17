@@ -1,12 +1,20 @@
 """Endpoint room untuk pengguna yang sudah login: lobby dan perintah selama pertandingan."""
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from typing import Literal
 from app.middleware.auth import require_authenticated_user
+from app.middleware.auth_limits import BatasPercobaan
 from app.services.room_service import RoomBelumTersimpan, room_service
 
 router = APIRouter(prefix="/api/rooms", tags=["rooms"])
+
+# Kode room hanya 6 hex, jadi /join yang gagal dibatasi supaya kode tidak bisa ditebak beruntun: 10 per akun, dan 30 per
+# IP untuk banyak akun dari satu tempat, tiap menit. Gabung yang berhasil tidak dihitung, jadi satu lab atau Wi-Fi
+# kampus yang berbagi IP tidak tertahan.
+PESAN_JOIN_PENUH = "Terlalu banyak percobaan gabung ruangan. Tunggu satu menit."
+_batas_join_akun = BatasPercobaan(10, 60, PESAN_JOIN_PENUH)
+_batas_join_ip = BatasPercobaan(30, 60, PESAN_JOIN_PENUH)
 
 
 class JoinRoom(BaseModel):
@@ -179,8 +187,18 @@ def create(body: CreateRoom = CreateRoom(), user=Depends(require_authenticated_u
 
 @router.post("/join")
 # CONTROLLER: tambahkan pengguna yang login ke ruangan berdasarkan kode dari request.
-def join(body: JoinRoom, user=Depends(require_authenticated_user)):
-    return _jalankan_perintah_lobby(lambda: room_service.join(body.code, user.username))
+# Alur: 1 akun atau IP sudah terlalu sering gagal: 429 -> 2 gabung -> 3 gagal (400): catat untuk akun dan IP
+def join(body: JoinRoom, request: Request, user=Depends(require_authenticated_user)):
+    kunci_ip = request.client.host if request.client else "unknown"
+    _batas_join_akun.tolak_bila_penuh(user.username)
+    _batas_join_ip.tolak_bila_penuh(kunci_ip)
+    try:
+        return _jalankan_perintah_lobby(lambda: room_service.join(body.code, user.username))
+    except HTTPException as error:
+        if error.status_code == 400:
+            _batas_join_akun.catat(user.username)
+            _batas_join_ip.catat(kunci_ip)
+        raise
 
 
 @router.get("/{code}")

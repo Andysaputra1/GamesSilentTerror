@@ -3,7 +3,7 @@ Aturan chat manusia: dari pesan masuk sampai tersimpan, terkirim ke room, dan te
 
 Alurnya
 1. Cek pesan dan identitas
-2. Cek boleh chat atau tidak
+2. Cek boleh chat atau tidak, lalu batas laju per pemain
 3. Simpan ke MySQL
 4. Kirim ke room
 5. IndoBERT membaca pesan
@@ -16,10 +16,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from math import ceil
 from time import perf_counter
 from typing import Any
 
 from app.bot.bot_controller import catat_nlu
+from app.middleware.auth_limits import BatasPercobaan
 from app.services.activity_service import activity
 from app.services.ai_diagnostics import measure
 from app.services.checker_service import checker_service
@@ -32,6 +34,23 @@ logger = logging.getLogger("shadow_heist.chat")
 
 class ChatDitolak(Exception):
     """Pesan tidak diproses. Teksnya dikirim ke pengirim sebagai system_alert."""
+
+
+# Batas laju chat per pemain di satu room. IndoBERT membaca tiap chat ±9 detik di satu thread yang juga dipakai langkah
+# bot semua room, jadi chat beruntun membuat langkah bot di mana pun melewati batas 25 detik. Jeda 2 detik menahan
+# kiriman dobel dan tempel beruntun; 5 pesan per 20 detik masih cukup untuk membalas beberapa tuduhan sekaligus, tetapi
+# rata-ratanya paling cepat satu pesan per 4 detik, jauh di bawah skrip spam.
+_jeda_chat = BatasPercobaan(1, 2)
+_jendela_chat = BatasPercobaan(5, 20)
+
+
+# Tolak pesan bila pemain ini mengirim terlalu cepat; selain itu catat kirimannya. Kunci = (kode room, username).
+def _cek_batas_chat(kunci):
+    tunggu = max(_jeda_chat.sisa_tunggu(kunci), _jendela_chat.sisa_tunggu(kunci))
+    if tunggu > 0:
+        raise ChatDitolak(f"Chat terlalu cepat. Tunggu {ceil(tunggu)} detik lalu kirim lagi.")
+    _jeda_chat.catat(kunci)
+    _jendela_chat.catat(kunci)
 
 
 # TAHAP 3, dijalankan di thread: simpan pesan lalu masukkan ke chat pertandingan. Aksi/skip HTTP bisa berjalan
@@ -105,6 +124,9 @@ async def kirim_chat_pemain(sid: str, data: dict[str, Any]) -> None:
                 result={"allowed": False},
             )
             raise ChatDitolak("Chat terkunci untukmu pada fase ini.")
+        # Batas laju dihitung sesudah izin engine dan sebelum MySQL/IndoBERT: pesan yang ditolak engine tidak memakai
+        # jatah, pesan yang lolos selalu memakainya.
+        _cek_batas_chat((kode_room, pengirim))
         # Jejak debugging pesan (tahap dan durasi) untuk checker di panel.
         jejak = checker_service.begin(kode_room, pengirim, pesan)
         jejak["match_id"] = token_fase[0] if token_fase else None

@@ -88,6 +88,7 @@ HTTP       -> controllers -> services -> game (Match) / models (SQL) -> MySQL
 Socket.IO  -> sockets/chat.py -> services/chat_service.py -> models -> MySQL -> emit_room
 Jam 0,5 dtk (main.py) -> room_service.perbarui_fase_semua_room       (fase yang habis berganti)
                       -> npc_service.jalankan_bot_yang_sudah_waktunya (bot yang sudah waktunya melangkah)
+                      -> tiap 60 dtk: room_service.bersihkan_room_diam  (lobby/room selesai yang ditinggal)
                       MySQL tidak menjawab: room_service.jeda_jam_semua_room (fase dan bot berhenti)
 ```
 
@@ -106,7 +107,9 @@ Contoh SQL di model dan pemakaiannya dari service ada di [backend/README.md](bac
    (`GET /api/rooms/active`). Akun yang masih bertanding dikembalikan ke `/game`, dari tab mana pun. Role dan izin
    tetap berasal dari snapshot backend, bukan storage browser.
 3. **Lobby.** `Lobby` → `RoomService` frontend → `controllers/rooms.py` → `room_service`. Keanggotaan ruangan ada di
-   memori proses backend.
+   memori proses backend. Setiap panggilan anggota (`room_service.get`, `join`) mencatat waktu room terakhir disentuh;
+   jam permainan menghapus lobby yang diam satu jam dan room selesai yang diam 30 menit, sesudah peserta pertandingan
+   itu dicatat ke arsip survei. `POST /api/rooms/join` yang gagal dibatasi 10 per akun dan 30 per IP per menit.
 4. **Mulai.** Host memanggil `POST /api/rooms/{code}/start`. `Match` dibuat (role acak) dan berada di fase
    `preparing` sampai otak bot siap atau batas tunggu habis.
 5. **Aksi pemain.** `GameService` mengirim aksi ke `POST /api/rooms/{code}/play` bersama token fase. `room_service`
@@ -116,8 +119,9 @@ Contoh SQL di model dan pemakaiannya dari service ada di [backend/README.md](bac
 6. **Chat tim malam.** `POST /api/rooms/{code}/team-chat`. Pesannya hanya di memori `Match` dan
    `me.team_messages`, sengaja tanpa socket, database, NLU, atau `@traced`.
 7. **Chat publik manusia.** `sockets/chat.py` (`send_chat`) → `chat_service.kirim_chat_pemain`: cek pesan dan sesi →
-   cek hak chat (`can_chat`) → simpan ke MySQL → kirim `receive_chat` ke room → IndoBERT membacanya lewat
-   `catat_nlu`. Penolakan dikirim ke pengirim sebagai `system_alert`. Sebelum broadcast, `emit_room` mengeluarkan
+   cek hak chat (`can_chat`) → batas laju per pemain per room (jeda 2 detik, 5 pesan per 20 detik) → simpan ke MySQL
+   → kirim `receive_chat` ke room → IndoBERT membacanya lewat `catat_nlu`. Penolakan dikirim ke pengirim sebagai
+   `system_alert`. Sebelum broadcast, `emit_room` mengeluarkan
    socket yang sudah keluar room atau sesinya dicabut, dan melewati socket yang tokennya belum bisa dicek karena
    MySQL gagal. Siaran dalam satu room dikirim berurutan.
 8. **Langkah bot.** Lihat [Satu langkah bot](#satu-langkah-bot).
@@ -299,19 +303,34 @@ python -m ruff check backend
 ## Akun, sesi, dan login
 
 - **Daftar:** username 3–40 huruf, angka, atau underscore; nama lengkap 1–100 karakter; password 10–128 karakter
-  dan konfirmasinya. Password disimpan sebagai PBKDF2-SHA256. Username duplikat ditolak. Sesudah daftar, pengguna
-  langsung mendapat sesi. API masih menerima email dari frontend lama; konfirmasi email itu bukan verifikasi.
-- **Login:** username, atau email untuk akun yang punya identitas email. Sesi pemain berlaku `AUTH_SESSION_HOURS`
-  jam (bawaan 24). Hanya hash token yang disimpan. Sesi kedaluwarsa dihapus di transaksi tersendiri sesudah login,
-  daftar, atau login Google berhasil, supaya dua login bersamaan tidak saling mengunci (deadlock). Gagal membersihkan
-  tidak menggagalkan login.
+  dan konfirmasinya. Password disimpan sebagai PBKDF2-SHA256. Username duplikat ditolak, begitu juga username yang
+  masih tercatat di `match_participants` atau `survey_responses` (survei terikat ke username, jadi pemakai baru akan
+  mewarisi survei orang lain). Sesudah daftar, pengguna langsung mendapat sesi. API masih menerima email dari
+  frontend lama, tetapi tidak menyimpannya karena kepemilikannya tidak pernah dibuktikan.
+- **Nama tampilan** (`periksa_nama_tampilan` di `schemas/auth.py`, dipakai form daftar, profil, panel user, dan nama
+  dari Google): tepi dirapikan; ditolak bila memuat karakter kontrol atau pembalik arah, tidak punya huruf/angka
+  (mis. hanya emoji), atau kata pertamanya kata ganti atau istilah game yang oleh NLU tidak pernah dianggap nama
+  (`KATA_GANTI` dan `ISTILAH_GAME` di `bot/nlu.py`, mis. "Aku", "Gw", "Vote"). Tanpa nama tampilan, username
+  diperiksa dengan aturan yang sama. Akun lama yang sudah bernama seperti itu tidak diubah; panel Manajemen user bisa
+  menggantinya.
+- **Login:** username, atau email yang sudah terverifikasi Google. Akun yang tidak ada, nonaktif, atau khusus Google
+  tetap menghitung PBKDF2 terhadap hash tiruan, jadi lama respons tidak membocorkan akun ada atau tidak. Sesi pemain
+  berlaku `AUTH_SESSION_HOURS` jam (bawaan 24). Hanya hash token yang disimpan. Sesi kedaluwarsa dihapus di
+  transaksi tersendiri sesudah login, daftar, atau login Google berhasil, supaya dua login bersamaan tidak saling
+  mengunci (deadlock). Gagal membersihkan tidak menggagalkan login.
 - **Google:** Google Identity Services popup. Backend memverifikasi signature, audience, issuer, expiry, email
-  verified, dan nonce sekali pakai (5 menit). Identitas memakai Google `sub`; email yang sama tidak otomatis menautkan
-  atau mengambil alih akun lama. Akun Google baru memakai username acak dan nama dari token. Token Google tidak
-  disimpan.
-- **Batas percobaan:** 15 per menit per IP klien dan endpoint, di memori satu worker. Lokal, semua pemain terlihat
-  sebagai IP gateway sehingga berbagi batas. Di Azure, uvicorn memakai `--proxy-headers` sehingga IP berasal dari
-  Caddy.
+  verified, dan nonce sekali pakai (5 menit). Nonce ditandatangani HMAC dengan kunci acak proses dan membawa batas
+  waktunya sendiri, jadi `/google/challenge` tidak mengisi memori; yang diingat hanya nonce yang sudah dipakai.
+  Identitas memakai Google `sub`; akun lama tidak pernah diambil alih lewat kesamaan email. Bila email itu masih
+  menempel di identitas lama yang belum terverifikasi (email ketikan form daftar lama), email itu dilepas dari akun
+  lama dan akun Google baru dibuat. Akun Google baru memakai username acak dan nama dari token bila lolos aturan nama
+  tampilan, selain itu "Detective". Token Google tidak disimpan.
+- **Batas percobaan** (`middleware/auth_limits.py`, di memori satu worker): login, daftar, dan Google pemain 60 per
+  menit per IP klien dan endpoint, supaya satu lab atau Wi-Fi kampus yang berbagi IP tidak tertahan; login panel dan
+  cek penulis 15 per menit. Password salah dihitung per akun (isian username/email yang dirapikan): 10 kali dalam
+  15 menit menahan akun itu dari IP mana pun, dan login yang berhasil menghapus hitungannya. Lokal, semua pemain
+  terlihat sebagai IP gateway sehingga berbagi batas. Di Azure, uvicorn memakai `--proxy-headers` sehingga IP berasal
+  dari Caddy.
 - **Profil:** ikon pensil menyimpan nama dan username lewat `POST /api/auth/me`. Username hanya bisa diganti sesudah
   keluar ruangan. ID akun dan identitas Google tetap; nama pengirim di arsip chat tetap seperti saat pesan dikirim.
 - **Avatar:** 6 skin (`arthur`, `dexter`, `eloise`, `jenny`, `kiera`, `sadie`), disimpan lewat `PUT /api/auth/skin`
@@ -320,10 +339,13 @@ python -m ruff check backend
 - **Manajemen user di panel** (`controllers/users.py`, `services/user_service.py`): tambah akun username/password
   tanpa membuat sesi; ubah nama atau username (ditolak bila masih di ruangan, dan mencabut sesi lama); reset password
   hanya untuk akun lokal dan mencabut semua sesinya; hapus akun dengan konfirmasi username dan hanya bila user sudah
-  keluar ruangan. Yang dihapus hanya akun, identitas login, dan sesi; chat dan jejak checker tetap.
+  keluar ruangan. Yang dihapus hanya akun, identitas login, dan sesi; chat, jejak checker, arsip peserta, dan jawaban
+  survei tetap, sehingga username akun yang dihapus tidak bisa dipakai lagi bila punya riwayat. CLI
+  `scripts/create_user.py` memakai validator `RegisterRequest` dan `create_user` yang sama, jadi aturannya sama
+  dengan API.
 - `ADMIN_USERNAMES` dan `HISTORY_ADMIN_USERNAMES` di `.env` hanya daftar username yang dicadangkan (tidak boleh
   dipakai akun game). Nama bot juga dicadangkan.
-- Belum ada reset password mandiri, verifikasi email, atau penautan akun.
+- Belum ada reset password mandiri, verifikasi email untuk akun password, atau penautan akun.
 
 ## Tes dan simulasi
 
@@ -412,8 +434,8 @@ akurasi vote warga). Seed tetap, jadi hasil bisa diulang. Kedua skrip memakai pa
 - Lobby, engine, role, aksi, vote, timer, dan ingatan bot ada di memori **satu proses** backend. Reload atau
   reconnect browser memulihkan snapshot dan 100 pesan terbaru selama proses itu hidup. Restart atau recreate backend
   menghapus pertandingan aktif; arsip chat dan jejak di MySQL tetap ada, tetapi tidak memulihkan pertandingan.
-- Jangan menjalankan lebih dari satu worker backend sebelum ada state bersama. Ruangan, nonce Google, dan batas
-  percobaan login hanya ada di satu proses.
+- Jangan menjalankan lebih dari satu worker backend sebelum ada state bersama. Ruangan, kunci nonce Google, dan
+  semua batas percobaan (login, gabung room, chat) hanya ada di satu proses.
 - Semua room berbagi dua kelompok thread di `BrainRuntime`: **satu thread otak** (`eksekutor_keputusan`) untuk
   langkah berpikir semua bot dan bacaan IndoBERT setiap chat, karena ingatan bot dan memo NLU tidak dirancang paralel,
   serta **tiga thread penulis** (`eksekutor_nlg`) untuk kalimat bot. Di VM produksi (2 vCPU), room 10 pemain membuat

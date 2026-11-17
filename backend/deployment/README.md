@@ -138,7 +138,7 @@ Skema lengkap berisi 15 tabel. `players` berbeda dari `user_accounts`: satu akun
 
 | Tabel | Pemakaian backend |
 | --- | --- |
-| `user_accounts`, `auth_sessions`, `account_identities` | Akun, sesi login, email dan identitas Google (`models/auth_queries.py`) |
+| `user_accounts`, `auth_sessions`, `account_identities` | Akun, sesi login, dan identitas Google (`models/auth_queries.py`). Baris `account_identities` lama tanpa Google `sub` (email form daftar, `email_verified = 0`) tidak dipakai login dan dilepas otomatis saat login Google dengan email yang sama; tidak perlu migrasi |
 | `game_sessions`, `players` | Identitas room dan peserta room (`models/game_queries.py`) |
 | `chat_messages` | Arsip chat manusia dan bot beserta bacaan NLU (`game_queries.py`, `panel_queries.py`) |
 | `checker_traces` | Jejak checker yang selesai (`game_queries.py`, `panel_queries.py`) |

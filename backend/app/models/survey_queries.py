@@ -165,26 +165,12 @@ KIRIMAN_TERBARU = """
 HANYA_TERBARU = "JOIN kiriman_terbaru t ON t.match_id = r.match_id AND t.username = r.username"
 
 
-# QUERY RINGKASAN: jumlah, rata-rata, dan sebaran nilai per pertanyaan, serta rata-rata per metode bot, hanya
-# dari kiriman terbaru tiap akun. Pertandingan yang semua botnya satu metode masuk ke metode itu, pertandingan
-# dengan beberapa metode masuk kelompok "campuran" (tidak dibagi ke tiap metode).
+# QUERY RINGKASAN: sebaran nilai dan jumlah jawaban teks per pertanyaan, hanya dari kiriman terbaru tiap akun.
 def summary(database: Session) -> dict:
     distribusi = database.execute(text(f"""
         {KIRIMAN_TERBARU}
         SELECT r.question_id, r.value_number, COUNT(*) AS n FROM survey_responses r {HANYA_TERBARU}
         WHERE r.value_number IS NOT NULL GROUP BY r.question_id, r.value_number
-    """)).all()
-    per_metode = database.execute(text(f"""
-        {KIRIMAN_TERBARU}
-        SELECT r.question_id, b.method, COUNT(*) AS n, AVG(r.value_number) AS rata
-        FROM survey_responses r {HANYA_TERBARU}
-        JOIN (
-            SELECT match_id,
-                   CASE WHEN COUNT(DISTINCT method) = 1 THEN MIN(method) ELSE 'campuran' END AS method
-            FROM match_bots GROUP BY match_id
-        ) b ON b.match_id = r.match_id
-        WHERE r.value_number IS NOT NULL
-        GROUP BY r.question_id, b.method
     """)).all()
     teks = database.execute(text(f"""
         {KIRIMAN_TERBARU}
@@ -193,10 +179,6 @@ def summary(database: Session) -> dict:
     """)).all()
     return {
         "distribution": [dict(baris._mapping) for baris in distribusi],
-        "per_method": [
-            {**dict(baris._mapping), "rata": float(baris.rata) if baris.rata is not None else None}
-            for baris in per_metode
-        ],
         "text_answers": [dict(baris._mapping) for baris in teks],
     }
 

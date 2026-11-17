@@ -134,7 +134,7 @@ def panel_clear_responses(token=Depends(require_panel)):
 
 
 @router.get("/api/panel/survey/summary")
-# PANEL: sebaran nilai per pertanyaan dan rata-rata per metode bot, dari kiriman terbaru tiap akun.
+# PANEL: sebaran nilai per pertanyaan, dari kiriman terbaru tiap akun.
 def panel_summary(token=Depends(require_panel)):
     return survey_call(survey_service.summary)
 

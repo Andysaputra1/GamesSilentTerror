@@ -14,7 +14,7 @@ from app.schemas.auth import (
     UpdateSkinRequest,
 )
 from app.config.settings import settings
-from app.middleware.auth_limits import limit_auth
+from app.middleware.auth_limits import batas_gagal_login, limit_auth_pemain
 from app.middleware.safe_validation import SafeValidationRoute
 from app.services.auth_service import (
     AccountConflict,
@@ -52,16 +52,23 @@ def _buat_respons_login(hasil_login: LoginResult) -> LoginResponse:
     )
 
 
-# Minta service memeriksa akun dan membuat sesi; kembalikan token atau error HTTP.
-@router.post("/login", response_model=LoginResponse, dependencies=[Depends(limit_auth)])
+# Minta service memeriksa akun dan membuat sesi; kembalikan token atau error HTTP. Password salah dihitung per akun
+# (isian yang dirapikan, ada atau tidak akunnya), jadi tebakan dari banyak IP tetap tertahan.
+# Alur: 1 akun sudah 10 kali salah dalam 15 menit: 429 -> 2 periksa password -> 3.1 salah: catat
+#                                                                          \> 3.2 benar: hapus catatan
+@router.post("/login", response_model=LoginResponse, dependencies=[Depends(limit_auth_pemain)])
 def login(body: LoginRequest) -> LoginResponse:
     """Create a short-lived opaque session after validating credentials."""
+    kunci_akun = body.username.strip().casefold()
+    batas_gagal_login.tolak_bila_penuh(kunci_akun)
     try:
         hasil_login = auth_service.login(username=body.username, password=body.password)
     except AuthenticationError as error:
+        batas_gagal_login.catat(kunci_akun)
         raise HTTPException(status_code=401, detail=str(error)) from error
     except PersistenceError as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
+    batas_gagal_login.hapus(kunci_akun)
     return _buat_respons_login(hasil_login)
 
 
@@ -132,12 +139,15 @@ def _jalankan_operasi_akun(operasi):
 
 # Daftarkan akun dan terbitkan sesi; respons autentikasi tidak boleh di-cache.
 @router.post(
-    "/register", response_model=LoginResponse, status_code=201, dependencies=[Depends(limit_auth)]
+    "/register",
+    response_model=LoginResponse,
+    status_code=201,
+    dependencies=[Depends(limit_auth_pemain)],
 )
 def register(body: RegisterRequest, response: Response):
     response.headers["Cache-Control"] = "no-store"
     return _jalankan_operasi_akun(
-        lambda: register_account(body.username, body.password, body.display_name, body.email)
+        lambda: register_account(body.username, body.password, body.display_name)
     )
 
 
@@ -156,7 +166,7 @@ def validate_google_origin(request):
 
 
 # Validasi origin lalu buat nonce sekali pakai untuk percobaan login Google.
-@router.post("/google/challenge", dependencies=[Depends(limit_auth)])
+@router.post("/google/challenge", dependencies=[Depends(limit_auth_pemain)])
 def google_challenge(request: Request, response: Response):
     validate_google_origin(request)
     try:
@@ -168,7 +178,7 @@ def google_challenge(request: Request, response: Response):
 
 
 # Verifikasi origin, token, dan nonce Google sebelum membuat sesi aplikasi.
-@router.post("/google", response_model=LoginResponse, dependencies=[Depends(limit_auth)])
+@router.post("/google", response_model=LoginResponse, dependencies=[Depends(limit_auth_pemain)])
 def google_login(body: GoogleLoginRequest, request: Request, response: Response):
     validate_google_origin(request)
     response.headers["Cache-Control"] = "no-store"

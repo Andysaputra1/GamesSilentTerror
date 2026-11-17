@@ -9,18 +9,25 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 from app.controllers.auth import router
-from app.middleware.auth_limits import _riwayat_percobaan
+from app.middleware.auth_limits import batas_gagal_login, limit_auth_pemain
 from app.config.settings import settings
-from app.services.auth_service import nonces
+from app.services.auth_service import hash_tiruan, nonces
+from app.services.password_service import verify_password
 
 # Diimpor sebelum setUp mem-patch SessionLocal: room_service menyalin nama itu saat pertama diimpor,
 # jadi impor pertama di tengah patch mengikatnya selamanya ke engine tes yang sudah ditutup.
 from app.services.room_service import room_service
 
 
+# Batas percobaan disimpan di memori proses; tiap tes mulai dari kosong.
+def kosongkan_batas():
+    limit_auth_pemain.riwayat.clear()
+    batas_gagal_login.riwayat.clear()
+
+
 class AccountTests(unittest.TestCase):
     def setUp(self):
-        _riwayat_percobaan.clear()
+        kosongkan_batas()
         self.engine = create_engine(
             "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
         )
@@ -40,6 +47,8 @@ class AccountTests(unittest.TestCase):
                     "CREATE TABLE auth_sessions (user_id INTEGER, token_hash TEXT, expires_at DATETIME)"
                 )
             )
+            db.execute(text("CREATE TABLE match_participants (match_id TEXT, username TEXT)"))
+            db.execute(text("CREATE TABLE survey_responses (match_id TEXT, username TEXT)"))
         self.session_patch = patch(
             "app.config.database.SessionLocal", sessionmaker(bind=self.engine)
         )
@@ -60,7 +69,7 @@ class AccountTests(unittest.TestCase):
         self.client.close()
         self.session_patch.stop()
         self.engine.dispose()
-        _riwayat_percobaan.clear()
+        kosongkan_batas()
 
     def register(self, **changes):
         return self.client.post("/api/auth/register", json={**self.body, **changes})
@@ -110,7 +119,9 @@ class AccountTests(unittest.TestCase):
         )
         token = self.register().json()["access_token"]
         headers = {"Authorization": "Bearer " + token}
-        for name in ["", "   ", "x" * 101, "Bad\nName", "Bad\u202eName", 123, None]:
+        # Nama yang dibaca keliru oleh NLU bot juga ditolak (M10): tanpa huruf/angka, atau diawali kata ganti/istilah.
+        for name in ["", "   ", "x" * 101, "Bad\nName", "Bad\u202eName", 123, None,
+                     "Aku", "gw", "Vote", "Hitman keren", "\U0001f525\U0001f525", "!!!"]:  # fmt: skip
             response = self.client.post(
                 "/api/auth/me", headers=headers, json={"display_name": name}
             )
@@ -144,7 +155,8 @@ class AccountTests(unittest.TestCase):
             self.body["username"],
         )
 
-    def test_register_password_hash_email_login_and_duplicates(self):
+    # H1: email dari form daftar tidak disimpan, jadi tidak bisa dipakai login dan tidak menghalangi pendaftar lain.
+    def test_register_password_hash_ignores_unverified_email_and_duplicates(self):
         response = self.register()
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.headers["cache-control"], "no-store")
@@ -153,21 +165,91 @@ class AccountTests(unittest.TestCase):
             row = db.execute(text("SELECT password_hash FROM user_accounts")).scalar()
             self.assertNotEqual(row, self.body["password"])
             self.assertTrue(row.startswith("pbkdf2_sha256"))
-            self.assertEqual(
-                db.execute(text("SELECT email_verified FROM account_identities")).scalar(), 0
-            )
+            self.assertEqual(db.execute(text("SELECT COUNT(*) FROM account_identities")).scalar(), 0)
         with self.engine.begin() as db:
             db.execute(text("UPDATE user_accounts SET skin_id = 'jenny'"))
         login = self.client.post(
             "/api/auth/login",
-            json={"username": "test@example.com", "password": self.body["password"]},
+            json={"username": self.body["username"], "password": self.body["password"]},
         )
         self.assertEqual(login.status_code, 200)
         self.assertEqual(login.json()["user"]["skin_id"], "jenny")  # skin tersimpan, bukan bawaan
+        lewat_email = self.client.post(
+            "/api/auth/login",
+            json={"username": "test@example.com", "password": self.body["password"]},
+        )
+        self.assertEqual(lewat_email.status_code, 401)
         self.assertEqual(self.register().status_code, 409)
-        self.assertEqual(self.register(username="another").status_code, 409)
+        self.assertEqual(self.register(username="another").status_code, 201)
         with self.engine.connect() as db:
-            self.assertEqual(db.execute(text("SELECT count(*) FROM user_accounts")).scalar(), 1)
+            self.assertEqual(db.execute(text("SELECT count(*) FROM user_accounts")).scalar(), 2)
+
+    # H1: identitas lama dari form daftar (email belum terverifikasi) tidak bisa dipakai login lewat email, dan login
+    # Google dengan email itu membuat akun Google baru sambil melepas email dari akun lama, tanpa 409.
+    def test_legacy_unverified_email_neither_logs_in_nor_blocks_google(self):
+        self.assertEqual(self.register().status_code, 201)
+        with self.engine.begin() as db:
+            db.execute(
+                text("INSERT INTO account_identities VALUES (1, 'korban@example.com', NULL, 0)")
+            )
+        login = self.client.post(
+            "/api/auth/login",
+            json={"username": "korban@example.com", "password": self.body["password"]},
+        )
+        self.assertEqual(login.status_code, 401)
+        google, _ = self.google(email="Korban@Example.com", subject="korban-sub")
+        self.assertEqual(google.status_code, 200)
+        self.assertTrue(google.json()["user"]["username"].startswith("google_"))
+        with self.engine.connect() as db:
+            identitas = db.execute(
+                text("SELECT user_id, google_subject, email_verified FROM account_identities")
+            ).all()
+            self.assertEqual(len(identitas), 1)
+            self.assertEqual(tuple(identitas[0])[1:], ("korban-sub", 1))
+            self.assertEqual(db.execute(text("SELECT count(*) FROM user_accounts")).scalar(), 2)
+        akun_lama = self.client.post(
+            "/api/auth/login",
+            json={"username": self.body["username"], "password": self.body["password"]},
+        )
+        self.assertEqual(akun_lama.status_code, 200)
+        lagi, _ = self.google(email="korban@example.com", subject="korban-sub")
+        self.assertEqual(lagi.json()["user"], google.json()["user"])
+
+    # L1: akun yang tidak ada tetap menghitung hash (hash tiruan), jadi lama respons sama dengan akun yang ada.
+    def test_login_unknown_account_still_hashes(self):
+        with patch(
+            "app.services.auth_service.verify_password", wraps=verify_password
+        ) as verifikasi:
+            for isian in ["tidak_ada_sama_sekali", "siapa@example.com"]:
+                response = self.client.post(
+                    "/api/auth/login", json={"username": isian, "password": "password-apa-saja"}
+                )
+                self.assertEqual(response.status_code, 401)
+        self.assertEqual(verifikasi.call_count, 2)
+        self.assertTrue(all(c.args[1] == hash_tiruan() for c in verifikasi.call_args_list))
+
+    # M5: 10 password salah untuk satu akun menahan akun itu 15 menit (juga dengan password benar), tanpa
+    # menahan akun lain.
+    def test_wrong_password_limit_is_per_account(self):
+        self.assertEqual(self.register().status_code, 201)
+        self.assertEqual(self.register(username="teman_lab").status_code, 201)
+        salah = {"username": self.body["username"], "password": "password-salah-123"}
+        with patch(
+            "app.services.auth_service.verify_password", side_effect=lambda p, h: p == "benar"
+        ):
+            for _ in range(10):
+                self.assertEqual(self.client.post("/api/auth/login", json=salah).status_code, 401)
+            ditahan = self.client.post(
+                "/api/auth/login",
+                json={"username": " " + self.body["username"].upper(), "password": "benar"},
+            )
+            self.assertEqual(ditahan.status_code, 429)
+            self.assertIn("akun ini", ditahan.json()["detail"])
+            self.assertLessEqual(int(ditahan.headers["retry-after"]), 15 * 60)
+            teman = self.client.post(
+                "/api/auth/login", json={"username": "teman_lab", "password": "benar"}
+            )
+            self.assertEqual(teman.status_code, 200)
 
     def test_validation_reserved_and_rate_limit(self):
         self.assertEqual(self.register(password_confirmation="different-password").status_code, 422)
@@ -176,9 +258,11 @@ class AccountTests(unittest.TestCase):
         self.assertEqual(self.register(username="sage").status_code, 409)  # nama NPC lain juga
         self.assertEqual(self.register(username="user1").status_code, 409)
         self.assertEqual(self.register(username="x<script>").status_code, 422)
-        for _ in range(16):
-            response = self.register(username="NOX")
-        self.assertEqual(response.status_code, 429)
+        # Batas per IP untuk pemain 60 per menit: orang ke-16 di satu lab tidak lagi kena 429.
+        kosongkan_batas()
+        for _ in range(60):
+            self.assertEqual(self.register(username="NOX").status_code, 409)
+        self.assertEqual(self.register(username="NOX").status_code, 429)
 
     def test_google_disabled_and_wrong_origin(self):
         with patch.object(settings, "google_client_id", ""):
@@ -305,11 +389,63 @@ class AccountTests(unittest.TestCase):
             {"username": "new_detective", "display_name": "New Name", "skin_id": "dexter"},
         )
 
+    # Email yang sama tidak menautkan akun: daftar dengan email korban lalu Google korban = dua akun terpisah.
     def test_google_mismatched_nonce_unverified_and_no_email_linking(self):
         self.assertEqual(self.google(nonce="wrong")[0].status_code, 401)
         self.assertEqual(self.google(email_verified=False)[0].status_code, 401)
-        self.assertEqual(self.register().status_code, 201)
-        self.assertEqual(self.google(email=self.body["email"])[0].status_code, 409)
+        registered = self.register()
+        self.assertEqual(registered.status_code, 201)
+        google, _ = self.google(email=self.body["email"])
+        self.assertEqual(google.status_code, 200)
+        self.assertNotEqual(google.json()["user"]["username"], registered.json()["user"]["username"])
+        with self.engine.connect() as db:
+            self.assertEqual(db.execute(text("SELECT count(*) FROM user_accounts")).scalar(), 2)
+
+    # M5: nonce Google ditandatangani, jadi banjir /google/challenge tidak menggusur nonce lama; nonce palsu, yang
+    # diubah, atau yang sudah dipakai ditolak.
+    def test_google_nonce_flood_tamper_and_replay(self):
+        nonce_awal = nonces.issue()
+        for _ in range(2000):
+            nonces.issue()
+        self.assertTrue(nonces.consume(nonce_awal))
+        self.assertFalse(nonces.consume(nonce_awal))
+        palsu = nonces.issue()
+        batas, acak, tanda = palsu.split(".")
+        self.assertFalse(nonces.consume(f"{int(batas) + 999}.{acak}.{tanda}"))
+        self.assertFalse(nonces.consume("x" * 40))
+        self.assertFalse(nonces.consume("1.2.\u00e9"))
+        self.assertTrue(nonces.consume(palsu))
+
+    # L8 + M10: nama Google dengan karakter kontrol/bidi, tanpa huruf/angka, atau berupa kata ganti diganti
+    # "Detective"; nama biasa hanya dirapikan.
+    def test_google_display_name_is_sanitized(self):
+        for subjek, nama, hasil in [
+            ("s1", "Bad\u202eName", "Detective"),
+            ("s2", "Aku", "Detective"),
+            ("s3", "\U0001f525\U0001f525", "Detective"),
+            ("s4", "  Andy Saputra  ", "Andy Saputra"),
+        ]:
+            with self.subTest(nama=nama):
+                response, _ = self.google(email=subjek + "@example.com", subject=subjek, name=nama)
+                self.assertEqual(response.json()["user"]["display_name"], hasil)
+
+    # M10 + M3: nama tampilan dari form daftar (atau username bila nama kosong) ikut diperiksa; username yang masih
+    # punya riwayat pertandingan atau survei tidak bisa didaftarkan atau dipakai saat ganti username.
+    def test_register_display_name_and_username_history(self):
+        self.assertEqual(self.register(display_name="Gw").status_code, 422)
+        self.assertEqual(self.register(username="Vote").status_code, 422)
+        with self.engine.begin() as db:
+            db.execute(text("INSERT INTO match_participants VALUES ('m1', 'pemain_lama')"))
+            db.execute(text("INSERT INTO survey_responses VALUES ('m2', 'pengisi_lama')"))
+        for username in ["pemain_lama", "pengisi_lama"]:
+            self.assertEqual(self.register(username=username).status_code, 409)
+        token = self.register().json()["access_token"]
+        ganti = self.client.post(
+            "/api/auth/me",
+            headers={"Authorization": "Bearer " + token},
+            json={"username": "pemain_lama", "display_name": "Nama Baru"},
+        )
+        self.assertEqual(ganti.status_code, 409)
         with self.engine.connect() as db:
             self.assertEqual(db.execute(text("SELECT count(*) FROM user_accounts")).scalar(), 1)
 

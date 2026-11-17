@@ -27,8 +27,11 @@ def create_user(username, display_name, password):
     validate_username(username)
     hash_tersimpan = hash_password(password)
 
-    # Constraint unik menangani dua admin yang membuat username sama secara bersamaan.
+    # Constraint unik menangani dua admin yang membuat username sama secara bersamaan. Username yang masih punya
+    # riwayat pertandingan atau survei ditolak, supaya akun baru tidak mewarisi survei orang lain.
     def simpan_akun_baru(database):
+        if auth_queries.username_punya_riwayat(database, username):
+            raise ValueError("Username masih tercatat di riwayat pertandingan atau survei.")
         try:
             id_akun_baru = auth_queries.create_account(
                 database, username=username, display_name=display_name, password_hash=hash_tersimpan
@@ -50,6 +53,8 @@ def update_user(user_id, display_name, username=None):
             validate_username(username_terpilih)
             if room_service.current(akun["username"]):
                 raise ValueError("User harus keluar dari ruangan sebelum username diganti.")
+            if auth_queries.username_punya_riwayat(database, username_terpilih):
+                raise ValueError("Username masih tercatat di riwayat pertandingan atau survei.")
             try:
                 auth_queries.update_username(database, user_id, username_terpilih)
             except IntegrityError as error:

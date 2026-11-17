@@ -198,7 +198,36 @@ def account_by_google_subject(database, google_subject):
     )
 
 
-# Pilih pencarian username atau email sesuai isian login.
+# Lepas email yang sama dari identitas yang belum terverifikasi (email ketikan form daftar lama), sebelum akun Google
+# dengan email itu dibuat. Akun pemilik identitas itu tidak ikut terhapus.
+def delete_unverified_identity(database, email):
+    database.execute(
+        text("""
+        DELETE FROM account_identities
+        WHERE email = :email AND google_subject IS NULL AND email_verified = FALSE
+    """),
+        {"email": email},
+    )
+
+
+# Username yang masih tercatat di arsip peserta atau jawaban survei. Survei terikat ke username, jadi username seperti
+# ini tidak boleh dipakai akun lain (daftar, ganti username, atau akun buatan admin).
+def username_punya_riwayat(database, username) -> bool:
+    return (
+        database.execute(
+            text("""
+        SELECT 1 FROM match_participants WHERE username = :username
+        UNION ALL
+        SELECT 1 FROM survey_responses WHERE username = :username
+        LIMIT 1
+    """),
+            {"username": username},
+        ).first()
+        is not None
+    )
+
+
+# Pilih pencarian username atau email sesuai isian login. Email hanya dipakai bila sudah terverifikasi (dari Google).
 def account_by_login(database, username_atau_email):
     # Username lama tetap bekerja; username pendaftaran tidak mengandung @.
     if "@" not in username_atau_email:
@@ -208,7 +237,7 @@ def account_by_login(database, username_atau_email):
             text("""
         SELECT u.id, u.username, u.display_name, u.password_hash, u.is_active, u.skin_id
         FROM user_accounts u JOIN account_identities i ON i.user_id = u.id
-        WHERE i.email = :email
+        WHERE i.email = :email AND i.email_verified = TRUE
     """),
             {"email": username_atau_email.lower()},
         )

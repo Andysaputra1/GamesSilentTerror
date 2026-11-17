@@ -21,7 +21,8 @@ Alurnya tiap detak jam (perbarui_fase_semua_room, dipanggil main.py tiap 0,5 det
 2. Pertandingan yang baru selesai: peserta manusianya dicatat sekali ke arsip survei lewat thread latar
 3. Fase yang berganti dicatat ke jejak aktivitas panel
 4. Satu room gagal: dicatat di log, room lain tetap jalan
-Selama MySQL tidak menjawab, main.py memanggil jeda_jam_semua_room sebagai ganti detak jam.
+Selama MySQL tidak menjawab, main.py memanggil jeda_jam_semua_room sebagai ganti detak jam. Tiap menit main.py juga
+memanggil bersihkan_room_diam: lobby dan room selesai yang ditinggal tanpa /leave dihapus.
 """
 
 import logging
@@ -42,6 +43,17 @@ BOT_NAMES = ("NOX", "ECHO", "VEIL", "RAVEN", "ASH", "DUSK", "IRIS", "SAGE", "ONY
 
 # Batas bot yang boleh ditambahkan host ke satu room. Simulasi panel memakai batasnya sendiri (3–9 bot).
 BOT_MAKS = 5
+
+# Batas room aktif di memori; lewat batas ini room baru ditolak.
+ROOM_MAKS = 500
+# Room yang tidak disentuh anggotanya selama ini dihapus bersihkan_room_diam (detik). Lobby: satu jam, karena lobby yang
+# tabnya masih terbuka bertanya ke server tiap 3 detik. Pertandingan selesai: 30 menit; survei tetap bisa dikirim
+# sesudahnya lewat arsip peserta dan registri memori survey_service.
+LOBBY_DIAM_DETIK = 60 * 60
+SELESAI_DIAM_DETIK = 30 * 60
+# Pesan yang sama untuk kode yang tidak ada dan room yang tidak boleh dibuka, supaya kode room tidak bisa ditebak
+# dengan membedakan pesan error.
+PESAN_ROOM_TERTUTUP = "Ruangan tidak ditemukan atau kamu bukan anggotanya."
 
 
 # Aksi rahasia yang bisa dipilih otak bot lewat Match.act.
@@ -105,6 +117,8 @@ class Room:
     match: Match | None = None
     capacity: int = 6
     peserta_tercatat: bool = False  # peserta pertandingan selesai sudah dikirim ke arsip survei
+    # Waktu (monotonic) anggota terakhir membuka atau mengubah room; dibaca bersihkan_room_diam.
+    disentuh: float = field(default_factory=time.monotonic)
 
 
 class RoomService:
@@ -135,17 +149,14 @@ class RoomService:
         for username, (skin_id, nama_tampilan) in self._ambil_profil_akun(daftar_username).items():
             room.members_skin[username], room.members_label[username] = skin_id, nama_tampilan
 
-    # Mengambil room dari kodenya, sekaligus memastikan pemain itu anggotanya.
-    # Room hanya ada di memori: tidak ada query DB di sini, dan semua room hilang saat server restart.
+    # Mengambil room dari kodenya, sekaligus memastikan pemain itu anggotanya. Panggilan anggota menandai room masih
+    # dipakai. Room hanya ada di memori: tidak ada query DB di sini, dan semua room hilang saat server restart.
     def get(self, code: str, username: str) -> Room:
         with self.lock:
             room = self.rooms.get(code.strip().upper())
-            if room is None:
-                raise ValueError("Ruangan tidak ditemukan atau server sudah dimulai ulang.")
-            if username not in room.members:
-                if room.match is not None:
-                    raise ValueError("Pertandingan sudah dimulai; tunggu ruangan baru.")
-                raise ValueError("Gabung ke ruangan ini terlebih dahulu.")
+            if room is None or username not in room.members:
+                raise ValueError(PESAN_ROOM_TERTUTUP)
+            room.disentuh = time.monotonic()
             return room
 
     # PEMULIHAN: cari room akun dari server, bukan sessionStorage tab; tanpa data role privat.
@@ -227,7 +238,7 @@ class RoomService:
             self._lepas_room_selesai(username)
             if self.current(username):
                 raise ValueError("Keluar dari ruangan sebelumnya sebelum membuat ruangan baru.")
-            if len(self.rooms) >= 500:
+            if len(self.rooms) >= ROOM_MAKS:
                 raise ValueError("Batas ruangan aktif tercapai. Hubungi pengelola.")
             kode_room = secrets.token_hex(3).upper()
             while kode_room in self.rooms:
@@ -276,6 +287,7 @@ class RoomService:
                     raise ValueError(f"Ruangan sudah penuh (maksimal {room.capacity} pemain).")
                 room.members.append(username)
                 self._ingat_profil(room, [username])
+            room.disentuh = time.monotonic()
             return room
 
     # Bot yang ikut: sebanyak pilihan host, tetapi tidak melebihi kursi kosong. Manusia yang bergabung saat kursi penuh
@@ -651,6 +663,36 @@ class RoomService:
                             "winner": pertandingan.winner,
                         },
                     )
+
+    # BERSIHKAN: dipanggil game_clock tiap menit. Menutup tab tidak memanggil /leave, jadi tanpa ini room tertinggal
+    # selamanya dan sesudah ROOM_MAKS tidak ada yang bisa membuat room. Pertandingan yang masih berjalan tidak disentuh.
+    # Hasil: kode room yang dihapus.
+    # Alur: 1 lobby diam >= LOBBY_DIAM_DETIK, atau pertandingan selesai diam >= SELESAI_DIAM_DETIK -> 2 pertandingan
+    #       selesai: peserta dicatat ke arsip survei dan registri memori survei, seperti saat keluar -> 3 hapus room
+    def bersihkan_room_diam(self):
+        waktu_sekarang = time.monotonic()
+        terhapus = []
+        with self.lock:
+            for room in list(self.rooms.values()):
+                if room.match is None:
+                    batas_diam = LOBBY_DIAM_DETIK
+                elif room.match.winner:
+                    batas_diam = SELESAI_DIAM_DETIK
+                else:
+                    continue
+                if waktu_sekarang - room.disentuh < batas_diam:
+                    continue
+                if room.match:
+                    # Impor lambat: survey_service mengimpor modul ini.
+                    from app.services.survey_service import survey_service
+
+                    survey_service.ingat_pertandingan(room)
+                    self._catat_peserta_pertandingan_selesai(room)
+                del self.rooms[room.code]
+                terhapus.append(room.code)
+        if terhapus:
+            logger.info("Room diam dibersihkan: %s", ", ".join(terhapus))
+        return terhapus
 
 
 room_service = RoomService()

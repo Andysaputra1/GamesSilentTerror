@@ -33,26 +33,30 @@ def main():
             assert client.post("/api/auth/register", json=body).status_code == 409
             assert (
                 client.post(
-                    "/api/auth/login", json={"username": email, "password": "wrong"}
+                    "/api/auth/login", json={"username": name, "password": "wrong"}
                 ).status_code
                 == 401
             )
-            logged = client.post("/api/auth/login", json={"username": email, "password": password})
+            # Email dari form daftar belum terverifikasi, jadi tidak disimpan dan tidak bisa dipakai login.
+            assert (
+                client.post(
+                    "/api/auth/login", json={"username": email, "password": password}
+                ).status_code
+                == 401
+            )
+            logged = client.post("/api/auth/login", json={"username": name, "password": password})
             assert logged.status_code == 200
             headers = {"Authorization": "Bearer " + logged.json()["access_token"]}
             assert client.post("/api/auth/logout", headers=headers).status_code == 204
             assert client.get("/api/auth/me", headers=headers).status_code == 401
             print(
-                "PASS real MySQL: register, session, duplicate, wrong password, email login, logout/revocation"
+                "PASS real MySQL: register, session, duplicate, wrong password, no email login, logout/revocation"
             )
     finally:
         with SessionLocal.begin() as db:
-            # Identifikasi tepat username dan email buatan tes; bukan wildcard akun pengguna.
+            # Identifikasi tepat username acak buatan tes; bukan wildcard akun pengguna.
             row = db.execute(
-                text(
-                    "SELECT u.id FROM user_accounts u JOIN account_identities i ON i.user_id=u.id WHERE u.username=:name AND i.email=:email"
-                ),
-                {"name": name, "email": email},
+                text("SELECT id FROM user_accounts WHERE username=:name"), {"name": name}
             ).scalar()
             if row:
                 db.execute(

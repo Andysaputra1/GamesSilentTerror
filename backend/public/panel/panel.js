@@ -83,7 +83,6 @@ function clearSession() {
   $('sim-status').hidden = true;
   $('npc-status').replaceChildren();
   $('survey-rows').replaceChildren();
-  $('survey-method-rows').replaceChildren();
   $('survey-stats').replaceChildren();
   $('survey-charts').replaceChildren();
   $('survey-respondent-rows').replaceChildren();
@@ -3681,10 +3680,10 @@ function tampilkanPengisiSurvei(daftarPertanyaan, dataPengisi) {
   }
   $('survey-respondent-rows').replaceChildren(...daftarKiriman.flatMap(barisPengisiSurvei));
 }
-// Muat ringkasan dan pengisi survei, lalu tampilkan tabel pertanyaan (urutan server), rata-rata per
-// metode, dan bagian pengisi (jumlah, diagram, daftar nama).
+// Muat ringkasan dan pengisi survei, lalu tampilkan tabel pertanyaan (urutan server) dan bagian pengisi
+// (jumlah, diagram, daftar nama).
 // Alur: 1 ambil ringkasan dan pengisi -> 2 kelompokkan nilai -> 3 bangun baris -> 4 tampilkan
-//       -> 5 tabel metode -> 6 bagian pengisi
+//       -> 5 bagian pengisi
 async function muatSurvei() {
   // 1 ambil ringkasan dan pengisi; jawaban untuk sesi lama diabaikan
   const generasiAwal = generation;
@@ -3806,24 +3805,7 @@ async function muatSurvei() {
   urutanSurveiTersimpan = [...urutanSurvei];
   tampilkanUrutanSurvei();
 
-  // 5 tabel rata-rata per metode
-  const teksPertanyaan = Object.fromEntries(
-    ringkasan.questions.map((pertanyaan) => [pertanyaan.id, pertanyaan.prompt]),
-  );
-  $('survey-method-rows').replaceChildren(
-    ...ringkasan.per_method.map((baris) => {
-      const barisTabel = document.createElement('tr');
-      barisTabel.append(
-        node('td', teksPertanyaan[baris.question_id] ?? String(baris.question_id)),
-        node('td', baris.method),
-        node('td', String(baris.n)),
-        node('td', baris.rata == null ? '—' : baris.rata.toFixed(2)),
-      );
-      return barisTabel;
-    }),
-  );
-
-  // 6 bagian pengisi: jumlah, diagram, daftar nama
+  // 5 bagian pengisi: jumlah, diagram, daftar nama
   tampilkanPengisiSurvei(ringkasan.questions, pengisi);
 }
 function kosongkanFormSurvei() {

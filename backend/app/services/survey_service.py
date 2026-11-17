@@ -333,7 +333,8 @@ class SurveyService:
             "questions": [public_question(pertanyaan) for pertanyaan in pertanyaan_aktif],
         }
 
-    # KIRIM: validasi terhadap pertanyaan aktif, simpan semua jawaban dalam satu transaksi.
+    # KIRIM: validasi terhadap pertanyaan aktif, simpan semua jawaban dalam satu transaksi. Kiriman tanpa satu jawaban
+    # pun ditolak: tidak ada baris yang tersimpan, jadi survei itu akan tetap dianggap belum dikirim.
     def submit(self, kode_room, username, id_pertandingan, daftar_jawaban):
         konteks = self._context(kode_room, username, id_pertandingan)
 
@@ -344,6 +345,8 @@ class SurveyService:
                 pertanyaan["id"]: pertanyaan for pertanyaan in queries.list_questions(database)
             }
             baris_jawaban = validate_answers(pertanyaan_aktif, daftar_jawaban)
+            if not baris_jawaban:
+                raise ValueError("Isi minimal satu jawaban sebelum mengirim survei.")
             for pertanyaan, nilai, teks in baris_jawaban:
                 queries.insert_answer(
                     database,
@@ -469,7 +472,7 @@ class SurveyService:
 
         jalankan_transaksi(hapus_bila_belum_dijawab)
 
-    # PANEL: ringkasan jawaban per pertanyaan dan per metode bot, dari kiriman terbaru tiap akun.
+    # PANEL: ringkasan jawaban per pertanyaan, dari kiriman terbaru tiap akun.
     def summary(self):
         def ambil_pertanyaan_dan_ringkasan(database):
             return queries.list_questions(database, active_only=False), queries.summary(database)

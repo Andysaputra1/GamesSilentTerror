@@ -47,8 +47,9 @@ salin hasilnya ke `backend/public/dokumen/`.
 
 ## Fitur yang sudah jalan
 
-- Daftar akun, login username dan password (email juga diterima untuk akun yang punya email), login Google, dan
-  pilihan avatar (6 skin, tersimpan per akun).
+- Daftar akun, login username dan password, login Google, dan pilihan avatar (6 skin, tersimpan per akun). Email
+  yang diketik saat daftar tidak disimpan karena tidak diverifikasi; nama tampilan yang membingungkan bacaan bot
+  (kata ganti, istilah game, atau tanpa huruf/angka) ditolak.
 - Main page, buat atau gabung ruangan untuk 4–10 peserta, dan bot opsional pengisi kursi kosong (ditambah satu per
   satu, paling banyak 5). Hanya pembuat ruangan yang mengatur bot dan memulai game.
 - Role acak dari server, layar persiapan, ronde siang → Tribunal → malam (ronde 1 tanpa Tribunal) sampai salah satu
@@ -241,8 +242,8 @@ di panel, atau CLI di bawah.
 Untuk mencoba chat AI, pakai durasi standar. Keputusan atau kalimat bot yang baru selesai sesudah fase berganti
 dibuang, jadi fase mode cepat yang singkat membuat banyak kalimat bot tidak tampil.
 
-Akun yang sama di beberapa tab tetap satu pemain. Akun teman bisa dibuat lewat CLI lokal; password diketik
-tersembunyi, disimpan sebagai hash, dan akun lama tidak ditimpa:
+Akun yang sama di beberapa tab tetap satu pemain. Akun teman bisa dibuat lewat CLI lokal dengan aturan yang sama
+dengan halaman daftar; password diketik tersembunyi, disimpan sebagai hash, dan akun lama tidak ditimpa:
 
 ```sh
 docker compose exec ai-engine python scripts/create_user.py teman1 --name "Teman Satu"
@@ -260,7 +261,7 @@ game. Sesi panel berlaku 8 jam dan otomatis tidak berlaku lagi bila password pan
 | 03 Riwayat chat | Arsip chat dari MySQL dengan filter dan ekspor CSV, termasuk intent, target, dan konteks bacaan IndoBERT |
 | 04 Manajemen user | Tambah user, ubah nama atau username, reset password akun lokal, hapus akun tanpa menghapus riwayat chat |
 | 05 Otak NPC | Penulis kalimat, urutan rantai penulis, model OpenRouter, model LLM link, tombol **Tes koneksi semua prioritas**, status NLU IndoBERT |
-| 06 Survei | Pertanyaan survei dan urutannya, jumlah pengisi, diagram jawaban per pertanyaan, daftar pengisi (satu kiriman terbaru per orang), rata-rata per metode bot, ekspor CSV per orang dan semua kiriman, dan pembersihan jawaban (rinciannya di [GAME_CONCEPT.md](GAME_CONCEPT.md#akhir-pertandingan-dan-survei)) |
+| 06 Survei | Pertanyaan survei dan urutannya, jumlah pengisi, diagram jawaban per pertanyaan, daftar pengisi (satu kiriman terbaru per orang), ekspor CSV per orang dan semua kiriman, dan pembersihan jawaban (rinciannya di [GAME_CONCEPT.md](GAME_CONCEPT.md#akhir-pertandingan-dan-survei)) |
 | 07 Simulasi | Pertandingan tiruan admin + 3–9 bot dengan otak asli: chat, flowchart proses AI yang menyala per tahap, dan kode asli tiap tahap |
 | 08 Dokumen | Dokumen web sistem, dimulai dari Peta Dokumen (lihat [Peta file penjelasan](#peta-file-penjelasan)) |
 
@@ -371,7 +372,8 @@ source. Belum ada target `ng e2e`. Perintah tes dan build ada di
 | Bot diam atau kalimatnya kaku | Buka panel **Otak NPC**: NLU harus tertulis IndoBERT, dan minimal satu jalur penulis hidup (atau `NPC_WRITER=templat`). Periksa `database_ready` di `/app-status` |
 | Bot lambat menjawab di room besar | Buka **Checker**: alur proses menunjukkan tahap yang lama, dan kotak Antrean menunjukkan pekerjaan yang menunggu thread otak atau penulis. Semua room berbagi thread itu (lihat [Batas implementasi](CODE_GUIDE.md#batas-implementasi)) |
 | Panel tidak bisa login | Pastikan `PANEL_PASSWORD_HASH` dibuat dengan `setup_panel.py` dan backend sudah di-recreate |
-| Ruangan tidak ditemukan | Backend mungkin baru restart; buat ruangan baru atau periksa kode undangan |
+| Ruangan tidak ditemukan | Backend mungkin baru restart, kode undangan salah, atau room ditinggal terlalu lama (lobby diam 1 jam, room selesai diam 30 menit dihapus otomatis); buat ruangan baru |
+| Chat terlalu cepat / terlalu banyak percobaan | Chat dibatasi 1 pesan per 2 detik dan 5 per 20 detik per pemain; gabung room yang gagal 10 kali per akun per menit; password salah 10 kali dalam 15 menit menahan akun itu. Tunggu sesuai pesan |
 
 ## Catatan keamanan
 

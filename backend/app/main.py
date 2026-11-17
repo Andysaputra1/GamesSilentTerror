@@ -5,6 +5,7 @@ Alurnya
 1. Memasang Socket.IO (dibuat di sockets/server.py, event-nya di sockets/chat.py)
 2. Membangun Server (Koneksi ke DB, Konfigurasi AI, Konfigurasi NPC, Memuat Otak AI, Menyalakan Jam (cek terus setiap 0.5 Detik))
 3. Konfigurasi panel yang gagal dimuat karena MySQL belum siap dicoba ulang di latar; selama MySQL tidak menjawab, jam room dijeda
+4. Tiap menit jam juga menghapus lobby dan room selesai yang ditinggal tanpa keluar
 
 Jadinya AI Mulai Mikir dari Sini (isi pikirannya di bot/bot_controller.py)
 """
@@ -39,6 +40,8 @@ from app.sockets.server import sio
 PEMUAT_KONFIGURASI = {"Konfigurasi AI": muat_konfigurasi_ai, "Konfigurasi Otak NPC": muat_konfigurasi_npc}
 # Jeda antarpercobaan memuat konfigurasi panel yang gagal saat server nyala (detik).
 JEDA_COBA_KONFIGURASI_DETIK = 5
+# Selang jam permainan membersihkan room yang ditinggal (detik).
+JEDA_BERSIH_ROOM_DETIK = 60
 
 
 # Muat konfigurasi panel yang namanya diberikan; MySQL sudah dicek siap oleh pemanggil. Hasil: nama yang perlu dicoba
@@ -73,9 +76,11 @@ async def lifespan(_: FastAPI):
     # setiap 0.5 detik jalankan pengcekan fase dan bot. Selama MySQL tidak menjawab (pemain hanya mendapat 503),
     # jam room dijeda: fase tidak berganti, bot tidak melangkah, dan sisa waktu fase tetap.
     # Alur: 1 putaran sebelumnya dijeda: geser batas waktu room sejauh selangnya -> 2.1 MySQL menjawab: ganti fase
-    #       dan jalankan bot -> 2.2 MySQL gagal: periksa ulang dengan SELECT 1 di thread
+    #       dan jalankan bot -> 2.1.1 tiap JEDA_BERSIH_ROOM_DETIK: hapus room yang ditinggal
+    #                         \> 2.2 MySQL gagal: periksa ulang dengan SELECT 1 di thread
     async def game_clock():
         dijeda, waktu_sebelum = False, time.monotonic()
+        waktu_bersih = waktu_sebelum
         while True:
             try:
                 waktu_sekarang = time.monotonic()
@@ -90,6 +95,10 @@ async def lifespan(_: FastAPI):
                     room_service.perbarui_fase_semua_room()
                     # jalankan bot yang sudah waktunya
                     npc_service.jalankan_bot_yang_sudah_waktunya()
+                    # lobby dan room selesai yang ditinggal tanpa /leave dihapus (lihat bersihkan_room_diam)
+                    if waktu_sekarang - waktu_bersih >= JEDA_BERSIH_ROOM_DETIK:
+                        waktu_bersih = waktu_sekarang
+                        room_service.bersihkan_room_diam()
             except Exception:
                 logger.exception("Satu putaran jam permainan gagal.")
             # tunggu 0,5 detik

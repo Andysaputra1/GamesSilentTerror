@@ -6,9 +6,11 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import OperationalError
 
+from app.controllers import rooms as rooms_controller
 from app.controllers.rooms import router
 from app.middleware.auth import require_authenticated_user
-from app.services.room_service import BOT_MAKS, RoomService
+from app.services import room_service as modul_room
+from app.services.room_service import BOT_MAKS, PESAN_ROOM_TERTUTUP, RoomService
 from tests.palsu.bot_lobby import isi_kursi_bot
 from app.services.checker_service import checker_service
 from app.services.auth_service import SessionValidationError
@@ -46,6 +48,17 @@ class RoomTests(unittest.TestCase):
             self.rooms.join(room.code, str(index))
         with self.assertRaises(ValueError):
             self.rooms.join(room.code, "overflow")
+
+    # L10: kode yang tidak ada dan room yang bukan milik kita memberi pesan yang sama, jadi kode tidak bisa ditebak
+    # dengan membedakan pesan error.
+    def test_missing_and_foreign_room_give_the_same_message(self):
+        lobby = self.rooms.create("alice")
+        bertanding = self.rooms.create("bob", capacity=4)
+        isi_kursi_bot(self.rooms, bertanding.code, "bob")
+        self.rooms.start(bertanding.code, "bob")
+        for kode in ("ZZZZZZ", lobby.code, bertanding.code):
+            with self.subTest(kode=kode), self.assertRaisesRegex(ValueError, PESAN_ROOM_TERTUTUP):
+                self.rooms.get(kode, "outsider")
 
     # Setelah pertandingan selesai, pemain langsung boleh membuat atau bergabung ke room baru;
     # lobby yang belum mulai tetap menahan pemain di satu room.
@@ -176,6 +189,80 @@ class BotLobbyTests(unittest.TestCase):
             for body in ({"enabled": True}, {"aksi": "hapus"}, {}):
                 self.assertEqual(client.post(jalur, json=body).status_code, 422)
             self.assertEqual(client.post(jalur, json={"aksi": "kurangi"}).json()["bot_count"], 4)
+
+
+# M1: lobby dan room selesai yang ditinggal (tanpa /leave) dihapus jam permainan; pertandingan berjalan tidak disentuh.
+class RoomDiamTests(unittest.TestCase):
+    def setUp(self):
+        self.rooms = RoomService()
+
+    def test_lobby_diam_satu_jam_dihapus_yang_masih_dipakai_tetap(self):
+        diam, dipakai = self.rooms.create("alice"), self.rooms.create("bob")
+        diam.disentuh -= modul_room.LOBBY_DIAM_DETIK + 1
+        dipakai.disentuh -= modul_room.LOBBY_DIAM_DETIK + 1
+        self.rooms.get(dipakai.code, "bob")  # lobby yang tabnya terbuka bertanya tiap 3 detik
+        self.assertEqual(self.rooms.bersihkan_room_diam(), [diam.code])
+        self.assertEqual(list(self.rooms.rooms), [dipakai.code])
+        self.assertIsNone(self.rooms.current("alice"))
+        self.rooms.create("alice")  # pemilik lobby yang dihapus bisa membuat room lagi
+
+    def test_pertandingan_berjalan_tidak_dihapus_yang_selesai_tetap_bisa_disurvei(self):
+        from app.services.survey_service import survey_service
+
+        berjalan, selesai = self.rooms.create("alice", capacity=4), self.rooms.create("bob", capacity=4)
+        for room, host in ((berjalan, "alice"), (selesai, "bob")):
+            isi_kursi_bot(self.rooms, room.code, host)
+            self.rooms.start(room.code, host)
+            room.disentuh -= modul_room.SELESAI_DIAM_DETIK + 1
+        selesai.match.finish("civilians", "hitman_executed", "Hitman dieksekusi.")
+        with patch.object(survey_service, "catat_peserta") as catat:
+            self.assertEqual(self.rooms.bersihkan_room_diam(), [selesai.code])
+        self.assertIn(berjalan.code, self.rooms.rooms)
+        # Peserta masuk arsip survei (MySQL) dan registri memori, jadi survei tetap bisa dikirim sesudah room hilang.
+        self.assertTrue(selesai.peserta_tercatat)
+        self.assertIn(selesai.match.id, survey_service._selesai)
+        catat.assert_called_once()
+        konteks = survey_service._context(selesai.code, "bob", selesai.match.id)
+        self.assertEqual(konteks["match_id"], selesai.match.id)
+
+    def test_batas_room_penuh_pulih_sesudah_pembersihan(self):
+        with patch.object(modul_room, "ROOM_MAKS", 3):
+            tertinggal = [self.rooms.create(f"pemain{nomor}") for nomor in range(3)]
+            with self.assertRaisesRegex(ValueError, "Batas ruangan aktif"):
+                self.rooms.create("baru")
+            for room in tertinggal:
+                room.disentuh -= modul_room.LOBBY_DIAM_DETIK
+            self.assertEqual(len(self.rooms.bersihkan_room_diam()), 3)
+            self.assertEqual(self.rooms.create("baru").owner, "baru")
+
+
+# L10: /join yang gagal paling banyak 10 per akun per menit; sesudahnya kode yang benar pun ditolak 429, akun lain tidak.
+class JoinLimitTests(unittest.TestCase):
+    def setUp(self):
+        rooms_controller._batas_join_akun.riwayat.clear()
+        rooms_controller._batas_join_ip.riwayat.clear()
+
+    tearDown = setUp
+
+    def test_join_dibatasi_per_akun(self):
+        rooms = RoomService()
+        app = FastAPI()
+        app.include_router(router)
+        akun = {"nama": "penebak"}
+        app.dependency_overrides[require_authenticated_user] = lambda: SimpleNamespace(
+            username=akun["nama"]
+        )
+        room = rooms.create("alice")
+        with patch("app.controllers.rooms.room_service", rooms), TestClient(app) as client:
+            for _ in range(10):
+                tebakan = client.post("/api/rooms/join", json={"code": "000000"})
+                self.assertEqual(tebakan.status_code, 400)
+            ditahan = client.post("/api/rooms/join", json={"code": room.code})
+            self.assertEqual(ditahan.status_code, 429)
+            self.assertIn("Retry-After", ditahan.headers)
+            self.assertNotIn("penebak", room.members)
+            akun["nama"] = "teman"
+            self.assertEqual(client.post("/api/rooms/join", json={"code": room.code}).status_code, 200)
 
 
 class SocketRoomTests(unittest.IsolatedAsyncioTestCase):
@@ -309,6 +396,37 @@ class SocketRoomTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(chats[0].kwargs["to"], room.code)
         self.assertNotEqual(chats[0].kwargs["to"], other.code)
         persistence.return_value.record_bot_message.assert_not_called()
+
+    # H4: chat dibatasi per pemain per room, jeda 2 detik dan 5 pesan per 20 detik. Pesan yang terlalu cepat tidak
+    # disimpan atau disiarkan, dan pengirim menerima system_alert berisi lama tunggu.
+    async def test_chat_terlalu_cepat_ditolak_dengan_pesan_jelas(self):
+        from app.middleware import auth_limits
+        from app.services import chat_service
+
+        rooms = RoomService()
+        room = rooms.create("alice")
+        sambungan = {"sid": {"username": "alice", "token": "alice", "room": room.code}}
+        jam = {"t": 1000.0}
+        hasil = []
+        with (
+            socket_palsu(rooms, sambungan) as sio,
+            patch("app.services.chat_service.PersistenceService") as persistence,
+            patch.object(auth_limits, "monotonic", lambda: jam["t"]),
+        ):
+            for detik in (1000, 1000.5, 1003, 1006, 1009, 1012, 1015, 1020.5):
+                jam["t"] = detik
+                sio.emit.reset_mock()
+                await chat.send_chat("sid", {"username": "alice", "message": f"pesan {detik}"})
+                peristiwa = sio.emit.call_args.args
+                hasil.append(peristiwa[1]["msg"] if peristiwa[0] == "system_alert" else "terkirim")
+        self.assertEqual(hasil[0], "terkirim")
+        self.assertEqual(hasil[1], "Chat terlalu cepat. Tunggu 2 detik lalu kirim lagi.")
+        self.assertEqual(hasil[2:6], ["terkirim"] * 4)
+        self.assertEqual(hasil[6], "Chat terlalu cepat. Tunggu 5 detik lalu kirim lagi.")
+        self.assertEqual(hasil[7], "terkirim")
+        self.assertEqual(persistence.return_value.record_player_message.call_count, 6)
+        chat_service._jeda_chat.riwayat.clear()
+        chat_service._jendela_chat.riwayat.clear()
 
     # Tes lain memanggil fungsinya langsung, jadi tes ini yang menjaga event benar-benar terpasang saat server nyala.
     def test_main_uses_one_sio_for_browser_events_and_bot_chat(self):

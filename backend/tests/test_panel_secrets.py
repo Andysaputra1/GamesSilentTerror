@@ -123,6 +123,37 @@ class PanelSecretsTests(unittest.TestCase):
             bad = self.client.put("/api/panel/config", json={**body, "model": "qwen3 4b; rm"})
             self.assertEqual(bad.status_code, 400)
 
+    # L6: simpan hanya menulis kolom yang diisi admin. Model OpenRouter tidak lagi ditulis qwen, link dan model lokal
+    # .env tidak dibekukan ke DB, dan sisa model qwen dari simpanan lama hilang pada simpan berikutnya.
+    def test_save_writes_only_fields_set_by_admin(self):
+        self.stored = json.dumps(
+            {
+                "ai_provider": "api",
+                "openrouter_model": "qwen/qwen3-14b",
+                "ollama_model": "qwen3:14b",
+            }
+        )
+        with (
+            patch.object(settings, "openrouter_model", "google/gemini-env"),
+            patch.object(settings, "ollama_base_url", "https://env.example"),
+        ):
+            result = self.client.put(
+                "/api/panel/config", json={"provider": "api", "api_key": "k-1"}
+            )
+            self.assertEqual(result.status_code, 200)
+            tersimpan = json.loads(self.stored)
+            self.assertNotIn("openrouter_model", tersimpan)
+            self.assertNotIn("ollama_base_url", tersimpan)
+            self.assertEqual(tersimpan["ollama_model"], "qwen3:14b")  # pernah diisi lewat panel
+            self.assertEqual(result.json()["model"], "google/gemini-env")
+            self.assertEqual(result.json()["endpoint"], "https://env.example")
+            with patch("app.services.panel_service.validate_endpoint", side_effect=lambda e: e):
+                self.client.put(
+                    "/api/panel/config", json={"provider": "docker", "endpoint": "https://panel.ex"}
+                )
+            self.client.put("/api/panel/config", json={"provider": "api"})
+            self.assertEqual(json.loads(self.stored)["ollama_base_url"], "https://panel.ex")
+
     def test_missing_encryption_key_cannot_save_plaintext(self):
         with patch.object(settings, "panel_encryption_key", None):
             with self.assertRaises(PersistenceError):

@@ -29,6 +29,7 @@ GDD awal dengan beberapa perubahan (lihat [Perubahan atas GDD awal](#perubahan-a
 | 26 Oktober 2026 | Setiap Hitman diberi tahu hasil Hostage tim tiap malam (berhasil, atau gagal karena Guard) |
 | 1 November 2026 | Korban Hostage diumumkan ke semua pemain saat malam selesai, dan tandanya tampil sampai permainan selesai |
 | 3 November 2026 | Guard boleh ke target yang sama berturut-turut; suara seri di Tribunal menambah waktu sekali; Spy di room ≥ 2 Spy saling tahu; Hitman dan Spy di room ≥ 2 pemain role itu punya chat tim saat malam |
+| 17 November 2026 | Chat publik dibatasi satu pesan per 2 detik dan 5 pesan per 20 detik per pemain; room yang ditinggal dihapus otomatis |
 
 ## Ruangan dan role
 
@@ -58,6 +59,12 @@ Cara angka ini diukur dan riwayatnya ada di [Keseimbangan komposisi](#keseimbang
   lagi ke pertandingan itu.
 - Satu akun menempati satu room. Keluar dari lobby sebelum pindah room. Room yang pertandingannya sudah selesai
   dilepas otomatis saat pemain membuat atau bergabung ke room lain; survei pertandingan itu tetap bisa dikirim.
+- Room yang ditinggal tanpa tombol Keluar (mis. tab ditutup) dihapus server: lobby yang tidak dibuka anggotanya
+  selama satu jam, dan room yang pertandingannya sudah selesai lalu diam 30 menit. Pertandingan yang masih berjalan
+  tidak pernah dihapus. Server menampung paling banyak 500 room sekaligus.
+- Gabung lewat kode yang gagal dibatasi 10 per akun dan 30 per IP per menit. Kode yang tidak ada dan room milik orang
+  lain dijawab dengan pesan yang sama ("Ruangan tidak ditemukan atau kamu bukan anggotanya."), jadi kode tidak bisa
+  ditebak beruntun.
 - Selama pertandingan aktif, membuka tab baru, halaman lain di aplikasi, atau login ulang mengembalikan akun ke
   `/game` berdasarkan data backend. Akun tidak bisa membuat atau bergabung ke pertandingan lain sebelum pertandingan
   itu selesai. Logout mencabut sesi tanpa menghentikan pertandingan; login ulang memulihkan keanggotaan.
@@ -98,7 +105,11 @@ Tambahan 30 detik di Tribunal standar memberi waktu menimbang dan mengunci vote 
 standar (siang/Tribunal/malam): 4 pemain 80/60/20 detik, 6 pemain 120/75/30 detik, 10 pemain 200/105/50 detik. Contoh
 mode cepat untuk 6 pemain: 20/15/15 detik.
 
-Chat publik tersedia saat siang dan Tribunal bagi pemain yang masih boleh berbicara.
+Chat publik tersedia saat siang dan Tribunal bagi pemain yang masih boleh berbicara. Setiap pemain paling cepat
+mengirim satu pesan per 2 detik dan paling banyak 5 pesan per 20 detik. Pesan yang terlalu cepat tidak dikirim dan
+pengirim membaca "Chat terlalu cepat. Tunggu N detik lalu kirim lagi." Alasannya, IndoBERT membaca tiap chat sekitar 9
+detik di satu thread yang juga dipakai langkah bot semua room. Chat tim malam lewat jalur lain (tanpa database dan
+IndoBERT) dan tidak dibatasi.
 
 ### Skip diskusi
 
@@ -247,7 +258,10 @@ statistik akhir. Di bawahnya ada **survei**.
 - Pertanyaan baru selalu masuk paling bawah. Urutannya diatur dengan menyeret pegangan ⋮⋮ atau tombol ▲▼ (Alt+↑/↓),
   langsung tersimpan lewat `PUT /api/panel/survey/questions/order`, dan dipakai form pemain serta ekspor CSV.
 - Setiap akun manusia mengirim survei sekali per pertandingan; kiriman ganda bersamaan juga dijawab "sudah dikirim".
-  Jawaban menyimpan salinan pertanyaan saat dijawab beserta role, kubu, dan hasil pemain.
+  Kiriman tanpa satu jawaban pun ditolak (400), jadi survei itu tetap bisa diisi. Jawaban menyimpan salinan
+  pertanyaan saat dijawab beserta role, kubu, dan hasil pemain.
+- Survei terikat ke username. Karena itu username yang masih tercatat di arsip peserta atau jawaban survei tidak bisa
+  dipakai lagi oleh akun lain (daftar, ganti username, atau akun buatan admin), juga sesudah akun pemiliknya dihapus.
 - Peserta manusia tiap pertandingan yang selesai diarsipkan di tabel `match_participants`, jadi survei tetap bisa
   dikirim sesudah keluar room, sesudah room dibersihkan, atau sesudah server dinyalakan ulang. Bila arsip itu gagal
   disimpan, backend masih mengingat peserta di memori selama 30 menit. V12 menghapus arsip pertandingan yang selesai
@@ -265,10 +279,8 @@ statistik akhir. Di bawahnya ada **survei**.
     dihapus), room, role, kubu dan hasil, serta jumlah jawaban yang terisi. Mengeklik nama membuka semua isian
     kiriman itu, bot di pertandingan itu, username, dan nomor pertandingan. Datanya dari
     `GET /api/panel/survey/respondents` (`total_people`, `total_matches`, dan `total_submissions_all` untuk semua
-    kiriman termasuk yang lama);
-  - rata-rata per pertanyaan dan per metode bot, juga dari kiriman terbaru tiap orang. Setiap jawaban dihitung sekali:
-    ke metode tunggal pertandingan itu, atau ke kelompok "campuran" untuk pertandingan lama yang botnya memakai
-    beberapa metode. Pertandingan baru selalu masuk metode `fuzzy`.
+    kiriman termasuk yang lama). Tabel rata-rata per metode bot sudah dihapus karena skripsi tidak lagi membandingkan
+    metode.
 - Menu Survei juga bisa menghapus permanen semua jawaban beserta arsip peserta (administrator mengetik BERSIHKAN),
   lalu menghapus pertanyaan yang sudah tidak punya jawaban. Ekspor CSV dijelaskan di
   [README.md](README.md#panel-administrator).

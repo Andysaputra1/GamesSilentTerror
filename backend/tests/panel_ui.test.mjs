@@ -240,10 +240,6 @@ test('survey menu renders questions as text and edits scale meaning from the pan
       return response({
         questions: [question],
         distribution: [{ question_id: 3, value_number: 5, n: 2 }],
-        per_method: [
-          { question_id: 3, method: 'fuzzy', n: 2, rata: 5 },
-          { question_id: 3, method: 'campuran', n: 4, rata: 3.5 }, // data lama
-        ],
         text_answers: [],
       });
     if (path === '/api/panel/survey/questions/3' && options.method === 'PUT') {
@@ -258,8 +254,8 @@ test('survey menu renders questions as text and edits scale meaning from the pan
   assert.equal(rows.querySelector('b'), null);
   assert.match(rows.textContent, /1 = Bosan · 6 = Seru/);
   assert.match(rows.textContent, /rata-rata 5.00/);
-  assert.match(w.document.querySelector('#survey-method-rows').textContent, /fuzzy/);
-  assert.match(w.document.querySelector('#survey-method-rows').textContent, /campuran/);
+  // Tabel rata-rata per metode bot sudah dihapus: skripsi tidak lagi membandingkan metode.
+  assert.equal(w.document.querySelector('#survey-method-rows'), null);
   assert.equal(w.document.querySelector('#survey-position'), null); // posisi ditentukan server
   [...rows.querySelectorAll('button')].find((tombol) => tombol.textContent === 'Edit').click();
   assert.equal(w.document.querySelector('#survey-editor-box').open, true);
@@ -308,7 +304,7 @@ test('survei: jumlah pengisi, diagram per pertanyaan, dan isian tiap nama dibuka
   }; // prettier-ignore
   const w = setup(t, (path) => {
     if (path === '/api/panel/survey/summary')
-      return response({ questions, distribution: [], per_method: [], text_answers: [] });
+      return response({ questions, distribution: [], text_answers: [] });
     if (path === '/api/panel/survey/respondents') return response(pengisi);
     return undefined;
   });
@@ -372,7 +368,7 @@ test('survei: jumlah pengisi, diagram per pertanyaan, dan isian tiap nama dibuka
 test('survei kosong: jumlah 0 dan daftar pengisi memberi tahu belum ada yang mengisi', async (t) => {
   const w = setup(t, (path) =>
     path === '/api/panel/survey/summary'
-      ? response({ questions: [], distribution: [], per_method: [], text_answers: [] })
+      ? response({ questions: [], distribution: [], text_answers: [] })
       : undefined,
   );
   await login(w);
@@ -431,7 +427,7 @@ test('urutan survei: seret, ▲▼, Alt+panah tersimpan; gagal simpan memulihkan
   let gagal = false;
   const w = setup(t, (path, options) => {
     if (path === '/api/panel/survey/summary')
-      return response({ questions, distribution: [], per_method: [], text_answers: [] });
+      return response({ questions, distribution: [], text_answers: [] });
     if (path === '/api/panel/survey/questions/order' && options.method === 'PUT') {
       saved.push(JSON.parse(options.body).ids);
       return gagal
@@ -551,7 +547,7 @@ test('survey menu deletes answers only after typed confirmation and a question a
   const deleted = [];
   const w = setup(t, (path, options) => {
     if (path === '/api/panel/survey/summary')
-      return response({ questions: [question], distribution: [], per_method: [], text_answers: [] });
+      return response({ questions: [question], distribution: [], text_answers: [] });
     if (options.method === 'DELETE') {
       deleted.push(path);
       return response({ deleted: 72 });

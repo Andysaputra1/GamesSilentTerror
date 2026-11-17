@@ -214,11 +214,9 @@ def simpan_konfigurasi(
         endpoint = validate_endpoint(endpoint)
     elif provider == "docker":
         raise AlamatTunnelDitolak("URL tunnel Ollama wajib diisi.")
-    else:
-        endpoint = ai_runtime.current().ollama_base_url
     simpan_konfigurasi_ai(
         provider,
-        endpoint,
+        endpoint or None,
         api_key=api_key or None,
         key_source=key_source,
         tunnel_token=tunnel_token or None,

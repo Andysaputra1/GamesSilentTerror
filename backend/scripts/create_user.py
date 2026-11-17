@@ -3,17 +3,20 @@
 import argparse
 from getpass import getpass
 from pathlib import Path
-import re
 import sys
-from sqlalchemy.exc import IntegrityError
+
+from pydantic import ValidationError
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from app.models.auth_queries import create_account
-from app.config.database import SessionLocal
-from app.services.password_service import hash_password
+from app.config.database import PersistenceError
+from app.schemas.auth import RegisterRequest
+from app.services.user_service import create_user
 
 
-# Buat satu akun pemain dari baris perintah tanpa mengubah akun lama.
+# Buat satu akun pemain dari baris perintah tanpa mengubah akun lama. Aturannya sama dengan pendaftaran lewat API:
+# validator RegisterRequest (username, nama tampilan, password) lalu create_user milik panel (username terlarang,
+# riwayat pertandingan/survei, username kembar).
+# Alur: 1 baca argumen dan password tersembunyi -> 2 validasi seperti API -> 3 simpan -> 4 lapor
 def main():
     pengurai_argumen = argparse.ArgumentParser(
         description="Buat akun pemain untuk multiplayer lokal."
@@ -23,29 +26,27 @@ def main():
     argumen = pengurai_argumen.parse_args()
 
     # INPUT: username dan nama dari baris perintah, password diketik tersembunyi dua kali
-    if not re.fullmatch(r"[A-Za-z0-9_-]{1,32}", argumen.username):
-        pengurai_argumen.error("Username 1-32 huruf/angka/underscore/tanda minus.")
-    nama_tampilan = argumen.name or argumen.username
-    if len(nama_tampilan) > 100:
-        pengurai_argumen.error("Nama tampilan maksimal 100 karakter.")
-    password = getpass("Password (minimal 8 karakter): ")
-    if not 8 <= len(password) <= 256 or password != getpass("Ulangi password: "):
-        pengurai_argumen.error("Password harus 8-256 karakter dan konfirmasi harus sama.")
-
-    # PROSES: hash password lalu INSERT; username yang sudah ada ditolak constraint unik
+    password = getpass("Password (10-128 karakter): ")
     try:
-        with SessionLocal.begin() as database:
-            create_account(
-                database,
-                username=argumen.username,
-                display_name=nama_tampilan,
-                password_hash=hash_password(password),
-            )
-    except IntegrityError:
-        pengurai_argumen.error("Username sudah digunakan; akun lama tidak diubah.")
+        data = RegisterRequest(
+            username=argumen.username,
+            display_name=argumen.name,
+            password=password,
+            password_confirmation=getpass("Ulangi password: "),
+        )
+    except ValidationError as error:
+        pengurai_argumen.error("; ".join(galat["msg"] for galat in error.errors()))
+
+    # PROSES: hash password lalu INSERT; username yang sudah ada atau terlarang ditolak
+    try:
+        create_user(data.username, data.display_name or data.username, data.password)
+    except ValueError as error:
+        pengurai_argumen.error(str(error))
+    except PersistenceError as error:
+        pengurai_argumen.error(f"Database gagal: {error}")
 
     # OUTPUT: beri tahu admin bahwa akun siap dipakai
-    print(f"Akun {argumen.username} siap dipakai login.")
+    print(f"Akun {data.username} siap dipakai login.")
 
 
 if __name__ == "__main__":
