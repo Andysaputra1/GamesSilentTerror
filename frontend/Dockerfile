@@ -1,14 +1,14 @@
-FROM node:20-alpine
+# Versi sama dengan engines.node di package.json dan Node di Vercel.
+FROM node:24.11.1-alpine
 
 WORKDIR /app
 
-RUN npm install -g @angular/cli
-
 COPY package*.json ./
-RUN npm install
+# npm ci memasang persis versi di package-lock.json, termasuk Angular CLI proyek.
+RUN npm ci
 
 COPY . .
 
 EXPOSE 4200
 
-CMD ["ng", "serve", "--host", "0.0.0.0", "--poll", "2000"]
+CMD ["npx", "ng", "serve", "--host", "0.0.0.0", "--poll", "2000"]
