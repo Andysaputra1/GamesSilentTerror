@@ -723,6 +723,15 @@ class Match:
             self.deadline = waktu_sekarang
             self.tick(waktu_sekarang)
 
+    # JEDA JAM (database gagal, lihat RoomService.jeda_jam_semua_room): batas fase dan jadwal persiapan digeser maju
+    # sejauh detik, jadi sisa waktunya sama seperti saat jeda dimulai.
+    def geser_jam(self, detik):
+        self.deadline += detik
+        if self.phase == "preparing":
+            self.preparation["min_until"] += detik
+            if self.preparation["ready_at"] is not None:
+                self.preparation["ready_at"] += detik
+
     # TIMER SERVER: maju satu fase saat deadline; tetap berjalan walaupun semua tab ditutup.
     def tick(self, now=None):
         now = time.time() if now is None else now

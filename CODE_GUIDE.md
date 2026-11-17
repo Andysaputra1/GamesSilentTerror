@@ -30,7 +30,7 @@ Istilah yang sering muncul:
 backend/
   app/
     main.py                 Entry point ASGI (app.main:asgi_app): pasang Socket.IO, muat konfigurasi, otak bot, jam 0,5 detik
-    config/                 settings.py (environment), mysql.py, database.py (pool, jalankan_transaksi), skins.py
+    config/                 settings.py (environment), mysql.py, database.py (pool, batas waktu, jalankan_transaksi), skins.py
     controllers/            API HTTP; routes.py menggabungkan router yang aktif
       auth.py health.py rooms.py survey.py users.py panel.py panel_npc.py
     middleware/             auth.py (bearer token), auth_limits.py (batas percobaan), cors.py, safe_validation.py (422 tanpa isi input)
@@ -88,7 +88,12 @@ HTTP       -> controllers -> services -> game (Match) / models (SQL) -> MySQL
 Socket.IO  -> sockets/chat.py -> services/chat_service.py -> models -> MySQL -> emit_room
 Jam 0,5 dtk (main.py) -> room_service.perbarui_fase_semua_room       (fase yang habis berganti)
                       -> npc_service.jalankan_bot_yang_sudah_waktunya (bot yang sudah waktunya melangkah)
+                      MySQL tidak menjawab: room_service.jeda_jam_semua_room (fase dan bot berhenti)
 ```
+
+Query MySQL dari event loop (cek token socket, simpan chat pemain, `/app-status`) berjalan di thread, dan setiap
+koneksi punya batas waktu. Rinciannya, termasuk query yang masih memegang lock room, ada di
+[backend/README.md](backend/README.md#saat-mysql-bermasalah).
 
 Contoh SQL di model dan pemakaiannya dari service ada di [backend/README.md](backend/README.md#pola-sql-di-model).
 
@@ -112,12 +117,14 @@ Contoh SQL di model dan pemakaiannya dari service ada di [backend/README.md](bac
 7. **Chat publik manusia.** `sockets/chat.py` (`send_chat`) → `chat_service.kirim_chat_pemain`: cek pesan dan sesi →
    cek hak chat (`can_chat`) → simpan ke MySQL → kirim `receive_chat` ke room → IndoBERT membacanya lewat
    `catat_nlu`. Penolakan dikirim ke pengirim sebagai `system_alert`. Sebelum broadcast, `emit_room` mengeluarkan
-   socket yang sudah keluar room atau sesinya dicabut.
+   socket yang sudah keluar room atau sesinya dicabut, dan melewati socket yang tokennya belum bisa dicek karena
+   MySQL gagal. Siaran dalam satu room dikirim berurutan.
 8. **Langkah bot.** Lihat [Satu langkah bot](#satu-langkah-bot).
 9. **Panel.** Sesi administrator terpisah dari pemain. Checker menampilkan penjelasan tiap langkah bot yang dibuat
    `bot/penjelasan.py` di `BrainRuntime.langkah`, dilengkapi hasil engine dan NLG di `isi_jejak`
    (`bot/bot_controller.py`). Daftar jejak hanya membawa `ringkas`; penjelasan lengkap diambil per jejak lewat
-   `GET /api/panel/checker/{code}/jejak/{id}`. Bagian yang masih berjalan diambil tiap detik lewat
+   `GET /api/panel/checker/{code}/jejak/{id}`. Kedua endpoint itu async: jejak yang masih berjalan disalin di event
+   loop, tempat chat dan langkah bot mengubahnya, sedangkan arsipnya dibaca di thread. Bagian yang masih berjalan diambil tiap detik lewat
    `GET /api/panel/checker/{code}/proses` (`panel_service.proses_checker`): tahap jejak yang belum selesai dan lamanya
    (`checker_service.proses_berjalan`), kondisi live tiap bot (`NPCService.kondisi_bot`), dan isi antrean thread otak
    dan penulis, yang dicatat `EksekutorTercatat` di `services/checker_service.py`. Nilai API key tidak pernah dikirim

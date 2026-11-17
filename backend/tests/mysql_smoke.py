@@ -17,6 +17,7 @@ from sqlalchemy import text
 from app.main import app
 from app.config.database import SessionLocal, jalankan_transaksi
 from app.models import auth_queries, game_queries, panel_queries, survey_queries
+from app.services.panel_service import MIGRASI_WAJIB
 from app.services.persistence_service import PersistenceError, PersistenceService
 from app.services.survey_service import validate_question
 
@@ -122,11 +123,11 @@ class MovedSqlIntegration(unittest.TestCase):
         buat_sesi(token, hours=1)
         self.assertEqual(sesi(token), token)
         self.assertIsNone(sesi(token, _hash_acak()))
-        # Sesi kedaluwarsa tidak berlaku, lalu ikut dibersihkan saat sesi baru dibuat.
+        # Sesi kedaluwarsa tidak berlaku, lalu dibersihkan di transaksi tersendiri (seperti sesudah login).
         kedaluwarsa = _hash_acak()
         buat_sesi(kedaluwarsa, hours=-1)
         self.assertIsNone(sesi(kedaluwarsa))
-        buat_sesi(_hash_acak(), hours=1)
+        jalankan_transaksi(panel_queries.delete_expired_panel_sessions)
         with SessionLocal() as db:
             self.assertEqual(
                 db.execute(
@@ -161,7 +162,11 @@ class MovedSqlIntegration(unittest.TestCase):
         self.assertEqual(_json(baca()), baru)
 
     def test_required_migrations(self):
-        self.assertEqual(jalankan_transaksi(panel_queries.count_required_migrations), 2)
+        self.assertEqual(
+            jalankan_transaksi(lambda db: panel_queries.recorded_migrations(db, MIGRASI_WAJIB)),
+            set(MIGRASI_WAJIB),
+        )
+        self.assertEqual(TestClient(app).get("/ready").json()["migrasi_kurang"], [])
 
     # Satu room arsip berisi dua pesan: pemain dengan bacaan NLU, lalu bot.
     def _room_dua_pesan(self):

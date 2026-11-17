@@ -21,6 +21,7 @@ Alurnya tiap detak jam (perbarui_fase_semua_room, dipanggil main.py tiap 0,5 det
 2. Pertandingan yang baru selesai: peserta manusianya dicatat sekali ke arsip survei lewat thread latar
 3. Fase yang berganti dicatat ke jejak aktivitas panel
 4. Satu room gagal: dicatat di log, room lain tetap jalan
+Selama MySQL tidak menjawab, main.py memanggil jeda_jam_semua_room sebagai ganti detak jam.
 """
 
 import logging
@@ -613,6 +614,15 @@ class RoomService:
             match.bot_berpikir.discard(nama)
             if not gagal and match.bot_tahap.get(nama) == "L":
                 match.bot_tahap[nama] = "O"
+
+    # JEDA JAM: dipanggil game_clock sebagai ganti detak biasa selama MySQL tidak menjawab. Pemain hanya mendapat 503,
+    # jadi batas waktu tiap pertandingan yang berjalan digeser sejauh lama jeda: fase tidak habis dan bot tidak
+    # mendahului manusia.
+    def jeda_jam_semua_room(self, detik):
+        with self.lock:
+            for room in self.rooms.values():
+                if room.match and not room.match.winner:
+                    room.match.geser_jam(detik)
 
     # JAM: dipanggil tiap 0,5 detik oleh game_clock, bukan oleh request browser. Untuk tiap room,
     # panggil Match.tick(): kalau waktu fase habis, fase berganti. Pergantian fase dicatat untuk panel.

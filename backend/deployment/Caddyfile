@@ -1,6 +1,13 @@
 {$BACKEND_DOMAIN} {
     encode zstd gzip
+    # Body sah terbesar ±300 KB (kiriman survei: 50 jawaban teks); Socket.IO polling dibatasi 1 MB oleh Engine.IO.
+    # Body yang lebih besar ditolak 413 di sini, sebelum sampai ke backend.
+    request_body {
+        max_size 1MB
+    }
     header {
+        # HTTPS wajib selama dua tahun, sama dengan yang dikirim Vercel untuk frontend.
+        Strict-Transport-Security "max-age=63072000"
         X-Content-Type-Options nosniff
         Referrer-Policy strict-origin-when-cross-origin
         -Server

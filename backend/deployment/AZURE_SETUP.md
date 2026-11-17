@@ -52,16 +52,19 @@ Jangan pernah meng-commit kredensial Google atau file environment.
    `openrouter_default` dengan key OpenRouter bawaan, atau atur key sendiri nanti dari panel. Biarkan
    `BACKEND_DOMAIN=backendthesis.andylabs.site` dan `FRONTEND_ORIGIN=https://silent-terror.andylabs.site`.
 4. Salin dua folder model IndoBERT dari laptop ke `backend/artifacts/indobert/intent/` dan
-   `backend/artifacts/indobert/target/` di VM (mis. dengan `scp -r`). Model ikut masuk image saat build; tanpa model,
-   bot tidak bisa chat.
+   `backend/artifacts/indobert/target/` di VM (mis. dengan `scp -r`). Model ikut masuk image saat build; build
+   berhenti dengan pesan bila salah satu folder belum berisi model.
 
 Jangan membagikan `.env.azure`. Mengubah password di file ini nanti tidak merotasi password database yang sudah
 diinisialisasi.
 
 ## 4. Nyalakan MySQL
 
+Volume database dan sertifikat Caddy dibuat lebih dulu sebagai volume eksternal, supaya `down -v` tidak menghapusnya:
+
 ```bash
 sudo docker volume create shadow_heist_mysql_data
+sudo docker volume create silent-terror-azure_caddy_data
 sudo docker compose --env-file .env.azure -f docker-compose.azure.yml up -d mysql
 sudo docker compose --env-file .env.azure -f docker-compose.azure.yml ps
 ```
@@ -93,8 +96,9 @@ curl -fsS https://backendthesis.andylabs.site/api/auth/google/config
 ```
 
 Caddy mengambil dan memperbarui sertifikat HTTPS sendiri begitu DNS dan port 80/443 berfungsi. `/ready` memeriksa
-skema tanpa menghubungi layanan AI. Satu worker backend memang disengaja: ruangan dan nonce Google hidup di satu
-proses. Restart backend memutus pertandingan aktif, tetapi tidak menghapus arsip chat.
+database dan migrasi tanpa menghubungi layanan AI, dan melaporkan status IndoBERT
+([README.md](README.md#update-rutin) langkah 7). Satu worker backend memang disengaja: ruangan dan nonce Google hidup
+di satu proses. Restart backend memutus pertandingan aktif, tetapi tidak menghapus arsip chat.
 
 ## 6. Hubungkan Vercel
 

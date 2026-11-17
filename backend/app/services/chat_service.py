@@ -9,10 +9,12 @@ Alurnya
 5. IndoBERT membaca pesan
 
 Pesan yang ditolak di tahap 1-3 menjadi ChatDitolak, dan sockets/chat.py mengirimkannya ke pengirim. Chat bot tidak lewat sini.
+Query MySQL (cek token, simpan pesan, arsip jejak) berjalan di thread, jadi event loop tidak ikut menunggu database.
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from time import perf_counter
 from typing import Any
@@ -32,6 +34,34 @@ class ChatDitolak(Exception):
     """Pesan tidak diproses. Teksnya dikirim ke pengirim sebagai system_alert."""
 
 
+# TAHAP 3, dijalankan di thread: simpan pesan lalu masukkan ke chat pertandingan. Aksi/skip HTTP bisa berjalan
+# bersamaan, jadi lock room tetap dipegang dari cek ulang sampai commit supaya Gag atau fase baru tidak diterobos;
+# query yang macet dibatasi batas waktu MySQL (config/database.py). Hasil: (id pesan, pesan untuk siaran).
+# Alur: 1 room dan pertandingan masih sama -> 2 fase sama dan masih boleh chat -> 3 simpan ke MySQL
+#       -> 4 masuk chat pertandingan
+def _simpan_pesan(kode_room, room, pertandingan, token_fase, pengirim, pesan, konteks):
+    with room_service.lock:
+        room_terkini = room_service.get(kode_room, pengirim)
+        if room_terkini is not room or room_terkini.match is not pertandingan:
+            raise ValueError("Ruangan sudah berubah. Kirim ulang pada fase yang sesuai.")
+        if pertandingan:
+            pertandingan.tick()
+            if token_fase != (
+                pertandingan.id,
+                pertandingan.round,
+                pertandingan.phase,
+            ) or not pertandingan.can_chat(pengirim):
+                raise ValueError("Chat terkunci atau fase sudah berubah. Pesan tidak dikirim.")
+        id_pesan = PersistenceService(kode_room).record_player_message(
+            username=pengirim,
+            message=pesan,
+            context=konteks,
+        )
+        if not pertandingan:
+            return id_pesan, {"sender": pengirim, "message": pesan}
+        return id_pesan, pertandingan.add_message(pengirim, pesan)
+
+
 # Jalan saat pemain mengirim chat, lewat 5 tahap di bawah. Fungsi ini tidak membalas pesan.
 # Jejak = catatan tahap dan durasi satu pesan, yang tampil di panel checker.
 # IndoBERT membaca pesan sekali di tahap 5; hasilnya masuk memo NLU, jadi langkah bot berikutnya tidak menghitung ulang.
@@ -49,7 +79,7 @@ async def kirim_chat_pemain(sid: str, data: dict[str, Any]) -> None:
             if not pesan or len(pesan) > 1000:
                 raise ValueError("Pesan chat harus berisi 1–1000 karakter.")
             # Socket sudah masuk kanal ruangan saat connect; pemain dicatat di transaksi pesan (tahap 3).
-            room = verifikasi_socket(sid, pengirim)
+            room = await verifikasi_socket(sid, pengirim)
         except (ValueError, PersistenceError) as error:
             raise ChatDitolak(str(error)) from error
 
@@ -91,31 +121,20 @@ async def kirim_chat_pemain(sid: str, data: dict[str, Any]) -> None:
             if token_fase
             else {"phase": "lobby"}
         )
-        pesan_diterima = {"sender": pengirim, "message": pesan}
         try:
-            # TAHAP 3: simpan pesan. Aksi/skip HTTP bisa berjalan bersamaan, jadi periksa ulang dan
-            # commit di lock yang sama supaya Gag atau fase baru tidak diterobos.
-            with measure(jejak, "persistence_ms"), room_service.lock:
-                room_terkini = room_service.get(kode_room, pengirim)
-                if room_terkini is not room or room_terkini.match is not pertandingan:
-                    raise ValueError("Ruangan sudah berubah. Kirim ulang pada fase yang sesuai.")
-                if pertandingan:
-                    pertandingan.tick()
-                    if token_fase != (
-                        pertandingan.id,
-                        pertandingan.round,
-                        pertandingan.phase,
-                    ) or not pertandingan.can_chat(pengirim):
-                        raise ValueError(
-                            "Chat terkunci atau fase sudah berubah. Pesan tidak dikirim."
-                        )
-                jejak["message_id"] = PersistenceService(kode_room).record_player_message(
-                    username=pengirim,
-                    message=pesan,
-                    context=konteks,
+            # TAHAP 3: simpan pesan (lihat _simpan_pesan). Jejak diisi di sini, di event loop, sama dengan
+            # penulis jejak lain, jadi panel Checker tidak menyalinnya saat sedang diubah.
+            with measure(jejak, "persistence_ms"):
+                jejak["message_id"], pesan_diterima = await asyncio.to_thread(
+                    _simpan_pesan,
+                    kode_room,
+                    room,
+                    pertandingan,
+                    token_fase,
+                    pengirim,
+                    pesan,
+                    konteks,
                 )
-                if pertandingan:
-                    pesan_diterima = pertandingan.add_message(pengirim, pesan)
             activity.record(
                 kode_room,
                 "PersistenceService.record_player_message",
@@ -143,6 +162,7 @@ async def kirim_chat_pemain(sid: str, data: dict[str, Any]) -> None:
         if jejak:
             jejak["duration_ms"] = round((perf_counter() - waktu_mulai) * 1000, 2)
             try:
-                PersistenceService(jejak["room_code"]).record_trace(jejak)
+                # Jejak tidak diubah lagi sesudah ini, jadi aman dibaca thread arsip.
+                await asyncio.to_thread(PersistenceService(jejak["room_code"]).record_trace, jejak)
             except PersistenceError:
                 logger.error("Checker archive could not be saved for room %s", jejak["room_code"])

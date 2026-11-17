@@ -15,12 +15,17 @@ Vercel) ada di [AZURE_SETUP.md](AZURE_SETUP.md). Isi tiap migrasi ada di
 | Repo di VM | `~/GamesSilentTerror`, dengan secret di `.env.azure` (diabaikan Git, jangan dibagikan) |
 | Compose | `docker-compose.azure.yml`, selalu dipakai dengan `--env-file .env.azure` |
 | `mysql` | MySQL 8.4.11. Volume eksternal `shadow_heist_mysql_data`; `backend/migrations/` dipasang ke `/docker-entrypoint-initdb.d`. Tanpa port host dan tanpa phpMyAdmin |
-| `backend` | Image dari `deployment/Dockerfile.azure`: PyTorch CPU, uvicorn **satu worker**, `--proxy-headers` supaya IP pemain berasal dari Caddy. `AI_PROVIDER=api` |
-| `proxy` | Caddy 2 (`deployment/Caddyfile`), port 80 dan 443, sertifikat HTTPS otomatis untuk `BACKEND_DOMAIN`. Baru menyala bila backend sehat |
+| `backend` | Image dari `deployment/Dockerfile.azure`: Python 3.11.18, PyTorch CPU, uvicorn **satu worker**, `--proxy-headers` supaya IP pemain berasal dari Caddy. `AI_PROVIDER=api`, `API_DOCS=false` (tanpa `/docs`) |
+| `proxy` | Caddy 2.11.4 (`deployment/Caddyfile`), port 80 dan 443, sertifikat HTTPS otomatis untuk `BACKEND_DOMAIN`, header HSTS, `nosniff`, dan `Referrer-Policy`, serta batas body 1 MB. Sertifikat di volume eksternal `silent-terror-azure_caddy_data`. Baru menyala bila backend sehat |
 
-Image backend menyalin seluruh folder `backend/` kecuali `tests/` (lihat `backend/.dockerignore`). Artinya model
-IndoBERT di `backend/artifacts/indobert/{intent,target}` harus sudah ada di VM sebelum build, dan tes tidak ikut di
-image.
+Versi image dasar (`python:3.11.18-slim`, `mysql:8.4.11`, `caddy:2.11.4-alpine`) dan semua dependensi langsung di
+`backend/requirements.txt` dikunci, jadi build ulang memasang versi yang sama. Naikkan versinya dengan sengaja, lalu
+uji dulu.
+
+Image backend menyalin seluruh folder `backend/` kecuali `tests/` (lihat `backend/.dockerignore`). Model IndoBERT di
+`backend/artifacts/indobert/{intent,target}` harus sudah ada di VM sebelum build; build berhenti dengan pesan bila
+salah satunya belum ada. Model disalin di layer sendiri sebelum kode, jadi deploy yang hanya mengubah kode memakai
+ulang layer model (±950 MB) dan tidak menambah pemakaian disk sebesar itu.
 
 Semua perintah di bawah dijalankan dari `~/GamesSilentTerror` dengan awalan Compose yang sama:
 
@@ -55,7 +60,15 @@ sudo docker compose --env-file .env.azure -f docker-compose.azure.yml ps
    tail -f /tmp/deploy.log
    ```
 
-6. **Periksa hasil:**
+6. **Bila `deployment/Caddyfile` atau bagian `proxy` di `docker-compose.azure.yml` berubah**, buat ulang proxy.
+   Caddyfile dipasang sebagai file, dan `git pull` menggantinya dengan file baru, jadi container lama tetap membaca
+   isi lama sampai dibuat ulang. Proxy berhenti beberapa detik.
+
+   ```bash
+   sudo docker compose --env-file .env.azure -f docker-compose.azure.yml up -d --force-recreate proxy
+   ```
+
+7. **Periksa hasil:**
 
    ```bash
    sudo docker compose --env-file .env.azure -f docker-compose.azure.yml ps
@@ -63,9 +76,11 @@ sudo docker compose --env-file .env.azure -f docker-compose.azure.yml ps
    curl -fsS https://backendthesis.andylabs.site/ready
    ```
 
-   `/ready` hanya memeriksa migrasi V5 dan V6. Coba juga login, buat room, dan chat dari frontend. Login yang gagal
-   dengan 503 sesudah update biasanya berarti ada migrasi yang belum dijalankan.
-7. **Bila disk VM menipis**, hapus image dan build cache yang tidak terpakai. Volume jangan disentuh.
+   `/ready` menjawab 503 bila MySQL tidak menjawab atau migrasi wajib belum tercatat (daftarnya di
+   `migrasi_kurang`), dan melaporkan status IndoBERT di `indobert` (`memuat` beberapa saat sesudah menyala, lalu
+   `siap`). Rinciannya di [backend/README.md](../README.md#saat-mysql-bermasalah). Coba juga login, buat room, dan chat
+   dari frontend.
+8. **Bila disk VM menipis**, hapus image dan build cache yang tidak terpakai. Volume jangan disentuh.
 
    ```bash
    sudo docker image prune -a
@@ -82,8 +97,8 @@ sudo docker compose --env-file .env.azure -f docker-compose.azure.yml exec -T my
   > backup_sebelum_VXX_$(date +%Y%m%d_%H%M).sql
 ```
 
-Simpan salinan dump di luar VM. Volume eksternal tidak terhapus oleh `down` atau `down -v`, tetapi menghapus volume
-secara manual atau kehilangan disk VM tetap menghapus data. Volume bukan backup.
+Simpan salinan dump di luar VM. Volume eksternal (database dan sertifikat Caddy) tidak terhapus oleh `down` atau
+`down -v`, tetapi menghapus volume secara manual atau kehilangan disk VM tetap menghapus data. Volume bukan backup.
 
 ## Menjalankan migrasi di database lama
 
@@ -145,7 +160,8 @@ direka ulang. Room lama yang tidak pernah tercatat di database dan jejak sebelum
 - `setup_azure.py` (pemasangan pertama) atau `python3 backend/scripts/setup_panel.py .env.azure` (ganti password)
   menulis `PANEL_PASSWORD_HASH` dan membuat `PANEL_ENCRYPTION_KEY` sekali. Kunci itu dipertahankan saat password
   diganti. Simpan cadangannya terpisah dari database: key yang disimpan dari panel tidak bisa didekripsi bila kunci
-  hilang.
+  hilang. `setup_panel.py` wajib diberi nama file env (tanpa argumen skrip berhenti), dan kedua skrip menulis file
+  dengan izin `600`.
 - Username panel tetap `administrator` (diset di Compose). Sesi admin berlaku 8 jam, bisa dicabut lewat logout, dan
   tidak berlaku lagi sesudah hash password diganti. Token panel hanya di memori tab, jadi refresh halaman perlu login
   ulang.

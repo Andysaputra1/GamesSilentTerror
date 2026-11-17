@@ -41,11 +41,13 @@ Nomor V03 sudah tidak ada: dulu berisi akun demo yang dihapus pada 26 Oktober 20
 termasuk `schema_migrations`. Pemakaian tiap tabel oleh backend ada di
 [backend/deployment/README.md](../deployment/README.md#audit-tabel).
 
-`/ready` hanya memeriksa V5 dan V6. Migrasi lain yang terlewat tidak membuat `/ready` gagal, tetapi fitur yang
-memakainya gagal: tanpa V07 kolom `skin_id` dan tabel survei belum ada (login bisa gagal dengan 503), tanpa V08
-peserta Stalker gagal diarsipkan, tanpa V09 menu Riwayat chat gagal dimuat, dan tanpa V10 arsip peserta gagal
-disimpan sehingga survei sesudah keluar room hanya bisa dikirim selama 30 menit dari ingatan backend. Tanpa V11
-dan V12 aplikasi tetap jalan, hanya pertanyaan survei yang tampil masih versi lama.
+`/ready` memeriksa V5, V6, dan migrasi terbaru (V12) lewat daftar `MIGRASI_WAJIB` di
+`app/services/panel_service.py`; versi yang belum tercatat muncul di `migrasi_kurang` dan `/ready` menjawab 503.
+Karena migrasi dijalankan berurutan, migrasi terbaru yang sudah tercatat menandakan file sebelumnya juga sudah jalan.
+Bila satu file di tengah terlewat, `/ready` tetap lolos tetapi fitur yang memakainya gagal: tanpa V07 kolom
+`skin_id` dan tabel survei belum ada (login bisa gagal dengan 503), tanpa V08 peserta Stalker gagal diarsipkan, tanpa
+V09 menu Riwayat chat gagal dimuat, tanpa V10 arsip peserta gagal disimpan sehingga survei sesudah keluar room hanya
+bisa dikirim selama 30 menit dari ingatan backend, dan tanpa V11 pertanyaan survei lama masih tampil.
 
 ### Catatan V11
 
@@ -87,6 +89,17 @@ V12 juga menghapus arsip `match_participants` untuk pertandingan yang selesai se
 Tabel itu hanya dipakai survei, jadi pengingat di Main dan pengiriman survei hanya berlaku untuk pertandingan mulai
 hari itu. Ambil cadangan database sebelum menjalankan V12 di server.
 
+## Menjalankan ulang migrasi lama
+
+File migrasi lama tidak diubah sesudah dijalankan di produksi, jadi menjalankannya ulang tidak selalu aman:
+
+- **V07 (`V07__survey_and_npc.sql`) dan V11 jangan dijalankan ulang sesudah V12.** Keduanya mengisi pertanyaan survei
+  lama dengan `INSERT IGNORE`. V12 sudah menghapus pertanyaan lama yang belum berjawab, sehingga menjalankan ulang V07
+  atau V11 memasukkannya lagi sebagai pertanyaan aktif di samping pertanyaan formal V12.
+- **V05 sampai V09 tidak dirancang untuk dijalankan dua kali.** `ADD COLUMN`, `ADD CONSTRAINT`, dan `INSERT` penanda
+  versi tanpa `IGNORE` berhenti dengan error karena kolom, constraint, atau versinya sudah ada. Error itu sendiri
+  tidak merusak data, tetapi jangan memaksanya lewat `mysql --force`, karena perintah sesudah error tetap dijalankan.
+
 ## Menambah migrasi
 
 1. Buat file dengan nomor dua digit berikutnya. Nomor terakhir sekarang V12, jadi file berikutnya mis.
@@ -98,9 +111,12 @@ hari itu. Ambil cadangan database sebelum menjalankan V12 di server.
 4. Uji pada database kosong (volume baru) dan pada salinan database lama.
 5. Catat file baru di tabel di atas, dan tambahkan perintahnya ke tabel migrasi di
    [backend/deployment/README.md](../deployment/README.md#menjalankan-migrasi-di-database-lama).
-6. Ingatkan bahwa database lokal dan produksi yang sudah berisi harus menjalankan file ini secara manual. Di Azure,
+6. Ganti migrasi terbaru di `MIGRASI_WAJIB` (`app/services/panel_service.py`) dengan versi baru, supaya `/ready` baru
+   lolos sesudah migrasi itu dijalankan. Tes `test_required_migrations_include_latest_file` gagal bila langkah ini
+   terlupa.
+7. Ingatkan bahwa database lokal dan produksi yang sudah berisi harus menjalankan file ini secara manual. Di Azure,
    jalankan sesudah [backup `mysqldump`](../deployment/README.md#backup-database) dan sebelum backend versi baru
-   menyala.
+   menyala; tanpa itu `/ready` menjawab 503 dan container backend tercatat tidak sehat.
 
 `ALTER TABLE` di MySQL tidak bisa dibatalkan bersama `INSERT` penanda migrasi. Bila SQL gagal di tengah, periksa
 struktur kolom sebelum mengulang.

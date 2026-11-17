@@ -8,14 +8,14 @@ from datetime import datetime
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from fastapi import FastAPI, Header
+from fastapi import FastAPI, Header, HTTPException
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, OperationalError, ProgrammingError
 from sqlalchemy.orm import Session
 
 from app.controllers.panel import require_panel
-from app.controllers.survey import router
+from app.controllers.survey import router, survey_call
 from app.middleware.auth import require_authenticated_user
 from app.models import survey_queries
 from app.services.persistence_service import PersistenceError
@@ -23,6 +23,7 @@ from app.services.room_service import RoomService
 from tests.palsu.bot_lobby import isi_kursi_bot
 from app.services.survey_service import (
     BERLAKU_SELESAI_DETIK,
+    PertanyaanTidakDitemukan,
     SurveyAlreadySubmitted,
     SurveyService,
     validate_answers,
@@ -592,8 +593,32 @@ class SurveyExportTests(unittest.TestCase):
             self.assertEqual(self.client.delete("/api/panel/survey/questions/1").status_code, 204)
             service.delete_question.side_effect = ValueError("masih punya jawaban")
             self.assertEqual(self.client.delete("/api/panel/survey/questions/1").status_code, 400)
-            service.delete_question.side_effect = LookupError("tidak ada")
+            service.delete_question.side_effect = PertanyaanTidakDitemukan("tidak ada")
             self.assertEqual(self.client.delete("/api/panel/survey/questions/9").status_code, 404)
+
+    # Pesan error mengikuti penyebabnya: bug (KeyError) tidak tersamar 404, data bentrok 409, tabel belum ada dan
+    # database mati 503 dengan pesan berbeda.
+    def test_survey_call_maps_errors_by_cause(self):
+        def gagal_karena(penyebab):
+            def operasi():
+                raise PersistenceError("Database sedang tidak tersedia.") from penyebab
+
+            return operasi
+
+        dari_mysql = Exception(0, "uji")
+        kasus = [
+            (IntegrityError("INSERT", {}, dari_mysql), 409, "Muat ulang"),
+            (ProgrammingError("SELECT", {}, dari_mysql), 503, "migrasi survei"),
+            (OperationalError("SELECT", {}, dari_mysql), 503, "tidak tersedia"),
+        ]
+        for penyebab, kode, pesan in kasus:
+            with self.subTest(penyebab=type(penyebab).__name__):
+                with self.assertRaises(HTTPException) as hasil:
+                    survey_call(gagal_karena(penyebab))
+                self.assertEqual(hasil.exception.status_code, kode)
+                self.assertIn(pesan, hasil.exception.detail)
+        with self.assertRaises(KeyError):
+            survey_call(lambda: {}["tidak_ada"])
 
 
 class SurveyCleanSqlTests(unittest.TestCase):

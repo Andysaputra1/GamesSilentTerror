@@ -49,6 +49,11 @@ class SurveyAlreadySubmitted(ValueError):
     """Satu akun hanya mengirim survei sekali untuk satu pertandingan."""
 
 
+# Turunan LookupError, tetapi controller hanya menangkap kelas ini: KeyError/IndexError (bug) tidak lagi tersamar 404.
+class PertanyaanTidakDitemukan(LookupError):
+    """Pertanyaan survei dengan ID itu tidak ada (mungkin baru dihapus panel lain)."""
+
+
 # Buang spasi berlebih dari teks yang diketik admin atau pemain.
 def _rapikan_spasi(nilai) -> str:
     return " ".join(str(nilai).split())
@@ -233,11 +238,15 @@ class SurveyService:
             del self._selesai[id_pertandingan]
 
     # KONTEKS: survei hanya untuk manusia peserta pertandingan yang sudah selesai.
+    # Arsip peserta dibaca dari MySQL di luar lock room, supaya query yang lambat tidak menahan jam permainan
+    # (event loop) yang juga memakai lock itu.
+    # Alur: 1 sudah keluar room: registri memori -> 2 arsip peserta di MySQL -> 3 pertandingan di room
     def _context(self, kode_room, username, id_pertandingan=None):
         kode_rapi = kode_room.strip().upper()
         with room_service.lock:
             room_hidup = room_service.rooms.get(kode_rapi)
-            if room_hidup is None or username not in room_hidup.members:
+            sudah_keluar = room_hidup is None or username not in room_hidup.members
+            if sudah_keluar:
                 # Sudah keluar room (mungkin room sudah dibersihkan). Cari dulu di registri memori:
                 # pertandingan selesai terbaru di room itu yang diikuti akun ini.
                 with self._kunci:
@@ -256,18 +265,20 @@ class SurveyService:
                         "room_code": data_terbaru["room_code"],
                         **data_terbaru["pemain"][username],
                     }
-                # Lalu arsip peserta di database: berlaku juga setelah server dinyalakan ulang.
-                try:
-                    konteks_arsip = jalankan_transaksi(
-                        lambda database: queries.participant(
-                            database, kode_rapi, username, id_pertandingan
-                        )
+        if sudah_keluar:
+            # Lalu arsip peserta di database: berlaku juga setelah server dinyalakan ulang.
+            try:
+                konteks_arsip = jalankan_transaksi(
+                    lambda database: queries.participant(
+                        database, kode_rapi, username, id_pertandingan
                     )
-                except PersistenceError:
-                    konteks_arsip = None
-                if konteks_arsip is not None:
-                    return konteks_arsip
+                )
+            except PersistenceError:
+                konteks_arsip = None
+            if konteks_arsip is not None:
+                return konteks_arsip
 
+        with room_service.lock:
             # Masih anggota room, atau konteks tidak ditemukan: baca pertandingan di room.
             # Room yang hilang atau akun bukan anggota ditolak dengan pesan standar room_service.
             room = room_service.get(kode_room, username)
@@ -391,7 +402,7 @@ class SurveyService:
             tersimpan = queries.list_questions(database, active_only=False)
             lama = next((item for item in tersimpan if item["id"] == id_pertanyaan), None)
             if lama is None:
-                raise LookupError("Pertanyaan tidak ditemukan.")
+                raise PertanyaanTidakDitemukan("Pertanyaan tidak ditemukan.")
             # 3 tolak kode kembar
             if any(
                 item["code"] == pertanyaan["code"] and item["id"] != id_pertanyaan
@@ -451,7 +462,7 @@ class SurveyService:
         def hapus_bila_belum_dijawab(database):
             tersimpan = queries.list_questions(database, active_only=False)
             if not any(item["id"] == id_pertanyaan for item in tersimpan):
-                raise LookupError("Pertanyaan tidak ditemukan.")
+                raise PertanyaanTidakDitemukan("Pertanyaan tidak ditemukan.")
             if queries.count_question_answers(database, id_pertanyaan):
                 raise ValueError("Pertanyaan ini masih punya jawaban. Bersihkan jawaban dulu.")
             queries.delete_question(database, id_pertanyaan)

@@ -3,6 +3,7 @@
 Berkas ini tidak mengenal HTTP. Controller menerjemahkan exception di sini menjadi status dan pesan.
 """
 
+import asyncio
 import base64
 import csv
 from datetime import datetime, date, time, timedelta, timezone
@@ -11,6 +12,7 @@ import hmac
 import io
 import ipaddress
 import json
+import logging
 import re
 import secrets
 import socket
@@ -30,6 +32,10 @@ from app.services.password_service import verify_password
 from app.services.room_service import room_service
 
 PESAN_PANEL = "Database panel belum siap. Periksa koneksi dan migrasi V5/V6."
+# Migrasi yang wajib tercatat sebelum /ready lolos: V5 dan V6 dipakai panel, lalu migrasi terbaru. Migrasi baru
+# ditambahkan di sini juga (lihat migrations/README.md); tes memastikan migrasi terakhir di folder ada di daftar ini.
+MIGRASI_WAJIB = ("V5__chat_history", "V6__admin_panel", "V12__survey_formal")
+logger = logging.getLogger("shadow_heist.panel")
 
 
 class PanelBelumSiap(RuntimeError):
@@ -82,6 +88,15 @@ def sesi_berlaku(token):
     )
 
 
+# Bersihkan sesi panel kedaluwarsa di transaksinya sendiri, sesudah login berhasil. Gagal membersihkan tidak
+# menggagalkan login: sesi kedaluwarsa memang sudah ditolak saat token dicek, dan dibersihkan login berikutnya.
+def _bersihkan_sesi_kedaluwarsa():
+    try:
+        transaction(panel_queries.delete_expired_panel_sessions)
+    except PersistenceError:
+        logger.warning("Sesi panel kedaluwarsa belum terhapus; dicoba lagi pada login berikutnya.")
+
+
 # Periksa kredensial admin lalu simpan sesi panel berumur delapan jam. Hasil: token sesi.
 def login(username, password):
     if not settings.panel_password_hash:
@@ -106,6 +121,7 @@ def login(username, password):
             database, digest(token_sesi), waktu_kedaluwarsa, credential_version()
         )
     )
+    _bersihkan_sesi_kedaluwarsa()
     return token_sesi
 
 
@@ -114,12 +130,15 @@ def logout(token):
     transaction(lambda database: panel_queries.delete_panel_session(database, digest(token)))
 
 
-# Skema siap bila migrasi V5 dan V6 sudah tercatat; database gagal dianggap belum siap.
-def skema_siap():
+# Migrasi wajib (MIGRASI_WAJIB) yang belum tercatat, urut versi; None bila database tidak bisa dibaca.
+def migrasi_kurang():
     try:
-        return jalankan_transaksi(panel_queries.count_required_migrations) == 2
+        tercatat = jalankan_transaksi(
+            lambda database: panel_queries.recorded_migrations(database, MIGRASI_WAJIB)
+        )
     except PersistenceError:
-        return False
+        return None
+    return [versi for versi in MIGRASI_WAJIB if versi not in tercatat]
 
 
 # Model yang disiapkan ai-docker (jalankan.bat): 4B cepat, 14B lebih pintar tetapi lebih lambat.
@@ -258,10 +277,12 @@ def daftar_room(after_id):
     }
 
 
-# Gabungkan jejak tersimpan dan jejak aktif; cursor menjaga urutan halaman.
-def halaman_checker(code, before):
-    daftar_baris = transaction(
-        lambda database: panel_queries.checker_trace_page(database, code, before)
+# Gabungkan jejak tersimpan dan jejak aktif; cursor menjaga urutan halaman. Async: jejak aktif disalin di event loop,
+# tempat chat dan langkah bot mengubahnya, jadi salinan tidak pernah berebut dengan penulisnya (dulu kadang 500
+# "dictionary changed size during iteration"). Query MySQL dan ringkasan room berjalan di thread.
+async def halaman_checker(code, before):
+    daftar_baris = await asyncio.to_thread(
+        transaction, lambda database: panel_queries.checker_trace_page(database, code, before)
     )
     isi_halaman = daftar_baris[:100]
     # Jejak di memori menimpa arsip ber-ID sama; halaman lanjutan hanya berisi arsip.
@@ -277,7 +298,9 @@ def halaman_checker(code, before):
         "events": activity.list(code) if before is None else [],
         # Ringkasan room hanya di halaman pertama: status, komposisi role, metode/persona bot.
         "room": (
-            checker_service.ringkasan_room(code, jejak_terbaru_dulu) if before is None else None
+            await asyncio.to_thread(checker_service.ringkasan_room, code, jejak_terbaru_dulu)
+            if before is None
+            else None
         ),
         "has_more": len(daftar_baris) > 100,
         "next_before": isi_halaman[-1]["trace_cursor"] if isi_halaman else None,
@@ -285,12 +308,13 @@ def halaman_checker(code, before):
 
 
 # Satu jejak lengkap beserta penjelasan keputusan bot (parameter, penalaran metode, NLG); None bila tidak ada.
-def jejak_checker(code, trace_id):
+# Async dengan alasan yang sama dengan halaman_checker: jejak aktif disalin di event loop, arsip dibaca di thread.
+async def jejak_checker(code, trace_id):
     jejak_aktif = checker_service.cari(code, trace_id)
     if jejak_aktif is not None:
         return jejak_aktif
-    jejak_arsip = transaction(
-        lambda database: panel_queries.checker_trace(database, trace_id, code)
+    jejak_arsip = await asyncio.to_thread(
+        transaction, lambda database: panel_queries.checker_trace(database, trace_id, code)
     )
     return None if jejak_arsip is None else _baca_kolom_json(jejak_arsip)
 

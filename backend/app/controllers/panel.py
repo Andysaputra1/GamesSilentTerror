@@ -34,6 +34,14 @@ def _jalankan(operasi):
         raise HTTPException(422, str(error)) from error
 
 
+# Versi async _jalankan untuk endpoint Checker yang menyalin jejak aktif di event loop.
+async def _jalankan_async(operasi):
+    try:
+        return await operasi
+    except PersistenceError as error:
+        raise HTTPException(503, str(error)) from error
+
+
 # Validasi sesi panel sebelum endpoint dijalankan.
 def require_panel(
     response: Response, credentials: HTTPAuthorizationCredentials | None = Depends(bearer)
@@ -154,24 +162,24 @@ def rooms(after_id: int = Query(0, ge=0), token=Depends(require_panel)):
 
 # Daftar jejak per halaman; detail diambil lewat endpoint jejak tunggal.
 @router.get("/api/panel/checker/{code}")
-def checker(
+async def checker(
     code: str, before: str | None = Query(None, max_length=100), token=Depends(require_panel)
 ):
     if len(code) > 36:
         raise HTTPException(422, "Kode room terlalu panjang.")
-    return _jalankan(lambda: panel_service.halaman_checker(code, before))
+    return await _jalankan_async(panel_service.halaman_checker(code, before))
 
 
 # Satu jejak lengkap beserta penjelasan keputusan bot (parameter, penalaran metode, NLG).
 @router.get("/api/panel/checker/{code}/jejak/{trace_id}")
-def checker_trace(code: str, trace_id: str, token=Depends(require_panel)):
+async def checker_trace(code: str, trace_id: str, token=Depends(require_panel)):
     if (
         len(code) > 36
         or len(trace_id) != 32
         or any(karakter not in "0123456789abcdef" for karakter in trace_id)
     ):
         raise HTTPException(422, "Kode room atau ID jejak tidak valid.")
-    jejak = _jalankan(lambda: panel_service.jejak_checker(code, trace_id))
+    jejak = await _jalankan_async(panel_service.jejak_checker(code, trace_id))
     if jejak is None:
         raise HTTPException(404, "Jejak tidak ditemukan.")
     return jejak

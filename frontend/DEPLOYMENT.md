@@ -9,10 +9,15 @@ mengalihkan browser ke `BACKEND_URL` + `/panel`.
 
 1. Buka https://vercel.com/new dan import `Andysaputra1/GamesSilentTerror`.
 2. Pilih **Root Directory: frontend** dan **Framework Preset: Other**.
-3. Gunakan Node.js **22.x**. Konfigurasi `vercel.json` menyediakan:
+3. Versi Node.js dikunci lewat `engines.node` (`24.x`) di `frontend/package.json`, sama dengan `package.json` root.
+   Vercel memakai nilai ini dan mengabaikan pilihan Node.js di pengaturan project. Konfigurasi `vercel.json`
+   menyediakan:
    - Install Command: `npm ci`
    - Build Command: `npm run build:vercel`
    - Output Directory: `dist/frontend/browser`
+   - Header `X-Content-Type-Options: nosniff` dan `Referrer-Policy: strict-origin-when-cross-origin` untuk semua
+     halaman. HSTS sudah dikirim Vercel sendiri. Content-Security-Policy sengaja tidak dipasang: kebijakan yang
+     kurang lengkap bisa memutus login Google (skrip dan iframe `accounts.google.com`).
 4. Deploy, lalu pastikan Production Branch pada pengaturan project adalah `main`.
    Push berikutnya ke `main` otomatis membuild dan memperbarui deployment produksi.
 

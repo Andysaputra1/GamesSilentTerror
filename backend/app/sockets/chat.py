@@ -3,7 +3,7 @@ Menerima event Socket.IO dari browser pemain, lalu mengirim hasilnya ke room.
 
 Alurnya
 1. Saat berkas ini diimpor, event connect, disconnect, send_chat didaftarkan ke sio
-2. connect: Cek token login dan room, catat socket ini milik siapa, masuk kanal room
+2. connect: Cek token login (di thread) dan room, catat socket ini milik siapa, masuk kanal room
 3. send_chat: Serahkan ke chat_service; kalau ditolak, kirim system_alert ke pengirim
 4. disconnect: Hapus catatan socket (keanggotaan lobby dan data MySQL tetap)
 
@@ -12,7 +12,9 @@ Chat bot tidak lewat send_chat. Bot hanya memakai emit_room di server.py untuk m
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import time
 from typing import Any
 
 import socketio
@@ -27,10 +29,11 @@ logger = logging.getLogger("shadow_heist.socket")
 
 # Jalan saat browser menyambung: mengecek siapa yang masuk dan ke room mana, sebelum sambungan boleh menerima chat.
 # auth = data dari browser (token, room_code). environ tidak dipakai, tapi wajib ada karena Socket.IO mengirimnya.
+# Token dicek di thread: connect bisa dipicu siapa saja, dan query yang lambat tidak boleh menahan event loop.
 async def connect(sid: str, environ: dict[str, Any], auth: Any = None) -> None:
     token = str(auth.get("token", "")) if isinstance(auth, dict) else ""
     try:
-        akun = auth_service.check_user_by_token(token)
+        akun = await asyncio.to_thread(auth_service.check_user_by_token, token)
     except (SessionValidationError, PersistenceError) as error:
         raise socketio.exceptions.ConnectionRefusedError("Login diperlukan.") from error
     try:
@@ -42,7 +45,13 @@ async def connect(sid: str, environ: dict[str, Any], auth: Any = None) -> None:
 
     kode_room = kode_room.strip().upper()
     # Token ikut dicatat karena dicek ulang tiap chat, jadi pemain yang sudah logout tidak bisa terus chat lewat sambungan lama.
-    sockets[sid] = {"username": akun.username, "token": token, "room": kode_room}
+    # `dicek`: token baru saja terbukti sah, jadi siaran beberapa detik berikutnya tidak perlu mengecek ulang.
+    sockets[sid] = {
+        "username": akun.username,
+        "token": token,
+        "room": kode_room,
+        "dicek": time.monotonic(),
+    }
     await sio.enter_room(sid, kode_room)
     logger.info("Pemain terkoneksi ke Socket: %s", sid)
 

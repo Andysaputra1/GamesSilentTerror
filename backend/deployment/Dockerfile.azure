@@ -1,4 +1,6 @@
-FROM python:3.11-slim
+# syntax=docker/dockerfile:1.19
+# Versi frontend Dockerfile dikunci: COPY --exclude di bawah butuh minimal 1.19.
+FROM python:3.11.18-slim
 WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 COPY requirements.txt ./requirements.txt
@@ -6,7 +8,14 @@ COPY requirements.txt ./requirements.txt
 # Versinya sama dengan requirements.txt agar langkah berikutnya tidak menggantinya.
 RUN pip install --no-cache-dir torch==2.14.0 --index-url https://download.pytorch.org/whl/cpu
 RUN pip install --no-cache-dir -r requirements.txt && useradd --create-home --uid 10001 appuser
-COPY --chown=appuser:appuser . .
+# Model IndoBERT (±950 MB) di layer sendiri, sebelum kode: deploy yang hanya mengubah kode memakai ulang layer ini,
+# jadi model tidak tersalin ulang dan disk VM tidak membengkak. Build berhenti bila salah satu model belum disalin.
+COPY --chown=appuser:appuser artifacts ./artifacts
+RUN for jenis in intent target; do \
+      test -s "artifacts/indobert/$jenis/model.safetensors" && test -s "artifacts/indobert/$jenis/config.json" \
+      || { echo "Model IndoBERT $jenis belum ada di backend/artifacts/indobert/$jenis"; exit 1; }; \
+    done
+COPY --chown=appuser:appuser --exclude=artifacts . .
 USER appuser
 EXPOSE 8000
 # One worker: room engine, Google nonces, and AI overrides live in one process.

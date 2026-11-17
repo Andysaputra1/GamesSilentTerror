@@ -30,6 +30,9 @@ class Settings(MySQLSettings):
     )
 
     app_name: str = "Shadow Heist Python Backend"
+    # /docs, /redoc, dan /openapi.json. Produksi mematikannya (API_DOCS=false di docker-compose.azure.yml) karena
+    # memuat peta semua endpoint panel; lokal tetap aktif.
+    api_docs: bool = True
     panel_encryption_key: SecretStr | None = None
     panel_username: str = "administrator"
     panel_password_hash: SecretStr | None = None

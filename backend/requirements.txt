@@ -1,21 +1,23 @@
-fastapi
-uvicorn
-pydantic
-pydantic-settings
-SQLAlchemy
-PyMySQL
-scikit-fuzzy
-numpy
-networkx
+# Semua dependensi langsung dikunci (==) ke versi yang terpasang di image produksi (pip freeze, 13 November 2026),
+# supaya build ulang saat deploy tidak diam-diam memasang versi baru. Naikkan versi dengan sengaja, lalu uji (V2).
+fastapi==0.162.5
+uvicorn==0.54.0
+pydantic==2.14.3
+pydantic-settings==2.16.3
+SQLAlchemy==2.1.8
+PyMySQL==1.2.4
+scikit-fuzzy==0.5.0
+numpy==2.4.6
+networkx==3.6.1
 # scikit-fuzzy tidak mendeklarasikan numpy, networkx, dan scipy.
 scipy==1.17.1
-httpx
-python-socketio
-google-auth[requests]>=2.40,<3
-email-validator>=2,<3
-cryptography>=46,<51
+httpx==0.28.1
+python-socketio==5.18.1
+google-auth[requests]==2.62.2
+email-validator==2.3.0
+cryptography==50.0.2
 # Otak NPC (lihat app/bot).
-pandas
+pandas==3.1.1
 # Sama dengan versi yang diuji (games_venv 2.14.0+cpu). Dockerfile memasang torch CPU lebih dulu;
 # pin versi yang sama di sana agar pip tidak menggantinya dengan build lain saat rilis baru.
 torch==2.14.0

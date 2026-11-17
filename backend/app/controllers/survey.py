@@ -6,12 +6,17 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
+from sqlalchemy.exc import IntegrityError, ProgrammingError
 
 from app.controllers.panel import require_panel
 from app.middleware.auth import require_authenticated_user
 from app.middleware.safe_validation import SafeValidationRoute
 from app.services.persistence_service import PersistenceError
-from app.services.survey_service import SurveyAlreadySubmitted, survey_service
+from app.services.survey_service import (
+    PertanyaanTidakDitemukan,
+    SurveyAlreadySubmitted,
+    survey_service,
+)
 
 router = APIRouter(tags=["survey"], route_class=SafeValidationRoute)
 
@@ -47,18 +52,28 @@ class QuestionOrder(BaseModel):
     ids: list[int] = Field(min_length=1, max_length=1000)
 
 
-# Terjemahkan kegagalan layanan survei menjadi status HTTP yang jelas tanpa detail internal.
+# Terjemahkan kegagalan layanan survei menjadi status HTTP yang jelas tanpa detail internal. Error database dipilah
+# menurut penyebabnya: data bentrok dengan perubahan lain (mis. dua admin menyimpan kode yang sama) 409, tabel atau
+# kolom belum ada 503 dengan petunjuk migrasi, selain itu 503 database tidak tersedia.
 def survey_call(operasi):
     try:
         return operasi()
     except SurveyAlreadySubmitted as error:
         raise HTTPException(409, str(error)) from error
-    except LookupError as error:
+    except PertanyaanTidakDitemukan as error:
         raise HTTPException(404, str(error)) from error
     except ValueError as error:
         raise HTTPException(400, str(error)) from error
     except PersistenceError as error:
-        raise HTTPException(503, "Database survei belum siap. Jalankan migrasi V7.") from error
+        penyebab = error.__cause__
+        if isinstance(penyebab, IntegrityError):
+            pesan = "Data survei berubah bersamaan dari tempat lain. Muat ulang lalu coba lagi."
+            raise HTTPException(409, pesan) from error
+        if isinstance(penyebab, ProgrammingError):
+            pesan = "Tabel survei belum lengkap. Jalankan migrasi survei (V07, V10–V12)."
+            raise HTTPException(503, pesan) from error
+        pesan = "Database survei sedang tidak tersedia. Coba lagi nanti."
+        raise HTTPException(503, pesan) from error
 
 
 # PEMAIN: survei pertandingan selesai yang belum diisi, untuk pengingat di halaman Main.

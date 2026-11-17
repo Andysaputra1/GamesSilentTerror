@@ -61,6 +61,8 @@ services:
       DATABASE_POOL_SIZE: '5'
       DATABASE_MAX_OVERFLOW: '5'
       SQL_ECHO: 'false'
+      # Produksi tanpa /docs, /redoc, dan /openapi.json (peta endpoint panel); lokal tetap aktif.
+      API_DOCS: 'false'
     healthcheck:
       test:
         [
@@ -80,7 +82,7 @@ services:
         max-file: '3'
 
   proxy:
-    image: caddy:2-alpine
+    image: caddy:2.11.4-alpine
     restart: unless-stopped
     depends_on:
       backend:
@@ -105,5 +107,9 @@ volumes:
   mysql_data:
     external: true
     name: shadow_heist_mysql_data
+  # Sertifikat HTTPS Caddy. Eksternal (volume yang sudah ada di VM) supaya `down -v` tidak menghapusnya; tanpa itu
+  # Caddy harus meminta sertifikat baru dan bisa terkena batas permintaan Let's Encrypt.
   caddy_data:
+    external: true
+    name: silent-terror-azure_caddy_data
   caddy_config:

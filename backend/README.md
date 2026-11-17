@@ -6,7 +6,8 @@ menjalankan backend tanpa Docker, dan pola SQL di model. Susunan folder dan atur
 
 Backend memakai FastAPI untuk HTTP dan Socket.IO untuk chat, dengan entry point `app.main:asgi_app`. Saat menyala,
 `app/main.py` memuat konfigurasi panel dari MySQL, memuat otak bot (IndoBERT, fuzzy, penulis kalimat) di latar, lalu
-menjalankan jam permainan tiap 0,5 detik.
+menjalankan jam permainan tiap 0,5 detik. Perilaku saat MySQL belum siap, lambat, atau mati ada di
+[Saat MySQL bermasalah](#saat-mysql-bermasalah).
 
 ## Variabel environment
 
@@ -35,6 +36,7 @@ bila dipakai.
 | `PANEL_USERNAME`, `PANEL_PASSWORD_HASH` | `administrator`, kosong | Login panel. Hash dibuat `scripts/setup_panel.py` |
 | `PANEL_ENCRYPTION_KEY` | kosong | Kunci Fernet untuk key dan token yang disimpan dari panel. Dibuat sekali oleh `setup_panel.py`; simpan cadangannya terpisah dari database |
 | `ADMIN_USERNAMES`, `HISTORY_ADMIN_USERNAMES` | `user1`, kosong | Hanya daftar username yang dicadangkan (tidak boleh dipakai akun game) |
+| `API_DOCS` | `true` | Membuka `/docs`, `/redoc`, dan `/openapi.json`. Compose Azure mengisi `false`, karena halaman itu memuat peta semua endpoint panel |
 
 **LLM dan otak bot**
 
@@ -84,6 +86,49 @@ panel menimpa `.env` tanpa restart. Selama baris panel kosong, `.env` yang dipak
 - Rantai memakai key OpenRouter dan link dari Konfigurasi AI. Jalur tanpa key atau link dilewati; bila semua gagal,
   bot memakai templat.
 - Tombol **Tes koneksi semua prioritas** mengirim pesan pendek ke setiap jalur aktif (OpenRouter memakai saldo).
+
+## Saat MySQL bermasalah
+
+**Batas waktu.** Setiap koneksi PyMySQL dibatasi 5 detik untuk tersambung serta 15 detik untuk membaca dan menulis,
+dan permintaan koneksi dari pool menunggu paling lama 10 detik (`app/config/database.py`, tidak diatur lewat
+environment). Query terberat selesai jauh di bawah satu detik, jadi batas ini hanya terlampaui bila MySQL macet atau
+jaringan putus. Query yang melewatinya gagal sebagai `PersistenceError`.
+
+**Query di luar event loop.** Cek token Socket.IO (saat menyambung, mengirim chat, dan setiap siaran ke room), simpan
+chat pemain beserta jejak Checker-nya, `/app-status`, arsip peserta survei, dan daftar jejak Checker menjalankan
+query di thread, sehingga jam permainan, bot, dan socket room lain tidak ikut menunggu. Hasil cek token sebuah
+sambungan dipakai ulang selama 5 detik (`TOKEN_BERLAKU_DETIK` di `app/sockets/server.py`), jadi logout atau sesi yang
+dicabut berlaku untuk chat paling lambat 5 detik kemudian. Sambungan yang tokennya belum bisa dicek karena MySQL gagal
+tidak dikirimi pesan itu, tetapi tetap di kanal room dan menerima pesan berikutnya begitu MySQL pulih.
+
+Beberapa query tetap berjalan sambil memegang lock room, karena pengecekan dan penulisannya harus terjadi bersama:
+simpan chat pemain dan chat bot (supaya Gag atau fase baru tidak diterobos), ganti username lewat profil atau panel
+dan hapus akun di panel (supaya pemiliknya tidak sempat masuk room), serta profil akun saat membuat, masuk, atau
+memulai room. Batas waktu di atas membatasi berapa lama lock itu tertahan.
+
+**Jam room dijeda.** Query yang gagal karena MySQL tidak bisa dihubungi atau tidak menjawab menandai database gagal
+(error SQL biasa seperti data bentrok atau kolom belum ada tidak dihitung). Selama tanda itu ada, jam permainan tidak
+mengganti fase dan tidak menjalankan bot; batas waktu setiap pertandingan yang berjalan digeser sejauh lama jeda,
+jadi sisa waktu fase tetap. Pemain mendapat 503 selama itu, tetapi waktu fasenya tidak berkurang, jadi vote dan aksi
+masih bisa dikirim sesudah MySQL pulih.
+Jam memeriksa MySQL dengan `SELECT 1` setiap putaran, dan query pertama yang berhasil menjalankan jam lagi. Log
+mencatat `MySQL tidak menjawab ...; jam room dijeda` dan `MySQL menjawab lagi; jam room berjalan kembali`.
+
+**Konfigurasi panel saat menyala.** Bila MySQL belum siap atau tidak menjawab saat backend menyala, Konfigurasi AI
+dan Otak NPC dari panel dicoba dimuat ulang di latar tiap 5 detik sampai berhasil; sementara itu backend memakai nilai
+`.env`. Kegagalan lain, misalnya API key panel yang tidak bisa dibuka dengan `PANEL_ENCRYPTION_KEY`, hanya dicatat di
+log dan tidak dicoba ulang. Log
+`... belum dimuat dari MySQL; dicoba ulang tiap 5 detik di latar` muncul saat menyala, dan
+`Konfigurasi panel dimuat dari MySQL pada percobaan ke-N` saat berhasil.
+
+**Respons ke browser.** Error database yang tidak ditangani controller (mis. saat membuat room) dijawab JSON 503 bila
+MySQL tidak menjawab, atau 500 untuk error SQL lain, dengan header CORS, jadi frontend menampilkan pesannya, bukan
+"CORS error".
+
+**`/ready`.** Menjawab 200 bila MySQL menjawab dan migrasi wajib sudah tercatat (`MIGRASI_WAJIB`: V5, V6, dan migrasi
+terbaru), selain itu 503. Body-nya memuat `database`, `migrasi_kurang`, dan `indobert` (`siap`, `memuat`, atau
+`gagal`). Status IndoBERT hanya dilaporkan dan tidak membuat `/ready` gagal, karena model dimuat di latar sesudah
+server menyala dan healthcheck Compose Azure memakai endpoint ini.
 
 ## Menjalankan backend tanpa Docker
 

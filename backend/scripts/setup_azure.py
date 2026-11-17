@@ -3,7 +3,7 @@
 from pathlib import Path
 import secrets
 import getpass
-from setup_panel import configure, ensure_encryption
+from setup_panel import configure, ensure_encryption, tulis_rahasia
 
 path = Path(".env.azure")
 content = path.read_text(encoding="utf-8") if path.exists() else ""
@@ -29,8 +29,7 @@ add("FRONTEND_ORIGIN", "https://silent-terror.andylabs.site")
 add("GOOGLE_CLIENT_ID", "")
 add("openrouter_default", "")
 add("OLLAMA_TUNNEL_TOKEN", "")
-path.write_text(content.lstrip(), encoding="utf-8")
-path.chmod(0o600)
+tulis_rahasia(path, content.lstrip())
 if not existing.get("PANEL_PASSWORD_HASH", "").strip():
     password = getpass.getpass("Password administrator panel: ")
     if len(password) < 8 or password != getpass.getpass("Ulangi password: "):

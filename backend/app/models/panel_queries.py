@@ -1,6 +1,6 @@
 """SQL panel administrator: sesi, konfigurasi, arsip room, jejak checker, riwayat chat, dan kesiapan skema. Transaksi diatur pemanggil."""
 
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 
 
 # Hash token sesi panel bila masih berlaku dan cocok dengan versi kredensial; kosong bila tidak.
@@ -14,9 +14,8 @@ def valid_panel_session(database, token_hash, credential_version):
     ).scalar()
 
 
-# Bersihkan sesi kedaluwarsa dan simpan hash sesi baru dalam satu transaksi.
+# Simpan hash sesi panel baru. Sesi kedaluwarsa dibersihkan terpisah (delete_expired_panel_sessions).
 def create_panel_session(database, token_hash, expires_at, credential_version):
-    database.execute(text("DELETE FROM panel_sessions WHERE expires_at <= UTC_TIMESTAMP()"))
     database.execute(
         text(
             "INSERT INTO panel_sessions(token_hash,expires_at,credential_version) VALUES(:token,:expires,:version)"
@@ -27,6 +26,12 @@ def create_panel_session(database, token_hash, expires_at, credential_version):
             "version": credential_version,
         },
     )
+
+
+# Hapus semua sesi panel yang sudah kedaluwarsa. Dijalankan service di transaksi sendiri sesudah login berhasil:
+# DELETE rentang lalu INSERT di satu transaksi membuat dua login bersamaan bisa saling mengunci (deadlock).
+def delete_expired_panel_sessions(database):
+    database.execute(text("DELETE FROM panel_sessions WHERE expires_at <= UTC_TIMESTAMP()"))
 
 
 # Hapus satu sesi panel berdasarkan hash token.
@@ -55,13 +60,16 @@ def write_panel_configuration(database, row_id, config):
     )
 
 
-# Jumlah migrasi wajib yang sudah tercatat; server siap bila keduanya ada.
-def count_required_migrations(database):
-    return database.execute(
-        text(
-            "SELECT COUNT(*) FROM schema_migrations WHERE version IN ('V5__chat_history','V6__admin_panel')"
-        )
-    ).scalar()
+# Versi dari daftar_versi yang sudah tercatat di schema_migrations.
+def recorded_migrations(database, daftar_versi):
+    return set(
+        database.execute(
+            text("SELECT version FROM schema_migrations WHERE version IN :versi").bindparams(
+                bindparam("versi", expanding=True)
+            ),
+            {"versi": list(daftar_versi)},
+        ).scalars()
+    )
 
 
 # Daftar room yang pernah tercatat beserta jumlah pesannya.

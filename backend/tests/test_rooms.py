@@ -198,9 +198,11 @@ class SocketRoomTests(unittest.IsolatedAsyncioTestCase):
         with socket_palsu(rooms, sambungan, cek_token) as sio:
             await server.emit_room("receive_chat", {"message": "private room"}, to=room.code)
             sio.leave_room.assert_awaited_once_with("bob-sid", room.code)
+            # Catatan socket basi ikut dibuang, jadi tidak dicek ulang di setiap siaran.
+            self.assertNotIn("bob-sid", server.sockets)
             sio.leave_room.reset_mock()
             rooms.join(room.code, "bob")
-            server.sockets["bob-sid"]["token"] = "revoked-session"
+            server.sockets["bob-sid"] = {"username": "bob", "token": "revoked-session", "room": room.code}
             await server.emit_room("receive_chat", {"message": "next"}, to=room.code)
             sio.leave_room.assert_awaited_once_with("bob-sid", room.code)
 
@@ -210,9 +212,10 @@ class SocketRoomTests(unittest.IsolatedAsyncioTestCase):
         room = rooms.create("alice")
         sambungan = {"sid": {"username": "alice", "room": room.code}}
         with socket_palsu(rooms, sambungan), self.assertRaises(KeyError):
-            server.verifikasi_socket("sid", "alice")
+            await server.verifikasi_socket("sid", "alice")
 
-    # Database sempat gagal bukan berarti sesinya berakhir: pemain tetap di kanal dan tetap menerima chat.
+    # Database sempat gagal bukan berarti sesinya berakhir: pemain tetap di kanal, tetapi siaran yang tokennya belum
+    # bisa dicek tidak dikirim kepadanya (gagal tertutup).
     async def test_database_failure_keeps_socket_in_room_channel(self):
         rooms = RoomService()
         room = rooms.create("alice")
@@ -223,8 +226,11 @@ class SocketRoomTests(unittest.IsolatedAsyncioTestCase):
             self.assertLogs("shadow_heist.socket", "WARNING"),
         ):
             await server.emit_room("receive_chat", {"message": "halo"}, to=room.code)
+            self.assertIn("sid", server.sockets)
         sio.leave_room.assert_not_awaited()
-        sio.emit.assert_awaited_once_with("receive_chat", {"message": "halo"}, to=room.code)
+        sio.emit.assert_awaited_once_with(
+            "receive_chat", {"message": "halo"}, to=room.code, skip_sid=["sid"]
+        )
 
     # Pengirim harus tahu layanannya yang bermasalah, bukan disuruh login ulang.
     async def test_database_failure_tells_sender_login_service_unavailable(self):

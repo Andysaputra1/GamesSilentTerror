@@ -213,14 +213,16 @@ Model OpenRouter penulis kalimat diatur di panel **Otak NPC** (atau `NPC_OPENROU
 | Aplikasi | http://localhost:4200 |
 | Panel administrator | http://localhost:8000/panel |
 | Status backend (database, provider, model) | http://localhost:8000/app-status |
-| Kesiapan skema database | http://localhost:8000/ready |
-| Dokumentasi API | http://localhost:8000/docs |
+| Kesiapan database dan migrasi, status IndoBERT | http://localhost:8000/ready |
+| Dokumentasi API (hanya lokal; produksi mematikannya) | http://localhost:8000/docs |
 | phpMyAdmin | http://localhost:8000/phpmyadmin/ |
 | MySQL dari host atau DB client | `localhost:3307`, database `shadow_heist` |
 | Ollama dari host (mode A) | http://localhost:11435 |
 
 Login phpMyAdmin memakai `MYSQL_USER` dan `MYSQL_PASSWORD` dari `.env`, bukan akun game. Backend dan phpMyAdmin
-berbagi port `8000` lewat gateway Nginx; port `3307` hanya untuk koneksi MySQL.
+berbagi port `8000` lewat gateway Nginx; port `3307` hanya untuk koneksi MySQL. Kedua port hanya bisa dibuka dari
+laptop ini (terikat ke `127.0.0.1`), karena root MySQL dan phpMyAdmin memakai password contoh. Port `4200` tetap
+terbuka ke jaringan untuk [Testing lewat LAN](#testing-lewat-lan).
 
 ## Mencoba permainan
 
@@ -328,8 +330,11 @@ Frontend development mengizinkan `localhost`, `127.0.0.1`, dan IP LAN pengembang
 2. Tambahkan origin lengkap ke `CORS_ORIGINS` di `.env`, mis.
    `CORS_ORIGINS=http://localhost:4200,http://127.0.0.1:4200,http://192.168.40.176:4200`. Daftar ini berlaku untuk
    HTTP API dan Socket.IO. Jangan memakai wildcard.
-3. Terapkan: `docker compose up -d --force-recreate ai-engine frontend`, lalu `docker compose restart gateway`.
-4. Teman di jaringan yang sama membuka `http://<IP-LAN>:4200`. Jangan memakai IP adapter WSL.
+3. Buka port `8000` ke jaringan dengan `GATEWAY_BIND=0.0.0.0` di `.env`. Bawaannya `127.0.0.1`, jadi perangkat lain
+   tidak bisa memanggil backend. Selama tes ini phpMyAdmin ikut terbuka ke LAN, jadi kembalikan ke `127.0.0.1`
+   sesudahnya.
+4. Terapkan: `docker compose up -d --force-recreate ai-engine frontend gateway`.
+5. Teman di jaringan yang sama membuka `http://<IP-LAN>:4200`. Jangan memakai IP adapter WSL.
 
 Bila perangkat lain masih timeout, periksa firewall dan isolasi klien Wi-Fi. Jangan membuka MySQL atau phpMyAdmin ke
 internet, dan jangan mematikan firewall seluruhnya.
