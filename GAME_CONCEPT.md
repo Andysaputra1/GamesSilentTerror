@@ -107,7 +107,8 @@ mode cepat untuk 6 pemain: 20/15/15 detik.
 
 Chat publik tersedia saat siang dan Tribunal bagi pemain yang masih boleh berbicara. Setiap pemain paling cepat
 mengirim satu pesan per 2 detik dan paling banyak 5 pesan per 20 detik. Pesan yang terlalu cepat tidak dikirim dan
-pengirim membaca "Chat terlalu cepat. Tunggu N detik lalu kirim lagi." Alasannya, IndoBERT membaca tiap chat sekitar 9
+pengirim membaca "Chat terlalu cepat. Tunggu N detik lalu kirim lagi."; teksnya kembali ke kotak ketik supaya bisa
+dikirim ulang. Alasannya, IndoBERT membaca tiap chat sekitar 9
 detik di satu thread yang juga dipakai langkah bot semua room. Chat tim malam lewat jalur lain (tanpa database dan
 IndoBERT) dan tidak dibatasi.
 
@@ -255,6 +256,9 @@ statistik akhir. Di bawahnya ada **survei**.
   pertanyaan formal penelitian dari migrasi V12; daftarnya dan bagian bot yang diukur tiap pertanyaan ada di
   [Catatan V12](backend/migrations/README.md#catatan-v12).
 - Pilihan bernama `Lainnya` pada pilihan ganda membuka isian bebas, disimpan sebagai `Lainnya: <isian>`.
+- Jawaban pertanyaan opsional (pilihan ganda, bintang, skala) bisa dikosongkan lagi lewat "Kosongkan pilihan". Selama
+  tombol kirim belum aktif, nomor pertanyaan yang belum lengkap tampil di atasnya. Jawaban yang sudah diisi tetap ada
+  saat pemain membuka "Lihat meja" atau "← Pengumuman" lalu kembali ke kuesioner.
 - Pertanyaan baru selalu masuk paling bawah. Urutannya diatur dengan menyeret pegangan ⋮⋮ atau tombol ▲▼ (Alt+↑/↓),
   langsung tersimpan lewat `PUT /api/panel/survey/questions/order`, dan dipakai form pemain serta ekspor CSV.
 - Setiap akun manusia mengirim survei sekali per pertandingan; kiriman ganda bersamaan juga dijawab "sudah dikirim".

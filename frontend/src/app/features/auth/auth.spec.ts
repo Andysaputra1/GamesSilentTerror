@@ -201,4 +201,83 @@ describe('Auth', () => {
     expect(component.errorMessage).toBe('MASUKKAN USERNAME DAN PASSWORD TERLEBIH DAHULU.');
     httpMock.expectNone('http://localhost:8000/api/auth/login');
   });
+
+  // Nama tampilan tanpa huruf/angka ditolak di browser; kata terlarang ditolak server dan pesannya ditampilkan apa adanya.
+  it('checks display names locally and shows the server reason for rejected names', () => {
+    component.registerName = 'detective';
+    component.registerDisplayName = '🔥🔥';
+    component.registerPassword = component.registerPasswordVerify = 'strong-password';
+    component.register();
+    expect(component.registerError).toBe('Nama lengkap harus memuat huruf atau angka.');
+    httpMock.expectNone('http://localhost:8000/api/auth/register');
+
+    component.registerDisplayName = 'Aku Detektif';
+    component.register();
+    httpMock.expectOne('http://localhost:8000/api/auth/register').flush(
+      {
+        detail: [
+          {
+            loc: ['body', 'display_name'],
+            msg: 'Value error, Nama tidak boleh diawali kata ganti atau istilah game (mis. Aku, Gw, Dia, Vote, Hitman).',
+            type: 'value_error',
+          },
+        ],
+      },
+      { status: 422, statusText: 'Unprocessable Entity' },
+    );
+    expect(component.registerError).toBe(
+      'Nama tidak boleh diawali kata ganti atau istilah game (mis. Aku, Gw, Dia, Vote, Hitman).',
+    );
+  });
+
+  // Nonce Google kedaluwarsa lima menit: tombol yang berumur empat menit disiapkan ulang saat tab kembali fokus.
+  it('refreshes the Google nonce before it expires', async () => {
+    const initialize = vi.fn();
+    (window as Window & { google?: unknown }).google = {
+      accounts: { id: { initialize, renderButton: vi.fn() } },
+    };
+    const siapkan = async (nonce: string) => {
+      httpMock
+        .expectOne('http://localhost:8000/api/auth/google/config')
+        .flush({ client_id: 'google-client-id' });
+      await Promise.resolve();
+      httpMock.expectOne('http://localhost:8000/api/auth/google/challenge').flush({ nonce });
+    };
+    const sekarang = vi.spyOn(Date, 'now').mockReturnValue(1_000_000);
+    vi.spyOn(document, 'hasFocus').mockReturnValue(true);
+    const pertama = component.siapkanTombolGoogle();
+    await siapkan('nonce-1');
+    await pertama;
+    expect(component.googleReady).toBe(true);
+
+    sekarang.mockReturnValue(1_000_000 + 3 * 60_000);
+    window.dispatchEvent(new Event('focus'));
+    httpMock.expectNone('http://localhost:8000/api/auth/google/config');
+
+    sekarang.mockReturnValue(1_000_000 + 4 * 60_000);
+    window.dispatchEvent(new Event('focus'));
+    await siapkan('nonce-2');
+    await vi.waitFor(() =>
+      expect(initialize).toHaveBeenLastCalledWith(expect.objectContaining({ nonce: 'nonce-2' })),
+    );
+    expect(component.googleReady).toBe(true);
+    // /ready ikut diperiksa saat fokus; tidak relevan untuk tes ini.
+    httpMock
+      .match((request) => request.url === 'http://localhost:8000/ready')
+      .forEach((request) => request.flush({ ready: true }));
+    sekarang.mockRestore();
+  });
+
+  // Pesan titipan (mis. sesi berakhir) tampil sekali di form login.
+  it('shows a notice left by the previous page once', () => {
+    sessionStorage.setItem('shadow_heist_notice', 'Sesi berakhir. Silakan login kembali.');
+    const kedua = TestBed.createComponent(Auth);
+    kedua.detectChanges();
+    expect(kedua.componentInstance.errorMessage).toBe('Sesi berakhir. Silakan login kembali.');
+    expect(sessionStorage.getItem('shadow_heist_notice')).toBeNull();
+    httpMock
+      .match((request) => request.url === 'http://localhost:8000/ready')
+      .forEach((request) => request.flush({ ready: true }));
+    kedua.destroy();
+  });
 });

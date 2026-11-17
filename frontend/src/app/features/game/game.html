@@ -300,7 +300,7 @@
           <button
             type="button"
             class="round-button"
-            (click)="showRules = true"
+            (click)="bukaPanduan()"
             aria-label="Cara bermain"
           >
             ?
@@ -387,7 +387,7 @@
           <div class="side-lens" aria-hidden="true">
             <img src="/assets/decorations/objects/case-lens.svg" alt="" />
           </div>
-          <button type="button" class="wood-button plank rules-open" (click)="showRules = true">
+          <button type="button" class="wood-button plank rules-open" (click)="bukaPanduan()">
             ❔ Cara bermain
           </button>
         </aside>
@@ -874,6 +874,7 @@
                       <app-survey-form
                         [code]="code"
                         [survey]="survey"
+                        [(answers)]="surveyAnswers"
                         (submitted)="surveyState = 'done'"
                       />
                     }
@@ -892,21 +893,22 @@
 
       <!-- PANDUAN: tombol "?" dan "Cara bermain" membuka tiga kartu yang sama dengan layar persiapan. -->
       @if (showRules) {
-        <div class="modal-backdrop" (click)="showRules = false">
+        <div class="modal-backdrop" (click)="tutupModal()">
           <section
+            #modal
             class="rules-modal paper"
             role="dialog"
             aria-modal="true"
             aria-labelledby="rules-title"
             (click)="$event.stopPropagation()"
-            (keydown.escape)="showRules = false"
           >
             <header class="rules-head">
               <h2 id="rules-title">Cara bermain</h2>
               <button
+                #rulesClose
                 type="button"
                 class="round-button"
-                (click)="showRules = false"
+                (click)="tutupModal()"
                 aria-label="Tutup"
               >
                 ✕
@@ -920,15 +922,15 @@
       }
       @if (popupKeluarTerbuka) {
         <!-- Konfirmasi keluar: kertas di tengah meja, pilihan aman ("Tetap bermain") difokuskan dulu. -->
-        <div class="modal-backdrop" (click)="popupKeluarTerbuka = false">
+        <div class="modal-backdrop" (click)="tutupModal()">
           <section
+            #modal
             class="leave-modal paper"
             role="alertdialog"
             aria-modal="true"
             aria-labelledby="leave-title"
             aria-describedby="leave-text"
             (click)="$event.stopPropagation()"
-            (keydown.escape)="popupKeluarTerbuka = false"
           >
             <span class="leave-icon" aria-hidden="true">🚪</span>
             <h2 id="leave-title">Keluar dari permainan?</h2>
@@ -937,12 +939,7 @@
               pertandingan ini. Menang atau kalah tetap mengikuti kubumu.
             </p>
             <div class="leave-actions">
-              <button
-                #stayButton
-                type="button"
-                class="wood-button plank"
-                (click)="popupKeluarTerbuka = false"
-              >
+              <button #stayButton type="button" class="wood-button plank" (click)="tutupModal()">
                 Tetap bermain
               </button>
               <button
@@ -961,6 +958,10 @@
   } @else {
     <div class="loading-card paper">
       <p class="loading">Memuat pertandingan dari server…</p>
+      <!-- Snapshot pertama gagal (5xx, timeout): alasannya tampil di sini, karena toast di atas meja belum ada. -->
+      @if (error) {
+        <p class="alert" role="alert">{{ error }}</p>
+      }
       <button type="button" class="wood-button green" (click)="refresh()" [disabled]="busy">
         Coba lagi
       </button>

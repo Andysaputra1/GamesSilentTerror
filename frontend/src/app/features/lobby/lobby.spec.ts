@@ -273,4 +273,29 @@ describe('Lobby', () => {
     expect(request).toHaveBeenLastCalledWith('POST', '/ABC123/bot', { aksi: 'kurangi' });
     expect(component.room?.bots).toEqual(['NOX']);
   });
+
+  // Tab tersembunyi tidak mem-polling roster; polling jalan lagi begitu tab tampil.
+  it('pauses roster polling while the tab is hidden', () => {
+    vi.useFakeTimers();
+    const lobby = TestBed.createComponent(Lobby);
+    lobby.detectChanges();
+    const room = {
+      code: 'ABC123',
+      owner: 'alice',
+      members: [member('alice')],
+      bots: [],
+      phase: 'lobby',
+    };
+    lobby.componentInstance.room = room;
+    const request = vi.spyOn(TestBed.inject(RoomService), 'request').mockReturnValue(of(room));
+    const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true);
+    vi.advanceTimersByTime(6000);
+    expect(request).not.toHaveBeenCalled();
+    hidden.mockReturnValue(false);
+    vi.advanceTimersByTime(3000);
+    expect(request).toHaveBeenCalledWith('GET', '/ABC123', undefined);
+    hidden.mockRestore();
+    lobby.destroy();
+    vi.useRealTimers();
+  });
 });

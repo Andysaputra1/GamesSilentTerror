@@ -1,9 +1,10 @@
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { Injectable, signal } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
+import { HttpClient, HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
+import { inject, Injectable, PLATFORM_ID, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { catchError, defer, finalize, map, of, tap, throwError, timeout } from 'rxjs';
+import { catchError, defer, finalize, map, of, tap, timeout } from 'rxjs';
 import { backendUrl } from './backend-url';
-import { authHeaders, forgetRoom, STORAGE } from './storage';
+import { authHeaders, forgetRoom, STORAGE, titipPemberitahuan } from './storage';
 
 export interface UserProfile {
   username: string;
@@ -98,7 +99,9 @@ export class SessionService {
     forgetRoom();
   }
 
-  // Cabut token sebelum membersihkan sesi; HTTP 401 berarti sesi sudah tidak berlaku.
+  // Cabut token di server lalu bersihkan sesi lokal. HTTP 401 berarti sesi memang sudah tidak berlaku. Gagal lain
+  // (server mati, 5xx, timeout) tetap membersihkan sesi lokal supaya pengguna bisa keluar atau ganti akun; token di
+  // server berakhir sendiri saat kedaluwarsa, dan halaman login menampilkan peringatannya.
   logout() {
     return defer(() => {
       this.loggingOut.set(true);
@@ -115,11 +118,13 @@ export class SessionService {
             .pipe(timeout(10000))
         : of(undefined);
       return pencabutanToken.pipe(
-        catchError((error: unknown) =>
-          error instanceof HttpErrorResponse && error.status === 401
-            ? of(undefined)
-            : throwError(() => error),
-        ),
+        catchError((error: unknown) => {
+          if (!(error instanceof HttpErrorResponse && error.status === 401))
+            titipPemberitahuan(
+              'Server belum bisa dihubungi, jadi logout hanya dilakukan di browser ini. Sesi lama di server berakhir sendiri saat kedaluwarsa.',
+            );
+          return of(undefined);
+        }),
         tap(() => {
           this.clearLocalSession();
           void this.router.navigateByUrl('/login', { replaceUrl: true });
@@ -129,3 +134,31 @@ export class SessionService {
     });
   }
 }
+
+// SESI DITOLAK SERVER: 401 untuk token yang masih tersimpan berarti sesinya sudah tidak berlaku di server (akun
+// dinonaktifkan, sesi dicabut, atau jam perangkat keliru), walau masa berlaku lokal belum habis. Sesi lokal dihapus lalu
+// pengguna dibawa ke /login, supaya tidak terjebak di halaman yang tampak sudah login. Request login dan daftar tidak
+// membawa token, request dengan token lama (akun sudah berganti di tab lain) dilewati, dan logout menangani 401-nya
+// sendiri.
+export const sesiDitolakInterceptor: HttpInterceptorFn = (request, next) => {
+  const session = inject(SessionService);
+  const router = inject(Router);
+  const diBrowser = isPlatformBrowser(inject(PLATFORM_ID));
+  return next(request).pipe(
+    tap({
+      error: (error: unknown) => {
+        if (!diBrowser || !(error instanceof HttpErrorResponse) || error.status !== 401) return;
+        const token = localStorage.getItem(STORAGE.token);
+        if (
+          !token ||
+          request.headers.get('Authorization') !== 'Bearer ' + token ||
+          request.url.endsWith('/api/auth/logout')
+        )
+          return;
+        session.clearLocalSession();
+        titipPemberitahuan('Sesi berakhir. Silakan login kembali.');
+        void router.navigateByUrl('/login', { replaceUrl: true });
+      },
+    }),
+  );
+};

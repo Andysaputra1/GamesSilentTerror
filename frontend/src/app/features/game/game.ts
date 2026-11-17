@@ -6,6 +6,7 @@ import {
   Component,
   DestroyRef,
   ElementRef,
+  HostListener,
   Inject,
   Injector,
   OnDestroy,
@@ -17,7 +18,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { finalize } from 'rxjs';
+import { finalize, fromEvent } from 'rxjs';
 import { io, Socket } from 'socket.io-client';
 import {
   GameMessage,
@@ -30,7 +31,7 @@ import { ProfileMenu } from '../../core/profile-menu';
 import { PhaseDurations } from '../../core/room.service';
 import { FullscreenPrompt } from '../../core/fullscreen-prompt';
 import { forgetRoom, STORAGE } from '../../core/storage';
-import { SurveyForm } from '../../core/survey-form/survey-form';
+import { JawabanSurvei, SurveyForm } from '../../core/survey-form/survey-form';
 import { RoleRevealCard } from '../../core/role-reveal-card/role-reveal-card';
 
 // Karakter cadangan dan warna label pemain: berdasarkan urutan kursi, bukan role atau status rahasia.
@@ -49,6 +50,8 @@ const TAG_COLORS = [
 ];
 const ROLES = ['hitman', 'spy', 'stalker', 'civilian'];
 const ROLE_REVEAL_READ_MS = 3000;
+// Pesan saat socket chat gagal tersambung; dihapus lagi begitu socket tersambung.
+const PESAN_CHAT_TERPUTUS = 'Chat belum tersambung. Periksa koneksi atau kembali ke lobby.';
 
 // KOMPONEN: render snapshot privat server; tidak mengacak role atau memutuskan hasil aksi di browser.
 @Component({
@@ -90,6 +93,14 @@ export class Game implements OnInit, OnDestroy {
   @ViewChild('stayButton') set stayButton(button: ElementRef<HTMLButtonElement> | undefined) {
     if (button) queueMicrotask(() => button.nativeElement.focus());
   }
+  // Panduan "Cara bermain" memfokuskan tombol ✕ saat dibuka.
+  @ViewChild('rulesClose') set rulesClose(button: ElementRef<HTMLButtonElement> | undefined) {
+    if (button) queueMicrotask(() => button.nativeElement.focus());
+  }
+  // Modal yang sedang terbuka (panduan atau pop-up keluar), untuk menjaga fokus Tab di dalamnya.
+  @ViewChild('modal') private modal?: ElementRef<HTMLElement>;
+  // Tombol yang membuka modal; fokus kembali ke sana saat modal ditutup.
+  private fokusSebelumModal?: HTMLElement;
   kartuRoleTerbuka = false;
   readingRole = false;
   private membacaLewatPengingat = false;
@@ -149,12 +160,20 @@ export class Game implements OnInit, OnDestroy {
   survey: SurveyStatus | null = null;
   surveyState: 'idle' | 'loading' | 'ready' | 'done' | 'unavailable' = 'idle';
   surveyError = '';
+  // Jawaban kuesioner disimpan di sini, bukan di SurveyForm, supaya tidak hilang saat pemain pindah ke
+  // "Lihat meja" atau "← Pengumuman" lalu kembali (formulir dilepas dan dibuat lagi).
+  surveyAnswers: JawabanSurvei = {};
   readonly confetti = Array.from({ length: 28 }, (_, index) => ({
     x: (index * 37) % 100,
     delay: (index % 7) * 0.35,
     color: ['#e3b448', '#36564b', '#c8553d', '#6c8ea4', '#efcfac'][index % 5],
   }));
   private socket?: Socket;
+  // Sambung ulang socket yang ditolak server: timer yang menunggu dan jumlah percobaan beruntun (untuk jeda).
+  private timerSambungUlang?: ReturnType<typeof setTimeout>;
+  private percobaanSambungUlang = 0;
+  // Teks chat terakhir yang dikirim dan belum kembali sebagai echo server; dipulihkan ke kotak ketik bila ditolak.
+  private chatMenungguEcho = '';
   private timerPolling?: ReturnType<typeof setInterval>;
   // Polling latar tidak memakai `busy`: aplikasi zoneless tidak menggambar ulang tombol saat polling
   // dimulai, jadi klik yang jatuh di tengah polling (tiap detik) dulu ditolak diam-diam dan tombol
@@ -719,6 +738,49 @@ export class Game implements OnInit, OnDestroy {
     private readonly injector: Injector,
   ) {}
 
+  // POLLING LATAR: dilewati selama tab tersembunyi dan sesudah ada pemenang. Sesudah menang snapshot tidak berubah
+  // lagi (room selesai tidak bisa dimulai ulang); layar akhir dan survei memakai snapshot terakhir dan endpoint survei.
+  // Tanpa polling, room selesai yang ditinggal bisa dibersihkan server, karena tiap GET /game menandainya masih dipakai.
+  private pollingLatar(): void {
+    if (document.hidden || this.game?.winner) return;
+    this.refresh();
+  }
+
+  // SOCKET TERSAMBUNG: jeda sambung ulang kembali dari awal, dan peringatan chat terputus yang basi dihapus.
+  private saatSocketTersambung(): void {
+    this.connected = true;
+    this.percobaanSambungUlang = 0;
+    if (this.error === PESAN_CHAT_TERPUTUS) this.error = '';
+    this.changeDetector.markForCheck();
+  }
+
+  // SOCKET GAGAL: tampilkan peringatan. Bila server menolak handshake (token atau room ditolak, atau DB gagal sesaat),
+  // socket.io tidak menyambung ulang sendiri (`socket.active` false), jadi dicoba lagi dengan token terbaru.
+  // Alur: 1 tandai terputus + pesan -> 2 ditolak server? -> 3 connect() lagi sesudah 2, 4, 8 … paling lama 30 detik
+  private saatSocketGagal(): void {
+    this.connected = false;
+    this.error = PESAN_CHAT_TERPUTUS;
+    const socket = this.socket;
+    if (socket && !socket.active && !this.timerSambungUlang) {
+      const jeda = Math.min(30_000, 2000 * 2 ** this.percobaanSambungUlang++);
+      this.timerSambungUlang = setTimeout(() => {
+        this.timerSambungUlang = undefined;
+        socket.auth = { token: localStorage.getItem(STORAGE.token), room_code: this.code };
+        socket.connect();
+      }, jeda);
+    }
+    this.changeDetector.markForCheck();
+  }
+
+  // CHAT DITOLAK: server hanya mengirim system_alert saat chat ditolak (mis. terlalu cepat). Pesannya tampil, dan teks
+  // yang ditolak dikembalikan ke kotak ketik bila pemain belum mengetik pesan baru.
+  private saatChatDitolak(pesan: string): void {
+    this.error = pesan;
+    if (this.chatMenungguEcho && !this.draft) this.draft = this.chatMenungguEcho;
+    this.chatMenungguEcho = '';
+    this.changeDetector.markForCheck();
+  }
+
   // INIT: polling menjaga snapshot setelah reconnect; Socket.IO membawa pesan/error langsung.
   ngOnInit(): void {
     if (!isPlatformBrowser(this.platform)) return;
@@ -730,34 +792,32 @@ export class Game implements OnInit, OnDestroy {
       return;
     }
 
-    // PROSES: ambil snapshot sekarang, ulangi tiap detik, dan jalankan timer dari jam browser
+    // PROSES: ambil snapshot sekarang, ulangi tiap detik, dan jalankan timer dari jam browser.
+    // Tab yang tampil lagi langsung mengambil snapshot tanpa menunggu detik berikutnya.
     this.refresh();
-    this.timerPolling = setInterval(() => this.refresh(), 1000);
+    this.timerPolling = setInterval(() => this.pollingLatar(), 1000);
     this.timerSisaDetik = setInterval(() => this.perbaruiSisaDetik(), 500);
+    fromEvent(document, 'visibilitychange')
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.pollingLatar());
 
-    // OUTPUT: status koneksi, peringatan, dan chat dari server lewat socket
+    // OUTPUT: status koneksi, peringatan, dan chat dari server lewat socket. tryAllTransports: bila WebSocket
+    // diblokir jaringan (mis. proxy kampus), socket turun ke HTTP long-polling.
     this.socket = io(`${backendUrl()}`, {
       auth: { token: localStorage.getItem(STORAGE.token), room_code: this.code },
       transports: ['websocket', 'polling'],
+      tryAllTransports: true,
     });
-    this.socket.on('connect', () => {
-      this.connected = true;
-      this.changeDetector.markForCheck();
-    });
+    this.socket.on('connect', () => this.saatSocketTersambung());
     this.socket.on('disconnect', () => {
       this.connected = false;
       this.changeDetector.markForCheck();
     });
-    this.socket.on('connect_error', () => {
-      this.connected = false;
-      this.error = 'Chat belum tersambung. Periksa koneksi atau kembali ke lobby.';
-      this.changeDetector.markForCheck();
-    });
-    this.socket.on('system_alert', (data: { msg: string }) => {
-      this.error = data.msg;
-      this.changeDetector.markForCheck();
-    });
+    this.socket.on('connect_error', () => this.saatSocketGagal());
+    this.socket.on('system_alert', (data: { msg: string }) => this.saatChatDitolak(data.msg));
     this.socket.on('receive_chat', (message: GameMessage) => {
+      if (message.sender === this.game?.me.name && message.message === this.chatMenungguEcho)
+        this.chatMenungguEcho = '';
       if (this.game && !this.game.messages.some((item) => item.id === message.id))
         this.game.messages = [...this.game.messages, message].slice(-100);
       // Kalimat bot sudah tiba: awan berpikirnya hilang tanpa menunggu polling berikutnya.
@@ -771,6 +831,7 @@ export class Game implements OnInit, OnDestroy {
   // Putuskan socket dan hentikan polling saat meninggalkan halaman pertandingan.
   ngOnDestroy(): void {
     this.stopRoleReading();
+    clearTimeout(this.timerSambungUlang);
     this.socket?.disconnect();
     if (this.timerPolling) clearInterval(this.timerPolling);
     if (this.timerSisaDetik) clearInterval(this.timerSisaDetik);
@@ -923,6 +984,7 @@ export class Game implements OnInit, OnDestroy {
   private loadSurvey(): void {
     if (!this.game?.winner || this.idPertandinganSurvei === this.game.id || !this.code) return;
     this.idPertandinganSurvei = this.game.id;
+    this.surveyAnswers = {};
     this.surveyState = 'loading';
     this.api
       .survey(this.code)
@@ -1049,9 +1111,11 @@ export class Game implements OnInit, OnDestroy {
           // Polling yang sudah dilewati klik pemain juga tidak boleh menimpa hasil klik itu.
           if (action === 'reveal' || nomorAksi !== this.nomorAksiTerakhir) return;
           // GET /game menolak room hilang, keanggotaan lama, atau match belum dimulai.
-          // Pulihkan lewat lobby; kesalahan aksi dan jaringan tidak boleh mengeluarkan pemain.
+          // Pulihkan lewat lobby; kesalahan aksi dan jaringan tidak boleh mengeluarkan pemain. Sesudah ada pemenang,
+          // keanggotaan bisa dicabut karena tab lain membuat atau bergabung ke room baru: layar hasil dan survei
+          // tetap tampil.
           if (!body && error.status === 400) {
-            this.exitRoom('/lobby');
+            if (!this.game?.winner) this.exitRoom('/lobby');
             return;
           }
           this.error =
@@ -1105,9 +1169,59 @@ export class Game implements OnInit, OnDestroy {
     );
   }
 
+  // MODAL: panduan dan pop-up keluar. Tombol pembukanya diingat, lalu fokus pindah ke dalam modal (lihat ViewChild
+  // rulesClose dan stayButton).
+  private ingatFokusSebelumModal(): void {
+    const aktif = document.activeElement;
+    this.fokusSebelumModal = aktif instanceof HTMLElement ? aktif : undefined;
+  }
+
+  bukaPanduan(): void {
+    this.ingatFokusSebelumModal();
+    this.showRules = true;
+  }
+
+  // Tutup modal yang terbuka dan kembalikan fokus ke tombol yang membukanya.
+  tutupModal(): void {
+    this.showRules = false;
+    this.popupKeluarTerbuka = false;
+    queueMicrotask(() => this.fokusSebelumModal?.focus());
+  }
+
+  // Escape menutup modal dari mana pun fokusnya berada.
+  @HostListener('document:keydown.escape')
+  tutupModalLewatEscape(): void {
+    if (this.showRules || this.popupKeluarTerbuka) this.tutupModal();
+  }
+
+  // Selama modal terbuka, Tab dan Shift+Tab berputar di dalam modal, tidak ke tombol di balik latar gelap.
+  @HostListener('document:keydown', ['$event'])
+  jagaFokusDalamModal(event: KeyboardEvent): void {
+    const modal = this.modal?.nativeElement;
+    if (event.key !== 'Tab' || !modal) return;
+    const bisaFokus = Array.from(
+      modal.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ),
+    );
+    if (!bisaFokus.length) return;
+    const pertama = bisaFokus[0];
+    const terakhir = bisaFokus[bisaFokus.length - 1];
+    const aktif = document.activeElement;
+    if (event.shiftKey && (aktif === pertama || !modal.contains(aktif))) {
+      event.preventDefault();
+      terakhir.focus();
+    } else if (!event.shiftKey && (aktif === terakhir || !modal.contains(aktif))) {
+      event.preventDefault();
+      pertama.focus();
+    }
+  }
+
   // KELUAR: tombol Keluar membuka pop-up konfirmasi bergaya game (bukan dialog bawaan browser).
   leaveMatch(): void {
-    if (this.code && !this.leaving) this.popupKeluarTerbuka = true;
+    if (!this.code || this.leaving) return;
+    this.ingatFokusSebelumModal();
+    this.popupKeluarTerbuka = true;
   }
 
   // Setelah dikonfirmasi, server menganggap pemain tereliminasi seperti dieksekusi (status "Keluar")
@@ -1142,6 +1256,7 @@ export class Game implements OnInit, OnDestroy {
   // Lepas room di tab ini: hentikan polling/socket, hapus pointer room, lalu pindah halaman.
   private exitRoom(url: string): void {
     this.stopRoleReading();
+    clearTimeout(this.timerSambungUlang);
     if (this.timerPolling) clearInterval(this.timerPolling);
     if (this.timerSisaDetik) clearInterval(this.timerSisaDetik);
     this.socket?.disconnect();
@@ -1172,11 +1287,13 @@ export class Game implements OnInit, OnDestroy {
     return this.game?.tribunal_votes.find((item) => item.target === name)?.voters ?? [];
   }
 
-  // CHAT: hanya echo server ditampilkan supaya pesan yang ditolak tidak tampak terkirim.
+  // CHAT: hanya echo server ditampilkan supaya pesan yang ditolak tidak tampak terkirim. Kotak ketik langsung
+  // dikosongkan; bila server menolak (system_alert), teksnya dikembalikan.
   sendMessage(): void {
     if (!this.game?.me.can_chat || !this.connected || !this.draft.trim()) return;
     this.error = '';
-    this.socket?.emit('send_chat', { username: this.game.me.name, message: this.draft.trim() });
+    this.chatMenungguEcho = this.draft.trim();
+    this.socket?.emit('send_chat', { username: this.game.me.name, message: this.chatMenungguEcho });
     this.draft = '';
   }
 

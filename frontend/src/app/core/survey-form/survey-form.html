@@ -76,10 +76,20 @@
         ></textarea>
         <small class="counter">{{ answers[question.id]?.text?.length ?? 0 }} / 1000</small>
       }
+      @if (!question.required && question.kind !== 'text' && answers[question.id]) {
+        <button type="button" class="clear-answer" (click)="kosongkanJawaban(question)">
+          Kosongkan pilihan
+        </button>
+      }
     </fieldset>
   }
   @if (error) {
     <p class="alert" role="alert">{{ error }}</p>
+  }
+  @if (nomorBelumLengkap.length) {
+    <p class="incomplete-note">
+      Pertanyaan yang belum lengkap: {{ nomorBelumLengkap.join(', ') }}.
+    </p>
   }
   <button class="submit-survey" [disabled]="!complete || sending">
     {{ sending ? 'Mengirim…' : 'Kirim kuesioner' }}

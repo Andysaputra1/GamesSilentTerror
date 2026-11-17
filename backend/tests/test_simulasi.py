@@ -1,11 +1,16 @@
 """Simulasi panel: engine, otak, dan NLU yang sama dengan room asli, tanpa room atau database."""
 
 import asyncio
+import functools
+import random
 import unittest
 from unittest.mock import patch
 
 from app.bot import simulasi as modul
 from tests.test_npc_brain import runtime_siap
+
+# Role diacak engine; seed tetap supaya pertandingan uji tidak kadang selesai sebelum Tribunal ronde 2.
+SEED_ROLE = 0
 
 
 class SimulasiTests(unittest.TestCase):
@@ -21,6 +26,10 @@ class SimulasiTests(unittest.TestCase):
         patcher = patch.object(modul, "brain_runtime", self.runtime)
         patcher.start()
         self.addCleanup(patcher.stop)
+        match_berseed = functools.partial(modul.Match, rng=random.Random(SEED_ROLE))
+        patcher_match = patch.object(modul, "Match", match_berseed)
+        patcher_match.start()
+        self.addCleanup(patcher_match.stop)
         self.layanan = modul.SimulasiService()
         self.awal = self.layanan.mulai("Andy Saputra", 3)
 

@@ -1,7 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GameService, PendingSurvey, SurveyStatus } from '../../../core/game.service';
 import { SurveyForm } from '../../../core/survey-form/survey-form';
@@ -184,5 +184,24 @@ describe('SurveyReminder', () => {
     expect(page().querySelector('.survey-dialog [role="alert"]')?.textContent).toContain(
       'Ruangan tidak ditemukan.',
     );
+  });
+
+  // Jaringan lambat: respons survei pertama yang datang sesudah survei lain dibuka tidak mengisi pop-up yang salah.
+  it('ignores a late survey response from a dialog that was replaced', () => {
+    const { api, page } = create();
+    const lambat = new Subject<SurveyStatus>();
+    const survey = vi.spyOn(api, 'survey').mockReturnValue(lambat);
+    const tombolIsi = () => page().querySelectorAll<HTMLButtonElement>('.reminder__fill');
+    tombolIsi()[0].click();
+    (page().querySelector('.survey-dialog__close') as HTMLButtonElement).click();
+    const keduaSiap = new Subject<SurveyStatus>();
+    survey.mockReturnValue(keduaSiap);
+    tombolIsi()[1].click();
+    expect(survey).toHaveBeenLastCalledWith('ABC123', 'm1');
+    lambat.next(status);
+    expect(page().querySelector('app-survey-form')).toBeNull();
+    expect(page().querySelector('.survey-dialog__note')?.textContent).toContain('Memuat');
+    keduaSiap.next({ ...status, match_id: 'm1' });
+    expect(page().querySelector('app-survey-form')).not.toBeNull();
   });
 });

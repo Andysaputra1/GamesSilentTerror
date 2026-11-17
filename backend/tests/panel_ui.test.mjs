@@ -1483,24 +1483,24 @@ test('simulation shows chat with NLU, live bot positions on the flowchart, and n
         node: 'nlg_llm',
         kode: [
           {
-            nama: 'nlg.PenulisBerantai.tulis',
-            berkas: 'backend/app/bot/nlg.py',
-            mulai: 897,
-            akhir: 899,
+            nama: 'penulis.PenulisBerantai.tulis',
+            berkas: 'backend/app/bot/nlg/penulis.py',
+            mulai: 312,
+            akhir: 322,
             konstanta: false,
             parameter: [
               { nama: 'sistem', bawaan: null },
               { nama: 'pesan', bawaan: null },
             ],
             baris: [
-              { no: 897, teks: '    def tulis(self, sistem, pesan):', jenis: 'param' },
+              { no: 312, teks: '    def tulis(self, sistem, pesan):', jenis: 'param' },
               {
-                no: 898,
+                no: 317,
                 teks: `        teks, status = p.tulis(sistem, pesan)  # ${evil}`,
                 jenis: 'inti',
                 catatan: 'panggil LLM jalur ini',
               },
-              { no: 899, teks: '        return teks, status', jenis: 'output' },
+              { no: 322, teks: '        return teks, status', jenis: 'output' },
             ],
           },
         ],
@@ -1568,10 +1568,10 @@ test('simulation shows chat with NLU, live bot positions on the flowchart, and n
   assert.match(info, /Aku bukan Hitman\./);
   await settle(); // kode asli dimuat dari server
   const kode = doc.querySelector('#flow-detail .kode-fungsi');
-  assert.match(kode.textContent, /nlg\.PenulisBerantai\.tulis\(sistem, pesan\)/);
-  assert.match(kode.textContent, /nlg\.py · baris 897–899/);
+  assert.match(kode.textContent, /penulis\.PenulisBerantai\.tulis\(sistem, pesan\)/);
+  assert.match(kode.textContent, /penulis\.py · baris 312–322/);
   assert.match(kode.textContent, /Output \(return\)return teks, status/);
-  assert.equal(kode.querySelector('.kode-inti .kode-no').textContent, '898');
+  assert.equal(kode.querySelector('.kode-inti .kode-no').textContent, '317');
   assert.equal(kode.querySelector('.kode-tanda').textContent, '↑ panggil LLM jalur ini');
   assert.equal(kode.querySelector('img'), null); // kode ditampilkan sebagai teks
   assert.ok(kode.querySelector('.kode-param') && kode.querySelector('.kode-output'));

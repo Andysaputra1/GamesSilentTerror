@@ -6,7 +6,7 @@ import { ActiveMatchService } from './core/active-match.service';
 import { BootLoader } from './core/boot-loader';
 import { FullscreenInvite } from './core/fullscreen-invite';
 import { SessionService } from './core/session.service';
-import { STORAGE } from './core/storage';
+import { forgetRoom, STORAGE, titipPemberitahuan } from './core/storage';
 
 // DECORATOR: hubungkan komponen dengan selector HTML, template, dan fitur router.
 @Component({
@@ -28,6 +28,22 @@ export class App implements OnInit, OnDestroy {
     @Inject(PLATFORM_ID) private readonly platform: object,
   ) {}
 
+  // Tab lain logout: sesi tab ini ikut dibersihkan. Tab lain login dengan akun lain: setiap request tab ini sudah
+  // memakai token baru, padahal room dan layarnya milik akun lama. Room dilupakan, lalu Main dimuat ulang dengan akun
+  // baru beserta pesannya.
+  // Alur: 1 token dihapus? -> 2.1.1 bersihkan sesi -> 2.1.2 ke /login
+  //                        \> 2.2.1 token berganti -> 2.2.2 lupakan room + titip pesan -> 2.2.3 muat ulang /main
+  private ikutiSesiTabLain(): void {
+    if (!localStorage.getItem(STORAGE.token)) {
+      this.session.clearLocalSession();
+      void this.router.navigateByUrl('/login', { replaceUrl: true });
+      return;
+    }
+    forgetRoom();
+    titipPemberitahuan('Akun berganti di tab lain. Halaman ini dimuat ulang dengan akun tersebut.');
+    location.assign('/main');
+  }
+
   // Host bisa memulai ketika anggota masih di main/lobby. Cek juga saat kembali ke tab.
   ngOnInit(): void {
     if (!isPlatformBrowser(this.platform)) return;
@@ -39,13 +55,11 @@ export class App implements OnInit, OnDestroy {
           (event) =>
             event.storageArea === localStorage &&
             (event.key === STORAGE.token || event.key === null) &&
-            !localStorage.getItem(STORAGE.token),
+            (!localStorage.getItem(STORAGE.token) ||
+              (!!event.oldValue && event.newValue !== event.oldValue)),
         ),
       )
-      .subscribe(() => {
-        this.session.clearLocalSession();
-        void this.router.navigateByUrl('/login', { replaceUrl: true });
-      });
+      .subscribe(() => this.ikutiSesiTabLain());
     this.monitor = merge(
       timer(0, 3000),
       fromEvent(window, 'focus'),

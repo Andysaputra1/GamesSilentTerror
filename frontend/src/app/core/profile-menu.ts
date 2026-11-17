@@ -18,6 +18,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { finalize } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { SessionService, UserProfile } from './session.service';
+import { namaTampilanBerhuruf, pesanNamaTampilanDitolak } from './nama-tampilan';
 import { STORAGE } from './storage';
 
 @Component({
@@ -232,6 +233,10 @@ export class ProfileMenu implements OnInit {
       this.error.set('Isi nama 1–100 karakter tanpa karakter kontrol.');
       return;
     }
+    if (!namaTampilanBerhuruf(name)) {
+      this.error.set('Nama harus memuat huruf atau angka.');
+      return;
+    }
     this.saving.set(true);
     this.error.set('');
     this.session
@@ -256,7 +261,8 @@ export class ProfileMenu implements OnInit {
               ? error.error.detail
               : error instanceof HttpErrorResponse && error.status === 401
                 ? 'Sesi berakhir. Silakan login kembali.'
-                : 'Nama belum berhasil disimpan. Periksa koneksi lalu coba lagi.',
+                : (pesanNamaTampilanDitolak(error) ??
+                  'Nama belum berhasil disimpan. Periksa koneksi lalu coba lagi.'),
           ),
       });
   }

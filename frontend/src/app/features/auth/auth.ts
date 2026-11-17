@@ -1,5 +1,5 @@
 import { backendUrl } from '../../core/backend-url';
-import { STORAGE } from '../../core/storage';
+import { ambilPemberitahuan, STORAGE } from '../../core/storage';
 import { isPlatformBrowser } from '@angular/common';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import {
@@ -19,6 +19,7 @@ import { FormsModule } from '@angular/forms';
 import {
   catchError,
   exhaustMap,
+  filter,
   finalize,
   firstValueFrom,
   fromEvent,
@@ -31,6 +32,7 @@ import {
 } from 'rxjs';
 import { BootLoader } from '../../core/boot-loader';
 import { loadGoogleIdentity } from '../../core/google-identity';
+import { namaTampilanBerhuruf, pesanNamaTampilanDitolak } from '../../core/nama-tampilan';
 import { profileCountdown, PROFILE_COUNTDOWN_TARGET } from '../../core/profile-countdown';
 
 // Respons login dan daftar dari API; nama field mengikuti backend (snake_case).
@@ -39,6 +41,9 @@ interface LoginResponse {
   expires_at: string;
   user: { username: string; display_name: string; skin_id?: string };
 }
+
+// Nonce Google berlaku lima menit di server (NonceStore.BERLAKU_DETIK); tombol disiapkan ulang sesudah empat menit.
+const NONCE_GOOGLE_SEGAR_MS = 4 * 60_000;
 
 // DECORATOR: sambungkan class Auth ke HTML/CSS login dan aktifkan binding form.
 @Component({
@@ -79,6 +84,8 @@ export class Auth implements OnInit, AfterViewInit {
   googleError = '';
   googleLoading = false;
   googleReady = false;
+  // Waktu nonce tombol Google sekarang diambil (Date.now); dipakai untuk menyiapkan ulang sebelum kedaluwarsa.
+  private nonceGoogleDiambil = 0;
   @ViewChild('googleButton') googleButton!: ElementRef<HTMLElement>;
 
   // REGISTER: validasi konfirmasi; backend tetap memvalidasi dan menangani duplikat.
@@ -101,6 +108,10 @@ export class Auth implements OnInit, AfterViewInit {
       /[\p{Cc}\p{Cf}\p{Cs}]/u.test(displayName)
     ) {
       this.registerError = 'Isi nama lengkap 1–100 karakter tanpa karakter kontrol.';
+      return;
+    }
+    if (!namaTampilanBerhuruf(displayName)) {
+      this.registerError = 'Nama lengkap harus memuat huruf atau angka.';
       return;
     }
     if (
@@ -138,7 +149,7 @@ export class Auth implements OnInit, AfterViewInit {
           this.registerError =
             error instanceof HttpErrorResponse && error.status === 409
               ? 'Username sudah digunakan. Pilih username lain atau login.'
-              : this.describeLoginError(error);
+              : (pesanNamaTampilanDitolak(error) ?? this.describeLoginError(error));
         },
       });
   }
@@ -151,11 +162,12 @@ export class Auth implements OnInit, AfterViewInit {
   // Siapkan satu tombol resmi Google yang langsung bisa diklik. Button flow
   // tidak boleh dipicu secara programatik oleh tombol custom, jadi tombol
   // resmi dirender otomatis sejak halaman login selesai dimuat.
-  async siapkanTombolGoogle(): Promise<void> {
+  // `perbarui`: tombol yang sudah tampil disiapkan ulang dengan nonce baru; tombol lama tetap terlihat sampai selesai.
+  async siapkanTombolGoogle(perbarui = false): Promise<void> {
     if (
       !isPlatformBrowser(this.platformId) ||
       this.googleLoading ||
-      this.googleReady ||
+      (this.googleReady && !perbarui) ||
       this.isSubmitting
     )
       return;
@@ -208,7 +220,9 @@ export class Auth implements OnInit, AfterViewInit {
         shape: 'circle',
       });
       this.googleReady = true;
+      this.nonceGoogleDiambil = Date.now();
     } catch (error) {
+      this.googleReady = false;
       this.googleError =
         error instanceof HttpErrorResponse
           ? this.describeLoginError(error)
@@ -302,6 +316,22 @@ export class Auth implements OnInit, AfterViewInit {
         this.backendStatus = ready ? 'online' : 'offline';
         this.changeDetector.markForCheck();
       });
+    // Nonce Google kedaluwarsa lima menit setelah diambil: siapkan ulang tombol yang sudah berumur empat menit, dicek
+    // tiap 30 detik dan saat tab kembali fokus. Tidak saat jendela kehilangan fokus, karena pop-up Google mungkin
+    // sedang terbuka dan masih memakai nonce lama.
+    merge(interval(30_000), fromEvent(window, 'focus'))
+      .pipe(
+        filter(
+          () =>
+            this.googleReady &&
+            document.hasFocus() &&
+            Date.now() - this.nonceGoogleDiambil >= NONCE_GOOGLE_SEGAR_MS,
+        ),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe(() => void this.siapkanTombolGoogle(true));
+    // Pesan titipan dari halaman sebelumnya, mis. sesi berakhir atau logout saat server mati.
+    this.errorMessage = ambilPemberitahuan();
   }
 
   ngAfterViewInit(): void {

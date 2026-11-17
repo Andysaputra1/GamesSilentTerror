@@ -60,18 +60,22 @@ describe('profile logout', () => {
     fixture.destroy();
   });
 
-  it('keeps a failed logout retryable and does not pretend the server session was revoked', () => {
+  // Server mati: token tidak bisa dicabut, tetapi sesi lokal tetap dihapus agar pengguna bisa keluar atau ganti
+  // akun; halaman login menampilkan peringatannya.
+  it('still clears the local session with a warning when the server cannot revoke it', () => {
     const fixture = TestBed.createComponent(ProfileMenu);
     fixture.componentInstance.toggle();
     fixture.componentInstance.logout();
     TestBed.inject(HttpTestingController)
       .expectOne((r) => r.url.endsWith('/logout'))
       .flush({}, { status: 503, statusText: 'Unavailable' });
-    fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('[role=alert]').textContent).toContain('coba lagi');
-    expect(fixture.nativeElement.querySelector('.logout-button').disabled).toBe(false);
-    expect(localStorage.getItem('shadow_heist_access_token')).toBe('test-session');
-    expect(TestBed.inject(Router).navigateByUrl).not.toHaveBeenCalled();
+    expect(localStorage.getItem('shadow_heist_access_token')).toBeNull();
+    expect(sessionStorage.getItem('shadow_heist_room')).toBeNull();
+    expect(sessionStorage.getItem('shadow_heist_notice')).toContain('Server belum bisa dihubungi');
+    expect(TestBed.inject(Router).navigateByUrl).toHaveBeenCalledWith('/login', {
+      replaceUrl: true,
+    });
+    expect(fixture.componentInstance.error()).toBe('');
     fixture.destroy();
   });
 
@@ -199,6 +203,38 @@ describe('profile logout', () => {
       username: 'alice_detective',
       displayName: 'Alice Detective',
     });
+    fixture.destroy();
+  });
+
+  // Nama tanpa huruf/angka ditolak di browser; penolakan server (kata terlarang) tampil dengan alasannya.
+  it('checks names locally and shows the server reason for a rejected name', () => {
+    const fixture = TestBed.createComponent(ProfileMenu);
+    fixture.componentRef.setInput('username', 'alice');
+    fixture.detectChanges();
+    const profile = fixture.componentInstance;
+    profile.editName();
+    profile.draftName = '!!!';
+    profile.saveName();
+    expect(profile.error()).toBe('Nama harus memuat huruf atau angka.');
+    TestBed.inject(HttpTestingController).expectNone((r) => r.url.endsWith('/me'));
+    profile.draftName = 'Vote Aku';
+    profile.saveName();
+    TestBed.inject(HttpTestingController)
+      .expectOne((r) => r.url.endsWith('/me'))
+      .flush(
+        {
+          detail: [
+            {
+              loc: ['body', 'display_name'],
+              msg: 'Value error, Nama tidak boleh diawali kata ganti atau istilah game (mis. Aku, Gw, Dia, Vote, Hitman).',
+              type: 'value_error',
+            },
+          ],
+        },
+        { status: 422, statusText: 'Unprocessable Entity' },
+      );
+    expect(profile.error()).toContain('Nama tidak boleh diawali kata ganti');
+    expect(profile.error()).not.toContain('Value error');
     fixture.destroy();
   });
 

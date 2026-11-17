@@ -10,6 +10,7 @@ import {
   ViewChild,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Subscription } from 'rxjs';
 import { GameService, PendingSurvey, SurveyStatus } from '../../../core/game.service';
 import { SurveyForm } from '../../../core/survey-form/survey-form';
 
@@ -40,6 +41,9 @@ export class SurveyReminder {
   private readonly destroyRef = inject(DestroyRef);
 
   private expiryTimer?: ReturnType<typeof setTimeout>;
+  // Request pertanyaan untuk pop-up yang sedang dibuka. Dibatalkan saat pop-up ditutup atau survei lain dibuka,
+  // supaya respons lambat milik pertandingan A tidak mengisi pop-up pertandingan B.
+  private permintaanSurvei?: Subscription;
 
   pending: DatedSurvey[] = [];
   dismissed = false;
@@ -115,11 +119,12 @@ export class SurveyReminder {
   bukaSurvei(item: DatedSurvey): void {
     this.expireReminders();
     if (Date.now() > item.expiresAt) return;
+    this.permintaanSurvei?.unsubscribe();
     this.surveiDibuka = item;
     this.survey = null;
     this.statusDialog = 'loading';
     this.error = '';
-    this.api
+    this.permintaanSurvei = this.api
       .survey(item.room_code, item.match_id)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
@@ -153,6 +158,7 @@ export class SurveyReminder {
 
   @HostListener('document:keydown.escape')
   tutupSurvei(): void {
+    this.permintaanSurvei?.unsubscribe();
     this.surveiDibuka = null;
     this.survey = null;
   }

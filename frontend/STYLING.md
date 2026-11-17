@@ -49,7 +49,7 @@ yang bergulir. Gayanya dibagi tujuh berkas karena budget stylesheet komponen di 
 | `game-cards.css` | Penanda di kartu pemain: hasil Intip, aura Jaga, label GAG, cap *Disandera* dan *Gagal*, huruf tahap bot |
 | `game-screens.css` | Transisi fase (termasuk tirai mulai `[data-phase='start']`), splash `.splash`, ajakan membuka kartu `.reveal-nudge`, tombol pesan baru `.chat-jump`, hitung mundur 5 detik `.final-count`, chip komposisi, penanda rekan |
 | `game-preparation.css` | Tiga kartu layar persiapan (`.prep-*`) |
-| `game-end.css` | Pengumuman pemenang `.end-stage`, kuesioner `.survey`, modal aturan |
+| `game-end.css` | Pengumuman pemenang `.end-stage`, kuesioner `.survey`, modal aturan, kartu memuat `.loading-card` beserta pesan gagalnya |
 | `game-motion.css` | Animasi, aturan responsif, `prefers-reduced-motion` (dimuat terakhir agar menimpa aturan dasar) |
 
 Panas vote diatur `--heat` (0–1) per kartu; jumlah kolom meja dipilih `Game.tableColumns` dari

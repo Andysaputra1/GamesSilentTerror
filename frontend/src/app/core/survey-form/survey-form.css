@@ -152,6 +152,24 @@ textarea:focus {
   font-size: 12px;
   color: #7a5230;
 }
+/* Tautan kecil untuk mengosongkan jawaban pertanyaan opsional. */
+.clear-answer {
+  display: block;
+  margin: 6px 0 0 auto;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: #7a5230;
+  font: 14px var(--font-hand);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.incomplete-note {
+  margin: 12px 0 0;
+  text-align: center;
+  font: 15px var(--font-hand);
+  color: #8c3f2b;
+}
 /* Papan kayu hijau, sama dengan .wood-button.green di meja permainan (gaya Game tidak menembus
    komponen ini). */
 .submit-survey {
@@ -183,7 +201,8 @@ textarea:focus {
 }
 /* Target sentuh tablet dan HP: seluruh label pilihan bisa diketuk. */
 @media (max-width: 1099px) {
-  .choices label {
+  .choices label,
+  .clear-answer {
     min-height: 44px;
   }
 }

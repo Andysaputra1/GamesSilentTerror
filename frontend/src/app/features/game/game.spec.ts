@@ -1736,4 +1736,213 @@ describe('Game', () => {
     expect(cards[2].querySelector('.stamp-sandera')).not.toBeNull();
     expect(fixture.nativeElement.querySelector('.stamp-gagal')).toBeNull();
   });
+
+  // TAHAP 3D: akses ke method privat untuk tes perilaku socket, polling latar, dan chat.
+  type GameInternal = {
+    socket: unknown;
+    pollingLatar(): void;
+    saatSocketGagal(): void;
+    saatSocketTersambung(): void;
+    saatChatDitolak(pesan: string): void;
+  };
+  const internal = () => component as unknown as GameInternal;
+
+  // POLLING LATAR: tidak jalan selama tab tersembunyi dan berhenti sesudah ada pemenang, supaya room selesai yang
+  // ditinggal bisa dibersihkan server.
+  it('skips background polling while the tab is hidden and after a winner', () => {
+    component.code = 'ABC123';
+    const request = vi
+      .spyOn(TestBed.inject(GameService), 'request')
+      .mockReturnValue(of(snapshot()));
+    const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true);
+    internal().pollingLatar();
+    expect(request).not.toHaveBeenCalled();
+    hidden.mockReturnValue(false);
+    internal().pollingLatar();
+    expect(request).toHaveBeenCalledTimes(1);
+    const finished = snapshot();
+    finished.game = { ...finished.game, phase: 'finished', winner: 'civilians' };
+    vi.spyOn(TestBed.inject(GameService), 'survey').mockReturnValue(
+      of({ match_id: 'match-1', submitted: false, questions: [] }),
+    );
+    request.mockReturnValue(of(finished));
+    internal().pollingLatar();
+    expect(request).toHaveBeenCalledTimes(2);
+    internal().pollingLatar();
+    expect(request).toHaveBeenCalledTimes(2);
+    hidden.mockRestore();
+  });
+
+  // Tab lain membuat room baru sesudah pertandingan selesai: 400 tidak melempar pemain dari layar survei.
+  it('keeps the end screen when the finished room is no longer ours', () => {
+    const finished = snapshot();
+    finished.game = { ...finished.game, phase: 'finished', winner: 'hitman' };
+    component.game = finished.game;
+    component.code = 'ABC123';
+    vi.mocked(TestBed.inject(Router).navigateByUrl).mockClear();
+    vi.spyOn(TestBed.inject(GameService), 'request').mockReturnValue(
+      throwError(() => ({ status: 400, error: { detail: 'Ruangan tidak ditemukan.' } })),
+    );
+    component.refresh();
+    expect(component.game).not.toBeNull();
+    expect(component.code).toBe('ABC123');
+    expect(TestBed.inject(Router).navigateByUrl).not.toHaveBeenCalled();
+  });
+
+  // Snapshot pertama gagal: alasannya tampil di kartu "Memuat…", bukan layar macet tanpa pesan.
+  it('shows why the first snapshot failed on the loading card', () => {
+    component.code = 'ABC123';
+    vi.spyOn(TestBed.inject(GameService), 'request').mockReturnValue(
+      throwError(() => ({ status: 503, error: { detail: 'Database belum siap.' } })),
+    );
+    component.refresh();
+    const alert = render().querySelector('.loading-card .alert');
+    expect(alert?.textContent).toContain('Database belum siap.');
+  });
+
+  // CHAT DITOLAK: teks yang ditolak server (mis. terlalu cepat) kembali ke kotak ketik, tetapi tidak menimpa pesan
+  // baru yang sudah diketik.
+  it('restores a chat message rejected by the server', () => {
+    component.game = snapshot().game;
+    component.connected = true;
+    const socket = { emit: vi.fn(), disconnect: vi.fn() };
+    internal().socket = socket;
+    component.draft = '  Aku di dapur  ';
+    component.sendMessage();
+    expect(socket.emit).toHaveBeenCalledWith('send_chat', {
+      username: 'alice',
+      message: 'Aku di dapur',
+    });
+    expect(component.draft).toBe('');
+    internal().saatChatDitolak('Chat terlalu cepat. Tunggu 2 detik lalu kirim lagi.');
+    expect(component.draft).toBe('Aku di dapur');
+    expect(component.error).toContain('terlalu cepat');
+    component.sendMessage();
+    component.draft = 'Pesan baru';
+    internal().saatChatDitolak('Chat terlalu cepat. Tunggu 1 detik lalu kirim lagi.');
+    expect(component.draft).toBe('Pesan baru');
+  });
+
+  // SOCKET DITOLAK: socket.io tidak menyambung ulang sendiri sesudah server menolak handshake, jadi game mencoba lagi
+  // dengan jeda yang makin panjang dan token terbaru; peringatan hilang begitu tersambung.
+  it('reconnects a refused socket with backoff and clears the stale warning on connect', () => {
+    vi.useFakeTimers();
+    component.code = 'ABC123';
+    localStorage.setItem('shadow_heist_access_token', 'token-baru');
+    const socket = { active: false, auth: {}, connect: vi.fn(), disconnect: vi.fn() };
+    internal().socket = socket;
+    internal().saatSocketGagal();
+    expect(component.error).toContain('Chat belum tersambung');
+    vi.advanceTimersByTime(1999);
+    expect(socket.connect).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+    expect(socket.connect).toHaveBeenCalledTimes(1);
+    expect(socket.auth).toEqual({ token: 'token-baru', room_code: 'ABC123' });
+    internal().saatSocketGagal();
+    vi.advanceTimersByTime(3999);
+    expect(socket.connect).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(1);
+    expect(socket.connect).toHaveBeenCalledTimes(2);
+    internal().saatSocketTersambung();
+    expect(component.connected).toBe(true);
+    expect(component.error).toBe('');
+    // Socket yang masih aktif menyambung ulang sendiri: tidak ada timer tambahan.
+    socket.active = true;
+    internal().saatSocketGagal();
+    vi.advanceTimersByTime(60_000);
+    expect(socket.connect).toHaveBeenCalledTimes(2);
+    localStorage.removeItem('shadow_heist_access_token');
+    vi.useRealTimers();
+  });
+
+  // SURVEI: jawaban yang sudah diisi tetap ada sesudah pemain melihat meja lalu kembali ke kuesioner.
+  it('keeps survey answers when switching to the board and back', async () => {
+    const finished = snapshot();
+    finished.game = { ...finished.game, phase: 'finished', winner: 'civilians' };
+    const api = TestBed.inject(GameService);
+    vi.spyOn(api, 'request').mockReturnValue(of(finished));
+    vi.spyOn(api, 'survey').mockReturnValue(
+      of({
+        match_id: 'match-1',
+        submitted: false,
+        questions: [
+          {
+            id: 7,
+            code: 'saran',
+            prompt: 'Saran Anda',
+            kind: 'text',
+            scale_min: 1,
+            scale_max: 6,
+            label_min: null,
+            label_max: null,
+            options: [],
+            required: true,
+          },
+        ],
+      }),
+    );
+    component.code = 'ABC123';
+    component.refresh();
+    component.goToSurvey();
+    render();
+    const pertama = fixture.debugElement.query(By.directive(SurveyForm))
+      .componentInstance as SurveyForm;
+    pertama.setText(component.survey!.questions[0], 'Bot terlalu cepat');
+    component.showBoard();
+    expect(render().querySelector('app-survey-form')).toBeNull();
+    component.goToSurvey();
+    render();
+    const kedua = fixture.debugElement.query(By.directive(SurveyForm))
+      .componentInstance as SurveyForm;
+    expect(kedua).not.toBe(pertama);
+    expect(kedua.answers[7]?.text).toBe('Bot terlalu cepat');
+    await fixture.whenStable();
+    expect(
+      (fixture.nativeElement.querySelector('app-survey-form textarea') as HTMLTextAreaElement)
+        .value,
+    ).toBe('Bot terlalu cepat');
+  });
+
+  // MODAL: fokus pindah ke ✕ saat panduan dibuka, Escape menutup dari mana pun, Tab tidak keluar dari pop-up, dan
+  // fokus kembali ke tombol pembuka.
+  it('manages focus in the rules and leave dialogs', async () => {
+    component.game = snapshot().game;
+    component.code = 'ABC123';
+    const page = render();
+    document.body.appendChild(fixture.nativeElement);
+    const tombolPanduan = page.querySelector('.rules-open') as HTMLButtonElement;
+    tombolPanduan.focus();
+    tombolPanduan.click();
+    render();
+    await Promise.resolve();
+    expect(document.activeElement?.getAttribute('aria-label')).toBe('Tutup');
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    render();
+    await Promise.resolve();
+    expect(page.querySelector('.rules-modal')).toBeNull();
+    expect(document.activeElement).toBe(tombolPanduan);
+
+    const tombolKeluar = page.querySelector('.leave-match') as HTMLButtonElement;
+    tombolKeluar.focus();
+    tombolKeluar.click();
+    render();
+    await Promise.resolve();
+    const tetap = page.querySelector('.leave-modal .wood-button.plank') as HTMLButtonElement;
+    const keluar = page.querySelector('.leave-modal .wood-button.red') as HTMLButtonElement;
+    expect(document.activeElement).toBe(tetap);
+    keluar.focus();
+    const tab = new KeyboardEvent('keydown', { key: 'Tab', cancelable: true });
+    document.dispatchEvent(tab);
+    expect(tab.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(tetap);
+    const shiftTab = new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, cancelable: true });
+    document.dispatchEvent(shiftTab);
+    expect(document.activeElement).toBe(keluar);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    render();
+    await Promise.resolve();
+    expect(page.querySelector('.leave-modal')).toBeNull();
+    expect(document.activeElement).toBe(tombolKeluar);
+    fixture.nativeElement.remove();
+  });
 });

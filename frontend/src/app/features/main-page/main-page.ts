@@ -23,7 +23,7 @@ import { ProfileMenu } from '../../core/profile-menu';
 import { RoleRevealCard } from '../../core/role-reveal-card/role-reveal-card';
 import { RoomService } from '../../core/room.service';
 import { SessionService } from '../../core/session.service';
-import { STORAGE } from '../../core/storage';
+import { ambilPemberitahuan, STORAGE } from '../../core/storage';
 import { validateRoomCode, saveRoomSession, DEFAULT_CAPACITY } from '../../shared/room-helpers';
 import { SurveyReminder } from './survey-reminder/survey-reminder';
 
@@ -143,6 +143,8 @@ export class MainPage implements OnInit, OnDestroy {
       this.username = user?.username || this.username;
       this.showSavedSkin(user?.skinId);
     } catch {}
+    // Pesan titipan, mis. akun berganti di tab lain sebelum halaman ini dimuat ulang.
+    this.error = ambilPemberitahuan();
     this.startRoleDeckShuffle();
     // Skin di browser bisa basi bila diganti dari perangkat lain; server yang menentukan.
     this.session

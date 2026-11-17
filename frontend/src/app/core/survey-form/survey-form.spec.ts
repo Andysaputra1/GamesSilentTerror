@@ -157,4 +157,37 @@ describe('SurveyForm', () => {
     form.setText(withoutOther, 'Lainnya: bukan opsi');
     expect(form.isOtherSelected(withoutOther)).toBe(false);
   });
+
+  // Lainnya di pertanyaan opsional tidak lagi mengunci tombol kirim: pilihan bisa dikosongkan, dan nomor pertanyaan
+  // yang belum lengkap tampil di dekat tombol.
+  it('lets an optional choice be cleared and names incomplete questions', async () => {
+    const choice = {
+      ...status.questions[1],
+      kind: 'choice' as const,
+      options: ['Lebih cepat', 'Lainnya'],
+    };
+    const { fixture, form } = create({ ...status, questions: [status.questions[0], choice] });
+    const changes = vi.fn();
+    form.answersChange.subscribe(changes);
+    const page = fixture.nativeElement as HTMLElement;
+    const send = page.querySelector('.submit-survey') as HTMLButtonElement;
+    expect(page.querySelector('.incomplete-note')?.textContent).toContain('belum lengkap: 1.');
+    expect(page.querySelector('.clear-answer')).toBeNull();
+
+    form.setAnswer(status.questions[0], 4);
+    (page.querySelectorAll('input[type="radio"]')[1] as HTMLInputElement).click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(send.disabled).toBe(true);
+    expect(page.querySelector('.incomplete-note')?.textContent).toContain('belum lengkap: 2.');
+
+    (page.querySelector('.clear-answer') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(form.answers[choice.id]).toBeUndefined();
+    expect(changes).toHaveBeenLastCalledWith({ 1: { value: 4 } });
+    expect(page.querySelector('textarea')).toBeNull();
+    expect(page.querySelector('.incomplete-note')).toBeNull();
+    expect(page.querySelector('.clear-answer')).toBeNull();
+    expect(send.disabled).toBe(false);
+  });
 });

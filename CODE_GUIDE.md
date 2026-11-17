@@ -110,18 +110,25 @@ Contoh SQL di model dan pemakaiannya dari service ada di [backend/README.md](bac
    memori proses backend. Setiap panggilan anggota (`room_service.get`, `join`) mencatat waktu room terakhir disentuh;
    jam permainan menghapus lobby yang diam satu jam dan room selesai yang diam 30 menit, sesudah peserta pertandingan
    itu dicatat ke arsip survei. `POST /api/rooms/join` yang gagal dibatasi 10 per akun dan 30 per IP per menit.
+   Lobby membaca `GET /api/rooms/{code}` tiap 3 detik selama tabnya tampil.
 4. **Mulai.** Host memanggil `POST /api/rooms/{code}/start`. `Match` dibuat (role acak) dan berada di fase
    `preparing` sampai otak bot siap atau batas tunggu habis.
 5. **Aksi pemain.** `GameService` mengirim aksi ke `POST /api/rooms/{code}/play` bersama token fase. `room_service`
    memajukan fase, mencocokkan token, lalu memanggil `Match.act` atau `Match.vote`. Engine memeriksa role, target,
    fase, dan cooldown. Browser membaca `GET /api/rooms/{code}/game` tiap 1 detik; `snapshot(viewer)` membatasi
-   informasi sesuai pemain yang melihat.
+   informasi sesuai pemain yang melihat. Pembacaan ini berhenti selama tab tersembunyi (diambil sekali saat tab tampil
+   lagi) dan sesudah ada pemenang. Layar akhir dan survei memakai snapshot terakhir, dan room selesai yang ditinggal
+   tidak lagi disentuh sehingga bisa dibersihkan. Sesudah ada pemenang, 400 dari server (mis. tab lain membuat room
+   baru) tidak mengeluarkan pemain dari layar survei.
 6. **Chat tim malam.** `POST /api/rooms/{code}/team-chat`. Pesannya hanya di memori `Match` dan
    `me.team_messages`, sengaja tanpa socket, database, NLU, atau `@traced`.
 7. **Chat publik manusia.** `sockets/chat.py` (`send_chat`) → `chat_service.kirim_chat_pemain`: cek pesan dan sesi →
    cek hak chat (`can_chat`) → batas laju per pemain per room (jeda 2 detik, 5 pesan per 20 detik) → simpan ke MySQL
    → kirim `receive_chat` ke room → IndoBERT membacanya lewat `catat_nlu`. Penolakan dikirim ke pengirim sebagai
-   `system_alert`. Sebelum broadcast, `emit_room` mengeluarkan
+   `system_alert`, dan halaman game mengembalikan teks yang ditolak ke kotak ketik. Socket yang ditolak saat
+   handshake (token atau room ditolak, atau MySQL gagal sesaat) tidak disambung ulang oleh socket.io, jadi halaman
+   game mencoba lagi dengan token terbaru sesudah 2, 4, 8 … paling lama 30 detik. `tryAllTransports` memakai HTTP
+   long-polling bila WebSocket diblokir jaringan. Sebelum broadcast, `emit_room` mengeluarkan
    socket yang sudah keluar room atau sesinya dicabut, dan melewati socket yang tokennya belum bisa dicek karena
    MySQL gagal. Siaran dalam satu room dikirim berurutan.
 8. **Langkah bot.** Lihat [Satu langkah bot](#satu-langkah-bot).
@@ -134,8 +141,14 @@ Contoh SQL di model dan pemakaiannya dari service ada di [backend/README.md](bac
    (`checker_service.proses_berjalan`), kondisi live tiap bot (`NPCService.kondisi_bot`), dan isi antrean thread otak
    dan penulis, yang dicatat `EksekutorTercatat` di `services/checker_service.py`. Nilai API key tidak pernah dikirim
    balik ke browser.
-10. **Logout.** `ProfileMenu` → `SessionService` → `POST /api/auth/logout`. Sesudah token dicabut atau kedaluwarsa,
-    data sesi browser dibersihkan dan pengguna diarahkan ke login. Logout tidak menghentikan pertandingan.
+10. **Logout dan sesi.** `ProfileMenu` → `SessionService` → `POST /api/auth/logout`. Sesudah token dicabut atau
+    kedaluwarsa, data sesi browser dibersihkan dan pengguna diarahkan ke login. Bila server tidak bisa dihubungi, sesi
+    lokal tetap dihapus dan halaman login memberi peringatan; token di server berakhir sendiri saat kedaluwarsa.
+    Logout tidak menghentikan pertandingan. Respons 401 untuk token yang masih tersimpan ditangani satu interceptor
+    (`sesiDitolakInterceptor` di `core/session.service.ts`): sesi lokal dihapus, lalu login dibuka dengan pesan "Sesi
+    berakhir". Login akun lain di tab lain mengganti token yang dipakai semua tab, jadi tab ini melupakan room-nya dan
+    memuat ulang Main dengan pesan "Akun berganti di tab lain" (`App`). Satu browser = satu akun; uji dua akun memakai
+    jendela penyamaran atau profil browser lain.
 
 ## Otak bot di kode
 
@@ -315,8 +328,10 @@ python -m ruff check backend
   (mis. hanya emoji), atau kata pertamanya kata ganti atau istilah game yang oleh NLU tidak pernah dianggap nama
   (`KATA_GANTI` dan `ISTILAH_GAME` di `bot/nlu.py`, mis. "Aku", "Gw", "Vote"). Tanpa nama tampilan, username
   diperiksa dengan aturan yang sama. Akun lama yang sudah bernama seperti itu tidak diubah; panel Manajemen user bisa
-  menggantinya.
-- **Login:** username, atau email yang sudah terverifikasi Google. Akun yang tidak ada, nonaktif, atau khusus Google
+  menggantinya. Form daftar dan profil mengecek syarat huruf/angka lebih dulu, lalu menampilkan alasan penolakan
+  server (`detail[].msg` respons 422); daftar kata terlarang hanya ada di server.
+- **Login:** form login meminta username. API juga menerima email yang sudah terverifikasi Google, tetapi akun Google
+  biasanya tanpa password dan masuk lewat tombol Google. Akun yang tidak ada, nonaktif, atau khusus Google
   tetap menghitung PBKDF2 terhadap hash tiruan, jadi lama respons tidak membocorkan akun ada atau tidak. Sesi pemain
   berlaku `AUTH_SESSION_HOURS` jam (bawaan 24). Hanya hash token yang disimpan. Sesi kedaluwarsa dihapus di
   transaksi tersendiri sesudah login, daftar, atau login Google berhasil, supaya dua login bersamaan tidak saling
@@ -324,6 +339,9 @@ python -m ruff check backend
 - **Google:** Google Identity Services popup. Backend memverifikasi signature, audience, issuer, expiry, email
   verified, dan nonce sekali pakai (5 menit). Nonce ditandatangani HMAC dengan kunci acak proses dan membawa batas
   waktunya sendiri, jadi `/google/challenge` tidak mengisi memori; yang diingat hanya nonce yang sudah dipakai.
+  Halaman login menyiapkan ulang tombol Google dengan nonce baru bila nonce lama sudah berumur empat menit (dicek
+  tiap 30 detik dan saat tab kembali fokus), kecuali saat jendela kehilangan fokus karena pop-up Google mungkin
+  sedang terbuka.
   Identitas memakai Google `sub`; akun lama tidak pernah diambil alih lewat kesamaan email. Bila email itu masih
   menempel di identitas lama yang belum terverifikasi (email ketikan form daftar lama), email itu dilepas dari akun
   lama dan akun Google baru dibuat. Akun Google baru memakai username acak dan nama dari token bila lolos aturan nama

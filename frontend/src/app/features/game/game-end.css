@@ -304,3 +304,8 @@
   margin: 0;
   font: 18px var(--font-hand);
 }
+.loading-card .alert {
+  max-width: min(480px, 80vw);
+  margin: 0;
+  text-align: center;
+}

@@ -97,8 +97,10 @@ export class Lobby implements OnInit, OnDestroy {
     this.room = this.bacaSnapshotRoom(kodeRoom);
     if (localStorage.getItem(STORAGE.token)) this.restoreRoom();
     else if (kodeRoom) this.kirimPermintaanRoom('GET', '/' + encodeURIComponent(kodeRoom));
+    // Tab tersembunyi tidak polling; saat tab tampil lagi, monitor /active di App yang memindahkan ke game bila
+    // pertandingan sudah dimulai.
     this.timerPolling = setInterval(() => {
-      if (this.room && !this.busy && !this.sedangPolling)
+      if (this.room && !this.busy && !this.sedangPolling && !document.hidden)
         this.kirimPermintaanRoom('GET', '/' + this.room.code, undefined, true);
     }, 3000);
   }

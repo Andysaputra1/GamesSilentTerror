@@ -132,7 +132,7 @@
 
         <form class="storybook-form login-form" (ngSubmit)="kirimLogin()" novalidate>
           <label class="paper-field" for="username">
-            <span>Email / username</span>
+            <span>Username</span>
             <input
               id="username"
               type="text"
@@ -142,7 +142,7 @@
               autocomplete="username"
               autocapitalize="none"
               spellcheck="false"
-              placeholder="Your detective name"
+              placeholder="Username akunmu"
               [disabled]="isSubmitting"
             />
           </label>
@@ -171,7 +171,9 @@
           </label>
 
           <div class="journal-links">
-            <span class="unavailable-note">Lupa password? Hubungi pengelola.</span>
+            <span class="unavailable-note"
+              >Lupa password? Hubungi pengelola. Akun Google masuk lewat tombol Google.</span
+            >
           </div>
 
           @if (errorMessage) {

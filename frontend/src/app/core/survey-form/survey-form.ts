@@ -13,6 +13,9 @@ import { FormsModule } from '@angular/forms';
 import { finalize } from 'rxjs';
 import { GameService, SurveyQuestion, SurveyStatus } from '../game.service';
 
+// Jawaban yang sedang diisi, per id pertanyaan: nilai skala/bintang atau teks (termasuk pilihan).
+export type JawabanSurvei = Record<number, { value?: number; text?: string }>;
+
 // FORMULIR SURVEI AKHIR: pertanyaan, jenis jawaban, dan skala dari backend; pertanyaan wajib harus diisi
 // sebelum kirim. Dipakai layar akhir pertandingan dan pengingat survei di Main; pemanggil yang
 // menampilkan ucapan terima kasih setelah event `submitted`.
@@ -31,8 +34,10 @@ export class SurveyForm {
   @Input({ required: true }) survey!: SurveyStatus;
   // Survei tersimpan (atau ternyata sudah pernah dikirim dari tab lain: 409).
   @Output() readonly submitted = new EventEmitter<void>();
-
-  answers: Record<number, { value?: number; text?: string }> = {};
+  // Jawaban bisa dipegang pemanggil lewat [(answers)], supaya isian tidak hilang saat formulir dilepas dan dibuat
+  // lagi (layar akhir pindah ke "Lihat meja" lalu kembali).
+  @Input() answers: JawabanSurvei = {};
+  @Output() readonly answersChange = new EventEmitter<JawabanSurvei>();
   sending = false;
   error = '';
   // Pilihan yang membuka isian bebas (sama dengan PILIHAN_LAINNYA di backend). Jawabannya dikirim
@@ -56,12 +61,24 @@ export class SurveyForm {
     return question.kind === 'stars' ? value <= chosen : value === chosen;
   }
 
+  private simpanJawaban(answers: JawabanSurvei): void {
+    this.answers = answers;
+    this.answersChange.emit(answers);
+  }
+
   setAnswer(question: SurveyQuestion, value: number): void {
-    this.answers = { ...this.answers, [question.id]: { value } };
+    this.simpanJawaban({ ...this.answers, [question.id]: { value } });
   }
 
   setText(question: SurveyQuestion, text: string): void {
-    this.answers = { ...this.answers, [question.id]: { text } };
+    this.simpanJawaban({ ...this.answers, [question.id]: { text } });
+  }
+
+  // Pertanyaan opsional bisa dikosongkan lagi; radio dan skala tidak punya cara bawaan untuk itu.
+  kosongkanJawaban(question: SurveyQuestion): void {
+    const sisa = { ...this.answers };
+    delete sisa[question.id];
+    this.simpanJawaban(sisa);
   }
 
   // Opsi Lainnya memakai kolom teks yang sama, termasuk saat disimpan dan diekspor.
@@ -87,17 +104,27 @@ export class SurveyForm {
     this.setText(question, this.otherPrefix + text);
   }
 
-  // Tombol kirim aktif setelah semua pertanyaan wajib dijawab. Lainnya yang isiannya masih kosong
-  // ditolak backend, jadi tombol juga tetap mati, termasuk di pertanyaan opsional.
+  // Pertanyaan wajib harus dijawab. Lainnya yang isiannya masih kosong ditolak backend, jadi dianggap belum lengkap,
+  // termasuk di pertanyaan opsional.
+  private lengkap(question: SurveyQuestion): boolean {
+    const answer = this.answers[question.id];
+    if (this.isOtherSelected(question)) return !!this.otherText(question).trim();
+    if (!question.required) return true;
+    return question.kind === 'stars' || question.kind === 'scale'
+      ? answer?.value !== undefined
+      : !!answer?.text?.trim();
+  }
+
+  // Tombol kirim aktif setelah semua pertanyaan lengkap.
   get complete(): boolean {
-    return this.survey.questions.every((question) => {
-      const answer = this.answers[question.id];
-      if (this.isOtherSelected(question)) return !!this.otherText(question).trim();
-      if (!question.required) return true;
-      return question.kind === 'stars' || question.kind === 'scale'
-        ? answer?.value !== undefined
-        : !!answer?.text?.trim();
-    });
+    return this.survey.questions.every((question) => this.lengkap(question));
+  }
+
+  // Nomor urut pertanyaan yang belum lengkap, ditampilkan di dekat tombol kirim.
+  get nomorBelumLengkap(): number[] {
+    return this.survey.questions.flatMap((question, indeks) =>
+      this.lengkap(question) ? [] : [indeks + 1],
+    );
   }
 
   // Kirim sekali; skala dan pertanyaan wajib divalidasi ulang di backend.

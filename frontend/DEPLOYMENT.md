@@ -32,7 +32,8 @@ karena belum ada backend. Tidak ada server game atau database yang dibuat di Ver
   Pilih environment Production; Preview juga perlu nilai jika ingin diuji.
 - Redeploy: nilai ini dimasukkan ke bundle saat build. Ini alamat publik,
   bukan tempat menyimpan password, token, atau API key.
-- Backend harus mendukung HTTPS dan upgrade WebSocket pada `/socket.io/`.
+- Backend harus mendukung HTTPS dan upgrade WebSocket pada `/socket.io/`. Bila WebSocket diblokir jaringan
+  pemain (mis. proxy kampus), Socket.IO turun ke HTTP long-polling di path yang sama.
 - Tambahkan origin frontend produksi ke `CORS_ORIGINS` backend untuk HTTP
   dan Socket.IO. Preview memakai origin berbeda, sehingga perlu diizinkan
   secara eksplisit jika digunakan.
@@ -42,7 +43,8 @@ karena belum ada backend. Tidak ada server game atau database yang dibuat di Ver
   phpMyAdmin, atau port database. Jangan restart backend saat match berlangsung
   karena state pertandingan saat ini berada di memori backend.
 - Verifikasi login, buat/join room dengan dua browser, chat realtime,
-  perpindahan fase, serta reconnect setelah koneksi terputus.
+  perpindahan fase, serta reconnect setelah koneksi terputus. Dua tab di browser yang sama
+  berbagi satu akun, jadi uji dua akun memakai browser, profil, atau jendela penyamaran berbeda.
 
 ## Lokal
 

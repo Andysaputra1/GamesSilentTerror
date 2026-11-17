@@ -13,6 +13,8 @@ export const STORAGE = {
   gameEntry: 'shadow_heist_game_entry',
   // sessionStorage: undangan layar penuh sudah dijawab di tab ini.
   fullscreenAsked: 'shadow_heist_fullscreen_asked',
+  // sessionStorage: pesan untuk halaman Login/Main berikutnya di tab ini (bertahan saat halaman dimuat ulang).
+  notice: 'shadow_heist_notice',
 } as const;
 
 // Header Bearer untuk API backend; bawaannya token sesi yang sedang tersimpan.
@@ -24,4 +26,16 @@ export function authHeaders(token = localStorage.getItem(STORAGE.token)): HttpHe
 export function forgetRoom(): void {
   for (const key of [STORAGE.room, STORAGE.roomSnapshot, STORAGE.gameEntry])
     sessionStorage.removeItem(key);
+}
+
+// Titip pesan untuk halaman Login atau Main berikutnya di tab ini, mis. sesi berakhir atau akun berganti di tab lain.
+export function titipPemberitahuan(pesan: string): void {
+  sessionStorage.setItem(STORAGE.notice, pesan);
+}
+
+// Ambil pesan titipan sekali lalu hapus; kosong bila tidak ada.
+export function ambilPemberitahuan(): string {
+  const pesan = sessionStorage.getItem(STORAGE.notice) ?? '';
+  sessionStorage.removeItem(STORAGE.notice);
+  return pesan;
 }

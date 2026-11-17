@@ -373,7 +373,9 @@ source. Belum ada target `ng e2e`. Perintah tes dan build ada di
 | Bot lambat menjawab di room besar | Buka **Checker**: alur proses menunjukkan tahap yang lama, dan kotak Antrean menunjukkan pekerjaan yang menunggu thread otak atau penulis. Semua room berbagi thread itu (lihat [Batas implementasi](CODE_GUIDE.md#batas-implementasi)) |
 | Panel tidak bisa login | Pastikan `PANEL_PASSWORD_HASH` dibuat dengan `setup_panel.py` dan backend sudah di-recreate |
 | Ruangan tidak ditemukan | Backend mungkin baru restart, kode undangan salah, atau room ditinggal terlalu lama (lobby diam 1 jam, room selesai diam 30 menit dihapus otomatis); buat ruangan baru |
-| Chat terlalu cepat / terlalu banyak percobaan | Chat dibatasi 1 pesan per 2 detik dan 5 per 20 detik per pemain; gabung room yang gagal 10 kali per akun per menit; password salah 10 kali dalam 15 menit menahan akun itu. Tunggu sesuai pesan |
+| Chat terlalu cepat / terlalu banyak percobaan | Chat dibatasi 1 pesan per 2 detik dan 5 per 20 detik per pemain (teks yang ditolak kembali ke kotak ketik); gabung room yang gagal 10 kali per akun per menit; password salah 10 kali dalam 15 menit menahan akun itu. Tunggu sesuai pesan |
+| Tiba-tiba kembali ke login dengan pesan "Sesi berakhir" | Server menolak token yang tersimpan (akun dinonaktifkan, sesi dicabut, atau jam perangkat keliru). Login ulang |
+| Halaman dimuat ulang dengan pesan "Akun berganti di tab lain" | Tab lain di browser yang sama login dengan akun lain. Satu browser memakai satu akun; uji dua akun dengan jendela penyamaran atau profil browser lain |
 
 ## Catatan keamanan
 

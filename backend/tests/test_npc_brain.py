@@ -14,7 +14,7 @@ from app.game.match_engine import Match, label_unik, snapshot_berlabel
 from app.bot import fuzzy as fuzzy_bot
 from app.bot import fuzzy_controller
 from app.bot import ingatan as ingatan_bot
-from app.bot.bot_controller import LANTAI_MAKS, BrainRuntime, NPCService, catat_nlu
+from app.bot.bot_controller import LANTAI_MAKS, BrainRuntime, NPCService, catat_nlu, tulis_kalimat
 from app.bot.nlu import NLUBersama, baca_chat, baca_chat_baru, memo_pertandingan
 from app.services.persistence_service import PersistenceError
 from app.services.room_service import RoomService
@@ -515,7 +515,21 @@ class NPCServiceBrainTests(unittest.IsolatedAsyncioTestCase):
             self.match.add_message("human", "NOX dan ECHO mencurigakan, kalian Hitman. Vote NOX!")
         self.match.deadline = time.time() + 60
         nox, echo = (self.runtime.otak_bot(self.match.id, nama) for nama in ("NOX", "ECHO"))
-        with patch("app.bot.bot_controller.asyncio.sleep", AsyncMock()):
+        tidur = asyncio.sleep  # diambil sebelum asyncio.sleep di-patch
+
+        # Kedua bot berpikir bergantian di satu thread otak. Kalimat bot pertama bisa terkirim sebelum bot kedua selesai
+        # berpikir, lalu bot kedua menunda chat karena aturan lantai (bukan yang diuji di sini). Jadi penulisan ditahan
+        # sampai kedua bot memegang lantai, paling lama 10 detik; bila bot kedua tidak mendapat lantai, tes tetap gagal.
+        async def tulis_sesudah_keduanya_di_lantai(*args, **kwargs):
+            batas = time.monotonic() + 10
+            while len(self.service.lantai.get(self.match.id, {})) < 2 and time.monotonic() < batas:
+                await tidur(0.01)
+            return await tulis_kalimat(*args, **kwargs)
+
+        with (
+            patch("app.bot.bot_controller.asyncio.sleep", AsyncMock()),
+            patch("app.bot.bot_controller.tulis_kalimat", tulis_sesudah_keduanya_di_lantai),
+        ):
             nox.sibuk = echo.sibuk = True
             await asyncio.gather(
                 self.service.brain_turn(self.room.code, self.match, nox),
