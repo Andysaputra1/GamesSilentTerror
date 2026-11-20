@@ -1,103 +1,127 @@
-# Frontend Docker untuk kerja bareng
+# Frontend Docker setup for collaborators
 
-File ini untuk pengembang frontend yang tidak perlu menjalankan backend sendiri. Frontend Angular berjalan di laptop teman; API, WebSocket, AI, dan database tetap memakai backend VPS `https://backendthesis.andylabs.site`. Perubahan CSS/HTML/TypeScript dalam `frontend/src` dan aset `frontend/public` otomatis dimuat ulang. Tidak perlu memasang Node.js, MySQL, atau model AI di laptop.
+This file is for frontend developers who do not need to run their own backend. The Angular frontend runs on a
+collaborator's laptop; the API, WebSocket, AI, and database continue using the VPS backend at
+`https://backendthesis.andylabs.site`. CSS/HTML/TypeScript changes in `frontend/src` and assets in `frontend/public`
+reload automatically. The laptop does not need Node.js, MySQL, or AI models installed.
 
-## 1. Persiapan laptop
+## 1. Prepare the laptop
 
-Pasang Git dan Docker Desktop, lalu jalankan Docker Desktop (Linux containers). Clone repo yang sudah diberikan akses:
+Install Git and Docker Desktop, then start Docker Desktop (Linux containers). Clone the repository after being
+granted access:
 
 ```bash
 git clone https://github.com/Andysaputra1/GamesSilentTerror.git
 cd GamesSilentTerror/frontend/docker
 ```
 
-Salin contoh env. PowerShell Windows:
+Copy the example environment file. In Windows PowerShell:
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-CMD Windows: `copy .env.example .env`. macOS/Linux: `cp .env.example .env`.
+Windows CMD: `copy .env.example .env`. macOS/Linux: `cp .env.example .env`.
 
-Isinya sudah mengarah ke VPS:
+It already points to the VPS:
 
 ```dotenv
 BACKEND_URL=https://backendthesis.andylabs.site
 FRONTEND_PORT=4200
 ```
 
-Env frontend ini hanya berisi alamat publik. API key OpenRouter, password database, dan env Azure tetap di backend; tidak perlu dibagikan kepada pengembang frontend. Semua akun, room, dan chat yang dibuat dari frontend lokal memakai data server yang sama dengan website utama.
+This frontend environment file contains only public addresses. The OpenRouter API key, database password, and Azure
+environment configuration stay on the backend and do not need to be shared with frontend developers. All accounts,
+rooms, and chat messages created from the local frontend use the same server data as the main website.
 
-## 2. Izinkan frontend lokal di backend VPS (Andy, sekali saja)
+## 2. Allow the local frontend on the VPS backend (Andy, once)
 
-Koneksi browser membutuhkan izin CORS pada backend. Dalam `~/GamesSilentTerror/.env.azure`, ubah/tambahkan satu baris berikut. Pertahankan domain frontend produksi:
+Browser connections require CORS permission on the backend. In `~/GamesSilentTerror/.env.azure`, update or add the
+following line. Keep the production frontend domain:
 
 ```dotenv
 FRONTEND_ORIGIN=https://silent-terror.andylabs.site,http://localhost:4200,http://127.0.0.1:4200
 ```
 
-Jika sudah ada origin lain yang diperlukan, pertahankan juga dan pisahkan dengan koma. Tidak ada slash penutup. Di terminal VPS:
+Keep any other required origins too, separated by commas. Do not add trailing slashes. In the VPS terminal:
 
 ```bash
 cd ~/GamesSilentTerror
 nano .env.azure
 ```
 
-Simpan dengan Ctrl+O, Enter, lalu keluar Ctrl+X. Terapkan:
+Save with Ctrl+O, Enter, then exit with Ctrl+X. Apply the change:
 
 ```bash
 sudo docker compose --env-file .env.azure -f docker-compose.azure.yml up -d backend
 ```
 
-Compose memuat perubahan env dengan membuat ulang backend. Pertandingan aktif di memori akan ter-reset, sedangkan riwayat database tetap ada; lakukan saat tidak ada pertandingan berjalan. Jangan membuka port MySQL untuk frontend.
+Compose loads the environment changes by recreating the backend. Active matches in memory are reset, while
+database history is preserved; do this when no matches are running. Do not expose the MySQL port for the frontend.
 
-Untuk tombol Google Login, tambahkan `http://localhost:4200` dan `http://127.0.0.1:4200` ke **Authorized JavaScript origins** pada OAuth Web Client yang dipakai backend. Pertahankan origin produksi. Client ID diambil frontend dari backend, jadi tidak perlu env Google di Docker frontend. Alur popup saat ini tidak membutuhkan redirect URI baru. Login akun biasa dapat dipakai untuk menguji tanpa Google.
+For the Google Login button, add `http://localhost:4200` and `http://127.0.0.1:4200` to the backend OAuth Web Client's
+**Authorized JavaScript origins**. Keep the production origin. The frontend fetches the client ID from the backend,
+so the frontend Docker environment does not need Google variables. The current popup flow does not require a new
+redirect URI. Regular account login can be used for testing without Google.
 
-## 3. Jalankan frontend
+## 3. Start the frontend
 
-Dari `frontend/docker`:
+From `frontend/docker`:
 
 ```bash
 docker compose --env-file .env -f docker-compose.yml up -d --build
 docker compose --env-file .env -f docker-compose.yml logs -f frontend
 ```
 
-Tunggu kompilasi Angular selesai, lalu buka **http://localhost:4200**. Ctrl+C pada tampilan log hanya menghentikan tampilan log; container tetap berjalan. Docker pertama kali mengunduh image dan dependency sehingga lebih lama.
+Wait for Angular compilation to finish, then open **http://localhost:4200**. Ctrl+C in the log viewer only stops
+viewing logs; the container keeps running. The first Docker run takes longer because it downloads images and dependencies.
 
-Edit file di `frontend/src` atau `frontend/public` memakai editor di laptop. Docker membaca perubahan lewat bind mount dan Angular memperbarui halaman. Dependency dipasang di image, terpisah dari `node_modules` laptop. Konfigurasi ini untuk pengembangan lokal, bukan server publik.
+Edit files in `frontend/src` or `frontend/public` with your laptop's editor. Docker reads changes through bind mounts,
+and Angular updates the page. Dependencies are installed in the image, separately from the laptop's `node_modules`.
+This configuration is for local development, not a public server.
 
-Jika mengubah package.json/package-lock.json, angular.json, script, atau Dockerfile, ulangi `up -d --build`. Jika mengubah `.env`, ulangi `up -d` agar container dibuat ulang. File `src/environments/environment.vercel.ts` dibuat otomatis saat container mulai dan diabaikan Git; jangan edit manual. Hindari menjalankan build Vercel pada checkout yang sama ketika container ini aktif, karena keduanya menulis file `environment.vercel.ts` yang sama.
+After changing package.json/package-lock.json, angular.json, scripts, or the Dockerfile, run `up -d --build` again.
+After changing `.env`, run `up -d` again to recreate the container. `src/environments/environment.vercel.ts` is
+generated automatically when the container starts and is ignored by Git; do not edit it manually. Avoid running a
+Vercel build in the same checkout while this container is active, because both write the same `environment.vercel.ts` file.
 
-## 4. Perintah harian
+## 4. Everyday commands
 
-Jalankan dari `frontend/docker`, supaya tidak menjalankan stack backend di folder root repo:
+Run these from `frontend/docker` to avoid starting the backend stack in the repository root:
 
 ```bash
 # Status
 docker compose --env-file .env -f docker-compose.yml ps
-# Berhenti dan hapus container frontend lokal
+# Stop and remove the local frontend container
 docker compose --env-file .env -f docker-compose.yml down
-# Setelah mengambil update repo
+# After pulling repository updates
 git pull
 docker compose --env-file .env -f docker-compose.yml up -d --build
 ```
 
-Kerjakan perubahan pada branch sendiri agar push teman tidak langsung men-deploy produksi: dari folder repo, `git switch -c frontend/nama-fitur`, lalu buat pull request ke main.
+Work on your own branch so a collaborator's push does not deploy directly to production: from the repository
+directory, run `git switch -c frontend/feature-name`, then open a pull request to main.
 
-## 5. Jika koneksi gagal
+## 5. Troubleshooting connections
 
-- UI terbuka tetapi API/CORS gagal: pastikan langkah CORS VPS sudah diterapkan, lalu buka tepat `http://localhost:4200`.
-- WebSocket gagal: izin origin backend juga dipakai Socket.IO. Pastikan HTTPS backend bisa dijangkau dan port 443 VPS terbuka.
-- Google menampilkan origin mismatch: cek Authorized JavaScript origins sesuai alamat browser, termasuk port.
-- Port 4200 terpakai: ubah FRONTEND_PORT (misalnya 4201), lalu tambahkan origin `http://localhost:4201` pada CORS dan Google sebelum menjalankan ulang.
-- Perubahan src tidak muncul: lihat log kompilasi; polling file aktif setiap 1 detik. Pastikan folder repo diizinkan untuk Docker Desktop.
-- Backend tidak bisa dihubungi: buka `https://backendthesis.andylabs.site/ready`. VM harus menyala.
+- The UI opens but API/CORS requests fail: make sure the VPS CORS step has been applied, then open exactly
+  `http://localhost:4200`.
+- WebSocket fails: Socket.IO uses the backend origin permissions too. Make sure the HTTPS backend is reachable
+  and VPS port 443 is open.
+- Google reports an origin mismatch: check that Authorized JavaScript origins match the browser address, including
+  its port.
+- Port 4200 is in use: change FRONTEND_PORT (for example, to 4201), then add `http://localhost:4201` to CORS and
+  Google origins before restarting.
+- Source changes do not appear: check compilation logs; file polling runs every second. Make sure Docker Desktop
+  is allowed to access the repository folder.
+- The backend is unreachable: open `https://backendthesis.andylabs.site/ready`. The VM must be running.
 
-Referensi: [Docker Compose](https://docs.docker.com/reference/cli/docker/compose/) dan [konfigurasi environment Angular](https://angular.dev/tools/cli/environments).
+References: [Docker Compose](https://docs.docker.com/reference/cli/docker/compose/) and
+[Angular environment configuration](https://angular.dev/tools/cli/environments).
 
-## Alternatif tanpa Docker: semua perintah dari root repo
+## Alternative without Docker: run every command from the repository root
 
-Install Git dan Node.js 24, lalu:
+Install Git and Node.js 24, then:
 
 ```bash
 git clone https://github.com/Andysaputra1/GamesSilentTerror.git
@@ -105,11 +129,15 @@ cd GamesSilentTerror
 npm install
 ```
 
-Buat `.env` di folder paling luar, sejajar dengan `package.json` dan folder `frontend`:
+Create `.env` in the outermost directory, alongside `package.json` and the `frontend` folder:
 
 ```dotenv
 BACKEND_URL=https://backendthesis.andylabs.site
 FRONTEND_PORT=4200
 ```
 
-Jalankan `npm start`, lalu buka http://localhost:4200. Root npm install otomatis memasang dependency frontend sesuai lockfile. Env root dibaca saat startup, jadi restart npm start setelah mengubah env. Tidak perlu pindah ke folder frontend atau menjalankan Docker. CORS dan Google origins localhost pada panduan di atas tetap berlaku. Jika sudah punya env backend di root, cukup tambahkan dua variabel publik tersebut tanpa menghapus isi lainnya.
+Run `npm start`, then open http://localhost:4200. Running npm install at the root automatically installs frontend
+dependencies according to the lockfile. The root environment file is read at startup, so restart npm start after
+changing it. You do not need to switch to the frontend folder or run Docker. The CORS and Google localhost origin
+instructions above still apply. If the root already has a backend environment file, add these two public variables
+without deleting anything else.

@@ -1,521 +1,524 @@
-# Silent Terror: aturan permainan dan perilaku bot
+# Silent Terror: game rules and bot behavior
 
-File ini adalah acuan aturan permainan, perilaku bot NPC, dan angka keseimbangan komposisi role. Letak kodenya
-dijelaskan di [CODE_GUIDE.md](CODE_GUIDE.md); cara menjalankan game ada di [README.md](README.md).
+This file is the reference for game rules, NPC bot behavior, and role composition balance. Code locations are
+explained in [CODE_GUIDE.md](CODE_GUIDE.md); setup instructions are in [README.md](README.md).
 
-Silent Terror adalah game social deduction multipemain berbasis web dengan hidden role yang asimetris. Fokusnya
-deduksi dari percakapan, alibi, dan voting. Tidak ada ekonomi, pembelian item, atau tebusan. Aturan di sini mengikuti
-GDD awal dengan beberapa perubahan (lihat [Perubahan atas GDD awal](#perubahan-atas-gdd-awal)).
+Silent Terror is a multiplayer web-based social deduction game with asymmetric hidden roles. It focuses on
+deduction through conversation, alibis, and voting. There is no economy, item purchasing, or ransom. These rules
+follow the original GDD with several changes (see [Changes from the original GDD](#changes-from-the-original-gdd)).
 
-## Istilah
+## Terminology
 
-| Istilah | Arti |
+| Term | Meaning |
 | --- | --- |
-| Warga | Kubu Spy, Stalker, dan Civilian |
-| Syndicate | Kubu Hitman |
-| Hostage | Sandera malam oleh Syndicate. Korban tetap hidup, tetapi kehilangan semua aksi |
-| Gag Order (Gag) | Bungkam chat publik satu pemain saat siang |
-| Guard | Jaga satu pemain dari Hostage malam itu (Spy) |
-| Peek | Intip role asli satu pemain (Stalker) |
-| Tribunal | Fase voting untuk mengeksekusi satu tersangka |
-| Snapshot | Data pertandingan yang dikirim server untuk satu pemain; informasi privat pemain lain tidak ikut |
+| Townspeople (Warga) | The Spy, Stalker, and Civilian team |
+| Syndicate | The Hitman team |
+| Hostage | A nighttime hostage-taking action by the Syndicate. The victim remains alive but loses all actions |
+| Gag Order (Gag) | Silences one player's public chat during the day |
+| Guard | Protects one player from Hostage that night (Spy) |
+| Peek | Reveals one player's actual role privately (Stalker) |
+| Tribunal | The voting phase for executing one suspect |
+| Snapshot | Match data sent by the server for one player; other players' private information is excluded |
 
-## Perubahan atas GDD awal
+## Changes from the original GDD
 
-| Sejak | Perubahan |
+| Since | Change |
 | --- | --- |
-| Awal | Mode kecil 4 dan 5 pemain; durasi fase mengikuti jumlah peserta |
-| 23 Oktober 2026 | Urutan ronde siang → Tribunal → malam (ronde 1 tanpa Tribunal). Hostage kehilangan semua aksi, termasuk skill malam |
-| 26 Oktober 2026 | Setiap Hitman diberi tahu hasil Hostage tim tiap malam (berhasil, atau gagal karena Guard) |
-| 1 November 2026 | Korban Hostage diumumkan ke semua pemain saat malam selesai, dan tandanya tampil sampai permainan selesai |
-| 3 November 2026 | Guard boleh ke target yang sama berturut-turut; suara seri di Tribunal menambah waktu sekali; Spy di room ≥ 2 Spy saling tahu; Hitman dan Spy di room ≥ 2 pemain role itu punya chat tim saat malam |
-| 17 November 2026 | Chat publik dibatasi satu pesan per 2 detik dan 5 pesan per 20 detik per pemain; room yang ditinggal dihapus otomatis |
+| Initial version | Small modes for 4 and 5 players; phase durations depend on participant count |
+| October 23, 2026 | Round order: day → Tribunal → night (no Tribunal in round 1). Hostage victims lose all actions, including night skills |
+| October 26, 2026 | Every Hitman receives the team's Hostage result each night (success, or failure because of Guard) |
+| November 1, 2026 | Hostage victims are announced to all players at the end of the night, and their markers remain until the match ends |
+| November 3, 2026 | Guard may target the same player on consecutive nights; a Tribunal tie adds time once; Spies know each other in rooms with ≥ 2 Spies; Hitmen and Spies have nighttime team chat in rooms that started with ≥ 2 players of their role |
+| November 17, 2026 | Public chat is limited to one message per 2 seconds and 5 messages per 20 seconds per player; abandoned rooms are removed automatically |
 
-## Ruangan dan role
+## Rooms and roles
 
-- **4–10 peserta**, campuran manusia dan NPC. Host memilih kapasitas room; permainan bisa dimulai dengan sedikitnya
-  empat peserta.
-- **Tanpa batas ronde.** Permainan berlanjut sampai salah satu kubu menang.
-- Komposisi role mengikuti jumlah peserta (`KOMPOSISI_PERAN` di `match_engine.py`). Hitman dan Spy bisa lebih dari
-  satu, Stalker selalu satu, sisanya Civilian. Role diacak server untuk manusia maupun NPC. Jumlah tiap role
-  diketahui semua pemain (`composition` di snapshot); siapa pemegangnya tetap rahasia.
+- **4–10 participants**, mixing humans and NPCs. The host chooses the room capacity; the game can start with at
+  least four participants.
+- **No round limit.** Play continues until one team wins.
+- Role composition follows participant count (`KOMPOSISI_PERAN` in `match_engine.py`). There may be multiple
+  Hitmen and Spies, always one Stalker, and Civilians fill the remaining seats. The server randomizes roles for
+  humans and NPCs. Everyone knows each role's count (`composition` in the snapshot); the holders remain secret.
 
-| Peserta | Hitman | Spy | Stalker | Civilian | Warga menang (Fuzzy saja, 200 game, 6 langkah per fase, 7 Nov 2026) | Rata-rata ronde |
+| Participants | Hitman | Spy | Stalker | Civilian | Town win rate (Fuzzy only, 200 games, 6 steps per phase, Nov 7, 2026) | Average rounds |
 | --- | --- | --- | --- | --- | --- | --- |
-| 4 | 1 | 1 | 1 | 1 | 47,0% ± 6,9 | 2,00 |
-| 5 | 1 | 1 | 1 | 2 | 47,0% ± 6,9 | 2,39 |
-| 6 | 1 | 1 | 1 | 3 | 46,0% ± 6,9 | 3,23 |
-| 7 | 2 | 2 | 1 | 2 | 60,5% ± 6,8 (1000 game: 55,1% ± 3,1) | 3,88 |
-| 8 | 2 | 2 | 1 | 3 | 52,5% ± 6,9 | 4,82 |
-| 9 | 2 | 2 | 1 | 4 | 56,0% ± 6,9 | 6,05 |
-| 10 | 2 | 2 | 1 | 5 | 59,5% ± 6,8 | 7,23 |
+| 4 | 1 | 1 | 1 | 1 | 47.0% ± 6.9 | 2.00 |
+| 5 | 1 | 1 | 1 | 2 | 47.0% ± 6.9 | 2.39 |
+| 6 | 1 | 1 | 1 | 3 | 46.0% ± 6.9 | 3.23 |
+| 7 | 2 | 2 | 1 | 2 | 60.5% ± 6.8 (1000 games: 55.1% ± 3.1) | 3.88 |
+| 8 | 2 | 2 | 1 | 3 | 52.5% ± 6.9 | 4.82 |
+| 9 | 2 | 2 | 1 | 4 | 56.0% ± 6.9 | 6.05 |
+| 10 | 2 | 2 | 1 | 5 | 59.5% ± 6.8 | 7.23 |
 
-Cara angka ini diukur dan riwayatnya ada di [Keseimbangan komposisi](#keseimbangan-komposisi).
+The measurement method and history are in [Composition balance](#composition-balance).
 
-- Host menambah NPC satu per satu (**+ Tambah bot**, sekali tekan satu bot) dan menguranginya dengan cara yang sama,
-  paling banyak 5 bot per room. Bot yang ikut = jumlah pilihan host, tetapi tidak melebihi kursi kosong (kapasitas
-  dikurangi manusia). Manusia yang bergabung saat kursi penuh menggantikan bot terakhir. Roster
-  terkunci sesudah mulai; anggota lama boleh reconnect. Pemain yang keluar di tengah pertandingan tidak bisa bergabung
-  lagi ke pertandingan itu.
-- Satu akun menempati satu room. Keluar dari lobby sebelum pindah room. Room yang pertandingannya sudah selesai
-  dilepas otomatis saat pemain membuat atau bergabung ke room lain; survei pertandingan itu tetap bisa dikirim.
-- Room yang ditinggal tanpa tombol Keluar (mis. tab ditutup) dihapus server: lobby yang tidak dibuka anggotanya
-  selama satu jam, dan room yang pertandingannya sudah selesai lalu diam 30 menit. Pertandingan yang masih berjalan
-  tidak pernah dihapus. Server menampung paling banyak 500 room sekaligus.
-- Gabung lewat kode yang gagal dibatasi 10 per akun dan 30 per IP per menit. Kode yang tidak ada dan room milik orang
-  lain dijawab dengan pesan yang sama ("Ruangan tidak ditemukan atau kamu bukan anggotanya."), jadi kode tidak bisa
-  ditebak beruntun.
-- Selama pertandingan aktif, membuka tab baru, halaman lain di aplikasi, atau login ulang mengembalikan akun ke
-  `/game` berdasarkan data backend. Akun tidak bisa membuat atau bergabung ke pertandingan lain sebelum pertandingan
-  itu selesai. Logout mencabut sesi tanpa menghentikan pertandingan; login ulang memulihkan keanggotaan.
+- The host adds NPCs individually (**+ Tambah bot**, Add Bot, one bot per click) and removes them the same way,
+  up to 5 bots per room. The bot count is the host's selection, capped by empty seats (capacity minus humans).
+  A human joining a full room replaces the last bot. The roster locks after starting; existing members may
+  reconnect. Players who leave during a match cannot rejoin that match.
+- One account occupies one room. Leave the lobby before switching rooms. A completed room is released
+  automatically when a player creates or joins another room; its survey can still be submitted.
+- The server removes rooms abandoned without using Leave (for example, by closing a tab): lobbies not opened by
+  a member for one hour, and completed rooms idle for 30 minutes. Active matches are never removed. The server
+  supports at most 500 rooms at once.
+- Failed room-code joins are limited to 10 per account and 30 per IP per minute. Missing codes and rooms belonging
+  to other people return the same message, "Ruangan tidak ditemukan atau kamu bukan anggotanya." (Room not found
+  or you are not a member), preventing repeated code guessing.
+- During an active match, opening a new tab, another application page, or logging in again returns the account to
+  `/game` based on backend data. The account cannot create or join another match until the current one ends.
+  Logging out revokes the session without stopping the match; logging back in restores membership.
 
-## Fase setiap ronde
+## Round phases
 
-Urutan ronde: **siang → Tribunal → malam**. Ronde 1 tanpa Tribunal (siang langsung ke malam), karena belum ada
-kejadian malam yang bisa dibahas sebelum voting. Tribunal pertama ada di ronde 2 dan selalu datang tepat sesudah
-diskusi siang.
+Round order: **day → Tribunal → night**. Round 1 skips Tribunal (day goes directly to night), since there are no
+night events to discuss before voting. The first Tribunal occurs in round 2, always immediately after day discussion.
 
-| Fase | Interaksi dan resolusi |
+| Phase | Interaction and resolution |
 | --- | --- |
-| Siang | Diskusi publik. Hitman bisa memakai Gag Order secara instan. |
-| Tribunal | Mulai ronde 2. Pemain yang punya hak suara memilih tersangka; suara boleh dibatalkan dan dipilih ulang sampai waktu habis. Suara terbanyak tunggal dieksekusi. Di room dengan ≥ 2 Hitman, jumlah Hitman yang masih hidup diumumkan sesudah eksekusi. |
-| Malam | Layar meredup dan chat publik terkunci (chat tim: lihat [Kemampuan dan status](#kemampuan-dan-status)). Hostage, Guard, dan Peek dipilih privat lalu diselesaikan bersama saat timer habis; Guard diproses sebelum Hostage. Hasil malam tampil di tirai pagi dan terlihat mulai siang ronde berikutnya. |
+| Day | Public discussion. Hitmen can use Gag Order instantly. |
+| Tribunal | From round 2 onward. Eligible players choose a suspect; votes may be canceled and recast until time runs out. A sole vote leader is executed. In rooms with ≥ 2 Hitmen, the remaining living Hitman count is announced after execution. |
+| Night | The screen dims and public chat locks (team chat: see [Abilities and statuses](#abilities-and-statuses)). Hostage, Guard, and Peek are selected privately and resolved together when the timer expires; Guard resolves before Hostage. Night results appear on the morning curtain and become visible from the next round's day phase. |
 
-**Seri di Tribunal.** Bila saat waktu habis ada ≥ 2 pemimpin suara, waktu ditambah **sekali** per Tribunal: 30 detik
-(mode cepat 10 detik). Tambahan ini diumumkan lewat catatan dan penanda publik `tribunal_extra`. Suara lama tetap
-berlaku; manusia boleh membatalkan dan memilih ulang, termasuk ke nama yang tidak seri. Bila masih seri sesudah
-tambahan, tidak ada eksekusi dan permainan lanjut ke malam. Tanpa suara sama sekali bukan seri, jadi tidak ada
-tambahan dan tidak ada eksekusi.
+**Tribunal ties.** If ≥ 2 candidates lead when time expires, the Tribunal gets **one** extension: 30 seconds
+(10 in fast mode). A note and the public `tribunal_extra` flag announce it. Existing votes remain; humans can
+cancel and recast them, including for candidates outside the tie. If the tie remains after the extension, nobody
+is executed and play proceeds to night. No votes at all is not a tie: there is no extension or execution.
 
-**Rekap malam publik** hanya menyebut korban Hostage: "Malam selesai. X disandera: …", atau "Malam selesai. Malam
-ini tidak ada yang disandera." bila Hostage dijaga Guard atau Syndicate tidak memilih. Target Hostage yang gagal,
-Guard, dan Peek tidak diumumkan.
+**The public night recap** names only Hostage victims: "Malam selesai. X disandera: …" (Night ended. X taken
+hostage: …), or "Malam selesai. Malam ini tidak ada yang disandera." (Night ended. Nobody was taken hostage
+tonight) if Guard blocked Hostage or the Syndicate made no selection. Failed Hostage, Guard, and Peek targets
+are not announced.
 
-### Durasi fase
+### Phase durations
 
-Durasi ditetapkan dari jumlah peserta awal N (manusia + NPC) dan tetap selama pertandingan. Waktu tambahan karena
-seri hanya memundurkan `deadline` Tribunal itu. Timer server tetap berjalan walaupun tab ditutup.
+Durations depend on the initial participant count N (humans + NPCs) and remain fixed throughout the match.
+A tie extension only moves that Tribunal's `deadline`. The server timer continues even when tabs are closed.
 
-| Mode | Siang | Tribunal | Malam |
+| Mode | Day | Tribunal | Night |
 | --- | --- | --- | --- |
-| Standar | 20N detik | 7,5N dibulatkan ke atas, + 30 detik | 5N detik |
-| Cepat | 10N/3 dibulatkan ke atas | 2,5N dibulatkan ke atas | 2,5N dibulatkan ke atas |
+| Standard | 20N seconds | 7.5N rounded up, + 30 seconds | 5N seconds |
+| Fast | 10N/3 rounded up | 2.5N rounded up | 2.5N rounded up |
 
-Tambahan 30 detik di Tribunal standar memberi waktu menimbang dan mengunci vote sesudah diskusi siang. Contoh durasi
-standar (siang/Tribunal/malam): 4 pemain 80/60/20 detik, 6 pemain 120/75/30 detik, 10 pemain 200/105/50 detik. Contoh
-mode cepat untuk 6 pemain: 20/15/15 detik.
+The extra 30 seconds in standard Tribunal gives players time to consider and lock votes after discussion.
+Standard examples (day/Tribunal/night): 4 players 80/60/20 seconds, 6 players 120/75/30 seconds, 10 players
+200/105/50 seconds. Fast mode with 6 players: 20/15/15 seconds.
 
-Chat publik tersedia saat siang dan Tribunal bagi pemain yang masih boleh berbicara. Setiap pemain paling cepat
-mengirim satu pesan per 2 detik dan paling banyak 5 pesan per 20 detik. Pesan yang terlalu cepat tidak dikirim dan
-pengirim membaca "Chat terlalu cepat. Tunggu N detik lalu kirim lagi."; teksnya kembali ke kotak ketik supaya bisa
-dikirim ulang. Alasannya, IndoBERT membaca tiap chat sekitar 9
-detik di satu thread yang juga dipakai langkah bot semua room. Chat tim malam lewat jalur lain (tanpa database dan
-IndoBERT) dan tidak dibatasi.
+Public chat is available during day and Tribunal for players who may still speak. Each player can send at most
+one message per 2 seconds and 5 messages per 20 seconds. Messages sent too quickly are not delivered; the sender
+sees "Chat terlalu cepat. Tunggu N detik lalu kirim lagi." (Chat too fast. Wait N seconds and send again), and
+the text returns to the input box for resubmission. This is because IndoBERT takes about 9 seconds to read each
+message on a single thread shared with bot steps across all rooms. Nighttime team chat uses a separate route
+(without the database or IndoBERT) and has no such rate limit.
 
-### Skip diskusi
+### Skipping discussion
 
-Saat siang, tombol **Setuju skip diskusi** mempercepat ke fase berikutnya (malam di ronde 1, Tribunal di ronde
-berikutnya) sesudah **semua manusia yang masih hidup** setuju. Bot tidak dihitung. Pemain yang di-Gag atau disandera
-tetap boleh setuju, karena ini bukan chat atau vote. Persetujuan tidak bisa ditarik pada ronde itu, dan pemain offline
-belum dianggap setuju. Hanya jumlah persetujuan yang dipublikasikan; bila belum lengkap, timer normal berlaku.
+During the day, **Setuju skip diskusi** (Agree to Skip Discussion) advances to the next phase (night in round 1,
+Tribunal afterward) once **all living humans** agree. Bots do not count. Gagged players and Hostage victims may
+still agree because this is neither chat nor voting. Agreement cannot be withdrawn that round, and offline
+players are not assumed to agree. Only the agreement count is public; otherwise, the normal timer applies.
 
-## Kemampuan dan status
+## Abilities and statuses
 
-| Role | Kubu | Kemampuan |
+| Role | Team | Abilities |
 | --- | --- | --- |
-| Hitman | Syndicate | Para Hitman saling tahu (`me.allies`). Syndicate menyandera **satu** pemain per malam: setiap Hitman memilih, dan target = pilihan terbanyak (pilihan rekan terlihat lewat `me.ally_actions`). Pada seri antara pilihan manusia dan bot, pilihan manusia yang dipakai; sesama manusia atau sesama bot memakai pilihan paling awal. Gag Order satu pemain saat siang, **satu kali untuk seluruh Syndicate**, dengan cooldown satu ronde penuh (ronde 1, lalu ronde 3). Hostage dan Gag tidak boleh ke rekan; vote ke rekan boleh. Sesudah malam, setiap Hitman tahu hasil Hostage tim (`me.syndicate_hostages`): berhasil, atau gagal karena target dijaga Guard. |
-| Spy | Warga | Guard satu pemain, termasuk diri sendiri, dan boleh target yang sama berturut-turut. Guard mencegah Hostage malam itu, tetapi tidak membebaskan korban lama. Di room yang sejak awal punya ≥ 2 Spy, para Spy saling tahu (`me.spy_allies`) dan melihat pilihan Guard rekan malam itu (`me.spy_actions`). |
-| Stalker | Warga | Peek role asli satu pemain; hasilnya privat dan keluar sesudah malam selesai. Sekali tiap dua ronde: ronde 1, lalu ronde 3. |
-| Civilian | Warga | Tidak punya skill malam; mengamati, berdebat, dan voting. |
+| Hitman | Syndicate | Hitmen know each other (`me.allies`). The Syndicate takes **one** player hostage per night: each Hitman chooses, and the most selected target wins (`me.ally_actions` shows teammates' choices). A human/bot tie favors the human choice; ties among humans or among bots use the earliest choice. Gag Order silences one player during the day, **once for the entire Syndicate**, with a full-round cooldown (round 1, then round 3). Hostage and Gag cannot target teammates; voting for them is allowed. After each night, every Hitman knows the team's Hostage result (`me.syndicate_hostages`): success, or failure because Guard protected the target. |
+| Spy | Town | Guard one player, including yourself, and the same target may be chosen on consecutive nights. Guard prevents Hostage that night but does not free existing victims. In rooms starting with ≥ 2 Spies, Spies know each other (`me.spy_allies`) and see teammates' Guard choices that night (`me.spy_actions`). |
+| Stalker | Town | Peek at one player's actual role; the private result arrives after night ends. Available every other round: round 1, then round 3. |
+| Civilian | Town | No night skill; observes, debates, and votes. |
 
-**Chat tim.** Hanya saat malam, untuk Hitman hidup di room yang sejak awal punya ≥ 2 Hitman, dan Spy hidup yang tidak
-disandera di room yang sejak awal punya ≥ 2 Spy. Kanal Hitman dan Spy terpisah dan tidak saling terlihat. Pesan
-dikirim lewat `POST /api/rooms/{code}/team-chat` (token match, ronde, fase; 1–1000 karakter), disimpan di memori
-pertandingan (100 pesan terakhir per tim), dan dibaca lewat `me.team_messages` oleh pengirim dan rekan setim yang
-berhak. Rekan yang sudah tersingkir atau disandera tidak lagi menerimanya. Gag tidak memengaruhi chat tim. Bot ikut
-chat tim hanya bila ada rekan manusia yang hidup dan tidak disandera; sesama bot tidak mengobrol.
+**Team chat.** Available only at night to living Hitmen in rooms starting with ≥ 2 Hitmen, and living Spies who
+are not hostages in rooms starting with ≥ 2 Spies. Hitman and Spy channels are separate and invisible to each
+other. Messages use `POST /api/rooms/{code}/team-chat` (match, round, and phase token; 1–1000 characters), are
+stored in match memory (last 100 messages per team), and are read through `me.team_messages` by the sender and
+eligible teammates. Eliminated or hostage teammates no longer receive them. Gag does not affect team chat.
+Bots use team chat only when a living human teammate is not held hostage; bots do not chat among themselves.
 
-**Hostage.** Korban tetap hidup di roster, tetapi kehilangan **semua aksi** secara permanen: chat, voting, dan skill
-malam. Ini lebih ketat dari GDD awal yang mempertahankan skill malam. Engine menolak aksinya, `can_act` di snapshot
-selalu `false`, dan bot yang disandera juga tidak beraksi. Korban tetap kubu warga.
+**Hostage.** The victim remains alive on the roster but permanently loses **all actions**: chat, voting, and
+night skills. This is stricter than the original GDD, which retained night skills. The engine rejects their
+actions, snapshot `can_act` is always `false`, and hostage bots also stop acting. Victims remain on the town team.
 
-- Saat malam selesai, korban **diumumkan ke semua pemain**: roster publik memuat `hostage: true` dan `hostage_round`
-  (malam korban disandera), dan cap *Disandera* menempel di kartu korban sampai pertandingan selesai.
-- Korban yang sudah disandera tidak bisa disandera atau di-Gag lagi (engine menolak, UI menonaktifkan targetnya),
-  jadi malam Syndicate tidak terbuang.
-- Saat malam berjalan, hanya Hitman yang melihat cap *Disandera* pada korban tim malam itu. Target yang dijaga Guard
-  tetap rahasia bagi warga; Hitman melihat cap *Disandera* bertanda *GAGAL* yang memudar pada siang berikutnya.
+- At night end, victims are **announced to all players**: the public roster includes `hostage: true` and
+  `hostage_round` (the night they were captured), and a *Disandera* (Hostage) stamp stays on their card until
+  the match ends.
+- Existing hostages cannot be taken hostage or Gagged again (the engine rejects this and the UI disables them
+  as targets), avoiding wasted Syndicate nights.
+- During the night, only Hitmen see the *Disandera* stamp for their team's victim that night. Guard-protected
+  targets remain secret from the town; Hitmen see a *Disandera* stamp marked *GAGAL* (FAILED), fading next day.
 
-**Gag Order.** Hanya membatasi chat publik sampai siang berikutnya (melewati Tribunal ronde itu bila ada). Voting dan
-skill malam tetap tersedia, dan Gag tidak mengurangi suara warga dalam kondisi kemenangan.
+**Gag Order.** Restricts only public chat until the next day (including that round's Tribunal, if any). Voting
+and night skills remain available, and Gag does not reduce the town's voting strength for win conditions.
 
-**Dieksekusi.** Tidak bisa chat, beraksi, atau voting; menjadi penonton. Menang atau kalah mengikuti kubu, termasuk
-bagi yang dieksekusi atau disandera.
+**Executed.** Cannot chat, act, or vote; becomes a spectator. Victory or defeat follows the player's team,
+including for executed players and hostages.
 
-**Keluar di tengah pertandingan** (tombol Keluar, dengan konfirmasi). Diperlakukan sama dengan dieksekusi, dan
-kemenangan langsung dicek ulang. Roster menandainya `left` ("Keluar"), dan catatannya "X meninggalkan permainan."
-dengan akhiran yang sama seperti eksekusi (jumlah Hitman tersisa, role tetap rahasia). Vote dan aksi malam miliknya
-dibuang; vote dan aksi yang menargetkannya juga dibuang sehingga pemilihnya boleh memilih ulang. Fase tidak menunggu
-dia (skip diskusi dan layar persiapan dihitung ulang). Pemain kembali ke menu utama.
+**Leaving mid-match** (the Leave button, with confirmation) is treated like execution, and victory is checked
+immediately. The roster marks the player `left` ("Keluar"), and the note says "X meninggalkan permainan."
+(X left the game), with the same suffix as an execution (remaining Hitman count, roles still hidden). Their
+votes and night actions are removed; votes and actions targeting them are also removed so others may reselect.
+The phase does not wait for them (discussion skipping and preparation readiness are recalculated). The player
+returns to the main menu.
 
-**Mengganti pilihan.** Satu pilihan per fase; untuk mengganti, batalkan dulu.
+**Changing a selection.** One selection per phase; cancel before changing it.
 
-- Vote Tribunal: tombol **Batalkan vote** (`POST /api/rooms/{code}/cancel-vote`), lalu pilih ulang. Yang dihitung
-  suara saat waktu habis.
-- Hostage, Guard, dan Peek: tombol **Batalkan Sandera/Jaga/Intip** (`POST /api/rooms/{code}/cancel-action`), lalu
-  pilih ulang. Yang diresolusikan pilihan saat malam habis.
-- Gag Order tidak bisa dibatalkan karena langsung berlaku: target dibungkam dan cooldown tim berjalan saat dikirim.
-- Target harus hidup; hanya Guard yang boleh memilih diri sendiri. Hostage dan Gag tidak boleh ke korban Hostage
-  (statusnya publik). Guard, Peek, dan vote ke korban Hostage tetap boleh walau tidak berguna.
+- Tribunal votes: **Batalkan vote** (Cancel Vote), `POST /api/rooms/{code}/cancel-vote`, then select again.
+  The vote at the deadline is counted.
+- Hostage, Guard, and Peek: **Batalkan Sandera/Jaga/Intip** (Cancel Hostage/Guard/Peek),
+  `POST /api/rooms/{code}/cancel-action`, then select again. The selection at night end is resolved.
+- Gag Order cannot be canceled because it takes effect immediately: the target is silenced and the team
+  cooldown starts upon submission.
+- Targets must be alive; only Guard allows self-targeting. Hostage and Gag cannot target existing hostages
+  (their status is public). Guard, Peek, and votes may target hostages, although doing so is unhelpful.
 
-## Kemenangan
+## Victory
 
-Backend mengecek kemenangan sesudah resolusi malam, sesudah Tribunal, dan saat pemain keluar:
+The backend checks victory after night resolution, after Tribunal, and when a player leaves:
 
-1. **Warga menang** bila **semua** Hitman sudah dieksekusi (atau keluar).
-2. **Syndicate menang**, selama masih ada Hitman hidup, saat warga hidup yang tidak disandera **tidak lebih banyak
-   dari Hitman yang hidup**. Warga yang dieksekusi atau disandera tidak dihitung; warga yang di-Gag tetap dihitung.
+1. **Town wins** when **all** Hitmen have been executed (or left).
+2. **Syndicate wins**, provided a Hitman is still alive, when living townspeople who are not hostages
+   **do not outnumber living Hitmen**. Executed townspeople and hostages do not count; Gagged townspeople do.
 
-Tidak ada hasil seri pertandingan. Bila belum ada pemenang, permainan lanjut ke ronde berikutnya. Vote yang masih seri
-sesudah waktu tambahan, atau tanpa suara, tidak mengeksekusi siapa pun. Role korban eksekusi dirahasiakan sampai
-akhir.
+Matches cannot end in a draw. Without a winner, play continues to the next round. Votes still tied after the
+extension, or no votes, execute nobody. Executed players' roles remain hidden until the end.
 
-Contoh enam pemain (satu Hitman): tiga dari lima warga disandera, dua bebas → lanjut. Satu lagi disandera atau
-dieksekusi → Hitman menang. Guard berhasil sehingga dua warga tetap bebas → lanjut. Hitman dieksekusi pada Tribunal
-ronde berapa pun → warga menang.
+Six-player example (one Hitman): three of five townspeople are hostages, two remain free → continue. One more
+becomes a hostage or is executed → Hitman wins. A successful Guard keeps two townspeople free → continue.
+The Hitman is executed in any Tribunal → town wins.
 
-Contoh sepuluh pemain (dua Hitman): satu Hitman dieksekusi → permainan lanjut dan diumumkan "Hitman tersisa: 1".
-Syndicate tinggal satu Hitman, jadi Syndicate menang bila warga bebas tinggal satu; warga menang begitu Hitman terakhir
-dieksekusi.
+Ten-player example (two Hitmen): one Hitman is executed → continue and announce "Hitman tersisa: 1"
+(Hitmen remaining: 1). With one Hitman left, Syndicate wins when only one free townsperson remains;
+town wins as soon as the last Hitman is executed.
 
-**Pengumuman jumlah Hitman (hanya room yang sejak awal punya ≥ 2 Hitman).** Sesudah setiap eksekusi Tribunal, engine
-menulis "Tribunal mengeksekusi X. Hitman tersisa: n. Role tetap dirahasiakan sampai permainan selesai." Setiap
-snapshot (semua pemain, semua fase termasuk persiapan dan selesai) memuat `hitman_remaining` = jumlah Hitman yang
-masih hidup. Room satu Hitman berisi `hitman_remaining: null` dan teks eksekusinya tidak berubah. Alasannya: di room
-satu Hitman, warga sudah tahu apakah korban eksekusi itu Hitman (game selesai atau berlanjut). Pengumuman ini
-memberi informasi yang sama untuk room multi-Hitman tanpa membuka role korban. Tanpa pengumuman ini, Syndicate dua
-Hitman terlalu kuat (lihat [riwayat pengukuran](#riwayat-pengukuran)). Angkanya hanya berubah karena eksekusi atau
-pemain keluar.
+**Hitman count announcements (only rooms starting with ≥ 2 Hitmen).** After each Tribunal execution, the engine
+writes "Tribunal mengeksekusi X. Hitman tersisa: n. Role tetap dirahasiakan sampai permainan selesai."
+(Tribunal executed X. Hitmen remaining: n. Roles remain secret until the game ends). Every snapshot (all
+players, all phases including preparation and completion) includes `hitman_remaining`, the living Hitman count.
+Single-Hitman rooms have `hitman_remaining: null` and unchanged execution text. In single-Hitman rooms, the
+town already knows whether the executed player was a Hitman because the game ends or continues. This announcement
+provides equivalent information in multi-Hitman rooms without revealing the victim's role. Without it, a two-Hitman
+Syndicate is too strong (see [Measurement history](#measurement-history)). The count changes only through
+execution or leaving.
 
-Layar hasil menunjukkan kubu pemenang, alasannya, menang atau kalah akun sendiri, jumlah warga hidup, disandera,
-dieksekusi, dan yang masih punya suara, serta role dan status akhir semua peserta.
+The results screen shows the winning team, the reason, the current account's victory or defeat, counts of living,
+hostage, executed, and voting-eligible townspeople, and every participant's role and final status.
 
-## Informasi tersembunyi
+## Hidden information
 
-- Snapshot aktif hanya memuat role, status, pilihan aksi, dan hasil Peek milik akun peminta. Roster pemain lain hanya
-  berisi nama dan hidup atau tidak, ditambah `left` bagi yang keluar dan `hostage`/`hostage_round` bagi korban Hostage
-  (keduanya sudah diumumkan).
-- Tidak ada pengumuman target Gag, Guard, Peek, atau Hostage yang gagal. Serangan yang gagal dan malam tanpa serangan
-  sama-sama diumumkan "tidak ada yang disandera", jadi hanya Syndicate yang tahu target yang dijaga Guard.
-- Publik untuk semua pemain: jumlah tiap role (`composition`) dan, di room ≥ 2 Hitman, jumlah Hitman tersisa
+- Active snapshots contain only the requesting account's role, status, action selections, and Peek results.
+  Other players' roster entries include only names and alive/dead status, plus `left` for those who left and
+  `hostage`/`hostage_round` for Hostage victims (both already announced).
+- Gag, Guard, Peek, and failed Hostage targets are not announced. Failed attacks and nights without an attack
+  both announce that nobody was taken hostage; only the Syndicate knows which target was Guard-protected.
+- Public to everyone: role counts (`composition`) and, in rooms with ≥ 2 Hitmen, the remaining Hitman count
   (`hitman_remaining`).
-- Hanya untuk Hitman: daftar rekan (`me.allies`), pilihan Hostage rekan malam itu (`me.ally_actions`), korban Hostage
-  tim malam itu (`me.syndicate_target`), hasil Hostage tim tiap malam (`me.syndicate_hostages`), target Gag ronde ini
-  (`me.ally_gags`), dan cooldown Gag bersama (`me.next_gag`). Warga selalu menerima nilai kosong dan `next_gag` 1,
-  sehingga tidak bisa menebak kapan atau ke siapa Gag dipakai.
-- Hanya untuk Spy: rekan Spy (`me.spy_allies`) dan pilihan Guard rekan (`me.spy_actions`); kosong di room 4–6 dan
-  bagi role lain. Kolom ini terpisah dari `me.allies` karena kode bot membaca `allies` sebagai rekan Syndicate.
-- Pesan chat tim (`me.team_messages`) hanya dikirim saat malam ke pengirim dan rekan setim yang berhak. Pesan itu tidak
-  masuk `messages`, `events`, riwayat chat, database, NLU, checker, jejak aktivitas panel, snapshot pemain lain, atau
-  layar hasil, dan tidak memakai nomor urut chat publik.
-- Pemain yang di-Gag hanya tahu status dirinya sendiri (`me.gagged`); status Hostage publik.
-- Vote yang dikirim terlihat saat Tribunal, termasuk nama pemilih per target, tanpa daftar orang yang berhak voting.
-  Diam bisa berarti strategi, Gag, atau offline.
-- Metode otak bot tidak ditampilkan ke pemain; panel admin tetap menampilkannya. Lobby dan layar persiapan masih
-  menyebut jumlah bot, jadi versi ini **belum menjadi protokol eksperimen Turing Test tersamar penuh**. Eksperimen
-  tersamar memerlukan penyamaran identitas lobby, prosedur rekrutmen, dan evaluasi tersendiri.
+- Hitman-only: teammates (`me.allies`), teammates' Hostage choices that night (`me.ally_actions`), the team's
+  Hostage victim that night (`me.syndicate_target`), each night's Hostage results (`me.syndicate_hostages`),
+  this round's Gag targets (`me.ally_gags`), and the shared Gag cooldown (`me.next_gag`). Townspeople always
+  receive empty values and `next_gag` 1, so they cannot infer when Gag was used or on whom.
+- Spy-only: Spy teammates (`me.spy_allies`) and their Guard choices (`me.spy_actions`); empty in 4–6-player rooms
+  and for other roles. These fields are separate from `me.allies`, which bot code treats as Syndicate allies.
+- Team messages (`me.team_messages`) are sent only at night to the sender and eligible teammates. They never
+  enter `messages`, `events`, chat history, the database, NLU, Checker, panel activity traces, other players'
+  snapshots, or the results screen, and do not use public chat sequence numbers.
+- Gagged players know only their own status (`me.gagged`); Hostage status is public.
+- Submitted votes are visible during Tribunal, including voter names per target, without a list of eligible
+  voters. Silence may reflect strategy, Gag, or being offline.
+- Bot brain methods are hidden from players but visible in the administrator panel. The lobby and preparation
+  screen still show bot counts, so this version **is not yet a fully blinded Turing Test experiment protocol**.
+  A blinded experiment requires hidden lobby identities, recruitment procedures, and separate evaluation.
 
-## Persiapan dan tampilan pertandingan
+## Match preparation and presentation
 
-Sesudah host menekan Mulai, semua peserta masuk **layar persiapan** dengan tiga kartu: role pribadi (karakter dan
-aksesori seperti di Main), contoh aksi, dan target kemenangan. Barisan karakter peserta dan progres AI tampil di
-bawahnya.
+After the host clicks Start, all participants enter a **preparation screen** with three cards: their private
+role (character and accessories as on Main), example actions, and the victory objective. Participant characters
+and AI progress appear below.
 
-- Ronde 1 belum berjalan, dan waktu baca minimum **40 detik**. Membuka role atau menekan Siap tidak mempercepat
-  countdown bersama.
-- Saat tersisa **10 detik**, pemain yang belum membuka role mendapat pengingat; pada **5 detik terakhir**, kartu dibuka
-  otomatis. Pembukaan pertama tetap memberi jeda baca lokal 3 detik, termasuk bila reconnect melewati countdown.
-- Bila AI baru siap saat waktu baca hampir habis, countdown memberi hingga 10 detik tambahan, tanpa melewati batas
-  tunggu **90 detik**. Pada batas itu permainan mulai dengan aksi cadangan engine. Room tanpa bot tetap menunggu
-  minimum 40 detik.
-- Saat ronde 1 dimulai, tirai transisi menaungi splash yang memudar dan meja yang muncul; reduced motion menonaktifkan
-  animasi.
+- Round 1 has not begun, and the minimum reading time is **40 seconds**. Revealing the role or clicking Ready
+  does not shorten the shared countdown.
+- With **10 seconds** left, players who have not revealed their role receive a reminder; in the **last 5 seconds**,
+  the card opens automatically. The first reveal still gives a local 3-second reading pause, including when
+  reconnecting after the countdown.
+- If AI becomes ready near the end of reading time, the countdown allows up to 10 extra seconds, without
+  exceeding the **90-second** wait limit. At that limit, the game starts using engine fallback actions.
+  Rooms without bots still wait at least 40 seconds.
+- At round 1 start, a transition curtain covers the fading splash and appearing table; reduced motion disables
+  the animation.
 
-Selama pertandingan, chat ikut turun ke pesan terbaru bila pemain sedang di dasar daftar atau baru mengirim pesan.
-Pemain yang sedang menggulir riwayat tidak ditarik turun; tombol "↓ n pesan baru" muncul sebagai gantinya. Pada 5
-detik terakhir siang, malam, dan Tribunal, angka hitung mundur besar muncul di tengah layar tanpa menangkap klik, jadi
-chat, vote, dan aksi tetap bisa dipakai.
+During play, chat scrolls to the latest message if the player is at the bottom or has just sent a message.
+Players reading older messages are not pulled down; a "↓ n pesan baru" (n new messages) button appears instead.
+In the last 5 seconds of day, night, and Tribunal, a large central countdown appears without intercepting clicks,
+so chat, votes, and actions remain usable.
 
-## Akhir pertandingan dan survei
+## Match end and survey
 
-Layar hasil menampilkan ucapan selamat (untuk pemenang pribadi atau kubu pemenang), daftar pemenang beserta role, dan
-statistik akhir. Di bawahnya ada **survei**.
+The results screen congratulates the individual winner or winning team, lists winners with their roles, and
+shows final statistics. A **survey** appears below.
 
-- Pertanyaan, jenis jawaban (bintang, skala angka, pilihan ganda, teks), rentang skala, dan arti nilai terkecil dan
-  terbesar diatur administrator di panel menu **Survei**, bukan di frontend. Sejak 13 November 2026 isinya sepuluh
-  pertanyaan formal penelitian dari migrasi V12; daftarnya dan bagian bot yang diukur tiap pertanyaan ada di
-  [Catatan V12](backend/migrations/README.md#catatan-v12).
-- Pilihan bernama `Lainnya` pada pilihan ganda membuka isian bebas, disimpan sebagai `Lainnya: <isian>`.
-- Jawaban pertanyaan opsional (pilihan ganda, bintang, skala) bisa dikosongkan lagi lewat "Kosongkan pilihan". Selama
-  tombol kirim belum aktif, nomor pertanyaan yang belum lengkap tampil di atasnya. Jawaban yang sudah diisi tetap ada
-  saat pemain membuka "Lihat meja" atau "← Pengumuman" lalu kembali ke kuesioner.
-- Pertanyaan baru selalu masuk paling bawah. Urutannya diatur dengan menyeret pegangan ⋮⋮ atau tombol ▲▼ (Alt+↑/↓),
-  langsung tersimpan lewat `PUT /api/panel/survey/questions/order`, dan dipakai form pemain serta ekspor CSV.
-- Setiap akun manusia mengirim survei sekali per pertandingan; kiriman ganda bersamaan juga dijawab "sudah dikirim".
-  Kiriman tanpa satu jawaban pun ditolak (400), jadi survei itu tetap bisa diisi. Jawaban menyimpan salinan
-  pertanyaan saat dijawab beserta role, kubu, dan hasil pemain.
-- Survei terikat ke username. Karena itu username yang masih tercatat di arsip peserta atau jawaban survei tidak bisa
-  dipakai lagi oleh akun lain (daftar, ganti username, atau akun buatan admin), juga sesudah akun pemiliknya dihapus.
-- Peserta manusia tiap pertandingan yang selesai diarsipkan di tabel `match_participants`, jadi survei tetap bisa
-  dikirim sesudah keluar room, sesudah room dibersihkan, atau sesudah server dinyalakan ulang. Bila arsip itu gagal
-  disimpan, backend masih mengingat peserta di memori selama 30 menit. V12 menghapus arsip pertandingan yang selesai
-  sebelum 13 November 2026, jadi pertandingan lama tidak lagi bisa disurvei.
-- Selama survei belum diisi, halaman Main menampilkan pengingat "Mohon isi survei untuk pertandingan di ruangan …" di
-  atas binder (satu baris per pertandingan, bisa digulir). Tombol X hanya menyembunyikannya sampai Main dibuka lagi.
-  Kalimat isian, ucapan terima kasih, dan pengingat memakai bahasa formal ("Anda").
-- Menu Survei di panel menampilkan:
-  - satu kiriman per orang: satu kiriman = satu akun mengisi survei untuk satu pertandingan. Bila satu akun mengisi
-    di beberapa pertandingan, hanya kiriman terbarunya yang ditampilkan dan dihitung (waktu kirim terbaru; bila
-    seri, `match_id` terbesar). Kiriman lama tetap tersimpan di database;
-  - jumlah orang yang mengisi dan pertandingan, ditambah catatan "N kiriman lama tidak ditampilkan" bila ada;
-  - diagram sebaran jawaban setiap pertanyaan dari kiriman terbaru tiap orang;
-  - daftar pengisi, satu baris per orang, terbaru di atas, dengan nama tampilan akun (username bila akunnya sudah
-    dihapus), room, role, kubu dan hasil, serta jumlah jawaban yang terisi. Mengeklik nama membuka semua isian
-    kiriman itu, bot di pertandingan itu, username, dan nomor pertandingan. Datanya dari
-    `GET /api/panel/survey/respondents` (`total_people`, `total_matches`, dan `total_submissions_all` untuk semua
-    kiriman termasuk yang lama). Tabel rata-rata per metode bot sudah dihapus karena skripsi tidak lagi membandingkan
-    metode.
-- Menu Survei juga bisa menghapus permanen semua jawaban beserta arsip peserta (administrator mengetik BERSIHKAN),
-  lalu menghapus pertanyaan yang sudah tidak punya jawaban. Ekspor CSV dijelaskan di
-  [README.md](README.md#panel-administrator).
+- Administrators configure questions, answer types (stars, numeric scales, multiple choice, text), scale ranges,
+  and endpoint meanings in the **Survei** (Survey) panel, not in the frontend. Since November 13, 2026, the default
+  set contains ten formal research questions from migration V12; their list and the bot aspects measured are in
+  [V12 notes](backend/migrations/README.md#v12-notes).
+- A multiple-choice option named `Lainnya` (Other) opens a free-text field, stored as `Lainnya: <answer>`.
+- Optional multiple-choice, star, and scale answers can be cleared with "Kosongkan pilihan" (Clear Selection).
+  While Submit is disabled, incomplete question numbers appear above it. Entered answers remain when players
+  open "Lihat meja" (View Table) or "← Pengumuman" (Announcement), then return to the questionnaire.
+- New questions are appended at the bottom. Drag the ⋮⋮ handle or use ▲▼ (Alt+↑/↓) to reorder them; the order is
+  saved immediately through `PUT /api/panel/survey/questions/order` and used by the player form and CSV exports.
+- Each human account submits once per match; simultaneous duplicate submissions also return "already submitted".
+  Submissions with no answers are rejected (400), leaving the survey available. Responses store a snapshot of
+  each question at submission time plus the player's role, team, and outcome.
+- Surveys are tied to usernames. Usernames still present in participant archives or responses cannot be reused
+  by another account through registration, renaming, or admin creation, even after the original account is deleted.
+- Human participants of every completed match are archived in `match_participants`, allowing submissions after
+  leaving a room, room cleanup, or server restart. If archiving fails, the backend retains participants in memory
+  for 30 minutes. V12 removes archives for matches completed before November 13, 2026, so those older matches
+  can no longer receive surveys.
+- Until a survey is completed, Main shows "Mohon isi survei untuk pertandingan di ruangan …" (Please complete
+  the survey for the match in room …) above the binder, one scrollable row per match. X hides it only until Main
+  is reopened. Form text, thanks, and reminders use formal Indonesian ("Anda").
+- The Survey panel displays:
+  - One submission per person: one submission means one account answering for one match. For accounts answering
+    across matches, only the latest submission is shown and counted (latest timestamp; highest `match_id` breaks
+    ties). Older submissions remain in the database.
+  - Respondent and match counts, plus "N kiriman lama tidak ditampilkan" (N older submissions not shown), if any.
+  - Answer-distribution charts for each question, using each person's latest submission.
+  - A respondent list, one row per person, newest first, with the account's display name (username if deleted),
+    room, role, team, outcome, and answered-question count. Clicking a name opens every answer in that submission,
+    the match's bots, username, and match number. Data comes from `GET /api/panel/survey/respondents`
+    (`total_people`, `total_matches`, and `total_submissions_all` counts all submissions, including older ones).
+    The average-by-bot-method table was removed because the thesis no longer compares methods.
+- The Survey panel can also permanently delete all responses and participant archives (the administrator types
+  BERSIHKAN), then delete questions with no responses. CSV exports are explained in
+  [README.md](README.md#administrator-panel).
 
-## NPC: otak bot
+## NPC: bot brain
 
-Setiap bot NPC punya **ingatan dan persona sendiri**; ingatan tidak dibagi antarbot. Bot melangkah dari timer tanpa
-menunggu pesan manusia, dan semua bot memakai otak Fuzzy. Metode dan persona tiap bot dicatat di tabel `match_bots`
-untuk analisis survei. Letak kodenya di [CODE_GUIDE.md](CODE_GUIDE.md#otak-bot-di-kode).
+Each NPC bot has **its own memory and persona**; memory is not shared between bots. Bots step on a timer without
+waiting for human messages, and all use the fuzzy brain. Each bot's method and persona are recorded in `match_bots`
+for survey analysis. Code locations are in [CODE_GUIDE.md](CODE_GUIDE.md#bot-brain-in-code).
 
-### Tiga tahap
+### Three stages
 
-1. **NLU (IndoBERT).** Satu model dipakai bersama semua bot dan hasilnya disimpan sekali per pesan. Model 1 membaca
-   intent (`offend`, `defend`, `neutral`); Model 2 membaca target per pemain dengan 12 chat sebelumnya sebagai
-   konteks. Karena nama pengguna bebas (mis. `tester`, `andy123`), nama pemain diganti nama yang dikenal model sebelum
-   intent dibaca; tanpa itu tuduhan singkat seperti "curiga sama tester" terbaca netral. Untuk pesan netral, pemain
-   yang disebut namanya menjadi target. Tanpa folder model, otak bot gagal dimuat: bot tidak chat dan hanya memakai
-   aksi cadangan engine.
-2. **Penalaran (Fuzzy Mamdani).** Bukti publik per pemain dihitung dari ingatan bot. [FUZZY 1] menilai pemain:
-   kecurigaan dari sudut pandang warga, ancaman dan kambing hitam untuk Hitman. [FUZZY 2] memilih tindakan per sesi:
-   Tribunal (vote), Diskusi (chat), dan Aksi Malam (Gag, Hostage, Guard, Peek). Hasilnya rencana chat, vote, dan aksi
-   rahasia.
-   - Bot Hitman membaca hasil Hostage tim dari server (`me.syndicate_hostages`), jadi tahu pasti korban yang berhasil
-     dan target yang dijaga Spy; bila hasil itu tidak ada, pengumuman Hostage di roster dipakai.
-   - Semua bot membaca korban Hostage dari roster publik (`players[].hostage`, `hostage_round`). Korban pasti warga:
-     kecurigaan 0, tidak di-vote, tidak dijaga atau di-Peek, tidak disandera ulang, dan tidak dibela lewat chat karena
-     statusnya sudah diumumkan. Pemain yang diam tanpa pengumuman tidak dianggap korban.
-   - Bot Hitman meninggalkan target yang Hostage-nya sudah gagal dua kali sepanjang pertandingan (kemungkinan terus
-     dijaga Spy) selama masih ada target lain. Tanpa aturan ini, sebagian pertandingan semua bot macet tanpa akhir.
-   - Bot membaca ulang seluruh suara Tribunal di setiap langkah dan baru menguncinya saat fase berganti, jadi suara
-     yang dibatalkan tidak dianggap bukti.
-3. **NLG (penulis kalimat).** Rencana menjadi kalimat lewat **rantai prioritas** penulis LLM, lalu templat:
-   - Jalur: OpenRouter (key di Konfigurasi AI) dan LLM sendiri lewat link (URL tunnel di Konfigurasi AI, mis. Ollama
-     di Docker; dikenali sebagai Ollama atau server kompatibel OpenAI). Urutan dan jalur aktifnya diatur di panel
-     **Otak NPC** (nilai awal `NPC_WRITER_ORDER`).
-   - Model OpenRouter: bawaan kode `qwen/qwen3-14b`; produksi memakai `google/gemini-2.5-flash` yang dipilih di panel
-     Otak NPC.
-   - Tiap jalur dicek saat otak dimuat, saat konfigurasi berubah, atau lewat tombol **Tes koneksi semua prioritas**.
-     OpenRouter dicek dengan key, model, lalu satu pesan pendek dengan batas token yang sama seperti saat bermain, agar
-     saldo kurang langsung ketahuan; link dicek lewat daftar modelnya.
-   - Jalur yang ditolak (401/403/402/404) dilewati sampai dicek ulang. Yang gagal sementara (429, error server,
-     timeout) diistirahatkan 30 detik, berlipat dua bila gagal lagi (maksimal 5 menit).
-   - Satu permintaan ke LLM dibatasi 20 detik. Percobaan kedua hanya dilakukan bila percobaan pertama selesai sebelum
-     20 detik. Menulis satu kalimat dibatasi 25 detik; lewat dari itu, templat yang dipakai.
-   - Penulis tidak menerima role asli bot. Setiap kalimat diperiksa aturan (tidak mengaku bot atau AI, tidak
-     membocorkan role atau aksi, target disebut), lalu langsung dikirim; IndoBERT baru membacanya sesudah terkirim.
-     Semua jalur gagal atau tanpa key → templat bervariasi sesuai persona. Jalur yang menulis dicatat di jejak
+1. **NLU (IndoBERT).** All bots share the model, with results cached once per message. Model 1 reads intent
+   (`offend`, `defend`, `neutral`); Model 2 reads targets per player using 12 previous messages as context.
+   Because usernames are arbitrary (for example, `tester`, `andy123`), player names are replaced with names
+   familiar to the model before intent inference; otherwise short accusations such as "curiga sama tester"
+   (I suspect tester) are read as neutral. Named players become targets for neutral messages. Without model
+   folders, the brain cannot load: bots do not chat and only use engine fallback actions.
+2. **Reasoning (Mamdani fuzzy logic).** Public evidence per player is computed from bot memory. [FUZZY 1]
+   evaluates players: suspicion from the town perspective, threats and scapegoats for Hitmen. [FUZZY 2] selects
+   actions per session: Tribunal (vote), Discussion (chat), and Night Actions (Gag, Hostage, Guard, Peek).
+   It produces chat plans, votes, and secret actions.
+   - Hitman bots read team Hostage results from the server (`me.syndicate_hostages`), so they know successful
+     victims and Spy-protected targets; if absent, they use public roster Hostage announcements.
+   - All bots read Hostage victims from the public roster (`players[].hostage`, `hostage_round`). Victims are
+     confirmed townspeople: suspicion 0, never voted for, Guarded, Peeked, or captured again, and not defended
+     in chat because their status is already public. Silence without an announcement does not imply Hostage.
+   - Hitman bots abandon a target after two failed Hostage attempts throughout the match (likely repeated Spy
+     protection), provided another target exists. Without this rule, some all-bot matches never end.
+   - Bots reread all Tribunal votes on every step and lock them into memory only at the phase change, so
+     canceled votes are not treated as evidence.
+3. **NLG (dialogue writer).** Plans become dialogue through an LLM writer **priority chain**, then templates:
+   - Routes: OpenRouter (key in Konfigurasi AI) and a custom LLM endpoint (tunnel URL in Konfigurasi AI, such as
+     Docker Ollama; detected as Ollama or an OpenAI-compatible server). Order and enabled routes are configured
+     in **Otak NPC** (NPC Brain), initially from `NPC_WRITER_ORDER`.
+   - OpenRouter model: code default `qwen/qwen3-14b`; production uses `google/gemini-2.5-flash`, selected in Otak NPC.
+   - Each route is checked when the brain loads, configuration changes, or **Tes koneksi semua prioritas**
+     (Test All Priority Connections) is clicked. OpenRouter checks the key, model, and one short message with the
+     same token limit as gameplay, exposing insufficient balance immediately; custom endpoints check their model list.
+   - Rejected routes (401/403/402/404) are skipped until rechecked. Temporary failures (429, server errors,
+     timeouts) pause the route for 30 seconds, doubling on repeated failure up to 5 minutes.
+   - One LLM request is limited to 20 seconds. A second attempt occurs only if the first finishes before
+     20 seconds. Writing one sentence is limited to 25 seconds; afterward, a template is used.
+   - The writer does not receive the bot's actual role. Each sentence is checked against rules (no admission of
+     being a bot or AI, no role/action leaks, target named), then sent immediately; IndoBERT reads it afterward.
+     All routes fail or no key → persona-specific template variants. The writing route is recorded in traces
      (`penulis`).
-   - Prompt memuat chat yang memicu kalimat (tuduhan, suara Tribunal, atau pertanyaan ke bot) dan kalimat bot itu
-     sebelumnya, tanpa contoh kalimat templat, jadi bot menanggapi kejadian nyata dan boleh menyapa penuduh atau
-     penanyanya. Kalimat LLM yang hanya parafrase tipis dari kalimat yang baru terdengar (kemiripan ≥ 0,75) ditolak
-     lalu ditulis ulang.
-   - Pembacaan ulang IndoBERT sebelum kirim diarsipkan pada 4 November 2026 karena lebih lama dari LLM-nya (median
-     5,7 detik, p95 21 detik); arsipnya di luar repo, `../arsip_validasi_nlg_2026-11-04/`.
+   - Prompts include the triggering chat (accusation, Tribunal vote, or question directed at the bot) and the bot's
+     previous sentence, without template examples. Bots therefore respond to actual events and may address their
+     accuser or questioner. LLM sentences that barely paraphrase recently heard dialogue (similarity ≥ 0.75)
+     are rejected and rewritten.
+   - Pre-send IndoBERT rereading was archived on November 4, 2026 because it took longer than the LLM itself
+     (median 5.7 seconds, p95 21 seconds); the archive is outside the repository at `../arsip_validasi_nlg_2026-11-04/`.
 
-### Jadwal dan giliran bicara
+### Scheduling and speaking turns
 
-- Bot melangkah setiap `NPC_STEP_SECONDS` (bawaan 3 detik), digeser sedikit per bot agar tidak serentak.
-- Chat yang memanggil bot (target netral dari IndoBERT, atau nama/panggilan yang ditulis) atau menuduhnya membuat
-  langkah bot itu dijadwalkan segera, minimal 1 detik dari langkah sebelumnya. Bot menjawab pertanyaan langsung
-  sekali per panggilan, tetap lewat jatah, jeda, dan lantai bicara.
-- Vote dan aksi rahasia diterapkan begitu diputuskan. Kalimat melewati **lantai bicara**: dalam satu pertandingan
-  paling banyak 3 bot (`LANTAI_MAKS`) menyusun dan "mengetik" bersamaan, jadi permintaan ke LLM dikirim paralel.
-  Lantai ini dihitung per pertandingan dan per fase: saat fase berganti, penyusun fase lama dilepas. Enam thread
-  penulis dipakai bersama semua room, jadi dua room penuh bisa menulis bersamaan dan room ketiga antre. Bot tidak ikut
-  menulis bila bot lain sedang menulis rencana kembar (intent dan target sama). Rencana chat yang dibuat sebelum chat
-  bot lain masuk dibatalkan, lalu bot memutuskan ulang dengan chat terbaru. Rencana yang ditunda tetap tercatat di
-  panel beserta masukan NLG-nya. Chat manusia tidak pernah ditahan.
-- Bila sisa fase lebih pendek dari batas satu panggilan LLM (20 detik), kalimat langsung ditulis templat, karena
-  jawaban LLM bisa datang sesudah fase berganti lalu dibuang. Selain itu batas tunggu LLM tidak melewati sisa fase.
-- Selama menulis, kartu bot menampilkan awan berpikir 🤔 (`players[].thinking`); awan hilang begitu kalimatnya muncul.
-- Kiri bawah kartu bot yang masih hidup menampilkan huruf tahap langkah terakhirnya (`players[].tahap`): **I**
-  snapshot (input) sudah diterima, **L** logika dan penyusunan kalimat sedang berjalan, **O** output atau aksi
-  selesai. Langkah yang gagal atau timeout tetap di **L** sampai langkah berikutnya. Bot melangkah di setiap fase apa
-  pun role-nya, jadi huruf ini tidak membocorkan role.
-- Bot tidak ikut bertanya bila pemain lain baru saja bertanya, tidak menjadi suara ketiga yang mengulang tuduhan atau
-  pembelaan yang sama di fase itu (anti-gema), dan tidak mengulang kalimat yang baru muncul di room.
-- Bot tidak menunggu manusia bicara: satu bot membuka diskusi, dan bila ruangan hening (tidak ada chat selama ≥
-  max(15 detik, 20% durasi fase), sekitar 24 detik di siang standar 6 pemain) bot boleh memancing percakapan lagi atau
-  mengajak pemain yang belum bicara. Bot tetap tidak menuduh tanpa bukti.
-- Keputusan diterapkan hanya bila ronde dan fase belum berganti; aksi yang ditolak engine tidak mengubah state. Bot
-  memegang fasenya begitu vote atau aksinya masuk, atau begitu otak sengaja tidak bertindak (abstain, tidak ada aksi
-  yang bisa dipakai); engine tidak menggantinya dengan aksi acak. "Tunggu" dan pilihan yang ditolak engine belum
-  memegang fase, jadi bila langkah berikutnya gagal, aksi cadangan engine tetap mengisi di akhir fase.
-- Bot yang menjadi korban Hostage tidak dijadwalkan lagi, karena sampai pertandingan selesai ia tidak bisa chat, vote,
-  atau beraksi.
-- Pertandingan yang dimulai saat otak gagal dimuat mendapat otak bot begitu pemuatan ulang berhasil (paling cepat 60
-  detik sesudah gagal); sampai itu bot memakai aksi cadangan engine.
-- Jadwal bot dan simulasi panel menghitung lama fase lewat `Match.phase_length()`, jadi waktu tambahan tidak membuat
-  fase tampak mundur.
+- Bots step every `NPC_STEP_SECONDS` (default 3 seconds), slightly staggered per bot.
+- Messages addressing a bot (IndoBERT neutral target or an explicit name/address) or accusing it schedule its
+  next step immediately, at least 1 second after its previous step. A bot answers a direct question once per
+  trigger, still subject to quotas, delays, and speaking-turn limits.
+- Votes and secret actions apply as soon as they are decided. Dialogue uses a **speaking floor**: at most 3 bots
+  (`LANTAI_MAKS`) per match compose and "type" simultaneously, sending LLM requests in parallel. The floor is
+  scoped to the match and phase; a phase change releases old-phase writers. Six writer threads are shared across
+  all rooms, so two full rooms can write at once while a third waits. A bot does not write while another is
+  writing an identical plan (same intent and target). Plans created before another bot message arrives are
+  canceled and reconsidered with the latest chat. Deferred plans and their NLG inputs remain visible in the panel.
+  Human chat is never held back.
+- If the remaining phase is shorter than one LLM call's limit (20 seconds), a template is used immediately,
+  since an LLM answer could arrive after the phase change and be discarded. Otherwise, the LLM wait limit is
+  also capped by remaining phase time.
+- While writing, a bot's card shows a thinking bubble 🤔 (`players[].thinking`), removed when its sentence appears.
+- The lower-left corner of a living bot's card shows the latest step stage (`players[].tahap`): **I**, snapshot
+  input received; **L**, logic and dialogue generation in progress; **O**, output/action complete. Failed or
+  timed-out steps stay at **L** until the next step. Bots step in every phase regardless of role, so this does
+  not reveal roles.
+- Bots do not ask another question immediately after someone else asks, become a third voice repeating the same
+  accusation or defense in a phase (anti-echo), or repeat a sentence just heard in the room.
+- Bots do not wait for humans to speak: one opens discussion. If the room is silent (no chat for ≥ max(15 seconds,
+  20% of phase duration), about 24 seconds in a standard six-player day), a bot may restart conversation or
+  invite someone who has not spoken. Bots still do not accuse without evidence.
+- Decisions apply only if round and phase are unchanged; engine-rejected actions do not alter state. A bot owns
+  its phase once its vote/action is accepted or its brain deliberately declines to act (abstention or no available
+  action); the engine does not replace that choice with a random action. "Wait" and rejected choices do not
+  claim the phase, so engine fallback still fills in at phase end if the next step fails.
+- Hostage bots are no longer scheduled because they cannot chat, vote, or act for the rest of the match.
+- Matches started while the brain failed to load gain bot brains once reloading succeeds (no sooner than
+  60 seconds after failure); until then, bots use engine fallback actions.
+- Bot scheduling and panel simulation calculate elapsed phase time through `Match.phase_length()`, so extensions
+  do not make phase progress appear to move backward.
 
-### Aturan bot ringkas
+### Bot rules at a glance
 
-Aturan ini berlaku sejak rombak otak Fase 1–9 (November 2026) dan mengikuti aturan permainan 3 November 2026.
-Rinciannya ada di notebook `npc_fuzzy`, bagian Strategi per Role.
+These rules apply after brain-rework Phases 1–9 (November 2026) and follow the November 3, 2026 game rules.
+Details are in the `npc_fuzzy` notebook's per-role strategy section.
 
-- **Chat siang dan Tribunal.** Bot memilih satu dari lima tindakan, masing-masing dengan jenis: `bela_diri` dan
-  `jawab` (reaktif), `tuduh`, `bela_orang`, dan `tanya_info` (inisiatif), atau `tunggu`. Urutannya: ungkap hasil Peek
-  Hitman → `bela_diri` → `jawab` → inisiatif bernilai tertinggi, minimal 40 → gali tersangka sebagai cadangan →
-  `tunggu`. Jatah inisiatif 3 per siang dan 2 per Tribunal; reaktif paling banyak 8 dan 5. Satu pemicu dibalas sekali,
-  dan pemicu baru dari orang yang sama menunggu 12% durasi fase. Bot tidak mengulang tuduhan atau pembelaan yang sudah
-  disuarakan dua orang lain, kecuali klaim Stalker. Klaim Stalker sendiri (hasil Peek Hitman atau Peek bersih) paling
-  banyak sekali per ronde: di Tribunal sesudah klaim siang, bot mengajak atau menjelaskan vote, atau membela tanpa
-  menyebut Peek. Klaim Peek menyebut malam Peek yang sebenarnya; "semalam" hanya untuk malam terakhir.
-- **Buka role** paling banyak sekali per game, hanya saat terdesak (porsi suara ke bot ≥ 0,3, tekanan ≥ 0,5, atau
-  warga hampir kalah). Spy membawa bukti Guard semalam, dan Stalker membawa hasil Peek. Selain itu, bot membela diri
-  dengan persuasi (terlalu awal, bahaya salah vote), menunjuk tersangka lain, atau sangkalan biasa. Hitman mengaku
-  Civilian, atau Spy dengan Guard palsu saat risikonya tinggi.
-- **Tuduhan.** Warga hanya menuduh dengan bukti: kecurigaan ≥ 0,40 dan alasannya bukan sekadar "banyak yang
-  menuduh". Hitman menyerang korban Gag, balik menuduh penuduhnya, atau memelintir bukti publik; setiap jenis yang
-  syaratnya cocok dinilai, dan yang nilainya tertinggi dipakai. Sekali per game, saat sudah dicurigai, Hitman mengaku
-  Peek palsu dengan malam yang mungkin bagi Stalker (Peek tiap dua malam: malam 1, 3, 5, ...). Klaim role dari pemain
-  yang sudah terbukti Hitman (dieksekusi atau keluar sebagai Hitman, atau hasil Peek bot) dianggap bohong, juga
-  sesudah ia mati.
-- **Tribunal.** `tanya_info` hanya untuk klaim bentrok dan gali tersangka. Bot boleh sekali mengajak vote (ajak pindah
-  saat waktu tambahan, ajak menyatukan suara, atau menjelaskan vote), kecuali suaranya hasil paksa.
-- **Gag** (Hitman, siang) selalu terpakai. Warga dengan ancaman ≥ 0,7 langsung di-Gag bila tidak ada rekan manusia
-  yang hidup. Sebelum 60% siang, yang di-Gag hanya warga yang sudah bicara dengan nilai ≥ 60. Sesudah 60% siang, Gag
-  wajib.
-- **Vote warga.** Urutannya: hasil Peek Hitman → vote langsung; kesiapan ≥ 75 → langsung; sebelum separuh Tribunal →
-  menunggu; kesiapan ≥ 45 → vote; ≥ 2 suara dan pemimpinnya dicurigai ≥ 0,35 → ikut. Saat warga kritis
-  (`warga_terdesak` ≥ 0,75, `PAKSA_VOTE_KRITIS = True`), bot memaksa vote ke tersangka layak teratas. Bila semua
-  nilainya sama, target diacak stabil per bot, dan pemain yang dibersihkan pengaku Stalker dilewati. Selain itu bot
-  abstain. Vote warga tidak pernah ke korban Hostage atau pemain yang pasti baik.
-- **Vote Hitman.** Hitman tidak pernah membuka vote. Ia ikut memilih rekan yang pasti dieksekusi, dan menyamakan suara
-  pesaing terkuat saat dirinya atau rekannya memimpin. Bila tidak terdesak, ia menunggu sampai separuh Tribunal. Tanpa
-  suara warga ia abstain; bila sudah ada, ia ikut pemimpin warga yang layak, atau memilih kambing hitam teratas.
-- **Waktu tambahan seri.** Bot yang sudah vote menilai ulang sekali. Warga pindah hanya ke target layak yang
-  kecurigaannya lebih tinggi; Hitman memakai aturan votenya sendiri, termasuk mempertahankan seri.
-- **Malam.** Aksi malam selalu terpakai bila ada target. Bot terkunci 15 detik (mode cepat 10 detik) sebelum malam
-  habis, sedangkan manusia boleh mengganti pilihan sampai waktu habis.
-  - **Hostage:** saat terkunci, mengikuti Hitman manusia yang sudah memilih. Saat terkunci adalah langkah pertama
-    sesudah batas kunci yang keputusannya sampai ke engine, jadi langkah yang timeout tidak menghabiskannya; selain itu mengikuti rekan bot yang sudah
-    memilih, atau memilih warga dengan ancaman × (1 − 0,5 × jejak tuduhan) tertinggi. Seri diacak stabil per bot dan
-    ronde.
-  - **Guard:** diri sendiri bila role sudah terbuka dan bot masih diserang ronde ini. Selain itu, orang yang diyakini
-    baik (rekan Spy, atau kecurigaan < 0,3) yang paling terancam, menghindari target rekan Spy; bila tidak ada, diri
-    sendiri. Target sama boleh berulang, dan bot Hitman tidak menganggap target yang semalam dijaga pasti aman
-    disandera malam ini. Bot yang belum terkunci pindah bila Spy manusia sudah menjaga target yang sama; antarbot, Spy
-    dengan nama yang lebih akhir yang pindah.
-  - **Peek:** pemain yang belum diperiksa, belum pasti baik, dan bukan korban, dengan nilai sistem `intip` tertinggi.
-    Bila semua terlewat, Peek ke pemain hidup mana pun.
-- **Chat tim** (Hitman dan Spy) hanya bila ada rekan manusia yang hidup dan tidak disandera, paling banyak 3 pesan
-  per malam. Isinya target pilihan bot dan alasannya, setuju atau berbeda dengan pilihan rekan, atau pemberitahuan
-  pindah target. Kalimat ditulis LLM atau templat tanpa IndoBERT. Isi chat tim tidak mengubah target.
+- **Day and Tribunal chat.** Bots choose among five actions, each with a type: `bela_diri` and `jawab` (reactive),
+  `tuduh`, `bela_orang`, and `tanya_info` (initiative), or `tunggu` (wait). Priority: reveal a Hitman Peek result
+  → `bela_diri` → `jawab` → highest-scoring initiative, minimum 40 → probe a suspect as fallback → `tunggu`.
+  Initiative quotas are 3 per day and 2 per Tribunal; reactive caps are 8 and 5. Each trigger is answered once,
+  and another trigger from the same person waits 12% of phase duration. Bots do not repeat accusations/defenses
+  already voiced by two others, except Stalker claims. A bot's own Stalker claim (Hitman or clean Peek result)
+  occurs at most once per round: in Tribunal after a daytime claim, it invites/explains a vote or defends without
+  mentioning Peek. Peek claims name the actual Peek night; "last night" is used only for the latest night.
+- **Role reveals** occur at most once per game, only under pressure (vote share against the bot ≥ 0.3, pressure
+  ≥ 0.5, or town close to losing). Spies cite last night's Guard evidence; Stalkers cite Peek results. Otherwise,
+  bots defend themselves through persuasion (too early, risk of a wrong vote), pointing to another suspect, or
+  ordinary denial. Hitmen claim Civilian, or Spy with a fake Guard when at high risk.
+- **Accusations.** Town bots accuse only with evidence: suspicion ≥ 0.40 and a reason beyond "many people accuse
+  them". Hitmen attack Gag victims, counter-accuse accusers, or twist public evidence; all eligible accusation
+  types are scored and the highest wins. Once per game, when suspected, a Hitman makes a fake Peek claim using
+  a possible Stalker night (Peek every other night: 1, 3, 5, ...). Role claims by a proven Hitman (executed or left
+  as Hitman, or identified by the bot's Peek) are treated as lies, even after that player's death.
+- **Tribunal.** `tanya_info` is only for conflicting claims and probing suspects. Bots may invite voting once
+  (switching during extra time, unifying votes, or explaining their vote), except when their vote was forced.
+- **Gag** (Hitman, day) is always used. A townsperson with threat ≥ 0.7 is Gagged immediately if no living human
+  teammate exists. Before 60% of the day, only townspeople who have spoken and score ≥ 60 are Gagged. After 60%,
+  Gag is mandatory.
+- **Town votes.** Priority: Hitman Peek result → vote immediately; readiness ≥ 75 → immediately; before halfway
+  through Tribunal → wait; readiness ≥ 45 → vote; ≥ 2 votes and suspicion of the leader ≥ 0.35 → follow. When
+  town is critical (`warga_terdesak` ≥ 0.75, `PAKSA_VOTE_KRITIS = True`), the bot forces a vote for the highest
+  eligible suspect. Equal scores use stable per-bot randomization, skipping players cleared by a claimed
+  Stalker. Otherwise, abstain. Town votes never target Hostage victims or confirmed good players.
+- **Hitman votes.** Hitmen never open voting. They join votes against a teammate whose execution is inevitable,
+  and equalize the strongest rival's vote count when they or their teammate lead. Without pressure, they wait
+  until halfway through Tribunal. Without town votes, they abstain; otherwise, they follow an eligible town
+  vote leader or select the top scapegoat.
+- **Tie extensions.** Bots that already voted reconsider once. Town bots switch only to an eligible target with
+  higher suspicion; Hitmen use their own voting rules, including preserving a tie.
+- **Night.** Night actions are always used when a target exists. Bots lock their choice 15 seconds (fast mode
+  10 seconds) before night ends; humans may change choices until the deadline.
+  - **Hostage:** at lock-in, follow a human Hitman who has chosen. Lock-in is the first step after the cutoff
+    whose decision reaches the engine, so a timed-out step does not consume it. Otherwise, follow a bot
+    teammate who has chosen, or select the townsperson maximizing threat × (1 − 0.5 × accusation history).
+    Ties use stable per-bot, per-round randomization.
+  - **Guard:** self if the role is revealed and the bot is still under attack this round. Otherwise, protect
+    the most threatened player believed good (Spy ally or suspicion < 0.3), avoiding the other Spy's target;
+    if none exists, self. Repeated targets are allowed, and Hitman bots do not assume last night's protected
+    target is safe to capture tonight. Unlocked bots switch if a human Spy guards the same target; among bots,
+    the Spy whose name sorts later switches.
+  - **Peek:** choose an unchecked player who is not confirmed good or a Hostage victim, maximizing the `intip`
+    system score. If everyone is skipped, Peek any living player.
+- **Team chat** (Hitman and Spy) requires a living human teammate who is not a hostage, with at most 3 messages
+  per night. Messages explain the bot's chosen target and reason, agreement/disagreement with a teammate, or
+  a target switch. LLMs or templates write them without IndoBERT. Team-chat content does not change targets.
 
-### Metode yang diarsipkan
+### Archived methods
 
-Utility AI dan Behavior Tree pernah dipakai bergantian dengan Fuzzy, lalu diarsipkan pada 3 November 2026 di luar repo,
-di `../arsip_bt_utility_2026-11-03/` (commit terakhir yang memuat keduanya: `2d0e9b9`; cara menariknya kembali ada di
-README folder itu). Data lama di `match_bots`, `checker_traces`, dan survei boleh tetap memuat nilai metode itu, dan
-panel tetap bisa membukanya.
+Utility AI and Behavior Tree once alternated with Fuzzy, then were archived on November 3, 2026 outside the repo
+at `../arsip_bt_utility_2026-11-03/` (last commit containing both: `2d0e9b9`; restoration instructions are in that
+folder's README). Historical `match_bots`, `checker_traces`, and survey data may retain those method values,
+and the panel can still display them.
 
-## Keseimbangan komposisi
+## Composition balance
 
-Target: warga menang 40–60% di setiap ukuran room. Semua angka di bagian ini berasal dari bot melawan bot, jadi hanya
-indikasi untuk pertandingan manusia. Komposisi cukup diubah di satu tempat (`KOMPOSISI_PERAN`) bila data pertandingan
-manusia menunjukkan hal lain.
+Target: a 40–60% town win rate for every room size. All figures here come from bot-versus-bot matches, so they
+are only indicative for human matches. Composition needs changing in only one place (`KOMPOSISI_PERAN`) if
+human-match data indicates otherwise.
 
-### Cara mengukur
+### Measurement method
 
-- Skrip `backend/tests/simulasi/simulasi_keseimbangan.py` (cara menjalankan di
-  [CODE_GUIDE.md](CODE_GUIDE.md#simulasi-keseimbangan-dan-uji-ab)).
-- Semua kursi bot melawan engine asli, label NLU sempurna, pengumuman jumlah Hitman tersisa aktif, 6 langkah keputusan
-  per fase (dekat dengan runtime, karena bot melangkah tiap `NPC_STEP_SECONDS`), 200 pertandingan per ukuran dengan
-  seed tetap.
-- Aturan memilih komposisi: bila ada komposisi dengan ≥ 2 Hitman yang win rate warganya 40–60%, dipilih yang paling
-  dekat 50%. Jumlah Hitman dan Spy tidak boleh turun saat peserta bertambah, dan 4–6 pemain tetap satu Hitman.
+- Script: `backend/tests/simulasi/simulasi_keseimbangan.py` (commands in
+  [CODE_GUIDE.md](CODE_GUIDE.md#balance-simulation-and-ab-testing)).
+- All seats are bots against the actual engine, with perfect NLU labels, remaining-Hitman announcements enabled,
+  6 decision steps per phase (close to runtime, where bots step every `NPC_STEP_SECONDS`), and 200 matches per
+  size with fixed seeds.
+- Selection rule: if a composition with ≥ 2 Hitmen gives a 40–60% town win rate, choose the one closest to 50%.
+  Hitman and Spy counts must not decrease as participant count rises, and 4–6-player rooms retain one Hitman.
 
-### Angka sekarang (7 November 2026)
+### Current figures (November 7, 2026)
 
-Tabel di [Ruangan dan role](#ruangan-dan-role) diukur pada 7 November 2026 dengan otak Fuzzy saja, sesudah tiga
-perbaikan bot hari itu: semua jenis tuduh Hitman yang cocok dinilai, klaim Peek menyebut malam yang mungkin, dan klaim
-Stalker tidak diulang di ronde yang sama. Aksi ilegal 0 dan pertandingan tanpa pemenang 0.
+The [Rooms and roles](#rooms-and-roles) table was measured on November 7, 2026 using Fuzzy only, after three bot
+fixes that day: scoring all eligible Hitman accusation types, using possible nights in Peek claims, and avoiding
+repeated Stalker claims within a round. Illegal actions: 0; matches without a winner: 0.
 
-- Dibanding 6 November (`be1bf7f`, seed sama), 4–6 dan 10 pemain tidak berubah, sedangkan 7/8/9 pemain bergeser
-  +2,5/−1,5/+1,0 poin (selisih berpasangan).
-- **7 pemain (60,5%) sedikit di atas batas target di 200 game**, jadi diukur ulang dengan 1000 game (200 seed pertama
-  sama): 55,1% ± 3,1. Sebelum perbaikan angkanya 54,6% ± 3,1 (selisih berpasangan +0,5 ± 1,1; 19 game berbalik ke
-  warga, 14 ke Hitman). Komposisi tidak diubah.
-- **10 pemain (59,5%) tetap dekat batas atas target.**
-- Sebelum rombak otak (Fuzzy saja, `1f11806`) angkanya 40,0/65,5/70,0/25,0/28,0/41,0/46,5% untuk 4–10 pemain.
+- Compared with November 6 (`be1bf7f`, same seeds), 4–6 and 10 players were unchanged; 7/8/9 players shifted
+  +2.5/−1.5/+1.0 percentage points (paired differences).
+- **7 players (60.5%) slightly exceeded the target in 200 games**, so the test was rerun with 1000 games (same
+  first 200 seeds): 55.1% ± 3.1. Before the fixes: 54.6% ± 3.1 (paired difference +0.5 ± 1.1; 19 games flipped
+  to town, 14 to Hitman). Composition was unchanged.
+- **10 players (59.5%) remain close to the upper target bound.**
+- Before the brain rework (Fuzzy only, `1f11806`), rates were 40.0/65.5/70.0/25.0/28.0/41.0/46.5% for 4–10 players.
 
-### Uji A/B paksa vote
+### Forced-vote A/B test
 
-`PAKSA_VOTE_KRITIS` aktif lawan mati, Fuzzy saja, 200 game per ukuran, 6 langkah per fase, seed sama untuk kedua
-kebijakan. Diukur 6 November 2026 di `4a5e48f`, sebelum perubahan pemutus seri Hostage dan klaim pengaku yang terbukti
-Hitman. Skrip pengulang: `backend/tests/simulasi/uji_ab_vote.py`.
+`PAKSA_VOTE_KRITIS` enabled versus disabled, Fuzzy only, 200 games per size, 6 steps per phase, identical seeds
+for both policies. Measured November 6, 2026 at `4a5e48f`, before Hostage tie-breaking changes and handling claims
+by proven Hitmen. Reproduction script: `backend/tests/simulasi/uji_ab_vote.py`.
 
-| Warga menang | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+| Town wins | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Tanpa paksa | 65,0% | 58,0% | 54,0% | 39,5% | 37,0% | 40,0% | 39,5% |
-| Paksa saat kritis | 49,5% | 48,0% | 54,5% | 55,5% | 53,5% | 50,5% | 54,0% |
+| No forced vote | 65.0% | 58.0% | 54.0% | 39.5% | 37.0% | 40.0% | 39.5% |
+| Force when critical | 49.5% | 48.0% | 54.5% | 55.5% | 53.5% | 50.5% | 54.0% |
 
-Tanpa paksa, 4 pemain di atas 60% dan 7–10 pemain di 40% atau lebih rendah. Dengan paksa, semua ukuran berada di
-48–56%. Karena itu **paksa vote tetap aktif**. Alasannya sejalan dengan aturan: warga yang kritis lalu abstain
-membiarkan satu suara lain, yang bisa milik Hitman, menentukan eksekusi.
+Without forced voting, 4 players exceed 60% and 7–10 players are at or below 40%. With it, every size is at
+48–56%. Therefore, **forced voting remains enabled**. The reasoning matches the rules: a critically threatened
+town that abstains lets another vote, possibly a Hitman's, decide the execution.
 
-Riwayat: uji lama (6 pemain, kebijakan `PAKSA_VOTE_BUKTI_LEMAH` tanpa syarat kritis, metode campuran masih ada)
-memilih Fuzzy tanpa paksa (paksa → tanpa: 26 Oktober 50,5% → 58,5%; 1 November 52,0% → 60,0%).
+History: the older test (6 players, `PAKSA_VOTE_BUKTI_LEMAH` without a critical-state condition, mixed methods
+still present) selected Fuzzy without forced voting (forced → unforced: October 26, 50.5% → 58.5%; November 1,
+52.0% → 60.0%).
 
-### Riwayat pengukuran
+### Measurement history
 
-Pengukuran sebelum 3 November 2026 memakai **metode campuran**: Fuzzy, Utility AI, dan Behavior Tree bergiliran
-sebagai otak bot. Urutan di bawah dari yang terbaru.
+Measurements before November 3, 2026 used **mixed methods**: Fuzzy, Utility AI, and Behavior Tree alternated as
+bot brains. Entries below are newest first.
 
-- **1 November 2026** (sesudah korban Hostage diumumkan ke semua pemain dan bot Hitman pindah target sesudah Hostage
-  ke target yang sama gagal dua malam berturut-turut): komposisi yang sama memberi 49,5/65,5/71,0/46,5/43,5/50,0/58,0%
-  untuk 4–10 pemain. Komposisi tidak berubah: 7–10 pemain tetap di 40–60%, tanpa pertandingan yang macet. Uji A/B
-  kebijakan vote juga diulang dan arahnya sama (Fuzzy tanpa paksa 60,0% vs paksa 52,0%; Utility AI paksa 81,0% vs
-  30,5%; Behavior Tree paksa 97,5% vs 61,5%), jadi kebijakan per metode tidak berubah.
-- **27 Oktober 2026** (sesudah bot Hitman tidak lagi membuka vote dan bot Utility AI memakai paksa vote): 7–10 pemain
-  pertama kali semuanya di 40–60%: 47,5/42,5/56,5/59,5%; 4–6 pemain 47,5/61,5/70,0%. Pembanding: 7 pemain 1/1/1 64,0%
-  dan 2/1/1 36,5%; 8 pemain 2/1/1 40,0%; 9 pemain 2/1/1 46,0% (Spy turun, tidak boleh) dan 3/2/1 19,0%; 10 pemain
-  2/1/1 53,0% (Spy turun, tidak boleh), 3/2/1 27,5%, 3/1/1 27,0%.
-- **23 Oktober 2026** (aturan baru: siang → Tribunal → malam, ronde 1 tanpa Tribunal, Hostage tanpa aksi, Tribunal
-  +30 detik; 6 langkah per fase):
-  - **7 pemain** pindah dari 1/1/1 (warga menang 75,0%) ke 2 Hitman + 2 Spy (42,0%); 2/1/1 hanya 26,0%.
-  - **8 pemain** tetap 2/2/1 (48,5%; 2/1/1: 42,0%).
-  - **9 dan 10 pemain** tetap 2/2/1 walau warga menang 64,5% dan 67,0%. Satu-satunya kandidat di 40–60% adalah 2/1/1
-    (57,0% dan 59,5%) yang menurunkan jumlah Spy, sedangkan tiga Hitman terlalu kuat (9: 3/2/1 15,0%; 10: 3/2/1 29,5%,
-    3/1/1 17,0%).
-- **Seleksi awal** (urutan lama siang → malam → Tribunal). Bila tidak ada komposisi ≥ 2 Hitman di 40–60%, ukuran itu
-  tetap satu Hitman.
-  - Pembanding yang ditolak: di 7 pemain dua Hitman + satu Spy 26,0% dan dua Hitman + dua Spy 37,5% (keduanya di bawah
-    40%, jadi tetap satu Hitman); dua Hitman + satu Spy di 8 dan 9 pemain 37,5% dan 39,0%; tiga Hitman di 9 dan 10
-    pemain 4–16%; di 10 pemain dua Hitman + satu Spy 46,5% lebih dekat 50%, tetapi Spy tidak boleh turun dari dua
-    (9 pemain), jadi dipilih dua Spy (57,0%).
-  - Tanpa pengumuman jumlah Hitman, dua Hitman terlalu kuat: warga hanya menang 21–32% di 8–10 pemain.
-  - Seleksi diulang dengan 6 langkah keputusan per fase, karena hasil 9–10 pemain sensitif terhadap jumlah langkah.
-    Tabel tetap: 8 dan 9 pemain seimbang (53,5% dan 52,0%). Di 10 pemain tidak ada kandidat di 40–60% (2/2/1: 64,5%;
-    2/1/1: 61,5% dan Spy tidak boleh turun; 3/2/1: 29,0%; 3/1/1: 15,5%), jadi dipilih yang paling dekat 50% dan sesuai
-    aturan monoton: 2/2/1, condong ke warga. 7 pemain sengaja tetap satu Hitman walau condong ke warga (71%), karena
-    dua Hitman hanya 32–37,5%.
+- **November 1, 2026** (after announcing Hostage victims to everyone and switching Hitman targets after Hostage
+  failed against the same target on two consecutive nights): the same composition yielded
+  49.5/65.5/71.0/46.5/43.5/50.0/58.0% for 4–10 players. Composition stayed unchanged: 7–10 players remained at
+  40–60%, with no stalled matches. The voting-policy A/B test repeated the same direction (Fuzzy unforced 60.0%
+  vs forced 52.0%; Utility AI forced 81.0% vs 30.5%; Behavior Tree forced 97.5% vs 61.5%), so per-method policies
+  were unchanged.
+- **October 27, 2026** (after Hitman bots stopped opening votes and Utility AI bots adopted forced voting):
+  7–10 players all reached 40–60% for the first time: 47.5/42.5/56.5/59.5%; 4–6 players: 47.5/61.5/70.0%.
+  Comparisons: 7 players, 1/1/1 64.0% and 2/1/1 36.5%; 8 players, 2/1/1 40.0%; 9 players, 2/1/1 46.0%
+  (Spy count decreases, disallowed) and 3/2/1 19.0%; 10 players, 2/1/1 53.0% (Spy count decreases, disallowed),
+  3/2/1 27.5%, 3/1/1 27.0%.
+- **October 23, 2026** (new rules: day → Tribunal → night, no round-1 Tribunal, Hostage disables all actions,
+  Tribunal +30 seconds; 6 steps per phase):
+  - **7 players** changed from 1/1/1 (75.0% town wins) to 2 Hitmen + 2 Spies (42.0%); 2/1/1 gave only 26.0%.
+  - **8 players** retained 2/2/1 (48.5%; 2/1/1: 42.0%).
+  - **9 and 10 players** retained 2/2/1 despite town win rates of 64.5% and 67.0%. The only 40–60% candidate was
+    2/1/1 (57.0% and 59.5%), which reduced Spy count, while three Hitmen were too strong (9: 3/2/1 15.0%;
+    10: 3/2/1 29.5%, 3/1/1 17.0%).
+- **Initial selection** (old order: day → night → Tribunal). If no composition with ≥ 2 Hitmen reached 40–60%,
+  that size retained one Hitman.
+  - Rejected comparisons: 7 players with two Hitmen + one Spy 26.0%, and two Hitmen + two Spies 37.5% (both below
+    40%, so one Hitman remained); two Hitmen + one Spy at 8 and 9 players 37.5% and 39.0%; three Hitmen at
+    9 and 10 players 4–16%; at 10 players, two Hitmen + one Spy 46.5% was closer to 50%, but Spy count could not
+    drop from two (at 9 players), so two Spies were chosen (57.0%).
+  - Without remaining-Hitman announcements, two Hitmen were too strong: town won only 21–32% at 8–10 players.
+  - Selection was repeated with 6 decision steps per phase because 9–10-player results were sensitive to step
+    count. The table stayed: 8 and 9 players balanced (53.5% and 52.0%). At 10 players, no candidate reached
+    40–60% (2/2/1: 64.5%; 2/1/1: 61.5% but Spy count cannot decrease; 3/2/1: 29.0%; 3/1/1: 15.5%), so the
+    closest-to-50% composition satisfying the monotonic rule was chosen: 2/2/1, favoring town. Seven players
+    deliberately retained one Hitman despite favoring town (71%), because two Hitmen gave only 32–37.5%.

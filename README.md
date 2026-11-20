@@ -7,8 +7,8 @@ and generate dialogue through an LLM or templates.
 
 This README is the repository's starting point: an overview, local setup instructions, and a guide to the other
 documentation. Game rules are in [GAME_CONCEPT.md](GAME_CONCEPT.md), and the code structure is explained in
-[CODE_GUIDE.md](CODE_GUIDE.md). Linked documentation and application labels may still be in Indonesian; UI labels
-below retain their original names so you can find them in the application.
+[CODE_GUIDE.md](CODE_GUIDE.md). Application labels remain in Indonesian; UI labels below retain their original names
+so you can find them in the application.
 
 The repository is named `GamesSilentTerror`. The database (`shadow_heist`), containers (`shadow_*`), and parts of
 the code still use the project's former name, Shadow Heist.
@@ -45,7 +45,7 @@ documents, and copy the output to `backend/public/dokumen/`.
 
 **Thesis notebooks** live outside this repository in `../training/prethesis/ai_2_dataset_baru/`
 (`npc_fuzzy.ipynb`, `npc_nlg.ipynb`, and the NLU notebooks). The notebooks are for the research report only.
-The source of bot logic is `backend/app/bot/`; see [CODE_GUIDE.md](CODE_GUIDE.md#mengubah-logika-bot).
+The source of bot logic is `backend/app/bot/`; see [CODE_GUIDE.md](CODE_GUIDE.md#changing-bot-logic).
 
 ## Implemented features
 
@@ -57,7 +57,7 @@ The source of bot logic is `backend/app/bot/`; see [CODE_GUIDE.md](CODE_GUIDE.md
 - Server-assigned random roles, a preparation screen, day → Tribunal → night rounds (no Tribunal in round 1)
   until a team wins, skills and cooldowns, voting, executions, nighttime team chat, and win conditions.
 - A post-match survey with questions managed through the panel. The default set contains ten formal research
-  questions from migration V12 ([V12 notes](backend/migrations/README.md#catatan-v12)).
+  questions from migration V12 ([V12 notes](backend/migrations/README.md#v12-notes)).
 - An administrator panel at `/panel` with eight menus (see [Administrator panel](#administrator-panel)).
 
 Roles: **Hitman** (Hostage, Gag Order), **Spy** (Guard), **Stalker** (Peek), and **Civilian**. Detailed rules,
@@ -77,8 +77,8 @@ The backend is the source of truth. The match engine validates every action, vot
 those from bots. If a bot brain fails, engine fallback actions fill in missing actions. Human chat is only
 validated, stored, and broadcast; bots interpret it independently through IndoBERT.
 
-The bot brain has three stages. See [GAME_CONCEPT.md](GAME_CONCEPT.md#npc-otak-bot) for details and
-[CODE_GUIDE.md](CODE_GUIDE.md#otak-bot-di-kode) for the corresponding code locations.
+The bot brain has three stages. See [GAME_CONCEPT.md](GAME_CONCEPT.md#npc-bot-brain) for details and
+[CODE_GUIDE.md](CODE_GUIDE.md#bot-brain-in-code) for the corresponding code locations.
 
 | Stage | Purpose |
 | --- | --- |
@@ -87,7 +87,7 @@ The bot brain has three stages. See [GAME_CONCEPT.md](GAME_CONCEPT.md#npc-otak-b
 | NLG (an LLM writer chain, then templates) | Turns plans into dialogue. Failed LLM routes are skipped; if no route is available, the bot uses templates |
 
 All bots use the fuzzy brain. Previously archived methods are listed in
-[GAME_CONCEPT.md](GAME_CONCEPT.md#metode-yang-diarsipkan).
+[GAME_CONCEPT.md](GAME_CONCEPT.md#archived-methods).
 
 ## Running locally
 
@@ -122,7 +122,7 @@ You do not need Python, Node.js, or MySQL installed on the host when running eve
    cp .env.example .env             # Linux/macOS
    ```
 
-   Each variable is explained in [backend/README.md](backend/README.md#variabel-environment).
+   Each variable is explained in [backend/README.md](backend/README.md#environment-variables).
 
 3. **Copy the two IndoBERT models** (approximately 440 MB each, ignored by Git). Without these models, the bot brain
    cannot load: bots will not chat and will use only engine fallback actions.
@@ -207,7 +207,7 @@ Only the backend reads the API key, and usage may incur charges on your OpenRout
 
 Configure the OpenRouter dialogue model in the **Otak NPC** panel (or through `NPC_OPENROUTER_MODEL`); the code
 default is `qwen/qwen3-14b`. The production model is documented in
-[backend/deployment/README.md](backend/deployment/README.md#panel-dan-secret-di-vm).
+[backend/deployment/README.md](backend/deployment/README.md#panel-and-secrets-on-the-vm).
 
 ### Local addresses
 
@@ -265,7 +265,7 @@ panel password changes.
 | 03 Riwayat chat (Chat History) | MySQL chat archives with filters and CSV export, including IndoBERT intent, target, and interpretation context |
 | 04 Manajemen user (User Management) | Add users, edit display names or usernames, reset local account passwords, and delete accounts without deleting chat history |
 | 05 Otak NPC (NPC Brain) | Dialogue writer, writer chain order, OpenRouter model, custom endpoint LLM model, **Tes koneksi semua prioritas** (Test All Priority Connections) button, and IndoBERT NLU status |
-| 06 Survei (Survey) | Survey questions and ordering, respondent count, per-question answer charts, respondent list (latest submission per person), CSV exports per person or for all submissions, and response cleanup (details in [GAME_CONCEPT.md](GAME_CONCEPT.md#akhir-pertandingan-dan-survei)) |
+| 06 Survei (Survey) | Survey questions and ordering, respondent count, per-question answer charts, respondent list (latest submission per person), CSV exports per person or for all submissions, and response cleanup (details in [GAME_CONCEPT.md](GAME_CONCEPT.md#match-end-and-survey)) |
 | 07 Simulasi (Simulation) | Simulated matches with an administrator and 3–9 bots using the real brain: chat, an AI process flowchart highlighting each active stage, and the actual code for each stage |
 | 08 Dokumen (Documents) | System web documentation, starting with Peta Dokumen (see [Documentation map](#documentation-map)) |
 
@@ -287,7 +287,7 @@ panel password changes.
   or bot). When opening this file in a spreadsheet, import `teks_chat` as text.
 
 Panel key, model, and endpoint settings are explained in
-[backend/README.md](backend/README.md#pengaturan-dari-panel).
+[backend/README.md](backend/README.md#panel-settings).
 
 ## Google login
 
@@ -299,7 +299,7 @@ Panel key, model, and endpoint settings are explained in
 3. Deployment domains must use HTTPS and be registered as origins. Google login does not support LAN IP addresses
    over HTTP, but password login remains available over LAN.
 
-Account, session, and token verification rules are in [CODE_GUIDE.md](CODE_GUIDE.md#akun-sesi-dan-login).
+Account, session, and token verification rules are in [CODE_GUIDE.md](CODE_GUIDE.md#accounts-sessions-and-login).
 Official guides: [Google Identity Services setup](https://developers.google.com/identity/gsi/web/guides/get-google-api-clientid)
 and [backend token verification](https://developers.google.com/identity/gsi/web/guides/verify-google-id-token).
 
@@ -327,7 +327,7 @@ docker compose restart gateway
   **Do not use `docker compose down -v` if you still need the data or models**: it deletes both volumes. Volumes
   are not a substitute for backups.
 - Restarting or recreating the backend clears active matches because match state is held only in memory
-  ([Implementation limits](CODE_GUIDE.md#batas-implementasi)). Chat archives in MySQL are preserved.
+  ([Implementation limits](CODE_GUIDE.md#implementation-limits)). Chat archives in MySQL are preserved.
 - SQL files in `backend/migrations/` (V01–V12) run automatically only when the database volume is first created.
   Existing databases require new migrations to be applied manually; see
   [backend/migrations/README.md](backend/migrations/README.md).
@@ -365,7 +365,7 @@ docker compose up -d --build frontend
 
 Build output is in `/app/dist/frontend` inside the container and is not mounted onto the host. Do not edit `dist`
 as source code. There is no `ng e2e` target yet. Test and build commands are in
-[CODE_GUIDE.md](CODE_GUIDE.md#tes-dan-simulasi); styling guidance is in [frontend/STYLING.md](frontend/STYLING.md).
+[CODE_GUIDE.md](CODE_GUIDE.md#tests-and-simulations); styling guidance is in [frontend/STYLING.md](frontend/STYLING.md).
 
 ## Troubleshooting
 
@@ -376,7 +376,7 @@ as source code. There is no `ng e2e` target yet. Test and build commands are in
 | Port already in use | Stop the other service using that port. Changing ports also requires updates to frontend URLs, CORS, and the proxy |
 | Login fails or the backend is not ready | Check `docker compose ps -a`, the `ai-engine` and `mysql` logs, and `/ready`. An existing database may be missing the latest migrations |
 | Bots are silent or their dialogue sounds rigid | Open **Otak NPC**: NLU must show IndoBERT, and at least one writer route must be available (or use `NPC_WRITER=templat`). Check `database_ready` in `/app-status` |
-| Bots respond slowly in large rooms | Open **Checker**: the process flow identifies slow stages, and the Antrean box shows jobs waiting for brain or writer threads. All rooms share these threads (see [Implementation limits](CODE_GUIDE.md#batas-implementasi)) |
+| Bots respond slowly in large rooms | Open **Checker**: the process flow identifies slow stages, and the Antrean box shows jobs waiting for brain or writer threads. All rooms share these threads (see [Implementation limits](CODE_GUIDE.md#implementation-limits)) |
 | Cannot log in to the panel | Make sure `PANEL_PASSWORD_HASH` was generated with `setup_panel.py` and the backend has been recreated |
 | Room not found | The backend may have restarted, the invite code may be incorrect, or the room may have been idle too long (idle lobbies are removed after 1 hour; completed rooms after 30 minutes). Create a new room |
 | Chat too fast / too many attempts | Chat is limited to 1 message per 2 seconds and 5 per 20 seconds per player (rejected text returns to the input box); failed room joins are limited to 10 per account per minute; 10 incorrect passwords within 15 minutes temporarily block that account. Wait as instructed by the message |

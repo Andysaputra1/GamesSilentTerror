@@ -1,66 +1,66 @@
-# Pemasangan pertama di Azure
+# Initial Azure Setup
 
-File ini berisi langkah sekali jalan untuk menyiapkan backend Silent Terror di VM Azure baru: DNS, firewall, Google
-OAuth, file `.env.azure`, model, dan sambungan ke frontend Vercel. Update rutin sesudahnya (backup, migrasi, build)
-ada di [README.md](README.md).
+This document covers the one-time steps to set up the Silent Terror backend on a new Azure VM: DNS, firewall,
+Google OAuth, `.env.azure`, models, and the connection to the Vercel frontend. Subsequent routine updates
+(backups, migrations, builds) are covered in [README.md](README.md).
 
-| Bagian | Alamat |
+| Component | Address |
 | --- | --- |
 | Frontend | https://silent-terror.andylabs.site |
 | Backend | https://backendthesis.andylabs.site |
 | Panel | https://backendthesis.andylabs.site/panel |
-| IP publik VM | 70.153.8.162 (cek di Azure bila berubah) |
+| VM public IP | 70.153.8.162 (check Azure if it changes) |
 
-## 1. DNS dan jaringan
+## 1. DNS and networking
 
-1. DNS dikelola nameserver Vercel, walaupun registrar domainnya Hostinger. Buat A record `backendthesis` →
-   IP publik VM di Vercel DNS.
-2. Jangan memasang subdomain backend ke project Vercel.
-3. Di jaringan VM Azure, izinkan TCP 80 dan 443 masuk. Port MySQL 3306 dan backend 8000 tetap tertutup untuk publik;
-   Docker hanya membuka port Caddy. Jaga akses SSH yang sudah ada.
-4. Bila UFW aktif, izinkan OpenSSH dulu sebelum mengubah aturan firewall.
+1. DNS is managed by Vercel nameservers even though the domain registrar is Hostinger. Create an A record for
+   `backendthesis` pointing to the VM's public IP in Vercel DNS.
+2. Do not attach the backend subdomain to a Vercel project.
+3. In the Azure VM network settings, allow inbound TCP 80 and 443. Keep MySQL port 3306 and backend port 8000
+   closed to the public; Docker exposes only Caddy's ports. Preserve existing SSH access.
+4. If UFW is enabled, allow OpenSSH before changing firewall rules.
 
 ## 2. Google login
 
-1. Di Google Cloud > Google Auth Platform > Clients, edit OAuth client jenis Web application yang sudah ada.
-2. Isi Authorized JavaScript origins, tanpa garis miring di akhir dan tanpa `/login`:
+1. In Google Cloud > Google Auth Platform > Clients, edit the existing Web application OAuth client.
+2. Set Authorized JavaScript origins without a trailing slash or `/login`:
    - `https://silent-terror.andylabs.site`
-   - `https://games-silent-terror.vercel.app` (hanya bila URL lama masih dipakai)
-   - `http://localhost:4200` (opsional, untuk development lokal)
-3. Authorized redirect URIs boleh kosong. Google Identity Services memakai popup dengan callback JavaScript, lalu
-   frontend mengirim ID token ke `/api/auth/google`. Client Secret tidak diperlukan.
-4. Atur branding aplikasi, email dukungan dan developer, serta audience di Google Auth Platform. Bila konsol meminta
-   test user selama mode Testing, tambahkan akun Google yang dipakai untuk uji.
+   - `https://games-silent-terror.vercel.app` (only if the old URL is still used)
+   - `http://localhost:4200` (optional, for local development)
+3. Authorized redirect URIs can remain empty. Google Identity Services uses a popup with a JavaScript callback,
+   and the frontend then sends the ID token to `/api/auth/google`. A Client Secret is not required.
+4. Configure application branding, support and developer emails, and the audience in Google Auth Platform. If
+   the console requests test users while in Testing mode, add the Google accounts used for testing.
 
-Jangan pernah meng-commit kredensial Google atau file environment.
+Never commit Google credentials or environment files.
 
-## 3. Repo, `.env.azure`, dan model di VM
+## 3. Repository, `.env.azure`, and models on the VM
 
-1. Clone repo ke `~/GamesSilentTerror` dan masuk ke foldernya.
-2. Buat `.env.azure`:
+1. Clone the repository to `~/GamesSilentTerror` and enter that directory.
+2. Create `.env.azure`:
 
    ```bash
    python3 backend/scripts/setup_azure.py
    nano .env.azure
    ```
 
-   Skrip membuat password database dan `PANEL_ENCRYPTION_KEY` yang belum ada, mempertahankan password database yang
-   sudah ada, menambah kunci `BACKEND_DOMAIN`, `FRONTEND_ORIGIN`, `GOOGLE_CLIENT_ID`, `openrouter_default`, dan
-   `OLLAMA_TUNNEL_TOKEN`, lalu meminta password administrator panel dua kali (minimal 8 karakter). File dibuat dengan
-   izin `600`.
-3. Di `nano`, isi `GOOGLE_CLIENT_ID` dengan Client ID yang sama dengan `.env` lokal. Opsional, isi
-   `openrouter_default` dengan key OpenRouter bawaan, atau atur key sendiri nanti dari panel. Biarkan
-   `BACKEND_DOMAIN=backendthesis.andylabs.site` dan `FRONTEND_ORIGIN=https://silent-terror.andylabs.site`.
-4. Salin dua folder model IndoBERT dari laptop ke `backend/artifacts/indobert/intent/` dan
-   `backend/artifacts/indobert/target/` di VM (mis. dengan `scp -r`). Model ikut masuk image saat build; build
-   berhenti dengan pesan bila salah satu folder belum berisi model.
+   The script generates missing database passwords and `PANEL_ENCRYPTION_KEY`, preserves existing database
+   passwords, adds the `BACKEND_DOMAIN`, `FRONTEND_ORIGIN`, `GOOGLE_CLIENT_ID`, `openrouter_default`, and
+   `OLLAMA_TUNNEL_TOKEN` keys, then asks for the panel administrator password twice (at least 8 characters).
+   The file is created with permissions `600`.
+3. In `nano`, set `GOOGLE_CLIENT_ID` to the same Client ID as the local `.env`. Optionally set `openrouter_default`
+   to the default OpenRouter key, or configure your own key later through the panel. Keep
+   `BACKEND_DOMAIN=backendthesis.andylabs.site` and `FRONTEND_ORIGIN=https://silent-terror.andylabs.site`.
+4. Copy the two IndoBERT model directories from the laptop to `backend/artifacts/indobert/intent/` and
+   `backend/artifacts/indobert/target/` on the VM (for example, with `scp -r`). Models are included in the image
+   during the build; it stops with a message if either directory is missing its model.
 
-Jangan membagikan `.env.azure`. Mengubah password di file ini nanti tidak merotasi password database yang sudah
-diinisialisasi.
+Do not share `.env.azure`. Changing a password in this file later does not rotate the password of an already
+initialized database.
 
-## 4. Nyalakan MySQL
+## 4. Start MySQL
 
-Volume database dan sertifikat Caddy dibuat lebih dulu sebagai volume eksternal, supaya `down -v` tidak menghapusnya:
+Create the database and Caddy certificate volumes first as external volumes so `down -v` does not delete them:
 
 ```bash
 sudo docker volume create shadow_heist_mysql_data
@@ -69,12 +69,13 @@ sudo docker compose --env-file .env.azure -f docker-compose.azure.yml up -d mysq
 sudo docker compose --env-file .env.azure -f docker-compose.azure.yml ps
 ```
 
-- Volume baru: MySQL menjalankan semua file di `backend/migrations/` (V01–V12, tanpa V03) berurutan, tanpa akun
-  bawaan. Hasil awalnya 15 tabel (termasuk `schema_migrations`), sepuluh pertanyaan survei formal, dan nol akun.
-- Volume yang sudah berisi data: migrasi tidak dijalankan ulang. Hentikan, periksa isinya, lalu ikuti
-  [README.md](README.md#menjalankan-migrasi-di-database-lama). Jangan menghapus volume untuk memaksa inisialisasi.
+- New volume: MySQL runs all files in `backend/migrations/` (V01–V12, excluding V03) in order, with no default
+  accounts. The initial result is 15 tables (including `schema_migrations`), ten formal survey questions, and
+  zero accounts.
+- Existing volume containing data: migrations do not rerun. Stop, inspect its contents, and follow
+  [README.md](README.md#applying-migrations-to-an-existing-database). Do not delete the volume to force initialization.
 
-Untuk memeriksa tabel (password root diminta di terminal; jangan menempelnya ke chat):
+To inspect tables (the root password is requested in the terminal; do not paste it into chat):
 
 ```bash
 sudo docker compose --env-file .env.azure -f docker-compose.azure.yml exec mysql mysql -uroot -p shadow_heist
@@ -85,7 +86,7 @@ SHOW TABLES;
 SELECT COUNT(*) FROM user_accounts;
 ```
 
-## 5. Nyalakan semua service
+## 5. Start all services
 
 ```bash
 sudo docker compose --env-file .env.azure -f docker-compose.azure.yml up -d --build
@@ -95,20 +96,21 @@ curl -fsS https://backendthesis.andylabs.site/ready
 curl -fsS https://backendthesis.andylabs.site/api/auth/google/config
 ```
 
-Caddy mengambil dan memperbarui sertifikat HTTPS sendiri begitu DNS dan port 80/443 berfungsi. `/ready` memeriksa
-database dan migrasi tanpa menghubungi layanan AI, dan melaporkan status IndoBERT
-([README.md](README.md#update-rutin) langkah 7). Satu worker backend memang disengaja: ruangan dan nonce Google hidup
-di satu proses. Restart backend memutus pertandingan aktif, tetapi tidak menghapus arsip chat.
+Caddy obtains and renews HTTPS certificates automatically once DNS and ports 80/443 are working. `/ready` checks
+the database and migrations without contacting AI services, and reports IndoBERT status
+([README.md](README.md#routine-updates), step 7). A single backend worker is intentional: rooms and Google nonces
+live in one process. Restarting the backend interrupts active matches but does not delete chat archives.
 
-## 6. Hubungkan Vercel
+## 6. Connect Vercel
 
-1. Di project Vercel `games-silent-terror`, environment Production, isi
+1. In the `games-silent-terror` Vercel project's Production environment, set
    `BACKEND_URL=https://backendthesis.andylabs.site`.
-2. Redeploy frontend hanya sesudah `/ready` lewat HTTPS berhasil.
-3. `GOOGLE_CLIENT_ID` dibaca frontend dari backend, jadi bukan secret build frontend.
-4. CORS di backend diatur lewat `FRONTEND_ORIGIN` di `.env.azure`. Bila kedua domain frontend dipakai, isi keduanya
-   sebagai origin HTTPS lengkap dipisah koma.
-5. Uji dari domain frontend asli: login Google, buat room, chat WebSocket, login `/panel`, dan unduh riwayat chat.
-   Login Google sungguhan butuh pemilik akun di browser; unit test tidak bisa memeriksa konfigurasi Google Cloud.
+2. Redeploy the frontend only after `/ready` succeeds over HTTPS.
+3. The frontend reads `GOOGLE_CLIENT_ID` from the backend, so it is not a frontend build secret.
+4. Backend CORS is configured through `FRONTEND_ORIGIN` in `.env.azure`. If both frontend domains are used,
+   list both full HTTPS origins, separated by commas.
+5. Test from the actual frontend domain: Google login, room creation, WebSocket chat, `/panel` login, and chat
+   history download. A real Google login requires the account owner in the browser; unit tests cannot verify
+   Google Cloud configuration.
 
-Rincian deploy frontend ada di [frontend/DEPLOYMENT.md](../../frontend/DEPLOYMENT.md).
+Frontend deployment details are in [frontend/DEPLOYMENT.md](../../frontend/DEPLOYMENT.md).

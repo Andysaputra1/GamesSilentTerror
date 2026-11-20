@@ -1,122 +1,126 @@
-# Migrasi MySQL
+# MySQL Migrations
 
-File ini menjelaskan folder SQL skema database: kapan file di sini dijalankan, isi tiap migrasi, dan cara menambah
-migrasi baru. Perintah menjalankan migrasi di server produksi ada di
-[backend/deployment/README.md](../deployment/README.md#menjalankan-migrasi-di-database-lama).
+This document covers the database schema SQL directory: when these files run, what each migration contains, and
+how to add a new migration. Commands for applying migrations on the production server are in
+[backend/deployment/README.md](../deployment/README.md#applying-migrations-to-an-existing-database).
 
-## Kapan migrasi dijalankan
+## When migrations run
 
-- Folder ini dipakai lokal **dan** Azure. Compose memasangnya ke `/docker-entrypoint-initdb.d`, dan image MySQL
-  menjalankan semua file berurutan **hanya saat volume database dibuat pertama kali**.
-- Database yang sudah berisi data **tidak** menjalankan file baru. Backend juga tidak menjalankan migrasi saat
-  menyala. Backup dulu, lalu jalankan file yang belum tercatat lewat MySQL client atau menu Import phpMyAdmin, sesuai
-  urutan versi. Jangan mengulang semua SQL tanpa memeriksa isi database.
-- Jangan memakai `docker compose down -v` untuk "mengulang migrasi": perintah itu menghapus volume database **dan**
-  model Ollama. `docker compose down` biasa mempertahankan data.
-- Folder ini tidak membuat akun apa pun. Akun dibuat lewat halaman daftar, login Google, menu Manajemen user di panel,
-  atau `scripts/create_user.py`.
+- This directory is used both locally **and** on Azure. Compose mounts it at `/docker-entrypoint-initdb.d`, and
+  the MySQL image runs all files in order **only when the database volume is first initialized**.
+- Databases that already contain data **do not** run new files automatically. The backend does not run migrations
+  on startup either. Back up first, then apply unrecorded files in version order using a MySQL client or the
+  phpMyAdmin Import menu. Do not rerun all SQL without inspecting the database first.
+- Do not use `docker compose down -v` to "rerun migrations": it deletes both the database volume **and** Ollama
+  models. Plain `docker compose down` preserves the data.
+- This directory does not create any accounts. Create accounts through registration, Google login, the panel's
+  Manajemen user (User Management) menu, or `scripts/create_user.py`.
 
-## Daftar migrasi
+## Migration list
 
-Nama file memakai nomor dua digit supaya MySQL menjalankannya berurutan pada volume kosong (tanpa itu `V10` jalan
-sebelum `V1`). Versi yang dicatat di tabel `schema_migrations` ditulis di dalam file dan untuk file lama tanpa nol,
-mis. `V5__chat_history`, supaya cocok dengan database yang sudah ada.
+Filenames use two-digit numbers so MySQL runs them in order on an empty volume (otherwise, `V10` runs before
+`V1`). Versions recorded in `schema_migrations` are defined inside each file. Older files retain version names
+without a leading zero, such as `V5__chat_history`, to match existing databases.
 
-| File | Versi tercatat | Isi |
+| File | Recorded version | Contents |
 | --- | --- | --- |
 | `V01__initial_schema.sql` | `V1__initial_schema` | `schema_migrations`, `game_sessions`, `players`, `chat_messages`, `ai_analyses` |
 | `V02__add_authentication.sql` | `V2__add_authentication` | `user_accounts`, `auth_sessions` |
-| `V04__account_identities.sql` | `V4__account_identities` | `account_identities`: email dan Google `sub` dengan constraint unik dan foreign key akun. Akun lama tetap bisa login dengan username |
-| `V05__chat_history.sql` | `V5__chat_history` | Kolom riwayat di `chat_messages` (`sender_kind`, `match_id`, ronde, fase, …). Pesan lama ditandai `legacy` |
+| `V04__account_identities.sql` | `V4__account_identities` | `account_identities`: email and Google `sub` with unique constraints and an account foreign key. Existing accounts can still log in with a username |
+| `V05__chat_history.sql` | `V5__chat_history` | History columns in `chat_messages` (`sender_kind`, `match_id`, round, phase, …). Older messages are marked `legacy` |
 | `V06__admin_panel.sql` | `V6__admin_panel` | `panel_configuration`, `panel_sessions`, `checker_traces` |
-| `V07__add_skin_preference.sql` | `V7__add_skin_preference` | Kolom `user_accounts.skin_id` (bawaan `dexter`) |
-| `V07__survey_and_npc.sql` | `V7__survey_and_npc` | `survey_questions`, `survey_responses` (satu kiriman per akun per pertandingan, dengan salinan pertanyaan), `match_bots` (metode dan persona tiap bot). Enam pertanyaan awal diisi dengan `INSERT IGNORE` |
-| `V08__fix_role_stalker_enum.sql` | `V8__fix_role_stalker_enum` | Enum role `players` memakai `stalker`, bukan `detective` |
-| `V09__chat_nlu.sql` | `V9__chat_nlu` | Kolom `chat_messages.nlu`: bacaan IndoBERT tiap pesan untuk menu Riwayat chat |
-| `V10__match_participants.sql` | `V10__match_participants` | `match_participants`: peserta manusia tiap pertandingan selesai, untuk survei kapan pun sesudahnya |
-| `V11__survey_player_feedback.sql` | `V11__survey_player_feedback` | Lima pertanyaan survei pengalaman bermain; tidak mengubah struktur tabel |
-| `V12__survey_formal.sql` | `V12__survey_formal` | Survei penelitian versi formal: sebelas pertanyaan lama diganti sepuluh pertanyaan baru, dan pengingat survei hanya untuk pertandingan mulai 13 November 2026; tidak mengubah struktur tabel |
+| `V07__add_skin_preference.sql` | `V7__add_skin_preference` | `user_accounts.skin_id` column (default `dexter`) |
+| `V07__survey_and_npc.sql` | `V7__survey_and_npc` | `survey_questions`, `survey_responses` (one submission per account per match, with a question snapshot), `match_bots` (each bot's method and persona). Six initial questions are inserted with `INSERT IGNORE` |
+| `V08__fix_role_stalker_enum.sql` | `V8__fix_role_stalker_enum` | The role enum in `players` uses `stalker` instead of `detective` |
+| `V09__chat_nlu.sql` | `V9__chat_nlu` | `chat_messages.nlu` column: IndoBERT's interpretation of each message for Riwayat chat (Chat History) |
+| `V10__match_participants.sql` | `V10__match_participants` | `match_participants`: human participants in each completed match, allowing surveys to be submitted at any later time |
+| `V11__survey_player_feedback.sql` | `V11__survey_player_feedback` | Five gameplay experience survey questions; no table structure changes |
+| `V12__survey_formal.sql` | `V12__survey_formal` | Formal research survey: eleven older questions replaced with ten new questions, and survey reminders limited to matches from November 13, 2026 onward; no table structure changes |
 
-Nomor V03 sudah tidak ada: dulu berisi akun demo yang dihapus pada 26 Oktober 2026. Hasil akhirnya 15 tabel,
-termasuk `schema_migrations`. Pemakaian tiap tabel oleh backend ada di
-[backend/deployment/README.md](../deployment/README.md#audit-tabel).
+V03 no longer exists: it previously contained demo accounts removed on October 26, 2026. The resulting schema has
+15 tables, including `schema_migrations`. Backend usage of each table is described in
+[backend/deployment/README.md](../deployment/README.md#table-audit).
 
-`/ready` memeriksa V5, V6, dan migrasi terbaru (V12) lewat daftar `MIGRASI_WAJIB` di
-`app/services/panel_service.py`; versi yang belum tercatat muncul di `migrasi_kurang` dan `/ready` menjawab 503.
-Karena migrasi dijalankan berurutan, migrasi terbaru yang sudah tercatat menandakan file sebelumnya juga sudah jalan.
-Bila satu file di tengah terlewat, `/ready` tetap lolos tetapi fitur yang memakainya gagal: tanpa V07 kolom
-`skin_id` dan tabel survei belum ada (login bisa gagal dengan 503), tanpa V08 peserta Stalker gagal diarsipkan, tanpa
-V09 menu Riwayat chat gagal dimuat, tanpa V10 arsip peserta gagal disimpan sehingga survei sesudah keluar room hanya
-bisa dikirim selama 30 menit dari ingatan backend, dan tanpa V11 pertanyaan survei lama masih tampil.
+`/ready` checks V5, V6, and the latest migration (V12) through `MIGRASI_WAJIB` in
+`app/services/panel_service.py`. Missing versions appear in `migrasi_kurang`, and `/ready` returns 503.
+Because migrations are applied in order, a recorded latest version implies earlier files have also run.
+If an intermediate file was skipped, `/ready` can still pass while the affected feature fails: without V07,
+`skin_id` and survey tables are missing (login may fail with 503); without V08, Stalker participants cannot be
+archived; without V09, Chat History cannot load; without V10, participant archives cannot be saved, so surveys
+after leaving a room can only be submitted for 30 minutes using backend memory; without V11, older survey
+questions remain visible.
 
-### Catatan V11
+### V11 notes
 
-V11 menambah lima pertanyaan: pengalaman bermain, saran/kesan/pesan, kesenangan bersama Bot NPC (1–5), harapan untuk
-Bot NPC, dan kesenangan bermain individu (1–5). Harapan Bot NPC opsional, dengan pilihan `Lebih cepat`,
-`Lebih berempati`, dan `Lainnya`; empat pertanyaan lain wajib. Pada pertanyaan jenis `choice`, opsi bernama `Lainnya`
-membuka isian bebas yang disimpan sebagai `Lainnya: <jawaban>`.
+V11 adds five questions: gameplay experience, suggestions/impressions/comments, enjoyment with NPC bots (1–5),
+expectations for NPC bots, and enjoyment of individual play (1–5). NPC bot expectations are optional, with choices
+`Lebih cepat` (Faster), `Lebih berempati` (More Empathetic), and `Lainnya` (Other); the other four questions are
+required. For `choice` questions, an option named `Lainnya` opens a free-text field, stored as
+`Lainnya: <answer>`.
 
-Kelima pertanyaan masuk paling bawah: posisinya posisi terbesar yang sudah ada ditambah 10, 20, …, 50 (pada database
-baru 70–110), sama seperti pertanyaan baru dari panel. Urutan selanjutnya diatur dari menu Survei di panel (seret ⋮⋮
-atau tombol ▲▼), yang menulis ulang posisi menjadi 10, 20, 30, …. Kode unik pertanyaan mencegah duplikasi bila file
-dijalankan ulang. Pasang versi aplikasi yang mendukung isian `Lainnya` bersama migrasi ini; menyalakan ulang backend
-saja tidak menambahkan pertanyaan.
+All five questions are appended at the bottom: their positions are the largest existing position plus
+10, 20, …, 50 (70–110 on a new database), matching new questions added through the panel. Subsequent ordering is
+managed in Survei (Survey) using the ⋮⋮ drag handle or ▲▼ buttons, which rewrite positions as 10, 20, 30, ….
+Unique question codes prevent duplicates if the file is rerun. Deploy an application version that supports
+`Lainnya` free-text answers together with this migration; restarting the backend alone does not add questions.
 
-### Catatan V12
+### V12 notes
 
-V12 mengganti pertanyaan V07 dan V11 dengan sepuluh pertanyaan formal untuk penelitian. Delapan di antaranya adalah
-pernyataan berskala 1–5 (`Sangat tidak setuju` sampai `Sangat setuju`), dan setiap pernyataan mengukur satu bagian bot:
+V12 replaces the V07 and V11 questions with ten formal research questions. Eight are statements rated on a
+1–5 scale (`Sangat tidak setuju` = Strongly Disagree through `Sangat setuju` = Strongly Agree), each measuring
+one aspect of the bots. The statements below are English translations of the Indonesian survey text:
 
-| Kode | Pernyataan | Yang diukur |
+| Code | Statement | Measures |
 | --- | --- | --- |
-| `kesenangan_bermain` | Bermain Silent Terror bersama Bot NPC merupakan pengalaman yang menyenangkan. | Pengalaman bermain |
-| `kemiripan_manusia` | Bot NPC berperilaku layaknya pemain manusia. | Kemiripan dengan manusia |
-| `pemahaman_pesan` | Bot NPC memahami maksud pesan yang saya kirimkan dalam diskusi. | NLU (IndoBERT) |
-| `kewajaran_bahasa` | Pesan yang ditulis Bot NPC menggunakan bahasa yang wajar dan sesuai dengan alur diskusi. | NLG |
-| `ketepatan_keputusan` | Tuduhan, pembelaan, dan pilihan vote Bot NPC masuk akal berdasarkan kejadian dalam permainan. | Fuzzy |
-| `kesesuaian_peran` | Tindakan Bot NPC sesuai dengan peran yang dimainkannya. | Fuzzy per role |
-| `tingkat_tantangan` | Bot NPC memberikan tantangan yang sepadan, baik sebagai lawan maupun sebagai rekan satu tim. | Keseimbangan |
-| `kecepatan_respons` | Bot NPC menanggapi pesan dan kejadian dalam permainan dengan cukup cepat. | Waktu tanggap |
+| `kesenangan_bermain` | Playing Silent Terror with NPC bots is an enjoyable experience. | Gameplay experience |
+| `kemiripan_manusia` | NPC bots behave like human players. | Similarity to humans |
+| `pemahaman_pesan` | NPC bots understand the meaning of the messages I send during discussions. | NLU (IndoBERT) |
+| `kewajaran_bahasa` | NPC bot messages use natural language that fits the discussion. | NLG |
+| `ketepatan_keputusan` | NPC bots' accusations, defenses, and voting choices make sense given the events in the game. | Fuzzy logic |
+| `kesesuaian_peran` | NPC bots' actions are consistent with their assigned roles. | Fuzzy logic by role |
+| `tingkat_tantangan` | NPC bots provide an appropriate level of challenge, both as opponents and as teammates. | Balance |
+| `kecepatan_respons` | NPC bots respond to messages and game events quickly enough. | Response time |
 
-Dua pertanyaan lainnya opsional. `aspek_perbaikan` adalah pilihan ganda tentang aspek bot yang paling perlu
-ditingkatkan, dengan opsi `Lainnya` untuk isian bebas. `saran_masukan` adalah isian bebas untuk kesan, saran, atau
-masukan.
+The other two questions are optional. `aspek_perbaikan` is a multiple-choice question about the bot aspect most
+in need of improvement, with a `Lainnya` (Other) option for free text. `saran_masukan` is a free-text field for
+impressions, suggestions, or feedback.
 
-Pertanyaan lama yang belum punya jawaban dihapus. Yang sudah punya jawaban hanya dinonaktifkan, karena foreign key
-`survey_responses` menjaga jawaban itu tetap utuh. Jawaban lama bisa dibersihkan lewat menu Survei di panel.
+Older questions with no answers are deleted. Those with answers are only deactivated because the
+`survey_responses` foreign key preserves those answers. Older responses can be cleared through the Survei menu.
 
-V12 juga menghapus arsip `match_participants` untuk pertandingan yang selesai sebelum 13 November 2026 pukul 00.00 WIB.
-Tabel itu hanya dipakai survei, jadi pengingat di Main dan pengiriman survei hanya berlaku untuk pertandingan mulai
-hari itu. Ambil cadangan database sebelum menjalankan V12 di server.
+V12 also deletes `match_participants` archives for matches completed before November 13, 2026 at 00:00 WIB
+(Western Indonesian Time). That table is used only for surveys, so Main page reminders and survey submissions
+apply only to matches from that day onward. Back up the database before running V12 on the server.
 
-## Menjalankan ulang migrasi lama
+## Rerunning older migrations
 
-File migrasi lama tidak diubah sesudah dijalankan di produksi, jadi menjalankannya ulang tidak selalu aman:
+Older migration files are not changed after being applied in production, so rerunning them is not always safe:
 
-- **V07 (`V07__survey_and_npc.sql`) dan V11 jangan dijalankan ulang sesudah V12.** Keduanya mengisi pertanyaan survei
-  lama dengan `INSERT IGNORE`. V12 sudah menghapus pertanyaan lama yang belum berjawab, sehingga menjalankan ulang V07
-  atau V11 memasukkannya lagi sebagai pertanyaan aktif di samping pertanyaan formal V12.
-- **V05 sampai V09 tidak dirancang untuk dijalankan dua kali.** `ADD COLUMN`, `ADD CONSTRAINT`, dan `INSERT` penanda
-  versi tanpa `IGNORE` berhenti dengan error karena kolom, constraint, atau versinya sudah ada. Error itu sendiri
-  tidak merusak data, tetapi jangan memaksanya lewat `mysql --force`, karena perintah sesudah error tetap dijalankan.
+- **Do not rerun V07 (`V07__survey_and_npc.sql`) or V11 after V12.** Both insert older survey questions with
+  `INSERT IGNORE`. V12 deletes unanswered older questions, so rerunning V07 or V11 restores them as active
+  questions alongside the formal V12 questions.
+- **V05 through V09 are not designed to run twice.** `ADD COLUMN`, `ADD CONSTRAINT`, and version-marker
+  `INSERT` statements without `IGNORE` stop with an error because the column, constraint, or version already
+  exists. The error itself does not damage data, but do not force execution with `mysql --force`, which continues
+  running statements after the error.
 
-## Menambah migrasi
+## Adding a migration
 
-1. Buat file dengan nomor dua digit berikutnya. Nomor terakhir sekarang V12, jadi file berikutnya mis.
-   `V13__nama_singkat.sql`.
-2. Utamakan perubahan yang hanya menambah (`CREATE TABLE IF NOT EXISTS`, `ADD COLUMN`, `INSERT IGNORE`). Bila
-   migrasi memang harus menghapus atau menonaktifkan data, seperti V12, tulis alasannya di komentar awal file dan di
-   catatan migrasi di bawah tabel, lalu ingatkan bahwa database harus di-backup dulu.
-3. Akhiri dengan `INSERT IGNORE INTO schema_migrations (version) VALUES ('V13__nama_singkat');`.
-4. Uji pada database kosong (volume baru) dan pada salinan database lama.
-5. Catat file baru di tabel di atas, dan tambahkan perintahnya ke tabel migrasi di
-   [backend/deployment/README.md](../deployment/README.md#menjalankan-migrasi-di-database-lama).
-6. Ganti migrasi terbaru di `MIGRASI_WAJIB` (`app/services/panel_service.py`) dengan versi baru, supaya `/ready` baru
-   lolos sesudah migrasi itu dijalankan. Tes `test_required_migrations_include_latest_file` gagal bila langkah ini
-   terlupa.
-7. Ingatkan bahwa database lokal dan produksi yang sudah berisi harus menjalankan file ini secara manual. Di Azure,
-   jalankan sesudah [backup `mysqldump`](../deployment/README.md#backup-database) dan sebelum backend versi baru
-   menyala; tanpa itu `/ready` menjawab 503 dan container backend tercatat tidak sehat.
+1. Create a file with the next two-digit number. The current latest version is V12, so the next file could be
+   `V13__short_name.sql`.
+2. Prefer additive changes (`CREATE TABLE IF NOT EXISTS`, `ADD COLUMN`, `INSERT IGNORE`). If a migration must
+   delete or deactivate data, as V12 does, explain why in the file's opening comments and the migration notes
+   below the table, and remind readers to back up the database first.
+3. End with `INSERT IGNORE INTO schema_migrations (version) VALUES ('V13__short_name');`.
+4. Test on an empty database (new volume) and a copy of an existing database.
+5. Add the file to the table above and its command to the migration table in
+   [backend/deployment/README.md](../deployment/README.md#applying-migrations-to-an-existing-database).
+6. Replace the latest migration in `MIGRASI_WAJIB` (`app/services/panel_service.py`) with the new version so
+   `/ready` passes only after that migration is applied. The `test_required_migrations_include_latest_file` test
+   fails if this step is missed.
+7. Remind users that existing local and production databases must apply the file manually. On Azure, run it after
+   the [`mysqldump` backup](../deployment/README.md#database-backups) and before starting the new backend version;
+   otherwise, `/ready` returns 503 and the backend container is marked unhealthy.
 
-`ALTER TABLE` di MySQL tidak bisa dibatalkan bersama `INSERT` penanda migrasi. Bila SQL gagal di tengah, periksa
-struktur kolom sebelum mengulang.
+MySQL `ALTER TABLE` cannot be rolled back together with the migration-marker `INSERT`. If SQL fails partway
+through, inspect the column structure before rerunning it.
